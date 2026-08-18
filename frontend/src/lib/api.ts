@@ -172,6 +172,24 @@ class ApiClient {
     );
   }
 
+  async getPlacements(adAccountId: string) {
+    return this.request<any[]>(
+      `/ads/placements?ad_account_id=${adAccountId}`
+    );
+  }
+
+  async getDemographics(adAccountId: string) {
+    return this.request<any[]>(
+      `/ads/demographics?ad_account_id=${adAccountId}`
+    );
+  }
+
+  async getAudiences(adAccountId: string) {
+    return this.request<any[]>(
+      `/ads/audiences?ad_account_id=${adAccountId}`
+    );
+  }
+
   async getSyncStatus() {
     return this.request<{ last_sync_at?: string; last_sync_status?: string; last_sync_error?: string }>(
       "/meta/sync/status"
