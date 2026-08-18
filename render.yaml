@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: digital-growth-studio-api
+    env: python
+    region: singapore
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: SECRET_KEY
+        value: digital_growth_studio_super_secret_key_2026
+      - key: ALLOWED_ORIGINS
+        value: https://digitalgrowthstudio.in,https://www.digitalgrowthstudio.in,https://digital-growth-studio.web.app,https://digital-growth-studio-api.onrender.com
