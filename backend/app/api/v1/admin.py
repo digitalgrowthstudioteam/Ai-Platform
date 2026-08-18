@@ -17,6 +17,8 @@ from app.models.meta import MetaAdAccount, MetaConnection
 from app.models.subscription import Subscription
 from app.models.ticket import SupportTicket
 from app.models.notification import Notification
+from app.models.campaign import Campaign
+from app.models.subscription_addon import SubscriptionAddOn
 
 logger = structlog.get_logger()
 router = APIRouter(prefix="/admin", tags=["Admin Control Panel"])
@@ -35,6 +37,8 @@ class PlatformStatsResponse(BaseModel):
     connected_ad_accounts: int
     active_connections: int
     plan_distribution: List[PlanCount]
+    total_campaigns: int
+    total_addons_active: int
 
 
 class AdminUserItem(BaseModel):
@@ -101,7 +105,17 @@ async def get_platform_stats(
     res_conns = await db.execute(stmt_conns)
     active_conns = res_conns.scalar_one()
 
-    # 4. Plan Distribution
+    # 4. Total Campaigns
+    stmt_camps = select(func.count(Campaign.id))
+    res_camps = await db.execute(stmt_camps)
+    total_camps = res_camps.scalar_one()
+
+    # 5. Total Active Addons
+    stmt_addons = select(func.count(SubscriptionAddOn.id)).where(SubscriptionAddOn.status == "active")
+    res_addons = await db.execute(stmt_addons)
+    total_addons = res_addons.scalar_one()
+
+    # 6. Plan Distribution
     stmt_plans = select(User.plan_id, func.count(User.id)).group_by(User.plan_id)
     res_plans = await db.execute(stmt_plans)
     plans_rows = res_plans.all()
@@ -115,6 +129,8 @@ async def get_platform_stats(
         connected_ad_accounts=total_accs,
         active_connections=active_conns,
         plan_distribution=plan_counts,
+        total_campaigns=total_camps,
+        total_addons_active=total_addons,
     )
 
 
@@ -390,3 +406,121 @@ async def reply_to_ticket(
 
     logger.info("admin_ticket_replied_success", ticket_id=ticket_id, status=req.status)
     return {"status": "success", "message": f"Successfully replied and marked ticket as {req.status}."}
+
+
+@router.get("/users/{user_id}/details", summary="Get complete user details")
+async def get_user_details(
+    user_id: uuid.UUID,
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Returns complete user profile details, active subscriptions, Meta connections, Meta ad accounts,
+    tracked campaigns, active add-ons, and raised support tickets.
+    """
+    verify_admin(claims)
+
+    # 1. Fetch User profile
+    stmt_user = select(User).where(User.id == user_id)
+    res_user = await db.execute(stmt_user)
+    user = res_user.scalar_one_or_none()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User profile not found."
+        )
+
+    # 2. Fetch Meta connections
+    stmt_conns = select(MetaConnection).where(MetaConnection.user_id == user_id)
+    res_conns = await db.execute(stmt_conns)
+    connections = res_conns.scalars().all()
+
+    # 3. Fetch Meta ad accounts
+    stmt_accs = select(MetaAdAccount).where(MetaAdAccount.user_id == user_id)
+    res_accs = await db.execute(stmt_accs)
+    ad_accounts = res_accs.scalars().all()
+
+    # 4. Fetch Active Add-ons
+    stmt_addons = select(SubscriptionAddOn).where(SubscriptionAddOn.user_id == user_id).where(SubscriptionAddOn.status == "active")
+    res_addons = await db.execute(stmt_addons)
+    addons = res_addons.scalars().all()
+
+    # 5. Fetch Support tickets
+    stmt_tickets = select(SupportTicket).where(SupportTicket.user_id == user_id).order_by(SupportTicket.created_at.desc())
+    res_tickets = await db.execute(stmt_tickets)
+    tickets = res_tickets.scalars().all()
+
+    # 6. Fetch Campaigns for connected ad accounts
+    campaigns = []
+    if ad_accounts:
+        acc_ids = [acc.id for acc in ad_accounts]
+        stmt_camps = select(Campaign).where(Campaign.ad_account_id.in_(acc_ids))
+        res_camps = await db.execute(stmt_camps)
+        campaigns = res_camps.scalars().all()
+
+    return {
+        "user": {
+            "id": user.id,
+            "email": user.email,
+            "name": user.name,
+            "plan_id": user.plan_id or "starter",
+            "status": user.status,
+            "created_at": user.created_at,
+            "deletion_scheduled_at": user.deletion_scheduled_at,
+        },
+        "connections": [
+            {
+                "id": conn.id,
+                "meta_user_id": conn.meta_user_id,
+                "status": conn.status,
+                "last_sync_at": conn.last_sync_at,
+                "last_sync_status": conn.last_sync_status,
+                "last_sync_error": conn.last_sync_error,
+            }
+            for conn in connections
+        ],
+        "ad_accounts": [
+            {
+                "id": acc.id,
+                "meta_account_id": acc.meta_account_id,
+                "account_name": acc.account_name,
+                "currency": acc.currency,
+                "timezone": acc.timezone,
+                "account_status": acc.account_status,
+                "industry": acc.industry,
+            }
+            for acc in ad_accounts
+        ],
+        "addons": [
+            {
+                "id": add.id,
+                "addon_id": add.addon_id,
+                "quantity": add.quantity,
+                "status": add.status,
+                "expires_at": add.expires_at,
+            }
+            for add in addons
+        ],
+        "tickets": [
+            {
+                "id": tick.id,
+                "subject": tick.subject,
+                "description": tick.description,
+                "category": tick.category,
+                "status": tick.status,
+                "admin_reply": tick.admin_reply,
+                "created_at": tick.created_at,
+            }
+            for tick in tickets
+        ],
+        "campaigns": [
+            {
+                "id": camp.id,
+                "name": camp.name,
+                "objective": camp.objective,
+                "status": camp.status,
+                "daily_budget": float(camp.daily_budget) if camp.daily_budget is not None else None,
+            }
+            for camp in campaigns
+        ]
+    }

@@ -116,6 +116,10 @@ class MetaAdAccount(BaseModel):
         nullable=False,
         default=1,  # 1 = ACTIVE, 2 = DISABLED, etc.
     )
+    industry: Mapped[Optional[str]] = mapped_column(
+        String(100),
+        nullable=True,
+    )
 
     # Relationships
     user: Mapped["User"] = relationship(

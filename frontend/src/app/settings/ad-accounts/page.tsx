@@ -12,12 +12,14 @@ interface AdAccount {
   timezone: string;
   account_status: number;
   is_connected: boolean;
+  industry?: string | null;
 }
 
 export default function AdAccountsPage() {
   const [connected, setConnected] = useState(false);
   const [metaUserName, setMetaUserName] = useState<string | null>(null);
   const [accounts, setAccounts] = useState<AdAccount[]>([]);
+  const [industries, setIndustries] = useState<Record<string, string>>({});
   
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -45,6 +47,15 @@ export default function AdAccountsPage() {
         // Set initially connected accounts
         const connectedIds = accountsRes.filter(a => a.is_connected).map(a => a.id);
         setSelectedAccounts(connectedIds);
+
+        // Map initial industries
+        const initialIndustries: Record<string, string> = {};
+        accountsRes.forEach(a => {
+          if (a.is_connected && a.industry) {
+            initialIndustries[a.id] = a.industry;
+          }
+        });
+        setIndustries(initialIndustries);
       }
     } catch (err: any) {
       console.error("Failed to load connection status:", err);
@@ -114,7 +125,15 @@ export default function AdAccountsPage() {
       setError(null);
       setSuccess(null);
       
-      await api.selectMetaAccounts(selectedAccounts);
+      // Verify mandatory industry selections
+      for (const accId of selectedAccounts) {
+        if (!industries[accId] || industries[accId] === "") {
+          const acc = accounts.find(a => a.id === accId);
+          throw new Error(`Industry vertical selection is mandatory for: ${acc?.name || accId}`);
+        }
+      }
+      
+      await api.selectMetaAccounts(selectedAccounts, industries);
       setSuccess("Ad account preferences saved successfully.");
       await checkStatus(); // Reload list
     } catch (err: any) {
@@ -263,19 +282,19 @@ export default function AdAccountsPage() {
                     <div 
                       key={acc.id} 
                       onClick={() => isActive && toggleAccount(acc.id)}
-                      className={`p-4 flex items-center justify-between transition cursor-pointer hover:bg-slate-50 ${
+                      className={`p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition cursor-pointer hover:bg-slate-50 ${
                         !isActive ? "opacity-60 cursor-not-allowed bg-slate-50/50" : ""
                       }`}
                     >
-                      <div className="flex items-center gap-3">
-                        <div className="text-primary shrink-0">
+                      <div className="flex items-start gap-3">
+                        <div className="text-primary shrink-0 mt-0.5">
                           {isChecked ? (
                             <CheckSquare size={20} className="fill-blue-50 text-blue-600" />
                           ) : (
                             <Square size={20} className="text-slate-400" />
                           )}
                         </div>
-                        <div>
+                        <div className="space-y-1">
                           <div className="font-bold text-sm text-slate-800 flex items-center gap-2">
                             {acc.name}
                             {!isActive && (
@@ -284,9 +303,41 @@ export default function AdAccountsPage() {
                               </span>
                             )}
                           </div>
-                          <div className="text-xs text-subtle font-medium mt-0.5">
+                          <div className="text-xs text-slate-400 font-medium">
                             ID: {acc.id} &bull; {acc.currency} ({acc.timezone})
                           </div>
+                          
+                          {isChecked && (
+                            <div className="pt-2 flex flex-col gap-1" onClick={(e) => e.stopPropagation()}>
+                              <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                                Industry Vertical (Mandatory)
+                              </label>
+                              <select
+                                value={industries[acc.id] || ""}
+                                onChange={(e) => {
+                                  setIndustries(prev => ({
+                                    ...prev,
+                                    [acc.id]: e.target.value
+                                  }));
+                                }}
+                                className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-xs font-bold text-slate-700 outline-none cursor-pointer w-48"
+                              >
+                                <option value="">-- Select Industry --</option>
+                                <option value="E-commerce">E-commerce</option>
+                                <option value="SaaS">SaaS / Software</option>
+                                <option value="Real Estate">Real Estate</option>
+                                <option value="Healthcare">Healthcare & Medical</option>
+                                <option value="Education">Education & Learning</option>
+                                <option value="Retail">Retail & Fashion</option>
+                                <option value="Entertainment">Entertainment & Media</option>
+                                <option value="Agency">Agency & Consulting</option>
+                                <option value="Financial Services">Financial Services</option>
+                                <option value="Travel">Travel & Hospitality</option>
+                                <option value="Local Business">Local Business</option>
+                                <option value="Other">Other</option>
+                              </select>
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -294,7 +345,7 @@ export default function AdAccountsPage() {
                         {isChecked ? (
                           <span className="text-green-600 bg-green-50 px-2 py-1 rounded">Active Pipeline</span>
                         ) : (
-                          <span className="text-subtle bg-slate-100 px-2 py-1 rounded">Inactive</span>
+                          <span className="text-slate-400 bg-slate-100 px-2 py-1 rounded">Inactive</span>
                         )}
                       </div>
                     </div>

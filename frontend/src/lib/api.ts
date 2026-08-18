@@ -117,13 +117,14 @@ class ApiClient {
       timezone: string;
       account_status: number;
       is_connected: boolean;
+      industry?: string | null;
     }>>("/meta/accounts");
   }
 
-  async selectMetaAccounts(accountIds: string[]) {
+  async selectMetaAccounts(accountIds: string[], industries?: Record<string, string>) {
     return this.request<{ status: string; message: string }>("/meta/accounts/select", {
       method: "POST",
-      body: { account_ids: accountIds },
+      body: { account_ids: accountIds, industries: industries },
     });
   }
 
@@ -267,6 +268,8 @@ class ApiClient {
       connected_ad_accounts: number;
       active_connections: number;
       plan_distribution: Array<{ plan: string; count: number }>;
+      total_campaigns: number;
+      total_addons_active: number;
     }>("/admin/stats");
   }
 
@@ -286,6 +289,10 @@ class ApiClient {
       method: "POST",
       body: { status: status },
     });
+  }
+
+  async getAdminUserDetails(userId: string) {
+    return this.request<any>(`/admin/users/${userId}/details`);
   }
 
   // Team Endpoints

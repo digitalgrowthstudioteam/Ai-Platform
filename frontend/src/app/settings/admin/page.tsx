@@ -10,24 +10,35 @@ import {
   Database,
   RefreshCw,
   Loader2,
-  Trash2,
   Lock,
   UserCheck,
   Award,
   MessageSquare,
   Send,
   CheckCircle,
+  BarChart3,
+  Megaphone,
+  CreditCard,
+  Calendar,
+  AlertTriangle,
+  Mail,
+  User as UserIcon,
 } from "lucide-react";
 
 export default function AdminPage() {
   const { user, loading: loadingAuth } = useAuth();
   const router = useRouter();
 
-  const [activeTab, setActiveTab] = useState<"users" | "tickets">("users");
+  const [activeTab, setActiveTab] = useState<"overview" | "users" | "tickets">("overview");
   const [stats, setStats] = useState<any>(null);
   const [usersList, setUsersList] = useState<any[]>([]);
   const [ticketsList, setTicketsList] = useState<any[]>([]);
   
+  // Selected user for details lookup
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [userDetails, setUserDetails] = useState<any>(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
+
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   
@@ -73,6 +84,30 @@ export default function AdminPage() {
     }
   }, [user, loadingAuth]);
 
+  // Load selected user details
+  useEffect(() => {
+    async function fetchDetails() {
+      if (!selectedUserId) {
+        setUserDetails(null);
+        return;
+      }
+      try {
+        setLoadingDetails(true);
+        const details = await api.getAdminUserDetails(selectedUserId);
+        setUserDetails(details);
+      } catch (err) {
+        console.error("Failed to fetch user details:", err);
+        setNotification({
+          type: "error",
+          message: "Failed to fetch complete details for selected user.",
+        });
+      } finally {
+        setLoadingDetails(false);
+      }
+    }
+    fetchDetails();
+  }, [selectedUserId]);
+
   const handlePlanOverride = async (targetUserId: string, newPlanId: string) => {
     try {
       setActionLoading(targetUserId);
@@ -86,6 +121,10 @@ export default function AdminPage() {
       setUsersList(updatedUsers);
       const updatedStats = await api.getAdminStats();
       setStats(updatedStats);
+      if (selectedUserId === targetUserId) {
+        const details = await api.getAdminUserDetails(targetUserId);
+        setUserDetails(details);
+      }
     } catch (err) {
       console.error("Failed to override plan:", err);
       setNotification({ type: "error", message: "Failed to override plan setting." });
@@ -106,6 +145,10 @@ export default function AdminPage() {
       // Refresh
       const updatedUsers = await api.getAdminUsers();
       setUsersList(updatedUsers);
+      if (selectedUserId === targetUserId) {
+        const details = await api.getAdminUserDetails(targetUserId);
+        setUserDetails(details);
+      }
     } catch (err) {
       console.error("Failed to override status:", err);
       setNotification({ type: "error", message: "Failed to override status flag." });
@@ -173,7 +216,7 @@ export default function AdminPage() {
         <div>
           <h1 className="page-title text-2xl font-bold text-slate-800">Admin Control Panel</h1>
           <p className="page-subtitle text-sm text-slate-500 mt-1">
-            Global SaaS configuration logs, subscription overrides, and support tickets
+            Global SaaS configuration logs, user detail lookups, subscription overrides, and support tickets
           </p>
         </div>
       </div>
@@ -190,50 +233,23 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* Admin Stats Grid */}
-      {stats && (
-        <div className="kpi-grid grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white border border-slate-150 rounded-2xl p-5 flex items-center gap-4 shadow-xs">
-            <div className="bg-blue-50 text-blue-600 p-3 rounded-xl flex items-center justify-center shrink-0">
-              <Users size={20} />
-            </div>
-            <div>
-              <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider block">Total Users</span>
-              <span className="text-2xl font-extrabold text-slate-900 mt-1 block">{stats.total_users}</span>
-            </div>
-          </div>
-
-          <div className="bg-white border border-slate-150 rounded-2xl p-5 flex items-center gap-4 shadow-xs">
-            <div className="bg-emerald-50 text-emerald-600 p-3 rounded-xl flex items-center justify-center shrink-0">
-              <Database size={20} />
-            </div>
-            <div>
-              <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider block">Connected Pipelines</span>
-              <span className="text-2xl font-extrabold text-slate-900 mt-1 block">{stats.connected_ad_accounts}</span>
-            </div>
-          </div>
-
-          <div className="bg-white border border-slate-150 rounded-2xl p-5 flex items-center gap-4 shadow-xs">
-            <div className="bg-purple-50 text-purple-600 p-3 rounded-xl flex items-center justify-center shrink-0">
-              <RefreshCw size={20} />
-            </div>
-            <div>
-              <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider block">Active Sync Logs</span>
-              <span className="text-2xl font-extrabold text-slate-900 mt-1 block">{stats.active_connections}</span>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Navigation Tabs */}
       <div className="flex border-b border-slate-150 gap-4">
+        <button
+          onClick={() => setActiveTab("overview")}
+          className={`pb-2.5 text-xs font-bold transition-all border-b-2 px-1 ${
+            activeTab === "overview" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-400"
+          }`}
+        >
+          Super Admin Dashboard
+        </button>
         <button
           onClick={() => setActiveTab("users")}
           className={`pb-2.5 text-xs font-bold transition-all border-b-2 px-1 ${
             activeTab === "users" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-400"
           }`}
         >
-          Users Management
+          Users Management & Lookup
         </button>
         <button
           onClick={() => setActiveTab("tickets")}
@@ -250,74 +266,363 @@ export default function AdminPage() {
         </button>
       </div>
 
-      {/* TAB CONTENT: Users Management */}
+      {/* TAB CONTENT: Super Admin Dashboard */}
+      {activeTab === "overview" && stats && (
+        <div className="space-y-6">
+          {/* Admin Stats Grid */}
+          <div className="kpi-grid grid grid-cols-1 md:grid-cols-5 gap-4">
+            <div className="bg-white border border-slate-150 rounded-2xl p-5 flex items-center gap-4 shadow-xs">
+              <div className="bg-blue-50 text-blue-600 p-3 rounded-xl flex items-center justify-center shrink-0">
+                <Users size={20} />
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider block">Total Users</span>
+                <span className="text-2xl font-extrabold text-slate-900 mt-1 block">{stats.total_users}</span>
+              </div>
+            </div>
+
+            <div className="bg-white border border-slate-150 rounded-2xl p-5 flex items-center gap-4 shadow-xs">
+              <div className="bg-emerald-50 text-emerald-600 p-3 rounded-xl flex items-center justify-center shrink-0">
+                <Database size={20} />
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider block">Connected Pipelines</span>
+                <span className="text-2xl font-extrabold text-slate-900 mt-1 block">{stats.connected_ad_accounts}</span>
+              </div>
+            </div>
+
+            <div className="bg-white border border-slate-150 rounded-2xl p-5 flex items-center gap-4 shadow-xs">
+              <div className="bg-purple-50 text-purple-600 p-3 rounded-xl flex items-center justify-center shrink-0">
+                <RefreshCw size={20} />
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider block">Active Sync Logs</span>
+                <span className="text-2xl font-extrabold text-slate-900 mt-1 block">{stats.active_connections}</span>
+              </div>
+            </div>
+
+            {/* NEW Campaign tracking metric */}
+            <div className="bg-white border border-slate-150 rounded-2xl p-5 flex items-center gap-4 shadow-xs">
+              <div className="bg-orange-50 text-orange-600 p-3 rounded-xl flex items-center justify-center shrink-0">
+                <Megaphone size={20} />
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider block">Tracked Campaigns</span>
+                <span className="text-2xl font-extrabold text-slate-900 mt-1 block">{stats.total_campaigns}</span>
+              </div>
+            </div>
+
+            {/* NEW Active Add-ons metric */}
+            <div className="bg-white border border-slate-150 rounded-2xl p-5 flex items-center gap-4 shadow-xs">
+              <div className="bg-pink-50 text-pink-600 p-3 rounded-xl flex items-center justify-center shrink-0">
+                <CreditCard size={20} />
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider block">Active Addons</span>
+                <span className="text-2xl font-extrabold text-slate-900 mt-1 block">{stats.total_addons_active}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Plan Distribution and Quick Summary */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-white border border-slate-150 rounded-2xl p-6 shadow-xs md:col-span-2">
+              <h3 className="text-sm font-bold text-slate-900 mb-4 pb-3 border-b border-slate-100 flex items-center gap-1.5">
+                <Award size={16} className="text-blue-600" /> Plan Distribution
+              </h3>
+              
+              <div className="space-y-4">
+                {stats.plan_distribution.map((p: any) => {
+                  const percent = stats.total_users > 0 ? (p.count / stats.total_users) * 100 : 0;
+                  
+                  return (
+                    <div key={p.plan} className="space-y-2">
+                      <div className="flex justify-between text-xs font-bold text-slate-700">
+                        <span className="capitalize">{p.plan.replace("_", " ")}</span>
+                        <span>{p.count} users ({percent.toFixed(0)}%)</span>
+                      </div>
+                      <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                        <div 
+                          className="bg-blue-600 h-full rounded-full transition-all duration-500" 
+                          style={{ width: `${percent}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="bg-white border border-slate-150 rounded-2xl p-6 shadow-xs space-y-4">
+              <h3 className="text-sm font-bold text-slate-900 pb-3 border-b border-slate-100 flex items-center gap-1.5">
+                <BarChart3 size={16} className="text-blue-600" /> Quick Stats Overview
+              </h3>
+              <div className="text-xs space-y-3.5">
+                <div className="flex justify-between text-slate-500">
+                  <span>Joined Users:</span>
+                  <span className="font-bold text-slate-800">{stats.total_users}</span>
+                </div>
+                <div className="flex justify-between text-slate-500">
+                  <span>Connected Meta profiles:</span>
+                  <span className="font-bold text-slate-800">{stats.active_connections}</span>
+                </div>
+                <div className="flex justify-between text-slate-500">
+                  <span>Active Addon Subscriptions:</span>
+                  <span className="font-bold text-slate-800">{stats.total_addons_active}</span>
+                </div>
+                <div className="flex justify-between text-slate-500">
+                  <span>Active Ad Accounts:</span>
+                  <span className="font-bold text-slate-800">{stats.connected_ad_accounts}</span>
+                </div>
+                <div className="flex justify-between text-slate-500">
+                  <span>Tracked Campaigns:</span>
+                  <span className="font-bold text-slate-800">{stats.total_campaigns}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB CONTENT: Users Management & Lookup */}
       {activeTab === "users" && (
-        <div className="bg-white border border-slate-150 shadow-xs rounded-2xl overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs text-left divide-y divide-slate-100">
-              <thead className="bg-slate-50/50">
-                <tr className="text-slate-400 font-bold uppercase tracking-wider border-b border-slate-100">
-                  <th className="p-4">User</th>
-                  <th className="p-4 text-center">Connected Accounts</th>
-                  <th className="p-4">Active Plan</th>
-                  <th className="p-4">Sync Status</th>
-                  <th className="p-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-                {usersList.map((usr) => (
-                  <tr key={usr.id} className="hover:bg-slate-50 transition">
-                    <td className="p-4">
-                      <div className="font-bold text-sm text-slate-800">{usr.name || "DG User"}</div>
-                      <div className="text-slate-400 font-bold truncate max-w-sm mt-0.5">{usr.email}</div>
-                    </td>
-                    <td className="p-4 text-center text-sm font-semibold">{usr.connected_accounts_count}</td>
-                    <td className="p-4">
-                      <select
-                        disabled={actionLoading === usr.id}
-                        value={usr.plan_id}
-                        onChange={(e) => handlePlanOverride(usr.id, e.target.value)}
-                        className="bg-slate-100 border border-slate-200 rounded-xl px-2.5 py-1 text-slate-800 font-bold outline-none cursor-pointer"
-                      >
-                        <option value="starter">Pro Early Access</option>
-                        <option value="growth">Growth</option>
-                        <option value="scale">Scale</option>
-                      </select>
-                    </td>
-                    <td className="p-4">
-                      {usr.last_sync_status ? (
-                        <span className={`px-2 py-0.5 rounded font-bold uppercase text-[9px] ${
-                          usr.last_sync_status === "success" ? "text-green-700 bg-green-50" : "text-red-700 bg-red-50"
-                        }`}>
-                          {usr.last_sync_status}
-                        </span>
-                      ) : (
-                        <span className="text-slate-400">None</span>
-                      )}
-                    </td>
-                    <td className="p-4 text-right">
-                      <button
-                        disabled={actionLoading === usr.id}
-                        onClick={() => handleStatusOverride(usr.id, usr.status)}
-                        className={`btn font-bold text-xs py-1.5 px-3 rounded-xl border transition ${
-                          usr.status === "active"
-                            ? "bg-red-50 text-red-600 border-red-200 hover:bg-red-100"
-                            : "bg-green-50 text-green-600 border-green-200 hover:bg-green-100"
-                        }`}
-                      >
-                        {actionLoading === usr.id ? (
-                          <Loader2 size={12} className="animate-spin inline" />
-                        ) : usr.status === "active" ? (
-                          "Suspend"
-                        ) : (
-                          "Reactivate"
-                        )}
-                      </button>
-                    </td>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* User list table */}
+          <div className="lg:col-span-2 bg-white border border-slate-150 shadow-xs rounded-2xl overflow-hidden self-start">
+            <div className="p-4 border-b border-slate-100">
+              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Registered Users Directory</h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left divide-y divide-slate-100">
+                <thead className="bg-slate-50/50">
+                  <tr className="text-slate-400 font-bold uppercase tracking-wider border-b border-slate-100">
+                    <th className="p-4">User</th>
+                    <th className="p-4 text-center">Connected Accounts</th>
+                    <th className="p-4">Active Plan</th>
+                    <th className="p-4">Status</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                  {usersList.map((usr) => (
+                    <tr 
+                      key={usr.id} 
+                      onClick={() => setSelectedUserId(usr.id)}
+                      className={`hover:bg-slate-50 transition cursor-pointer ${
+                        selectedUserId === usr.id ? "bg-blue-50/20" : ""
+                      }`}
+                    >
+                      <td className="p-4">
+                        <div className="font-bold text-sm text-slate-800">{usr.name || "DG User"}</div>
+                        <div className="text-slate-400 font-bold truncate max-w-sm mt-0.5">{usr.email}</div>
+                      </td>
+                      <td className="p-4 text-center text-sm font-semibold">{usr.connected_accounts_count}</td>
+                      <td className="p-4 capitalize">{usr.plan_id.replace("_", " ")}</td>
+                      <td className="p-4">
+                        <span className={`px-2 py-0.5 rounded font-bold uppercase text-[9px] ${
+                          usr.status === "active" ? "text-green-700 bg-green-50" : "text-rose-700 bg-rose-50"
+                        }`}>
+                          {usr.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* User Details Lookup View Panel */}
+          <div className="bg-white border border-slate-150 rounded-2xl p-6 shadow-xs space-y-4 self-start min-h-[400px]">
+            <h3 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-3 flex items-center gap-1.5">
+              <UserIcon size={16} className="text-blue-600" /> Complete User Lookup
+            </h3>
+
+            {loadingDetails ? (
+              <div className="py-24 text-center">
+                <Loader2 className="animate-spin text-blue-600 mx-auto" size={24} />
+                <span className="block text-xs text-slate-400 mt-2 font-medium">Fetching details...</span>
+              </div>
+            ) : !selectedUserId || !userDetails ? (
+              <div className="py-24 text-center text-slate-400 text-xs italic">
+                Select a user from the directory to review all details, connected pipelines, active add-ons, and campaigns.
+              </div>
+            ) : (
+              <div className="space-y-6 text-left text-xs">
+                {/* 1. Profile Overview */}
+                <div className="space-y-2">
+                  <h4 className="font-bold text-slate-800 border-b border-slate-100 pb-1.5 uppercase text-[10px] tracking-wider text-blue-600">Profile Details</h4>
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-slate-500">
+                      <span>Name:</span>
+                      <span className="font-bold text-slate-800">{userDetails.user.name || "None"}</span>
+                    </div>
+                    <div className="flex justify-between text-slate-500">
+                      <span>Email:</span>
+                      <span className="font-bold text-slate-800 break-all">{userDetails.user.email}</span>
+                    </div>
+                    <div className="flex justify-between text-slate-500">
+                      <span>Plan:</span>
+                      <div className="flex items-center gap-1">
+                        <select
+                          disabled={actionLoading === userDetails.user.id}
+                          value={userDetails.user.plan_id}
+                          onChange={(e) => handlePlanOverride(userDetails.user.id, e.target.value)}
+                          className="bg-slate-100 border border-slate-200 rounded px-1.5 py-0.5 text-slate-800 font-bold outline-none cursor-pointer text-[10px]"
+                        >
+                          <option value="starter">Pro Early Access</option>
+                          <option value="growth">Growth</option>
+                          <option value="scale">Scale</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="flex justify-between text-slate-500">
+                      <span>Status:</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className={`px-1.5 py-0.5 rounded font-bold uppercase text-[9px] ${
+                          userDetails.user.status === "active" ? "text-green-700 bg-green-50" : "text-rose-700 bg-rose-50"
+                        }`}>
+                          {userDetails.user.status}
+                        </span>
+                        <button
+                          disabled={actionLoading === userDetails.user.id}
+                          onClick={() => handleStatusOverride(userDetails.user.id, userDetails.user.status)}
+                          className="text-blue-600 font-bold hover:underline"
+                        >
+                          Toggle
+                        </button>
+                      </div>
+                    </div>
+                    <div className="flex justify-between text-slate-500">
+                      <span>Joined:</span>
+                      <span className="font-bold text-slate-800">{new Date(userDetails.user.created_at).toLocaleDateString()}</span>
+                    </div>
+                    {userDetails.user.deletion_scheduled_at && (
+                      <div className="p-2 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 flex items-start gap-1">
+                        <AlertTriangle size={14} className="shrink-0 mt-0.5 text-amber-600" />
+                        <div>
+                          <span className="font-bold block">Scheduled Deletion</span>
+                          <span className="text-[10px]">On: {new Date(userDetails.user.deletion_scheduled_at).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* 2. Meta Connections */}
+                <div className="space-y-2">
+                  <h4 className="font-bold text-slate-800 border-b border-slate-100 pb-1.5 uppercase text-[10px] tracking-wider text-blue-600">Meta Connections</h4>
+                  {userDetails.connections.length === 0 ? (
+                    <div className="text-slate-400 italic font-medium">No active Meta profiles connected.</div>
+                  ) : (
+                    userDetails.connections.map((c: any) => (
+                      <div key={c.id} className="p-2.5 bg-slate-50 border border-slate-150 rounded-xl space-y-1.5">
+                        <div className="flex justify-between text-slate-500">
+                          <span>Meta User ID:</span>
+                          <span className="font-bold text-slate-850 font-mono">{c.meta_user_id}</span>
+                        </div>
+                        <div className="flex justify-between text-slate-500">
+                          <span>Status:</span>
+                          <span className="font-bold text-slate-800 uppercase text-[9px]">{c.status}</span>
+                        </div>
+                        <div className="flex justify-between text-slate-500">
+                          <span>Sync Status:</span>
+                          <span className={`font-bold uppercase text-[9px] ${
+                            c.last_sync_status === "success" ? "text-green-700" : "text-rose-700"
+                          }`}>{c.last_sync_status || "None"}</span>
+                        </div>
+                        {c.last_sync_error && (
+                          <div className="text-[9px] text-rose-600 leading-relaxed bg-rose-50/50 p-1.5 rounded border border-rose-100 break-words font-medium">
+                            Error: {c.last_sync_error}
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* 3. Meta Ad Accounts with INDUSTRY */}
+                <div className="space-y-2">
+                  <h4 className="font-bold text-slate-800 border-b border-slate-100 pb-1.5 uppercase text-[10px] tracking-wider text-blue-600">Connected Ad Accounts</h4>
+                  {userDetails.ad_accounts.length === 0 ? (
+                    <div className="text-slate-400 italic font-medium">No selected active ad accounts.</div>
+                  ) : (
+                    <div className="space-y-2">
+                      {userDetails.ad_accounts.map((acc: any) => (
+                        <div key={acc.id} className="p-2.5 bg-slate-50 border border-slate-150 rounded-xl space-y-1">
+                          <div className="font-bold text-slate-850 truncate">{acc.account_name}</div>
+                          <div className="text-[10px] text-slate-450 font-mono">ID: {acc.meta_account_id}</div>
+                          <div className="flex justify-between text-[10px] text-slate-500 pt-1">
+                            <span>Currency: <span className="font-bold text-slate-700">{acc.currency}</span></span>
+                            <span>Industry: <span className="font-bold text-blue-650 bg-blue-50 px-1.5 py-0.5 rounded uppercase text-[8px]">{acc.industry || "Not Specified"}</span></span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* 4. Active Subscription Add-ons */}
+                <div className="space-y-2">
+                  <h4 className="font-bold text-slate-800 border-b border-slate-100 pb-1.5 uppercase text-[10px] tracking-wider text-blue-600">Active Addons</h4>
+                  {userDetails.addons.length === 0 ? (
+                    <div className="text-slate-400 italic font-medium">No active paid add-ons purchased.</div>
+                  ) : (
+                    userDetails.addons.map((add: any) => (
+                      <div key={add.id} className="flex justify-between items-center p-2 bg-slate-50 rounded-xl border border-slate-150">
+                        <div>
+                          <div className="font-bold text-slate-800 uppercase text-[10px]">{add.addon_id.replace("_", " ")}</div>
+                          <div className="text-[9px] text-slate-400 mt-0.5">Expires: {new Date(add.expires_at).toLocaleDateString()}</div>
+                        </div>
+                        <span className="font-extrabold text-sm text-slate-900 bg-white px-2 py-1 rounded border border-slate-200">Qty: {add.quantity}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* 5. Tracked Campaigns */}
+                <div className="space-y-2">
+                  <h4 className="font-bold text-slate-800 border-b border-slate-100 pb-1.5 uppercase text-[10px] tracking-wider text-blue-600">Sync Campaigns ({userDetails.campaigns.length})</h4>
+                  {userDetails.campaigns.length === 0 ? (
+                    <div className="text-slate-400 italic font-medium">No imported campaigns.</div>
+                  ) : (
+                    <div className="max-h-48 overflow-y-auto divide-y divide-slate-100 border border-slate-150 rounded-xl overflow-hidden bg-slate-50">
+                      {userDetails.campaigns.map((camp: any) => (
+                        <div key={camp.id} className="p-2 flex items-center justify-between gap-2">
+                          <div className="truncate pr-2 font-medium text-slate-800">{camp.name}</div>
+                          <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
+                            camp.status === "ACTIVE" ? "bg-green-50 text-green-700" : "bg-slate-200 text-slate-600"
+                          }`}>{camp.status}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* 6. Raised Support Tickets */}
+                <div className="space-y-2">
+                  <h4 className="font-bold text-slate-800 border-b border-slate-100 pb-1.5 uppercase text-[10px] tracking-wider text-blue-600">Support Tickets Log</h4>
+                  {userDetails.tickets.length === 0 ? (
+                    <div className="text-slate-400 italic font-medium">No raised tickets.</div>
+                  ) : (
+                    <div className="space-y-2">
+                      {userDetails.tickets.map((t: any) => (
+                        <div key={t.id} className="p-2 bg-slate-50 border border-slate-150 rounded-xl space-y-1">
+                          <div className="flex justify-between">
+                            <span className="font-bold text-slate-800">{t.subject}</span>
+                            <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded uppercase ${
+                              t.status === "resolved" ? "bg-emerald-50 text-emerald-700" : "bg-blue-50 text-blue-700"
+                            }`}>{t.status}</span>
+                          </div>
+                          <div className="text-[10px] text-slate-500 leading-relaxed italic mt-1 bg-white p-1 rounded border border-slate-100">
+                            "{t.description}"
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -362,7 +667,7 @@ export default function AdminPage() {
                       <span className={`text-[9px] font-bold px-2 py-0.5 rounded-md uppercase ${
                         t.status === "resolved" 
                           ? "bg-emerald-50 text-emerald-700" 
-                          : t.status === "in_progress" 
+                           : t.status === "in_progress" 
                           ? "bg-blue-50 text-blue-700" 
                           : "bg-amber-50 text-amber-700"
                       }`}>
