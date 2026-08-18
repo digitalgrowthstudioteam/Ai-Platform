@@ -60,15 +60,28 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS Middleware — allow Next.js frontend
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.cors_origins,
-    allow_origin_regex=r"https://.*|http://localhost:.*",
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+from starlette.middleware.base import BaseHTTPMiddleware
+from fastapi.responses import Response
+
+class CustomCORSMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        origin = request.headers.get("origin")
+        if request.method == "OPTIONS":
+            response = Response(status_code=200)
+            if origin:
+                response.headers["Access-Control-Allow-Origin"] = origin
+                response.headers["Access-Control-Allow-Credentials"] = "true"
+                response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+                response.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type, Accept, Origin, X-Requested-With, X-CSRF-Token"
+            return response
+        
+        response = await call_next(request)
+        if origin:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+        return response
+
+app.add_middleware(CustomCORSMiddleware)
 
 # Mount API v1 router
 app.include_router(api_v1_router, prefix="/api/v1")
