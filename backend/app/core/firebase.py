@@ -28,16 +28,22 @@ def initialize_firebase(service_account_path: Optional[str] = None):
         import firebase_admin
         from firebase_admin import credentials
 
+        import os
         if _firebase_app is not None:
             logger.info("firebase_already_initialized")
             return
 
-        if service_account_path:
+        if service_account_path and os.path.exists(service_account_path):
             cred = credentials.Certificate(service_account_path)
             _firebase_app = firebase_admin.initialize_app(cred)
         else:
-            # Uses GOOGLE_APPLICATION_CREDENTIALS environment variable
-            _firebase_app = firebase_admin.initialize_app()
+            try:
+                # Uses GOOGLE_APPLICATION_CREDENTIALS environment variable
+                _firebase_app = firebase_admin.initialize_app()
+                logger.info("firebase_initialized_with_default_credentials")
+            except Exception as e:
+                logger.warning("firebase_initialization_skipped", reason="Service account JSON not found and default credentials unavailable", error=str(e))
+                return
 
         logger.info("firebase_initialized_successfully")
 
