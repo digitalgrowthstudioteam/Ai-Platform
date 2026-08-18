@@ -73,10 +73,13 @@ async def test_subscription_details_query(mock_auth, setup_billing_data):
 
 
 @pytest.mark.asyncio
-async def test_order_creation_flows(mock_auth, setup_billing_data):
+async def test_order_creation_flows(mock_auth, setup_billing_data, monkeypatch):
     """
-    Verify creating order generates mock Razorpay order IDs.
+    Verify creating order generates mock Razorpay order IDs when credentials are not configured.
     """
+    from app.config import get_settings
+    monkeypatch.setattr(get_settings(), "RAZORPAY_KEY_ID", None)
+    
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.post("/api/v1/billing/order", json={"plan_id": "growth"})
