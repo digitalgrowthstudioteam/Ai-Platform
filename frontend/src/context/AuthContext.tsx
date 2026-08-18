@@ -12,6 +12,7 @@ import {
   GoogleAuthProvider,
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { trackSignUp, trackLogin } from "@/lib/analytics";
 
 interface AuthContextType {
   user: User | null;
@@ -44,6 +45,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, pass);
+      trackLogin("email");
     } finally {
       setLoading(false);
     }
@@ -61,6 +63,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { updateProfile } = await import("firebase/auth");
         await updateProfile(userCredential.user, { displayName: name });
       }
+      trackSignUp("email");
     } finally {
       setLoading(false);
     }
@@ -71,6 +74,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth, provider);
+      trackLogin("google");
     } finally {
       setLoading(false);
     }

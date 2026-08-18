@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Geist } from "next/font/google";
 import "./globals.css";
 import AppWrapper from "@/components/layout/AppWrapper";
+import GoogleAnalytics from "@/components/GoogleAnalytics";
 import { cn } from "@/lib/utils";
 
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
@@ -23,6 +24,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={cn(inter.variable, "font-sans", geist.variable)}>
       <body>
+        <GoogleAnalytics />
         <AppWrapper>{children}</AppWrapper>
       </body>
     </html>

@@ -22,6 +22,7 @@ import {
   Building2,
   TrendingUp,
 } from "lucide-react";
+import { trackPurchase } from "@/lib/analytics";
 
 export default function BillingPage() {
   const { user } = useAuth();
@@ -160,6 +161,7 @@ export default function BillingPage() {
               type: "success",
               message: `Payment verification successful! Subscription upgraded to ${planId.toUpperCase()} plan.`,
             });
+            trackPurchase(planId, order.amount / 100, order.currency || "INR");
             await fetchSubscription();
           } catch (err: any) {
             console.error("Payment verification failed:", err);
@@ -251,6 +253,7 @@ export default function BillingPage() {
               type: "success",
               message: `Add-on successfully activated for your account!`,
             });
+            trackPurchase(addonId, order.amount / 100, order.currency || "INR");
             await fetchSubscription();
           } catch (err: any) {
             console.error("Addon payment verification failed:", err);
