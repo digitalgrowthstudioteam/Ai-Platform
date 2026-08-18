@@ -7,6 +7,7 @@ import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
 import { Lock, Sparkles, Settings } from "lucide-react";
 import Link from "next/link";
+import { useAuth } from "@/context/AuthContext";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -40,6 +41,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     "/settings/admin",
   ].some(path => pathname === path || pathname.startsWith(path + "/"));
 
+  const { user } = useAuth();
+  const isAdmin = user?.email === "flasshgames2026@gmail.com" || user?.email === "digitalgrowthstudioteam@gmail.com";
+
   // Check trial expiration
   const endsAt = sub?.expires_at ? new Date(sub.expires_at) : null;
   const now = new Date();
@@ -49,15 +53,15 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const isTrialActive = sub?.status === "trialing" && diffDays > 0;
   const isTrialExpired = sub?.status === "expired" || (sub?.status === "trialing" && diffDays <= 0);
 
-  // If trial is expired and they are NOT on an unlocked path, show lock screen
-  const shouldShowLockScreen = isTrialExpired && !isUnlockedPath;
+  // If trial is expired and they are NOT on an unlocked path, and they are NOT an admin, show lock screen
+  const shouldShowLockScreen = isTrialExpired && !isUnlockedPath && !isAdmin;
 
   return (
     <div className="dashboard-layout">
       <Sidebar />
       <div className="dashboard-main flex flex-col min-h-screen">
         {/* Trial Countdown Banner */}
-        {isTrialActive && (
+        {isTrialActive && !isAdmin && (
           <div className={`w-full py-2 px-4 text-xs font-semibold flex items-center justify-between border-b transition-all ${
             diffDays === 1 
               ? "bg-amber-500 text-white border-amber-600" 
