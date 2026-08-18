@@ -15,6 +15,24 @@ export default function Topbar() {
     status: string | null;
   }>({ lastSyncAt: null, status: null });
 
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState([
+    { id: 1, title: "System Ready", message: "Optimizations fully loaded.", time: "Just now", read: false },
+    { id: 2, title: "Pro Early Access Active", message: "Early Access entitlements activated.", time: "1h ago", read: false },
+    { id: 3, title: "Token Verification Success", message: "Decoded fallback signatures active.", time: "2h ago", read: false },
+    { id: 4, title: "Welcome to DGS!", message: "Your Meta Ads optimizer profile is active.", time: "1d ago", read: true },
+  ]);
+
+  const unreadCount = notifications.filter(n => !n.read).length;
+
+  const markAllAsRead = () => {
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+  };
+
+  const toggleRead = (id: number) => {
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: !n.read } : n));
+  };
+
   const displayName = user?.displayName || user?.email || "User";
   const initials = displayName
     .split("@")[0]
@@ -137,10 +155,50 @@ export default function Topbar() {
         </button>
 
         {/* Notifications */}
-        <button className="topbar-notification" id="notifications-btn" aria-label="Notifications">
-          <Bell size={18} />
-          <span className="topbar-notification-badge">4</span>
-        </button>
+        <div className="relative">
+          <button 
+            onClick={() => setShowNotifications(!showNotifications)}
+            className="topbar-notification relative" 
+            id="notifications-btn" 
+            aria-label="Notifications"
+          >
+            <Bell size={18} />
+            {unreadCount > 0 && (
+              <span className="topbar-notification-badge">{unreadCount}</span>
+            )}
+          </button>
+
+          {showNotifications && (
+            <div className="absolute right-0 mt-2 w-80 bg-white border border-slate-150 rounded-2xl shadow-xl z-50 overflow-hidden animate-fade-in">
+              <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                <span className="text-xs font-bold text-slate-800">Notifications</span>
+                {unreadCount > 0 && (
+                  <button 
+                    onClick={markAllAsRead}
+                    className="text-[10px] font-bold text-blue-600 hover:text-blue-700 transition"
+                  >
+                    Mark all as read
+                  </button>
+                )}
+              </div>
+              <div className="max-h-64 overflow-y-auto divide-y divide-slate-100">
+                {notifications.map((n) => (
+                  <div 
+                    key={n.id} 
+                    onClick={() => toggleRead(n.id)}
+                    className={`p-3.5 hover:bg-slate-50 transition cursor-pointer text-left ${n.read ? "opacity-60" : "bg-blue-50/20"}`}
+                  >
+                    <div className="flex items-start justify-between gap-1">
+                      <span className={`text-[11px] font-bold ${n.read ? "text-slate-700" : "text-slate-900"}`}>{n.title}</span>
+                      <span className="text-[9px] text-slate-400 shrink-0 font-medium">{n.time}</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 mt-0.5 leading-relaxed">{n.message}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Profile Info and Logout */}
         <div 

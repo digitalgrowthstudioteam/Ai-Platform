@@ -287,6 +287,48 @@ class ApiClient {
       body: { status: status },
     });
   }
+
+  // Team Endpoints
+  async getTeamMembers() {
+    return this.request<any[]>("/team");
+  }
+
+  async inviteTeamMember(email: string, name?: string, role: string = "member") {
+    return this.request<any>("/team/invite", {
+      method: "POST",
+      body: { email, name, role },
+    });
+  }
+
+  async removeTeamMember(memberId: string) {
+    return this.request<{ status: string; message: string }>(`/team/${memberId}`, {
+      method: "DELETE",
+    });
+  }
+
+  // Help & Support Endpoints
+  async getSupportTickets() {
+    return this.request<any[]>("/support/tickets");
+  }
+
+  async createSupportTicket(subject: string, description: string, category: string = "General Support") {
+    return this.request<any>("/support/tickets", {
+      method: "POST",
+      body: { subject, description, category },
+    });
+  }
+
+  // Admin Ticket Endpoints
+  async getAdminTickets() {
+    return this.request<any[]>("/admin/tickets");
+  }
+
+  async replyToTicket(ticketId: string, reply: string, status: string = "resolved") {
+    return this.request<{ status: string; message: string }>(`/admin/tickets/${ticketId}/reply`, {
+      method: "POST",
+      body: { reply, status },
+    });
+  }
 }
 
 export const api = new ApiClient(API_BASE_URL);

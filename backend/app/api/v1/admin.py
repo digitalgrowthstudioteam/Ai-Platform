@@ -15,6 +15,7 @@ from app.api.v1.meta import get_db_user_from_claims
 from app.models.user import User
 from app.models.meta import MetaAdAccount, MetaConnection
 from app.models.subscription import Subscription
+from app.models.ticket import SupportTicket
 
 logger = structlog.get_logger()
 router = APIRouter(prefix="/admin", tags=["Admin Control Panel"])
@@ -314,3 +315,68 @@ async def update_addon_config(
         
     logger.info("admin_addon_config_updated", addon_id=req.addon_id)
     return {"status": "success", "message": f"Successfully updated addon config for: {req.addon_id}."}
+
+
+class TicketReplyRequest(BaseModel):
+    reply: str
+    status: str = "resolved"  # in_progress, resolved
+
+
+@router.get("/tickets", summary="Query all platform support tickets")
+async def list_all_tickets(
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Returns platform-wide listing of support tickets raised by users.
+    """
+    verify_admin(claims)
+    stmt = select(SupportTicket, User.email.label("user_email")).join(User, SupportTicket.user_id == User.id).order_by(SupportTicket.created_at.desc())
+    res = await db.execute(stmt)
+    rows = res.all()
+    
+    tickets_list = []
+    for r in rows:
+        t = r.SupportTicket
+        tickets_list.append({
+            "id": t.id,
+            "user_id": t.user_id,
+            "user_email": r.user_email,
+            "subject": t.subject,
+            "description": t.description,
+            "category": t.category,
+            "status": t.status,
+            "admin_reply": t.admin_reply,
+            "created_at": t.created_at,
+        })
+    return tickets_list
+
+
+@router.post("/tickets/{ticket_id}/reply", summary="Reply to and resolve a support ticket")
+async def reply_to_ticket(
+    ticket_id: uuid.UUID,
+    req: TicketReplyRequest,
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Saves an administrator answer and updates support ticket resolution status.
+    """
+    verify_admin(claims)
+
+    stmt = select(SupportTicket).where(SupportTicket.id == ticket_id)
+    res = await db.execute(stmt)
+    ticket = res.scalar_one_or_none()
+
+    if not ticket:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Support ticket not found."
+        )
+
+    ticket.admin_reply = req.reply
+    ticket.status = req.status
+    await db.commit()
+
+    logger.info("admin_ticket_replied_success", ticket_id=ticket_id, status=req.status)
+    return {"status": "success", "message": f"Successfully replied and marked ticket as {req.status}."}

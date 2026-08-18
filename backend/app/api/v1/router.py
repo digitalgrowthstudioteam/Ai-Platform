@@ -11,6 +11,8 @@ from app.api.v1.ads import router as ads_router
 from app.api.v1.recommendations import router as recommendations_router
 from app.api.v1.billing import router as billing_router
 from app.api.v1.admin import router as admin_router
+from app.api.v1.team import router as team_router
+from app.api.v1.support import router as support_router
 
 api_v1_router = APIRouter()
 api_v1_router.include_router(auth_router)
@@ -21,6 +23,8 @@ api_v1_router.include_router(ads_router, tags=["Ads"])
 api_v1_router.include_router(recommendations_router, tags=["AI Recommendations"])
 api_v1_router.include_router(billing_router, tags=["Billing & Subscriptions"])
 api_v1_router.include_router(admin_router, tags=["Admin Control Panel"])
+api_v1_router.include_router(team_router, tags=["Team Management"])
+api_v1_router.include_router(support_router, tags=["Help & Support Tickets"])
 
 
 # ──────────────────────────────────────────────
