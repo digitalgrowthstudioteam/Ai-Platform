@@ -224,7 +224,16 @@ async def create_billing_order(
     # Razorpay active integration check
     if settings.RAZORPAY_KEY_ID and settings.RAZORPAY_KEY_SECRET and razorpay:
         try:
-            client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
+            import requests
+            session = requests.Session()
+            orig_req = session.request
+            def timeout_req(*args, **kwargs):
+                if "timeout" not in kwargs:
+                    kwargs["timeout"] = 5.0
+                return orig_req(*args, **kwargs)
+            session.request = timeout_req
+
+            client = razorpay.Client(session=session, auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
             order_data = {
                 "amount": amount,
                 "currency": currency,
