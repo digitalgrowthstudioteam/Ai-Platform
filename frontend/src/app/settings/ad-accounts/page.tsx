@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Megaphone, CheckCircle2, AlertCircle, Loader2, RefreshCw, LogOut, CheckSquare, Square } from "lucide-react";
 import { api } from "@/lib/api";
 import { auth } from "@/lib/firebase";
+import { useAdAccount } from "@/context/AdAccountContext";
 
 interface AdAccount {
   id: string;
@@ -16,6 +17,7 @@ interface AdAccount {
 }
 
 export default function AdAccountsPage() {
+  const { refreshAccounts } = useAdAccount();
   const [connected, setConnected] = useState(false);
   const [metaUserName, setMetaUserName] = useState<string | null>(null);
   const [accounts, setAccounts] = useState<AdAccount[]>([]);
@@ -74,6 +76,7 @@ export default function AdAccountsPage() {
     if (params.get("connected") === "success") {
       const metaName = params.get("meta_name");
       setSuccess(`Successfully connected to Meta profile ${metaName ? `as ${metaName}` : ""}`);
+      refreshAccounts(); // Refresh global header selector immediately
       // Clean up URL query parameters
       window.history.replaceState({}, document.title, window.location.pathname);
     } else if (params.get("error")) {
@@ -136,6 +139,7 @@ export default function AdAccountsPage() {
       await api.selectMetaAccounts(selectedAccounts, industries);
       setSuccess("Ad account preferences saved successfully.");
       await checkStatus(); // Reload list
+      await refreshAccounts(); // Refresh global header selector
     } catch (err: any) {
       setError(err.message || "Failed to save selected ad accounts");
     } finally {
@@ -160,6 +164,7 @@ export default function AdAccountsPage() {
       setAccounts([]);
       setSelectedAccounts([]);
       setSuccess("Meta account disconnected successfully.");
+      await refreshAccounts(); // Clear global header selector
     } catch (err: any) {
       setError(err.message || "Failed to disconnect Meta account");
     } finally {
