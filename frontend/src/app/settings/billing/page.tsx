@@ -38,13 +38,17 @@ export default function BillingPage() {
   } | null>(null);
 
   const fetchSubscription = async () => {
-    try {
-      setLoading(true);
-      const res = await api.getSubscription();
-      setSub(res);
-    } catch (err) {
-      console.error("Failed to load subscription details:", err);
-      // Fallback default subscription state when API is offline/blocked by browser CORS
+    const cacheKey = "dgs_cached_subscription";
+
+    // Load cached subscription instantly to bypass loading spinner
+    const cached = sessionStorage.getItem(cacheKey);
+    if (cached) {
+      try {
+        setSub(JSON.parse(cached));
+        setLoading(false);
+      } catch (e) {}
+    } else {
+      // Fallback default starter subscription state instantly if no cache exists
       setSub({
         plan: "starter",
         status: "active",
@@ -57,8 +61,15 @@ export default function BillingPage() {
         active_addons_list: [],
         monthly_total_cost: 99,
       });
-    } finally {
       setLoading(false);
+    }
+
+    try {
+      const res = await api.getSubscription();
+      setSub(res);
+      sessionStorage.setItem(cacheKey, JSON.stringify(res));
+    } catch (err) {
+      console.error("Failed to load subscription details:", err);
     }
   };
 
