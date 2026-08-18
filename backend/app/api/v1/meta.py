@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 
@@ -40,10 +40,12 @@ class MetaAdAccountResponse(BaseModel):
     timezone: str
     account_status: int
     is_connected: bool
+    industry: Optional[str] = None
 
 
 class SelectAdAccountsRequest(BaseModel):
     account_ids: List[str]
+    industries: Optional[dict[str, str]] = None
 
 
 # ──────────────────────────────────────────────
@@ -293,7 +295,7 @@ async def get_ad_accounts(
     # Retrieve already synced ad accounts for this user
     stmt = select(MetaAdAccount).where(MetaAdAccount.user_id == user.id)
     result = await db.execute(stmt)
-    synced_accounts = {acc.meta_account_id for acc in result.scalars().all()}
+    synced_accounts_map = {acc.meta_account_id: acc.industry for acc in result.scalars().all()}
 
     try:
         # Mock connection bypass (EAAGm0PX is user's mock token prefix for tests)
@@ -311,7 +313,8 @@ async def get_ad_accounts(
                     currency=acc["currency"],
                     timezone=acc["timezone"],
                     account_status=acc["account_status"],
-                    is_connected=acc["id"] in synced_accounts,
+                    is_connected=acc["id"] in synced_accounts_map,
+                    industry=synced_accounts_map.get(acc["id"]),
                 )
                 for acc in mock_accounts
             ]
@@ -334,7 +337,8 @@ async def get_ad_accounts(
                     currency=acc.get("currency", "INR"),
                     timezone=acc.get("timezone", "Asia/Kolkata"),
                     account_status=acc.get("account_status", 1),
-                    is_connected=acc["id"] in synced_accounts,
+                    is_connected=acc["id"] in synced_accounts_map,
+                    industry=synced_accounts_map.get(acc["id"]),
                 )
                 for acc in data
             ]
@@ -419,13 +423,30 @@ async def select_ad_accounts(
     result = await db.execute(stmt)
     existing_meta_ids = {acc.meta_account_id for acc in result.scalars().all()}
 
-    # 4. Insert new registrations
+    # 5. Insert new registrations or update existing industries
     for acc_id in payload.account_ids:
         if acc_id not in available_accounts:
             continue  # Security validation: user cannot connect random accounts they don't own
         
+        industry = None
+        if payload.industries:
+            industry = payload.industries.get(acc_id)
+        if not industry:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Industry selection is mandatory for active ad account: {acc_id}"
+            )
+        
         if acc_id in existing_meta_ids:
-            continue  # Already connected
+            # Update industry for existing account
+            update_stmt = (
+                update(MetaAdAccount)
+                .where(MetaAdAccount.user_id == user.id)
+                .where(MetaAdAccount.meta_account_id == acc_id)
+                .values(industry=industry)
+            )
+            await db.execute(update_stmt)
+            continue
         
         meta_acc_data = available_accounts[acc_id]
         new_account = MetaAdAccount(
@@ -436,6 +457,7 @@ async def select_ad_accounts(
             currency=meta_acc_data.get("currency", "INR"),
             timezone=meta_acc_data.get("timezone", "Asia/Kolkata"),
             account_status=meta_acc_data.get("account_status", 1),
+            industry=industry,
         )
         db.add(new_account)
     
