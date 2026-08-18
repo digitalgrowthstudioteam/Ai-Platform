@@ -5,6 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
 import { User, Key, Shield, Award, Loader2, AlertCircle, CheckCircle, Trash2, Calendar, RefreshCcw } from "lucide-react";
 import { updateProfile } from "firebase/auth";
+import { trackAccountDeletion } from "@/lib/analytics";
 
 export default function AccountSettingsPage() {
   const { user, resetPassword } = useAuth();
@@ -150,6 +151,7 @@ export default function AccountSettingsPage() {
         type: "success",
         message: "Account deletion scheduled. You have a 7-day grace period to restore your profile.",
       });
+      trackAccountDeletion();
       setConfirmName("");
       await loadData();
     } catch (err: any) {
