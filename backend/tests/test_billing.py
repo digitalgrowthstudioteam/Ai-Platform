@@ -2,6 +2,7 @@
 Digital Growth Studio — Subscription Billing Integration Tests
 """
 import pytest
+from datetime import datetime, timedelta
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -43,6 +44,10 @@ async def setup_billing_data(db: AsyncSession):
         email=MOCK_CLAIMS["email"],
         name=MOCK_CLAIMS["name"],
         plan_id="starter",
+        trial_status="active",
+        trial_started_at=datetime.utcnow(),
+        trial_ends_at=datetime.utcnow() + timedelta(days=7),
+        trial_used=True,
     )
     db.add(user)
     await db.commit()
@@ -69,7 +74,7 @@ async def test_subscription_details_query(mock_auth, setup_billing_data):
         assert response.status_code == 200
         sub = response.json()
         assert sub["plan"] == "starter"
-        assert sub["status"] == "active"
+        assert sub["status"] == "trialing"
 
 
 @pytest.mark.asyncio

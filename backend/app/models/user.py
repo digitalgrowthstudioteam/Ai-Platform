@@ -45,6 +45,27 @@ class User(BaseModel):
         DateTime(timezone=True),
         nullable=True,
     )
+    trial_started_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    trial_ends_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    trial_status: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        default="not_started",
+    )
+    trial_used: Mapped[bool] = mapped_column(
+        nullable=False,
+        default=False,
+    )
+    trial_meta_account_id: Mapped[Optional[str]] = mapped_column(
+        String(128),
+        nullable=True,
+    )
 
     # Relationships
     subscriptions: Mapped[List["Subscription"]] = relationship(

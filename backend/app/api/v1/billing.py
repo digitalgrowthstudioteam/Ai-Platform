@@ -159,25 +159,44 @@ async def get_subscription_details(
         else:
             addons_cost_paise += unit_cost * a.quantity
 
-    # Base subscription cost monthly
-    user_plan = user.plan_id or "free"
-    base_price = PLANS_CONFIG.get(user_plan.lower(), {}).get("price_monthly", 0)
-    if user_plan == "starter":  # Ensure starter pricing
-        base_price = 99
-    elif user_plan == "growth":
-        base_price = 999
-    elif user_plan == "pro":
-        base_price = 2999
-    elif user_plan == "agency":
-        base_price = 4999
+    # Base subscription cost monthly (₹0 if trialing/unsubscribed, otherwise paid plan price)
+    if not sub:
+        base_price = 0
+    else:
+        user_plan = sub.plan.lower()
+        base_price = PLANS_CONFIG.get(user_plan, {}).get("price_monthly", 0)
+        if user_plan == "starter":
+            base_price = 99
+        elif user_plan == "growth":
+            base_price = 999
+        elif user_plan == "pro":
+            base_price = 2999
+        elif user_plan == "agency":
+            base_price = 4999
 
     monthly_total_cost = base_price + addons_cost_paise
 
     if not sub:
+        # Check trial status
+        status_to_return = user.trial_status
+        if user.trial_status == "active" and user.trial_ends_at:
+            now = datetime.now(timezone.utc)
+            ends_at = user.trial_ends_at
+            if ends_at.tzinfo is None:
+                ends_at = ends_at.replace(tzinfo=timezone.utc)
+            if now > ends_at:
+                user.trial_status = "expired"
+                await db.commit()
+                status_to_return = "expired"
+            else:
+                status_to_return = "trialing"
+
         return SubscriptionDetailsResponse(
-            plan=user.plan_id or "free",
-            status="active",
-            is_mock=True,
+            plan="starter",
+            status=status_to_return,
+            started_at=user.trial_started_at,
+            expires_at=user.trial_ends_at,
+            is_mock=not bool(settings.RAZORPAY_KEY_ID),
             resolved_entitlements=entitlements,
             active_addons_list=addons_list,
             monthly_total_cost=monthly_total_cost,

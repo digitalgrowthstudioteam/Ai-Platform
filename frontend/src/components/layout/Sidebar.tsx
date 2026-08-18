@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 import {
   LayoutDashboard,
   Megaphone,
@@ -22,6 +23,7 @@ import {
   Settings,
   HelpCircle,
   ChevronUp,
+  ShieldAlert,
 } from "lucide-react";
 
 interface NavItem {
@@ -85,6 +87,26 @@ const navigation: NavSection[] = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const { user } = useAuth();
+
+  const isAdmin = user?.email === "flasshgames2026@gmail.com" || user?.email === "digitalgrowthstudioteam@gmail.com";
+
+  const visibleNavigation = navigation.map((section) => {
+    if (section.label === "SETTINGS" && isAdmin) {
+      // Add Super Admin menu item if not already present
+      const hasAdminItem = section.items.some((item) => item.href === "/settings/admin");
+      if (!hasAdminItem) {
+        return {
+          ...section,
+          items: [
+            ...section.items,
+            { label: "Super Admin", href: "/settings/admin", icon: ShieldAlert } as NavItem,
+          ],
+        };
+      }
+    }
+    return section;
+  });
 
   return (
     <aside className="sidebar" id="sidebar">
@@ -99,7 +121,7 @@ export default function Sidebar() {
 
       {/* Navigation */}
       <nav className="sidebar-nav">
-        {navigation.map((section, sectionIdx) => (
+        {visibleNavigation.map((section, sectionIdx) => (
           <div key={sectionIdx} className="sidebar-section">
             {section.label && (
               <div className="sidebar-section-label">{section.label}</div>

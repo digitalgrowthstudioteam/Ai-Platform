@@ -12,12 +12,13 @@ from typing import List, Optional
 
 from app.config import get_settings
 from app.database import get_db
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, require_active_subscription
 from app.core.firebase import verify_firebase_token
 from app.core.exceptions import NotAuthenticatedException
 from app.models.user import User
 from app.models.meta import MetaConnection, MetaAdAccount
 from app.models.notification import Notification
+from app.models.subscription import Subscription
 
 
 router = APIRouter()
@@ -399,7 +400,66 @@ async def select_ad_accounts(
             detail=f"Failed to fetch Meta accounts for validation: {str(e)}"
         )
 
-    # 2. Validate max_meta_accounts entitlement limit
+    # 2. Check for active paid subscription
+    stmt_sub = select(Subscription).where(Subscription.user_id == user.id).where(Subscription.status == "active")
+    res_sub = await db.execute(stmt_sub)
+    sub = res_sub.scalar_one_or_none()
+
+    if not sub:
+        # No active paid subscription -> Trial flow
+        if user.trial_status == "expired":
+            raise HTTPException(
+                status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                detail="Your 7-day trial has ended. Please subscribe to a paid plan to continue."
+            )
+        
+        if user.trial_used:
+            # Already consumed a trial. If status is active, allow only their trial account.
+            if user.trial_status == "active":
+                if len(payload.account_ids) > 1 or (payload.account_ids and payload.account_ids[0] != user.trial_meta_account_id):
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Trial accounts are limited to 1 Meta Ad Account: {user.trial_meta_account_id}. Upgrade to select other accounts."
+                    )
+            else:
+                # Should not happen but fallback
+                raise HTTPException(
+                    status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                    detail="Please subscribe to a paid plan to select ad accounts."
+                )
+        else:
+            # Start Trial if eligible
+            if not payload.account_ids:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Please select at least one Meta Ad Account to start your 7-day free trial."
+                )
+            if len(payload.account_ids) > 1:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Free trial is limited to 1 Meta Ad Account. Please select exactly 1 account."
+                )
+            
+            first_acc_id = payload.account_ids[0]
+            # Check Meta Ad Account ID trial abuse check
+            stmt_abuse = select(User).where(User.trial_meta_account_id == first_acc_id).where(User.trial_used == True)
+            res_abuse = await db.execute(stmt_abuse)
+            abuse_user = res_abuse.scalar_one_or_none()
+            if abuse_user:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="This Meta Ad Account has already used its free trial. Please choose a paid plan to continue."
+                )
+            
+            # Eligible -> Create Trial
+            user.trial_status = "active"
+            user.trial_started_at = datetime.utcnow()
+            user.trial_ends_at = datetime.utcnow() + timedelta(days=7)
+            user.trial_used = True
+            user.trial_meta_account_id = first_acc_id
+            user.plan_id = "starter"
+
+    # 3. Validate max_meta_accounts entitlement limit for paid subscribers
     from app.services.entitlement_engine import EntitlementEngine
     entitlements = await EntitlementEngine.resolve_entitlements(user, db)
     if len(payload.account_ids) > entitlements["max_meta_accounts"]:
@@ -411,14 +471,14 @@ async def select_ad_accounts(
             )
         )
 
-    # 3. De-register accounts that are no longer selected
+    # 4. De-register accounts that are no longer selected
     delete_stmt = delete(MetaAdAccount).where(
         MetaAdAccount.user_id == user.id,
         ~MetaAdAccount.meta_account_id.in_(payload.account_ids)
     )
     await db.execute(delete_stmt)
 
-    # 4. Retrieve current registered accounts to prevent duplicate insert errors
+    # 5. Retrieve current registered accounts to prevent duplicate insert errors
     stmt = select(MetaAdAccount).where(MetaAdAccount.user_id == user.id)
     result = await db.execute(stmt)
     existing_meta_ids = {acc.meta_account_id for acc in result.scalars().all()}
@@ -491,7 +551,7 @@ class SyncStatusResponse(BaseModel):
     last_sync_error: Optional[str] = None
 
 
-@router.post("/sync/trigger", summary="Trigger Meta marketing database sync")
+@router.post("/sync/trigger", summary="Trigger Meta marketing database sync", dependencies=[Depends(require_active_subscription)])
 async def trigger_sync(
     payload: Optional[SyncTriggerRequest] = None,
     claims: dict = Depends(get_current_user),

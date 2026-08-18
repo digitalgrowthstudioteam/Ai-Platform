@@ -78,7 +78,7 @@ class MetaSyncService:
             notif = Notification(
                 user_id=conn.user_id,
                 title="Meta Sync Complete",
-                message=f"Sync cycle completed successfully for ad account: {ad_acc.name or ad_acc.meta_account_id}.",
+                message=f"Sync cycle completed successfully for ad account: {ad_acc.account_name or ad_acc.meta_account_id}.",
                 read=False
             )
             db.add(notif)
@@ -94,7 +94,7 @@ class MetaSyncService:
             notif = Notification(
                 user_id=conn.user_id,
                 title="Meta Sync Failed",
-                message=f"Sync failed for ad account {ad_acc.name or ad_acc.meta_account_id}: {str(e)[:100]}.",
+                message=f"Sync failed for ad account {ad_acc.account_name or ad_acc.meta_account_id}: {str(e)[:100]}.",
                 read=False
             )
             db.add(notif)

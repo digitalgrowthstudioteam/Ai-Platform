@@ -11,10 +11,7 @@ const getBaseUrl = () => {
       return "https://digital-growth-studio-api.onrender.com/api/v1";
     }
   }
-  if (process.env.NEXT_PUBLIC_API_URL && !process.env.NEXT_PUBLIC_API_URL.includes("localhost")) {
-    return process.env.NEXT_PUBLIC_API_URL;
-  }
-  return "https://digital-growth-studio-api.onrender.com/api/v1";
+  return process.env.NEXT_PUBLIC_API_URL || "https://digital-growth-studio-api.onrender.com/api/v1";
 };
 
 const API_BASE_URL = getBaseUrl();

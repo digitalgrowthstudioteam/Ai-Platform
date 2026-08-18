@@ -3,7 +3,7 @@ Digital Growth Studio — AI Recommendations Integration Tests
 """
 import pytest
 import uuid
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -53,6 +53,10 @@ async def setup_rec_data(db: AsyncSession):
         firebase_uid=MOCK_CLAIMS["uid"],
         email=MOCK_CLAIMS["email"],
         name=MOCK_CLAIMS["name"],
+        trial_status="active",
+        trial_started_at=datetime.utcnow(),
+        trial_ends_at=datetime.utcnow() + timedelta(days=7),
+        trial_used=True,
     )
     db.add(user)
     await db.commit()

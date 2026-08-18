@@ -11,14 +11,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 
 from app.database import get_db
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, require_active_subscription
 from app.api.v1.meta import get_db_user_from_claims
 from app.models.meta import MetaAdAccount
 from app.models.campaign import Campaign
 from app.models.metrics import CampaignDailyMetrics
 
 logger = structlog.get_logger()
-router = APIRouter(prefix="/campaigns", tags=["Campaigns"])
+router = APIRouter(
+    prefix="/campaigns",
+    tags=["Campaigns"],
+    dependencies=[Depends(require_active_subscription)],
+)
 
 
 # ──────────────────────────────────────────────

@@ -3,6 +3,7 @@ Digital Growth Studio — Admin Control Panel Router
 """
 import uuid
 import structlog
+from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy import select, func
@@ -32,6 +33,15 @@ class PlanCount(BaseModel):
     count: int
 
 
+class TrialStats(BaseModel):
+    trials_started: int
+    trials_active: int
+    trials_expiring_today: int
+    trials_expired: int
+    trials_converted: int
+    trial_conversion_rate: float
+
+
 class PlatformStatsResponse(BaseModel):
     total_users: int
     connected_ad_accounts: int
@@ -39,6 +49,7 @@ class PlatformStatsResponse(BaseModel):
     plan_distribution: List[PlanCount]
     total_campaigns: int
     total_addons_active: int
+    trial_stats: TrialStats
 
 
 class AdminUserItem(BaseModel):
@@ -124,6 +135,46 @@ async def get_platform_stats(
     for r in plans_rows:
         plan_counts.append(PlanCount(plan=r.plan_id or "starter", count=r[1]))
 
+    # 7. Trial Metrics
+    now = datetime.utcnow()
+    
+    stmt_started = select(func.count(User.id)).where(User.trial_used == True)
+    res_started = await db.execute(stmt_started)
+    trials_started = res_started.scalar_one()
+
+    stmt_active = select(func.count(User.id)).where(User.trial_status == "active").where(User.trial_ends_at > now)
+    res_active = await db.execute(stmt_active)
+    trials_active = res_active.scalar_one()
+
+    stmt_expiring = select(func.count(User.id)).where(User.trial_status == "active").where(User.trial_ends_at >= now).where(User.trial_ends_at <= now + timedelta(days=1))
+    res_expiring = await db.execute(stmt_expiring)
+    trials_expiring = res_expiring.scalar_one()
+
+    stmt_expired = select(func.count(User.id)).where(User.trial_status == "expired")
+    res_expired = await db.execute(stmt_expired)
+    trials_expired = res_expired.scalar_one()
+
+    # Trials Converted: trial_used = True and has an active paid subscription
+    stmt_converted = (
+        select(func.count(User.id))
+        .join(Subscription, User.id == Subscription.user_id)
+        .where(User.trial_used == True)
+        .where(Subscription.status == "active")
+    )
+    res_converted = await db.execute(stmt_converted)
+    trials_converted = res_converted.scalar_one()
+
+    conversion_rate = (trials_converted / trials_started * 100.0) if trials_started > 0 else 0.0
+
+    trial_stats_obj = TrialStats(
+        trials_started=trials_started,
+        trials_active=trials_active,
+        trials_expiring_today=trials_expiring,
+        trials_expired=trials_expired,
+        trials_converted=trials_converted,
+        trial_conversion_rate=round(conversion_rate, 2),
+    )
+
     return PlatformStatsResponse(
         total_users=total_users,
         connected_ad_accounts=total_accs,
@@ -131,6 +182,7 @@ async def get_platform_stats(
         plan_distribution=plan_counts,
         total_campaigns=total_camps,
         total_addons_active=total_addons,
+        trial_stats=trial_stats_obj,
     )
 
 

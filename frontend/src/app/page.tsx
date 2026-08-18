@@ -787,13 +787,13 @@ export default function LandingPage() {
             </div>
 
             <div className="text-center space-y-2">
-              <h3 className="text-xl font-bold text-slate-900">Pro Early Access</h3>
+              <h3 className="text-xl font-bold text-slate-900">Starter Plan</h3>
               <div className="flex items-baseline justify-center gap-1">
                 <span className="text-5xl font-extrabold text-slate-950 tracking-tight">₹99</span>
                 <span className="text-sm font-semibold text-slate-500">/ month</span>
               </div>
               <p className="text-xs text-emerald-600 font-semibold bg-emerald-50 py-1 px-3 rounded-md inline-block">
-                Includes 3-Day Free Trial • Cancel Anytime
+                Includes 7-Day Free Trial • Cancel Anytime
               </p>
             </div>
 
@@ -828,7 +828,7 @@ export default function LandingPage() {
               href="/signup"
               className="mt-8 w-full block text-center bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm py-3.5 rounded-xl transition shadow-lg shadow-blue-500/25 active:scale-98"
             >
-              Start Free 3-Day Trial
+              Start 7-Day Free Trial
             </Link>
           </div>
         ) : (
