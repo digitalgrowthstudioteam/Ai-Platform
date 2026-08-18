@@ -292,6 +292,20 @@ class ApiClient {
     return this.request<any>(`/admin/users/${userId}/details`);
   }
 
+  async updateUserAddons(userId: string, addonId: string, quantity: number) {
+    return this.request<{ status: string; message: string }>(`/admin/users/${userId}/addons`, {
+      method: "POST",
+      body: { addon_id: addonId, quantity },
+    });
+  }
+
+  async updateUserCredits(userId: string, credits: number) {
+    return this.request<{ status: string; message: string }>(`/admin/users/${userId}/credits`, {
+      method: "POST",
+      body: { credits },
+    });
+  }
+
   // Team Endpoints
   async getTeamMembers() {
     return this.request<any[]>("/team");

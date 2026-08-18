@@ -60,6 +60,7 @@ class AdminUserItem(BaseModel):
     status: str
     connected_accounts_count: int
     last_sync_status: Optional[str] = None
+    credits: int
 
 
 class PlanOverrideRequest(BaseModel):
@@ -68,6 +69,15 @@ class PlanOverrideRequest(BaseModel):
 
 class StatusOverrideRequest(BaseModel):
     status: str
+
+
+class AdminAddonOverrideRequest(BaseModel):
+    addon_id: str
+    quantity: int
+
+
+class AdminCreditsOverrideRequest(BaseModel):
+    credits: int
 
 
 # ──────────────────────────────────────────────
@@ -223,6 +233,7 @@ async def list_platform_users(
                 status=user.status,
                 connected_accounts_count=r.acc_count,
                 last_sync_status=r.last_sync,
+                credits=user.credits,
             )
         )
     return user_items
@@ -252,6 +263,26 @@ async def override_user_plan(
 
     # Upgrade/overwrite plan
     user.plan_id = req.plan_id
+    
+    # Synchronize/Override Subscription table record
+    stmt_sub = select(Subscription).where(Subscription.user_id == user.id).where(Subscription.status == "active")
+    res_sub = await db.execute(stmt_sub)
+    sub = res_sub.scalar_one_or_none()
+    
+    if sub:
+        sub.plan = req.plan_id
+        # Reset expires_at to 10 years in the future so override remains active
+        sub.expires_at = datetime.utcnow() + timedelta(days=3650)
+    else:
+        new_sub = Subscription(
+            user_id=user.id,
+            plan=req.plan_id,
+            status="active",
+            started_at=datetime.utcnow(),
+            expires_at=datetime.utcnow() + timedelta(days=3650)
+        )
+        db.add(new_sub)
+        
     await db.commit()
 
     logger.info("admin_plan_override_success", user_id=user_id, plan=req.plan_id)
@@ -517,6 +548,7 @@ async def get_user_details(
             "name": user.name,
             "plan_id": user.plan_id or "starter",
             "status": user.status,
+            "credits": user.credits,
             "created_at": user.created_at,
             "deletion_scheduled_at": user.deletion_scheduled_at,
         },
@@ -576,3 +608,90 @@ async def get_user_details(
             for camp in campaigns
         ]
     }
+
+
+@router.post("/users/{user_id}/addons", summary="Give or remove user subscription addons")
+async def override_user_addons(
+    user_id: uuid.UUID,
+    req: AdminAddonOverrideRequest,
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Creates, updates, or deletes user subscription addons directly.
+    """
+    verify_admin(claims)
+
+    stmt = select(User).where(User.id == user_id)
+    res = await db.execute(stmt)
+    user = res.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found."
+        )
+
+    # Find existing active addon
+    stmt_addon = (
+        select(SubscriptionAddOn)
+        .where(SubscriptionAddOn.user_id == user_id)
+        .where(SubscriptionAddOn.addon_id == req.addon_id)
+        .where(SubscriptionAddOn.status == "active")
+    )
+    res_addon = await db.execute(stmt_addon)
+    addon = res_addon.scalar_one_or_none()
+
+    if req.quantity <= 0:
+        # Remove addon
+        if addon:
+            await db.delete(addon)
+            await db.commit()
+        return {"status": "success", "message": f"Successfully removed addon {req.addon_id}."}
+
+    # Add or update addon
+    if addon:
+        addon.quantity = req.quantity
+        addon.expires_at = datetime.utcnow() + timedelta(days=3650)
+    else:
+        addon = SubscriptionAddOn(
+            user_id=user_id,
+            addon_id=req.addon_id,
+            quantity=req.quantity,
+            status="active",
+            expires_at=datetime.utcnow() + timedelta(days=3650)
+        )
+        db.add(addon)
+
+    await db.commit()
+    logger.info("admin_addon_override_success", user_id=user_id, addon=req.addon_id, qty=req.quantity)
+    return {"status": "success", "message": f"Successfully set addon {req.addon_id} quantity to {req.quantity}."}
+
+
+@router.post("/users/{user_id}/credits", summary="Give or remove user credits")
+async def override_user_credits(
+    user_id: uuid.UUID,
+    req: AdminCreditsOverrideRequest,
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Modifies a user's credit balance directly.
+    """
+    verify_admin(claims)
+
+    stmt = select(User).where(User.id == user_id)
+    res = await db.execute(stmt)
+    user = res.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found."
+        )
+
+    user.credits = req.credits
+    await db.commit()
+
+    logger.info("admin_credits_override_success", user_id=user_id, credits=req.credits)
+    return {"status": "success", "message": f"Successfully updated user credits to {req.credits}."}

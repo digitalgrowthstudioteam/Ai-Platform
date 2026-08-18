@@ -2,7 +2,7 @@
 Digital Growth Studio — User Model
 """
 from datetime import datetime
-from sqlalchemy import String, DateTime
+from sqlalchemy import String, DateTime, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import List, Optional
 
@@ -35,6 +35,11 @@ class User(BaseModel):
         String(50),
         nullable=True,
         default="starter",
+    )
+    credits: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
     )
     status: Mapped[str] = mapped_column(
         String(50),

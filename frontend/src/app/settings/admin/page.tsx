@@ -158,6 +158,49 @@ export default function AdminPage() {
     }
   };
 
+  const handleCreditsOverride = async (targetUserId: string, newCredits: number) => {
+    try {
+      setActionLoading(`credits_${targetUserId}`);
+      await api.updateUserCredits(targetUserId, newCredits);
+      setNotification({
+        type: "success",
+        message: `User credits updated successfully to ${newCredits}.`,
+      });
+      // Refresh user details in real-time
+      if (selectedUserId === targetUserId) {
+        const details = await api.getAdminUserDetails(targetUserId);
+        setUserDetails(details);
+      }
+    } catch (err) {
+      console.error("Failed to override credits:", err);
+      setNotification({ type: "error", message: "Failed to override user credits." });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleAddonQtyChange = async (targetUserId: string, addonId: string, currentQty: number, increment: boolean) => {
+    try {
+      setActionLoading(`addon_${addonId}`);
+      const newQty = increment ? currentQty + 1 : Math.max(0, currentQty - 1);
+      await api.updateUserAddons(targetUserId, addonId, newQty);
+      setNotification({
+        type: "success",
+        message: `Addon ${addonId.replace("_", " ")} quantity updated successfully to ${newQty}.`,
+      });
+      // Refresh user details in real-time
+      if (selectedUserId === targetUserId) {
+        const details = await api.getAdminUserDetails(targetUserId);
+        setUserDetails(details);
+      }
+    } catch (err) {
+      console.error("Failed to update addon:", err);
+      setNotification({ type: "error", message: "Failed to update user addon quantity." });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const handleReplySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!replyTicketId || !replyText) return;
@@ -511,9 +554,10 @@ export default function AdminPage() {
                           onChange={(e) => handlePlanOverride(userDetails.user.id, e.target.value)}
                           className="bg-slate-100 border border-slate-200 rounded px-1.5 py-0.5 text-slate-800 font-bold outline-none cursor-pointer text-[10px]"
                         >
-                          <option value="starter">Pro Early Access</option>
-                          <option value="growth">Growth</option>
-                          <option value="scale">Scale</option>
+                          <option value="starter">Starter (₹99)</option>
+                          <option value="growth">Growth (₹999)</option>
+                          <option value="pro">Pro (₹2,999)</option>
+                          <option value="agency">Agency (₹4,999)</option>
                         </select>
                       </div>
                     </div>
@@ -531,6 +575,27 @@ export default function AdminPage() {
                           className="text-blue-600 font-bold hover:underline"
                         >
                           Toggle
+                        </button>
+                      </div>
+                    </div>
+                    <div className="flex justify-between text-slate-550">
+                      <span>Credits:</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-extrabold text-slate-800 text-[11px]">{userDetails.user.credits || 0}</span>
+                        <button
+                          disabled={actionLoading === `credits_${userDetails.user.id}`}
+                          onClick={() => {
+                            const val = prompt("Enter new credits count:", (userDetails.user.credits || 0).toString());
+                            if (val !== null) {
+                              const parsed = parseInt(val, 10);
+                              if (!isNaN(parsed)) {
+                                handleCreditsOverride(userDetails.user.id, parsed);
+                              }
+                            }
+                          }}
+                          className="text-blue-600 font-bold hover:underline text-[9px] cursor-pointer"
+                        >
+                          Modify
                         </button>
                       </div>
                     </div>
@@ -606,19 +671,49 @@ export default function AdminPage() {
                 {/* 4. Active Subscription Add-ons */}
                 <div className="space-y-2">
                   <h4 className="font-bold text-slate-800 border-b border-slate-100 pb-1.5 uppercase text-[10px] tracking-wider text-blue-600">Active Addons</h4>
-                  {userDetails.addons.length === 0 ? (
-                    <div className="text-slate-400 italic font-medium">No active paid add-ons purchased.</div>
-                  ) : (
-                    userDetails.addons.map((add: any) => (
-                      <div key={add.id} className="flex justify-between items-center p-2 bg-slate-50 rounded-xl border border-slate-150">
-                        <div>
-                          <div className="font-bold text-slate-800 uppercase text-[10px]">{add.addon_id.replace("_", " ")}</div>
-                          <div className="text-[9px] text-slate-400 mt-0.5">Expires: {new Date(add.expires_at).toLocaleDateString()}</div>
+                  <div className="space-y-2">
+                    {[
+                      { id: "additional_account", name: "Additional Meta Ad Account" },
+                      { id: "faster_sync", name: "Faster Sync (3-Hour)" },
+                      { id: "lifetime_history_monthly", name: "Lifetime Historical Data (Monthly)" },
+                      { id: "lifetime_history_annual", name: "Lifetime Historical Data (Annual)" },
+                      { id: "ai_deep_analysis", name: "AI Deep Analysis" },
+                      { id: "additional_team_member", name: "Additional Team Member" }
+                    ].map((addon) => {
+                      const activeRecord = userDetails.addons.find((a: any) => a.addon_id === addon.id);
+                      const quantity = activeRecord ? activeRecord.quantity : 0;
+                      
+                      return (
+                        <div key={addon.id} className="flex justify-between items-center p-2 bg-slate-50 rounded-xl border border-slate-150 text-xs">
+                          <div>
+                            <div className="font-bold text-slate-800 text-[10px]">{addon.name}</div>
+                            {quantity > 0 && activeRecord.expires_at && (
+                              <div className="text-[8px] text-slate-400 mt-0.5">Expires: {new Date(activeRecord.expires_at).toLocaleDateString()}</div>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                              disabled={quantity === 0 || actionLoading === `addon_${addon.id}`}
+                              onClick={() => handleAddonQtyChange(userDetails.user.id, addon.id, quantity, false)}
+                              className="w-5 h-5 bg-white border border-slate-200 rounded flex items-center justify-center font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-50 cursor-pointer text-xs"
+                            >
+                              -
+                            </button>
+                            <span className="font-extrabold text-xs text-slate-900 bg-white min-w-6 text-center px-1.5 py-0.5 rounded border border-slate-200">
+                              {quantity}
+                            </span>
+                            <button
+                              disabled={actionLoading === `addon_${addon.id}`}
+                              onClick={() => handleAddonQtyChange(userDetails.user.id, addon.id, quantity, true)}
+                              className="w-5 h-5 bg-white border border-slate-200 rounded flex items-center justify-center font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-50 cursor-pointer text-xs"
+                            >
+                              +
+                            </button>
+                          </div>
                         </div>
-                        <span className="font-extrabold text-sm text-slate-900 bg-white px-2 py-1 rounded border border-slate-200">Qty: {add.quantity}</span>
-                      </div>
-                    ))
-                  )}
+                      );
+                    })}
+                  </div>
                 </div>
 
                 {/* 5. Tracked Campaigns */}
