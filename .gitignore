@@ -1,0 +1,68 @@
+# =============================================
+# Digital Growth Studio — .gitignore
+# =============================================
+
+# ── Dependencies ─────────────────────────────
+node_modules/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# ── Environment Variables ────────────────────
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# ── Firebase ─────────────────────────────────
+firebase-service-account.json
+*-firebase-adminsdk-*.json
+
+# ── IDE ──────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ── Build Output ─────────────────────────────
+.next/
+out/
+build/
+dist/
+*.egg-info/
+*.egg
+
+# ── Testing ──────────────────────────────────
+coverage/
+.coverage
+htmlcov/
+.pytest_cache/
+.nyc_output/
+
+# ── Logs ─────────────────────────────────────
+*.log
+logs/
+
+# ── OS ───────────────────────────────────────
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ── Misc ─────────────────────────────────────
+*.bak
+*.tmp
+*.temp
+.vercel
+.turbo

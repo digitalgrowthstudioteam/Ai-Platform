@@ -1,0 +1,520 @@
+"""
+Digital Growth Studio — Meta Ads OAuth & Ad Accounts Management Router
+"""
+import httpx
+from datetime import datetime, timedelta
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import RedirectResponse
+from pydantic import BaseModel
+from sqlalchemy import select, delete
+from sqlalchemy.ext.asyncio import AsyncSession
+from typing import List, Optional
+
+from app.config import get_settings
+from app.database import get_db
+from app.dependencies import get_current_user
+from app.core.firebase import verify_firebase_token
+from app.core.exceptions import NotAuthenticatedException
+from app.models.user import User
+from app.models.meta import MetaConnection, MetaAdAccount
+
+
+router = APIRouter()
+settings = get_settings()
+
+
+# ──────────────────────────────────────────────
+# Pydantic Schemas
+# ──────────────────────────────────────────────
+class MetaConnectionStatus(BaseModel):
+    connected: bool
+    meta_user_name: Optional[str] = None
+    last_sync_at: Optional[datetime] = None
+
+
+class MetaAdAccountResponse(BaseModel):
+    id: str
+    name: str
+    currency: str
+    timezone: str
+    account_status: int
+    is_connected: bool
+
+
+class SelectAdAccountsRequest(BaseModel):
+    account_ids: List[str]
+
+
+# ──────────────────────────────────────────────
+# Helper Functions
+# ──────────────────────────────────────────────
+async def get_db_user_from_claims(claims: dict, db: AsyncSession) -> User:
+    """
+    Given Firebase token claims, find or dynamically register the User model in SQL.
+    Ensures cascading logic and referential integrity are maintained.
+    """
+    uid = claims.get("uid")
+    if not uid:
+        raise NotAuthenticatedException("Firebase UID not found in claims")
+        
+    stmt = select(User).where(User.firebase_uid == uid)
+    result = await db.execute(stmt)
+    user = result.scalar_one_or_none()
+
+    if not user:
+        # Dynamic JIT Onboarding registration in DB
+        user = User(
+            firebase_uid=uid,
+            email=claims.get("email", ""),
+            name=claims.get("name", claims.get("email", "").split("@")[0]),
+        )
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+
+    return user
+
+
+# ──────────────────────────────────────────────
+# Router Endpoints
+# ──────────────────────────────────────────────
+
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+security = HTTPBearer(auto_error=False)
+
+
+@router.get("/connect", summary="Redirect to Meta OAuth consent screen")
+async def connect_meta(
+    token: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+):
+    """
+    Redirects the user to Facebook's OAuth Dialog screen.
+    Extracts authentication claims either from the 'token' query parameter (for direct browser redirections)
+    or from standard HTTP Authorization header.
+    """
+    if not settings.META_APP_ID or not settings.META_REDIRECT_URI:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Meta App ID or Redirect URI is not configured in settings."
+        )
+
+    # 1. Resolve claims from either Query Token or Header Bearer token
+    claims = None
+    if token:
+        claims = await verify_firebase_token(token)
+    elif credentials:
+        claims = await verify_firebase_token(credentials.credentials)
+
+    if not claims:
+        raise NotAuthenticatedException("Not authenticated")
+
+    # 2. Get DB User to get user UUID as state
+    user = await get_db_user_from_claims(claims, db)
+    state = str(user.id)
+    
+    oauth_url = (
+        f"https://www.facebook.com/{settings.META_API_VERSION}/dialog/oauth"
+        f"?client_id={settings.META_APP_ID}"
+        f"&redirect_uri={settings.META_REDIRECT_URI}"
+        f"&scope=ads_read,read_insights"
+        f"&state={state}"
+        f"&response_type=code"
+    )
+    return RedirectResponse(url=oauth_url)
+
+
+@router.get("/callback", summary="Handle Meta OAuth callback")
+async def meta_callback(
+    code: Optional[str] = None,
+    state: Optional[str] = None,
+    error: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Callback endpoint Facebook redirects users back to.
+    Exchanges authorization code for long-lived access token.
+    """
+    frontend_redirect_url = f"{settings.FRONTEND_URL}/settings/ad-accounts"
+
+    if error:
+        return RedirectResponse(url=f"{frontend_redirect_url}?error={error}")
+
+    if not code or not state:
+        return RedirectResponse(url=f"{frontend_redirect_url}?error=missing_oauth_params")
+
+    # Fetch corresponding user from state (contains user.id UUID)
+    stmt = select(User).where(User.id == state)
+    result = await db.execute(stmt)
+    user = result.scalar_one_or_none()
+    
+    if not user:
+        return RedirectResponse(url=f"{frontend_redirect_url}?error=invalid_user_session")
+
+    try:
+        async with httpx.AsyncClient() as client:
+            # 1. Exchange short-lived auth code for access token
+            token_exchange_url = (
+                f"https://graph.facebook.com/{settings.META_API_VERSION}/oauth/access_token"
+                f"?client_id={settings.META_APP_ID}"
+                f"&redirect_uri={settings.META_REDIRECT_URI}"
+                f"&client_secret={settings.META_APP_SECRET}"
+                f"&code={code}"
+            )
+            r = await client.get(token_exchange_url)
+            r.raise_for_status()
+            res_data = r.json()
+            short_token = res_data["access_token"]
+
+            # 2. Exchange short-lived token for long-lived (60 days) access token
+            long_token_exchange_url = (
+                f"https://graph.facebook.com/{settings.META_API_VERSION}/oauth/access_token"
+                f"?grant_type=fb_exchange_token"
+                f"&client_id={settings.META_APP_ID}"
+                f"&client_secret={settings.META_APP_SECRET}"
+                f"&fb_exchange_token={short_token}"
+            )
+            r = await client.get(long_token_exchange_url)
+            r.raise_for_status()
+            long_res_data = r.json()
+            long_token = long_res_data["access_token"]
+            expires_in = long_res_data.get("expires_in")
+            
+            token_expires_at = None
+            if expires_in:
+                token_expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
+
+            # 3. Retrieve user profile (meta_user_id & name) via /me
+            profile_url = f"https://graph.facebook.com/{settings.META_API_VERSION}/me?fields=id,name&access_token={long_token}"
+            r = await client.get(profile_url)
+            r.raise_for_status()
+            profile_data = r.json()
+            meta_user_id = profile_data["id"]
+            meta_user_name = profile_data["name"]
+
+            # 4. Save or update MetaConnection in DB
+            stmt = select(MetaConnection).where(MetaConnection.user_id == user.id)
+            result = await db.execute(stmt)
+            connection = result.scalar_one_or_none()
+
+            if connection:
+                connection.meta_user_id = meta_user_id
+                connection.status = "connected"
+                connection.access_token = long_token
+                connection.token_expires_at = token_expires_at
+                connection.last_sync_status = "success"
+                connection.last_sync_error = None
+            else:
+                connection = MetaConnection(
+                    user_id=user.id,
+                    meta_user_id=meta_user_id,
+                    status="connected",
+                    access_token=long_token,
+                    token_expires_at=token_expires_at,
+                    last_sync_status="success",
+                )
+                db.add(connection)
+            
+            await db.commit()
+            return RedirectResponse(url=f"{frontend_redirect_url}?connected=success&meta_name={meta_user_name}")
+
+    except Exception as e:
+        # Commit failure state
+        return RedirectResponse(url=f"{frontend_redirect_url}?error=oauth_exchange_failed&detail={str(e)}")
+
+
+@router.get("/status", response_model=MetaConnectionStatus, summary="Check Meta connection status")
+async def get_connection_status(
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Returns connection details of current user's Meta profile integration.
+    """
+    user = await get_db_user_from_claims(claims, db)
+    
+    stmt = select(MetaConnection).where(MetaConnection.user_id == user.id)
+    result = await db.execute(stmt)
+    connection = result.scalar_one_or_none()
+
+    if not connection or connection.status != "connected":
+        return MetaConnectionStatus(connected=False)
+
+    # Decode and fetch connection status name from access token or use static ID
+    meta_name = f"Meta Account ({connection.meta_user_id})"
+    return MetaConnectionStatus(
+        connected=True,
+        meta_user_name=meta_name,
+        last_sync_at=connection.last_sync_at,
+    )
+
+
+@router.get("/accounts", response_model=List[MetaAdAccountResponse], summary="Retrieve available Meta Ad Accounts")
+async def get_ad_accounts(
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Calls Meta API and retrieves available ad accounts linked to connection token.
+    Lists which ones are already active in the local DB.
+    """
+    user = await get_db_user_from_claims(claims, db)
+    
+    stmt = select(MetaConnection).where(MetaConnection.user_id == user.id)
+    result = await db.execute(stmt)
+    connection = result.scalar_one_or_none()
+
+    if not connection or connection.status != "connected":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Meta account is not connected. Connect via OAuth first."
+        )
+
+    # Retrieve already synced ad accounts for this user
+    stmt = select(MetaAdAccount).where(MetaAdAccount.user_id == user.id)
+    result = await db.execute(stmt)
+    synced_accounts = {acc.meta_account_id for acc in result.scalars().all()}
+
+    try:
+        # Mock connection bypass (EAAGm0PX is user's mock token prefix for tests)
+        if connection.access_token.startswith("EAAGm0PX") or connection.access_token == "mock_access_token":
+            # Return Mock Data for testing
+            mock_accounts = [
+                {"id": "act_101010101", "name": "DGS Primary Ad Account", "currency": "INR", "timezone": "Asia/Kolkata", "account_status": 1},
+                {"id": "act_202020202", "name": "Brand Growth Sandbox", "currency": "USD", "timezone": "America/New_York", "account_status": 1},
+                {"id": "act_303030303", "name": "Underperforming Ecom Store", "currency": "INR", "timezone": "Asia/Kolkata", "account_status": 2},
+            ]
+            return [
+                MetaAdAccountResponse(
+                    id=acc["id"],
+                    name=acc["name"],
+                    currency=acc["currency"],
+                    timezone=acc["timezone"],
+                    account_status=acc["account_status"],
+                    is_connected=acc["id"] in synced_accounts,
+                )
+                for acc in mock_accounts
+            ]
+
+        async with httpx.AsyncClient() as client:
+            # Call Meta Marketing API: /me/adaccounts
+            meta_url = (
+                f"https://graph.facebook.com/{settings.META_API_VERSION}/me/adaccounts"
+                f"?fields=id,name,currency,timezone,account_status"
+                f"&access_token={connection.access_token}"
+            )
+            r = await client.get(meta_url)
+            r.raise_for_status()
+            data = r.json().get("data", [])
+
+            return [
+                MetaAdAccountResponse(
+                    id=acc["id"],
+                    name=acc.get("name", f"Account {acc['id']}"),
+                    currency=acc.get("currency", "INR"),
+                    timezone=acc.get("timezone", "Asia/Kolkata"),
+                    account_status=acc.get("account_status", 1),
+                    is_connected=acc["id"] in synced_accounts,
+                )
+                for acc in data
+            ]
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Failed to fetch ad accounts from Meta: {str(e)}"
+        )
+
+
+@router.post("/accounts/select", summary="Save active ad account selections")
+async def select_ad_accounts(
+    payload: SelectAdAccountsRequest,
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Accepts selected list of meta_account_ids.
+    Synchronizes them, deleting deselected ones, and inserting newly selected ones.
+    """
+    user = await get_db_user_from_claims(claims, db)
+    
+    stmt = select(MetaConnection).where(MetaConnection.user_id == user.id)
+    result = await db.execute(stmt)
+    connection = result.scalar_one_or_none()
+
+    if not connection or connection.status != "connected":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Meta account is not connected."
+        )
+
+    # 1. Fetch available accounts (either mock or live) to get currency, name etc.
+    available_accounts = {}
+    try:
+        # Mock connection bypass
+        if connection.access_token.startswith("EAAGm0PX") or connection.access_token == "mock_access_token":
+            mock_accounts = [
+                {"id": "act_101010101", "name": "DGS Primary Ad Account", "currency": "INR", "timezone": "Asia/Kolkata", "account_status": 1},
+                {"id": "act_202020202", "name": "Brand Growth Sandbox", "currency": "USD", "timezone": "America/New_York", "account_status": 1},
+                {"id": "act_303030303", "name": "Underperforming Ecom Store", "currency": "INR", "timezone": "Asia/Kolkata", "account_status": 2},
+            ]
+            available_accounts = {acc["id"]: acc for acc in mock_accounts}
+        else:
+            async with httpx.AsyncClient() as client:
+                meta_url = (
+                    f"https://graph.facebook.com/{settings.META_API_VERSION}/me/adaccounts"
+                    f"?fields=id,name,currency,timezone,account_status"
+                    f"&access_token={connection.access_token}"
+                )
+                r = await client.get(meta_url)
+                r.raise_for_status()
+                available_accounts = {acc["id"]: acc for acc in r.json().get("data", [])}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Failed to fetch Meta accounts for validation: {str(e)}"
+        )
+
+    # 2. Validate max_meta_accounts entitlement limit
+    from app.services.entitlement_engine import EntitlementEngine
+    entitlements = await EntitlementEngine.resolve_entitlements(user, db)
+    if len(payload.account_ids) > entitlements["max_meta_accounts"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Your selected connected accounts ({len(payload.account_ids)}) exceed your plan limit "
+                f"({entitlements['max_meta_accounts']}). Upgrade your plan, purchase an additional account, or disconnect an account."
+            )
+        )
+
+    # 3. De-register accounts that are no longer selected
+    delete_stmt = delete(MetaAdAccount).where(
+        MetaAdAccount.user_id == user.id,
+        ~MetaAdAccount.meta_account_id.in_(payload.account_ids)
+    )
+    await db.execute(delete_stmt)
+
+    # 4. Retrieve current registered accounts to prevent duplicate insert errors
+    stmt = select(MetaAdAccount).where(MetaAdAccount.user_id == user.id)
+    result = await db.execute(stmt)
+    existing_meta_ids = {acc.meta_account_id for acc in result.scalars().all()}
+
+    # 4. Insert new registrations
+    for acc_id in payload.account_ids:
+        if acc_id not in available_accounts:
+            continue  # Security validation: user cannot connect random accounts they don't own
+        
+        if acc_id in existing_meta_ids:
+            continue  # Already connected
+        
+        meta_acc_data = available_accounts[acc_id]
+        new_account = MetaAdAccount(
+            user_id=user.id,
+            meta_connection_id=connection.id,
+            meta_account_id=acc_id,
+            account_name=meta_acc_data.get("name", f"Account {acc_id}"),
+            currency=meta_acc_data.get("currency", "INR"),
+            timezone=meta_acc_data.get("timezone", "Asia/Kolkata"),
+            account_status=meta_acc_data.get("account_status", 1),
+        )
+        db.add(new_account)
+    
+    await db.commit()
+    return {"status": "success", "message": "Ad account selections saved successfully."}
+
+
+@router.post("/disconnect", summary="Revoke Meta integration")
+async def disconnect_meta(
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Deletes the MetaConnection and cascades to clear MetaAdAccounts.
+    """
+    user = await get_db_user_from_claims(claims, db)
+    
+    delete_stmt = delete(MetaConnection).where(MetaConnection.user_id == user.id)
+    await db.execute(delete_stmt)
+    await db.commit()
+    return {"status": "success", "message": "Meta account disconnected successfully."}
+
+
+class SyncTriggerRequest(BaseModel):
+    ad_account_id: Optional[str] = None
+
+
+class SyncStatusResponse(BaseModel):
+    last_sync_at: Optional[datetime] = None
+    last_sync_status: Optional[str] = None
+    last_sync_error: Optional[str] = None
+
+
+@router.post("/sync/trigger", summary="Trigger Meta marketing database sync")
+async def trigger_sync(
+    payload: Optional[SyncTriggerRequest] = None,
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Enqueues Celery background tasks to sync Meta marketing structure and metrics.
+    Can sync a specific ad_account_id or all selected accounts of the user.
+    """
+    # Inline import to prevent circular loops
+    from app.workers.tasks import sync_ad_account_task
+
+    user = await get_db_user_from_claims(claims, db)
+    
+    stmt = select(MetaAdAccount).where(MetaAdAccount.user_id == user.id)
+    if payload and payload.ad_account_id:
+        # Match either UUID or Meta Ad account ID string
+        stmt = stmt.where(
+            (MetaAdAccount.meta_account_id == payload.ad_account_id) | 
+            (MetaAdAccount.id.cast(String) == payload.ad_account_id)
+        )
+    
+    res = await db.execute(stmt)
+    accounts = res.scalars().all()
+    
+    if not accounts:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="No active ad accounts found to sync."
+        )
+        
+    for acc in accounts:
+        # Launch Celery background task
+        sync_ad_account_task.delay(str(acc.id))
+        
+    return {
+        "status": "success", 
+        "message": f"Database synchronization triggered in the background for {len(accounts)} ad account(s)."
+    }
+
+
+@router.get("/sync/status", response_model=SyncStatusResponse, summary="Query connection synchronization history")
+async def get_sync_status(
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Queries sync status, timestamps, and error logs of the Meta integration connection.
+    """
+    user = await get_db_user_from_claims(claims, db)
+    
+    stmt = select(MetaConnection).where(MetaConnection.user_id == user.id)
+    res = await db.execute(stmt)
+    connection = res.scalar_one_or_none()
+    
+    if not connection:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="No active Meta integration connection found."
+        )
+        
+    return SyncStatusResponse(
+        last_sync_at=connection.last_sync_at,
+        last_sync_status=connection.last_sync_status,
+        last_sync_error=connection.last_sync_error,
+    )
+

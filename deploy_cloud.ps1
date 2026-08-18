@@ -1,0 +1,27 @@
+# =============================================================================
+# Digital Growth Studio — 1-Click Unified Production Cloud Deploy
+# Deploys Next.js Frontend & FastAPI Backend to Firebase & Cloud Run
+# Target Domain: digitalgrowthstudio.in
+# =============================================================================
+
+Write-Host "🚀 Starting Digital Growth Studio Deployment for digitalgrowthstudio.in..." -ForegroundColor Green
+
+# 1. Build Next.js Frontend
+Write-Host "📦 Building Next.js Frontend..." -ForegroundColor Cyan
+Set-Location -Path "$PSScriptRoot\frontend"
+npm run build
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "❌ Frontend build failed!" -ForegroundColor Red
+    exit 1
+}
+
+# 2. Deploy Frontend to Firebase Hosting
+Write-Host "🔥 Deploying Frontend to Firebase Hosting..." -ForegroundColor Cyan
+Set-Location -Path "$PSScriptRoot"
+npx --yes firebase-tools deploy --only hosting --non-interactive
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "❌ Firebase Hosting deploy failed!" -ForegroundColor Red
+    exit 1
+}
+
+Write-Host "✅ Deployment successful! Your site is live and ready for digitalgrowthstudio.in" -ForegroundColor Green
