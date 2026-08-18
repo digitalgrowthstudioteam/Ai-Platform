@@ -13,6 +13,9 @@ export default function AdSetsPage() {
   const [selectedAdSet, setSelectedAdSet] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
   const [datePreset, setDatePreset] = useState<"7d" | "30d">("30d");
+  const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const [sortBy, setSortBy] = useState<string>("spend");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
   // Date helper
   const getDates = (preset: "7d" | "30d") => {
@@ -80,6 +83,23 @@ export default function AdSetsPage() {
   };
   const dateRangeLabel = `${formatDateHeader(startStr)} – ${formatDateHeader(endStr)}, 2026`;
 
+  const filteredAndSortedAdSets = adsets
+    .filter(a => statusFilter === "ALL" || a.status === statusFilter)
+    .sort((a, b) => {
+      let valA: any = 0;
+      let valB: any = 0;
+      if (sortBy === "name") {
+        valA = a.name.toLowerCase();
+        valB = b.name.toLowerCase();
+      } else {
+        valA = a.metrics[sortBy] || 0;
+        valB = b.metrics[sortBy] || 0;
+      }
+      if (valA < valB) return sortOrder === "asc" ? -1 : 1;
+      if (valA > valB) return sortOrder === "asc" ? 1 : -1;
+      return 0;
+    });
+
   if (loadingAccounts) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -139,57 +159,99 @@ export default function AdSetsPage() {
         </div>
       ) : (
         /* Ad Sets Table Card */
-        <div className="card border border-border bg-white shadow-sm rounded-lg overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-xs text-left divide-y divide-border">
-              <thead className="bg-slate-50/50">
-                <tr className="text-subtle font-bold uppercase tracking-wider border-b border-border">
-                  <th className="p-4">Ad Set Details</th>
-                  <th className="p-4">Campaign</th>
-                  <th className="p-4 text-right">Spend</th>
-                  <th className="p-4 text-right">Impressions</th>
-                  <th className="p-4 text-right">Clicks</th>
-                  <th className="p-4 text-right">Conversions</th>
-                  <th className="p-4 text-right">CTR</th>
-                  <th className="p-4 text-right">CPC</th>
-                  <th className="p-4 text-right">ROAS</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border font-medium text-slate-700">
-                {adsets.map((as, idx) => (
-                  <tr 
-                    key={idx} 
-                    onClick={() => setSelectedAdSet(as)} 
-                    className="hover:bg-slate-50 transition cursor-pointer"
-                  >
-                    <td className="p-4">
-                      <div className="font-bold text-sm text-slate-800">{as.name}</div>
-                      <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                        <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${as.status === "ACTIVE" ? "text-green-600 bg-green-50" : "text-slate-500 bg-slate-100"}`}>
-                          {as.status}
-                        </span>
-                        <span className="text-[9px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded font-bold uppercase">
-                          {as.optimization_goal.replace(/_/g, " ")}
-                        </span>
-                        <span className="text-[9px] text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded font-bold uppercase">
-                          {as.billing_event.replace(/_/g, " ")}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="p-4 text-slate-500 font-semibold max-w-xs truncate">{as.campaign_name}</td>
-                    <td className="p-4 text-right font-semibold">{formatCurrency(as.metrics.spend)}</td>
-                    <td className="p-4 text-right">{formatNumber(as.metrics.impressions)}</td>
-                    <td className="p-4 text-right">{formatNumber(as.metrics.clicks)}</td>
-                    <td className="p-4 text-right">{formatNumber(as.metrics.purchases)}</td>
-                    <td className="p-4 text-right">{formatPercent(as.metrics.ctr)}</td>
-                    <td className="p-4 text-right">{formatCurrency(as.metrics.cpc)}</td>
-                    <td className="p-4 text-right text-green-600 font-bold text-sm">
-                      {as.metrics.roas.toFixed(2)}x
-                    </td>
+        <div className="space-y-4">
+          {/* Dynamic Filters & Sorter Header */}
+          <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 border border-border rounded-lg shadow-xs">
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-bold text-slate-500">Status Filter:</span>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="text-xs border border-border rounded px-2.5 py-1.5 bg-white font-semibold text-slate-700 focus:outline-none cursor-pointer"
+              >
+                <option value="ALL">All Statuses</option>
+                <option value="ACTIVE">Active</option>
+                <option value="PAUSED">Paused</option>
+                <option value="ARCHIVED">Stopped / Archived</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-bold text-slate-500">Sort By:</span>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="text-xs border border-border rounded px-2.5 py-1.5 bg-white font-semibold text-slate-700 focus:outline-none cursor-pointer"
+              >
+                <option value="name">Ad Set Name</option>
+                <option value="spend">Spend</option>
+                <option value="impressions">Impressions</option>
+                <option value="clicks">Clicks</option>
+                <option value="purchases">Conversions</option>
+                <option value="ctr">CTR</option>
+                <option value="cpc">CPC</option>
+                <option value="roas">ROAS</option>
+              </select>
+              <button
+                onClick={() => setSortOrder(prev => prev === "asc" ? "desc" : "asc")}
+                className="text-xs border border-border rounded px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 font-bold text-slate-600 cursor-pointer"
+              >
+                {sortOrder === "asc" ? "↑ Asc" : "↓ Desc"}
+              </button>
+            </div>
+          </div>
+
+          <div className="card border border-border bg-white shadow-sm rounded-lg overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-xs text-left divide-y divide-border">
+                <thead className="bg-slate-50/50">
+                  <tr className="text-subtle font-bold uppercase tracking-wider border-b border-border">
+                    <th className="p-4">Ad Set Details</th>
+                    <th className="p-4">Campaign</th>
+                    <th className="p-4 text-right">Spend</th>
+                    <th className="p-4 text-right">Impressions</th>
+                    <th className="p-4 text-right">Clicks</th>
+                    <th className="p-4 text-right">Conversions</th>
+                    <th className="p-4 text-right">CTR</th>
+                    <th className="p-4 text-right">CPC</th>
+                    <th className="p-4 text-right">ROAS</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-border font-medium text-slate-700">
+                  {filteredAndSortedAdSets.map((as, idx) => (
+                    <tr 
+                      key={idx} 
+                      onClick={() => setSelectedAdSet(as)} 
+                      className="hover:bg-slate-50 transition cursor-pointer"
+                    >
+                      <td className="p-4">
+                        <div className="font-bold text-sm text-slate-800">{as.name}</div>
+                        <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                          <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${as.status === "ACTIVE" ? "text-green-600 bg-green-50" : "text-slate-500 bg-slate-100"}`}>
+                            {as.status}
+                          </span>
+                          <span className="text-[9px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded font-bold uppercase">
+                            {as.optimization_goal.replace(/_/g, " ")}
+                          </span>
+                          <span className="text-[9px] text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded font-bold uppercase">
+                            {as.billing_event.replace(/_/g, " ")}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="p-4 text-slate-500 font-semibold max-w-xs truncate">{as.campaign_name}</td>
+                      <td className="p-4 text-right font-semibold">{formatCurrency(as.metrics.spend)}</td>
+                      <td className="p-4 text-right">{formatNumber(as.metrics.impressions)}</td>
+                      <td className="p-4 text-right">{formatNumber(as.metrics.clicks)}</td>
+                      <td className="p-4 text-right">{formatNumber(as.metrics.purchases)}</td>
+                      <td className="p-4 text-right">{formatPercent(as.metrics.ctr)}</td>
+                      <td className="p-4 text-right">{formatCurrency(as.metrics.cpc)}</td>
+                      <td className="p-4 text-right text-green-600 font-bold text-sm">
+                        {as.metrics.roas.toFixed(2)}x
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
