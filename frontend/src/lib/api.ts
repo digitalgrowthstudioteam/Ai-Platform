@@ -329,6 +329,40 @@ class ApiClient {
       body: { reply, status },
     });
   }
+
+  // Notifications Endpoints
+  async getNotifications() {
+    return this.request<any[]>("/notifications");
+  }
+
+  async markNotificationAsRead(notificationId: string) {
+    return this.request<{ status: string; message: string }>(`/notifications/${notificationId}/read`, {
+      method: "POST",
+    });
+  }
+
+  async markAllNotificationsAsRead() {
+    return this.request<{ status: string; message: string }>("/notifications/read-all", {
+      method: "POST",
+    });
+  }
+
+  // Account Deletion Endpoints
+  async deleteAccount() {
+    return this.request<{ status: string; message: string }>("/auth/delete-account", {
+      method: "POST",
+    });
+  }
+
+  async cancelAccountDeletion() {
+    return this.request<{ status: string; message: string }>("/auth/cancel-delete", {
+      method: "POST",
+    });
+  }
+
+  async getMyProfile() {
+    return this.request<any>("/auth/me");
+  }
 }
 
 export const api = new ApiClient(API_BASE_URL);

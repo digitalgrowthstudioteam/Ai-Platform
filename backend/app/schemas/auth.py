@@ -11,3 +11,5 @@ class UserMeResponse(BaseModel):
     email: EmailStr
     name: Optional[str] = None
     picture: Optional[str] = None
+    status: Optional[str] = None
+    deletion_scheduled_at: Optional[str] = None
