@@ -128,11 +128,6 @@ export default function AdAccountsPage() {
 
   // Trigger toggle on (deactivation is blocked / locked)
   const handleToggleOn = (accountId: string) => {
-    // 1. Verify industry vertical is selected
-    if (!industries[accountId] || industries[accountId] === "") {
-      setError("Please select an Industry Vertical before activating this ad account.");
-      return;
-    }
     setError(null);
     setPendingAccountId(accountId);
     setShowConfirmModal(true);
@@ -398,18 +393,51 @@ export default function AdAccountsPage() {
           </div>
  
           {/* Confirmation Popup Modal */}
-          {showConfirmModal && (
+          {showConfirmModal && pendingAccountId && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
               <div className="bg-white rounded-xl shadow-xl max-w-md w-full border border-slate-100 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
                 <div className="p-6 space-y-4">
                   <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center">
                     <Megaphone size={24} />
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     <h3 className="text-lg font-bold text-slate-900">Confirm Account Activation</h3>
                     <p className="text-sm text-slate-500 leading-relaxed">
-                      Once you select the ads account, you will not be able to switch to any other account further. Do you want to proceed and activate this ad account pipeline?
+                      Once you select the ads account, you will not be able to switch to any other account further.
                     </p>
+                    
+                    {/* Render Industry vertical selection inside the modal if not selected on the card */}
+                    {(!industries[pendingAccountId] || industries[pendingAccountId] === "") && (
+                      <div className="pt-2 space-y-1.5 text-left">
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                          Select Industry Vertical (Mandatory)
+                        </label>
+                        <select
+                          value={industries[pendingAccountId] || ""}
+                          onChange={(e) => {
+                            setIndustries(prev => ({
+                              ...prev,
+                              [pendingAccountId]: e.target.value
+                            }));
+                          }}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold text-slate-700 outline-none cursor-pointer focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                        >
+                          <option value="">-- Select Industry --</option>
+                          <option value="E-commerce">E-commerce</option>
+                          <option value="SaaS">SaaS / Software</option>
+                          <option value="Real Estate">Real Estate</option>
+                          <option value="Healthcare">Healthcare & Medical</option>
+                          <option value="Education">Education & Learning</option>
+                          <option value="Retail">Retail & Fashion</option>
+                          <option value="Entertainment">Entertainment & Media</option>
+                          <option value="Agency">Agency & Consulting</option>
+                          <option value="Financial Services">Financial Services</option>
+                          <option value="Travel">Travel & Hospitality</option>
+                          <option value="Local Business">Local Business</option>
+                          <option value="Other">Other</option>
+                        </select>
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="bg-slate-50 border-t border-slate-100 px-6 py-4 flex items-center justify-end gap-3">
@@ -424,9 +452,9 @@ export default function AdAccountsPage() {
                     Cancel
                   </button>
                   <button
-                    disabled={saving}
+                    disabled={saving || !industries[pendingAccountId] || industries[pendingAccountId] === ""}
                     onClick={() => pendingAccountId && saveAccountSelection(pendingAccountId)}
-                    className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 text-xs rounded-lg transition flex items-center gap-1.5"
+                    className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 text-xs rounded-lg transition flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {saving && <Loader2 size={12} className="animate-spin text-white" />}
                     Confirm & Activate
