@@ -17,18 +17,17 @@ def initialize_firebase(service_account_path: Optional[str] = None):
     """
     Initialize Firebase Admin SDK.
     Called during application startup.
-
-    Args:
-        service_account_path: Path to Firebase service account JSON file.
-                             If None, uses GOOGLE_APPLICATION_CREDENTIALS env var.
     """
     global _firebase_app
+    from app.config import get_settings
+    settings = get_settings()
 
     try:
         import firebase_admin
         from firebase_admin import credentials
-
         import os
+        import json
+
         if _firebase_app is not None:
             logger.info("firebase_already_initialized")
             return
@@ -36,16 +35,18 @@ def initialize_firebase(service_account_path: Optional[str] = None):
         if service_account_path and os.path.exists(service_account_path):
             cred = credentials.Certificate(service_account_path)
             _firebase_app = firebase_admin.initialize_app(cred)
+            logger.info("firebase_initialized_with_certificate_file")
+        elif os.environ.get("FIREBASE_SERVICE_ACCOUNT_JSON"):
+            service_account_info = json.loads(os.environ["FIREBASE_SERVICE_ACCOUNT_JSON"])
+            cred = credentials.Certificate(service_account_info)
+            _firebase_app = firebase_admin.initialize_app(cred)
+            logger.info("firebase_initialized_with_env_json")
         else:
-            try:
-                # Uses GOOGLE_APPLICATION_CREDENTIALS environment variable
-                _firebase_app = firebase_admin.initialize_app()
-                logger.info("firebase_initialized_with_default_credentials")
-            except Exception as e:
-                logger.warning("firebase_initialization_skipped", reason="Service account JSON not found and default credentials unavailable", error=str(e))
-                return
-
-        logger.info("firebase_initialized_successfully")
+            project_id = getattr(settings, "FIREBASE_PROJECT_ID", "digital-growth-studio")
+            _firebase_app = firebase_admin.initialize_app(
+                options={"projectId": project_id}
+            )
+            logger.info("firebase_initialized_with_project_id", project_id=project_id)
 
     except Exception as e:
         logger.error("firebase_initialization_failed", error=str(e))
