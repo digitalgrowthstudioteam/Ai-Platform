@@ -29,9 +29,9 @@ async def test_base_entitlements_by_plan(db):
 
     ent_free = await EntitlementEngine.resolve_entitlements(user_free, db)
     assert ent_free["plan_id"] == "free"
-    assert ent_free["max_meta_accounts"] == 1
-    assert ent_free["sync_interval_hours"] == 48
-    assert ent_free["historical_days"] == 7
+    assert ent_free["max_meta_accounts"] == 0
+    assert ent_free["sync_interval_hours"] == 999999
+    assert ent_free["historical_days"] == 0
     assert ent_free["feature_gates"]["creative_analysis"] is False
 
     # Create test user for Starter plan
@@ -40,6 +40,10 @@ async def test_base_entitlements_by_plan(db):
         name="Starter User",
         plan_id="starter",
         firebase_uid="uid_starter_limits",
+        trial_status="active",
+        trial_started_at=datetime.now(timezone.utc),
+        trial_ends_at=datetime.now(timezone.utc) + timedelta(days=7),
+        trial_used=True,
     )
     db.add(user_starter)
     await db.commit()
@@ -63,6 +67,10 @@ async def test_addons_resolve_entitlements_combination(db):
         name="Combo User",
         plan_id="starter",
         firebase_uid="uid_addon_combos",
+        trial_status="active",
+        trial_started_at=datetime.now(timezone.utc),
+        trial_ends_at=datetime.now(timezone.utc) + timedelta(days=7),
+        trial_used=True,
     )
     db.add(user)
     await db.commit()
@@ -120,6 +128,10 @@ async def test_expired_addons_excluded(db):
         name="Expired User",
         plan_id="starter",
         firebase_uid="uid_expired_addons",
+        trial_status="active",
+        trial_started_at=datetime.now(timezone.utc),
+        trial_ends_at=datetime.now(timezone.utc) + timedelta(days=7),
+        trial_used=True,
     )
     db.add(user)
     await db.commit()
@@ -171,6 +183,17 @@ async def test_billing_addon_endpoints(db):
         firebase_uid="uid_billing_endpoints",
     )
     db.add(user)
+    await db.commit()
+
+    # Pre-create active paid subscription to test billing addon endpoints
+    sub = Subscription(
+        user_id=user.id,
+        plan="starter",
+        status="active",
+        started_at=datetime.now(timezone.utc),
+        expires_at=datetime.now(timezone.utc) + timedelta(days=30),
+    )
+    db.add(sub)
     await db.commit()
 
     from app.database import get_db

@@ -3,10 +3,13 @@ Digital Growth Studio — FastAPI Dependencies
 Dependency injection for authentication, database sessions, and services.
 """
 import structlog
-from fastapi import Depends, Header
+from datetime import datetime, timezone
+from fastapi import Depends, Header, HTTPException, status
 from typing import Optional
 
 from app.database import get_db, AsyncSession
+from app.models.user import User
+from app.models.subscription import Subscription
 
 logger = structlog.get_logger()
 
@@ -51,13 +54,71 @@ async def get_current_user(
 # ──────────────────────────────────────────────
 # Subscription Dependency (Phase 9)
 # ──────────────────────────────────────────────
-# This will verify that the authenticated user has an active subscription.
-#
-# async def require_active_subscription(
-#     user: User = Depends(get_current_user),
-#     db: AsyncSession = Depends(get_database_session),
-# ) -> User:
-#     ...
+async def require_active_subscription(
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    """
+    Verifies that the user has either an active paid subscription or an active free trial.
+    Rejects with 402 Payment Required if expired/unsubscribed, or 403 if suspended.
+    """
+    from app.api.v1.meta import get_db_user_from_claims
+    user = await get_db_user_from_claims(claims, db)
+    
+    if user.status == "suspended":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your account has been suspended. Please contact support."
+        )
+
+    # 1. Check for active paid subscription
+    from sqlalchemy import select
+    stmt = (
+        select(Subscription)
+        .where(Subscription.user_id == user.id)
+        .where(Subscription.status == "active")
+        .order_by(Subscription.expires_at.desc())
+    )
+    res = await db.execute(stmt)
+    sub = res.scalar_one_or_none()
+    
+    if sub:
+        return user
+
+    # 2. Check trial status
+    if user.trial_status == "active":
+        now = datetime.now(timezone.utc)
+        ends_at = user.trial_ends_at
+        if ends_at:
+            if ends_at.tzinfo is None:
+                ends_at = ends_at.replace(tzinfo=timezone.utc)
+            
+            if now > ends_at:
+                # Update status to expired
+                user.trial_status = "expired"
+                await db.commit()
+                raise HTTPException(
+                    status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                    detail="Your 7-day trial has ended. Please subscribe to a paid plan to continue."
+                )
+            return user
+
+    elif user.trial_status == "expired":
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail="Your 7-day trial has ended. Please subscribe to a paid plan to continue."
+        )
+
+    elif user.trial_status == "not_started":
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail="Please connect a Meta Ad Account and start your 7-day trial."
+        )
+
+    raise HTTPException(
+        status_code=status.HTTP_402_PAYMENT_REQUIRED,
+        detail="Active subscription or trial is required to access paid features."
+    )
 
 
 # ──────────────────────────────────────────────

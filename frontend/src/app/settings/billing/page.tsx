@@ -310,6 +310,13 @@ export default function BillingPage() {
   };
 
   const getPlanDetails = (planId: string) => {
+    if (sub?.status === "trialing") {
+      return { name: "7-Day Free Trial", price: "₹0/mo", color: "text-blue-700 bg-blue-50 border-blue-200" };
+    }
+    if (sub?.status === "expired") {
+      return { name: "Trial Expired", price: "₹99/mo", color: "text-rose-700 bg-rose-50 border-rose-200" };
+    }
+
     switch (planId?.toLowerCase()) {
       case "agency":
         return { name: "Agency Plan", price: "₹4,999/mo", color: "text-purple-700 bg-purple-50 border-purple-200" };
@@ -454,69 +461,25 @@ export default function BillingPage() {
               <p className="text-xs text-slate-500 font-medium">Select the right intelligence level for your Meta advertising scale</p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-              {/* 1. FREE PLAN */}
-              <div className={`bg-white border rounded-2xl overflow-hidden shadow-xs flex flex-col justify-between ${
-                sub?.plan === "free" ? "ring-2 ring-blue-600 border-blue-600" : "border-slate-200"
-              }`}>
-                <div className="p-5 space-y-3">
-                  <div>
-                    <h4 className="text-base font-bold text-slate-900">Free</h4>
-                    <p className="text-[11px] text-slate-500">Explore platform capabilities</p>
-                  </div>
-                  <div className="text-2xl font-extrabold text-slate-950">
-                    ₹0<span className="text-xs text-slate-400 font-normal">/mo</span>
-                  </div>
-
-                  <div className="space-y-2 border-t border-slate-150 pt-3 text-[11px] font-medium text-slate-600">
-                    <div className="flex items-center gap-1.5">
-                      <Check size={13} className="text-blue-600 shrink-0" />
-                      <span>1 Meta Ad Account</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <Check size={13} className="text-blue-600 shrink-0" />
-                      <span>Max 3 Campaigns analyzed</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <Check size={13} className="text-blue-600 shrink-0" />
-                      <span>7 Days historical data</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <Check size={13} className="text-blue-600 shrink-0" />
-                      <span>Every 48 Hours data sync</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <Check size={13} className="text-blue-600 shrink-0" />
-                      <span>3 AI Recommendations/mo</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <Check size={13} className="text-blue-600 shrink-0" />
-                      <span>1 Team Member</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-4 border-t border-slate-100 bg-slate-50">
-                  <button
-                    disabled={true}
-                    className="w-full py-2 rounded-xl font-bold text-xs bg-slate-200 text-slate-600 cursor-not-allowed"
-                  >
-                    {sub?.plan === "free" ? "Current Plan" : "Free Plan"}
-                  </button>
-                </div>
-              </div>
-
-              {/* 2. PRO EARLY ACCESS PLAN (₹99/mo) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* 1. STARTER PLAN (₹99/mo) */}
               {(starterAvailable || sub?.plan === "starter") && (
                 <div className={`bg-white border-2 rounded-2xl overflow-hidden shadow-sm flex flex-col justify-between relative ${
-                  sub?.plan === "starter" ? "ring-2 ring-blue-600 border-blue-600" : "border-blue-500/80"
+                  sub?.plan === "starter" ? "ring-2 ring-blue-600 border-blue-600" : "border-slate-200"
                 }`}>
-                  <div className="bg-blue-600 text-white text-[10px] font-extrabold uppercase tracking-wider text-center py-1">
-                    🔥 Early Access Tier
-                  </div>
+                  {sub?.status === "trialing" && (
+                    <div className="bg-blue-600 text-white text-[10px] font-extrabold uppercase tracking-wider text-center py-1">
+                      ⚡ Active Free Trial
+                    </div>
+                  )}
+                  {sub?.status !== "trialing" && (
+                    <div className="bg-slate-100 text-slate-800 text-[10px] font-extrabold uppercase tracking-wider text-center py-1">
+                      Starter Tier
+                    </div>
+                  )}
                   <div className="p-5 space-y-3">
                     <div>
-                      <h4 className="text-base font-bold text-slate-900">Pro Early Access</h4>
+                      <h4 className="text-base font-bold text-slate-900">Starter</h4>
                       <p className="text-[11px] text-slate-500">Low-cost entry for advertisers</p>
                     </div>
                     <div className="text-2xl font-extrabold text-slate-950">
@@ -561,12 +524,16 @@ export default function BillingPage() {
 
                   <div className="p-4 border-t border-slate-100 bg-slate-50">
                     <button
-                      disabled={sub?.plan === "starter" || actionLoading !== null}
+                      disabled={(sub?.plan === "starter" && sub?.status === "active") || actionLoading !== null}
                       onClick={() => handlePlanCheckout("starter")}
-                      className="w-full py-2 rounded-xl font-bold text-xs bg-blue-600 hover:bg-blue-700 text-white transition flex items-center justify-center gap-1.5 shadow-xs"
+                      className="w-full py-2 rounded-xl font-bold text-xs bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-500 disabled:cursor-not-allowed text-white transition flex items-center justify-center gap-1.5 shadow-xs"
                     >
                       {actionLoading === "plan_starter" && <Loader2 size={12} className="animate-spin" />}
-                      {sub?.plan === "starter" ? "Current Plan" : "Upgrade to Pro Early Access"}
+                      {sub?.plan === "starter" && sub?.status === "active"
+                        ? "Current Plan"
+                        : sub?.plan === "starter" && sub?.status === "trialing"
+                        ? "Upgrade Trial to Paid"
+                        : "Subscribe to Starter"}
                     </button>
                   </div>
                 </div>

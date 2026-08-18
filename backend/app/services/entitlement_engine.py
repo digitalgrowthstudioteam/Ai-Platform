@@ -8,17 +8,18 @@ from typing import Dict, Any, List
 
 from app.models.user import User
 from app.models.subscription_addon import SubscriptionAddOn
+from app.models.subscription import Subscription
 
 # ──────────────────────────────────────────────
 # Centralised SaaS Plan Entitlements Config
 # ──────────────────────────────────────────────
 PLANS_CONFIG = {
     "free": {
-        "max_meta_accounts": 1,
-        "historical_days": 7,
-        "sync_interval_hours": 48,
-        "max_team_members": 1,
-        "ai_recommendations_limit": 3,
+        "max_meta_accounts": 0,
+        "historical_days": 0,
+        "sync_interval_hours": 999999,
+        "max_team_members": 0,
+        "ai_recommendations_limit": 0,
         "feature_gates": {
             "creative_analysis": False,
             "copy_analysis": False,
@@ -177,8 +178,34 @@ class EntitlementEngine:
     async def resolve_entitlements(cls, user: User, db: AsyncSession) -> Dict[str, Any]:
         """
         Combines user subscription plan limits and active add-on quantities.
+        Dynamically checks for active trials and active paid subscriptions.
         """
-        plan_id = user.plan_id or "free"
+        # 1. Check if user has active trial
+        is_trial_active = False
+        if user.trial_status == "active" and user.trial_ends_at:
+            ends_at = user.trial_ends_at
+            if ends_at.tzinfo is None:
+                ends_at = ends_at.replace(tzinfo=timezone.utc)
+            if datetime.now(timezone.utc) <= ends_at:
+                is_trial_active = True
+
+        # 2. Check if user has active paid subscription
+        stmt = (
+            select(Subscription)
+            .where(Subscription.user_id == user.id)
+            .where(Subscription.status == "active")
+            .order_by(Subscription.expires_at.desc())
+        )
+        res = await db.execute(stmt)
+        sub = res.scalar_one_or_none()
+
+        if sub:
+            plan_id = sub.plan.lower()
+        elif is_trial_active:
+            plan_id = "starter"
+        else:
+            plan_id = "free"  # Zero-entitlement locked state
+
         base_config = cls.get_plan_config(plan_id)
         
         # Load user add-ons

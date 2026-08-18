@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 
 from app.database import get_db
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, require_active_subscription
 from app.api.v1.meta import get_db_user_from_claims
 from app.models.meta import MetaAdAccount
 from app.models.campaign import Campaign, AdSet, Ad
@@ -19,7 +19,11 @@ from app.models.creative import Creative
 from app.models.metrics import AdDailyMetrics
 
 logger = structlog.get_logger()
-router = APIRouter(prefix="/ads", tags=["Ads"])
+router = APIRouter(
+    prefix="/ads",
+    tags=["Ads"],
+    dependencies=[Depends(require_active_subscription)],
+)
 
 
 # ──────────────────────────────────────────────

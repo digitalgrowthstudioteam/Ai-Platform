@@ -23,6 +23,7 @@ import {
   AlertTriangle,
   Mail,
   User as UserIcon,
+  Sparkles,
 } from "lucide-react";
 
 export default function AdminPage() {
@@ -381,6 +382,47 @@ export default function AdminPage() {
               </div>
             </div>
           </div>
+
+          {/* Trial Funnel Analytics */}
+          {stats.trial_stats && (
+            <div className="bg-white border border-slate-150 rounded-2xl p-6 shadow-xs">
+              <h3 className="text-sm font-bold text-slate-900 mb-6 pb-3 border-b border-slate-100 flex items-center gap-1.5">
+                <Sparkles size={16} className="text-blue-600" /> Trial Funnel & Conversion Analytics
+              </h3>
+              
+              <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+                <div className="p-4 bg-slate-50 border border-slate-200/80 rounded-xl space-y-1">
+                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Trials Started</div>
+                  <div className="text-xl font-extrabold text-slate-900">{stats.trial_stats.trials_started}</div>
+                </div>
+
+                <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl space-y-1">
+                  <div className="text-[10px] font-bold text-blue-500 uppercase tracking-widest">Active Trials</div>
+                  <div className="text-xl font-extrabold text-blue-800">{stats.trial_stats.trials_active}</div>
+                </div>
+
+                <div className="p-4 bg-amber-50 border border-amber-100 rounded-xl space-y-1">
+                  <div className="text-[10px] font-bold text-amber-600 uppercase tracking-widest">Expiring Today</div>
+                  <div className="text-xl font-extrabold text-amber-800">{stats.trial_stats.trials_expiring_today}</div>
+                </div>
+
+                <div className="p-4 bg-slate-100 border border-slate-200 rounded-xl space-y-1">
+                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Expired Trials</div>
+                  <div className="text-xl font-extrabold text-slate-700">{stats.trial_stats.trials_expired}</div>
+                </div>
+
+                <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-xl space-y-1">
+                  <div className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">Trials Converted</div>
+                  <div className="text-xl font-extrabold text-emerald-800">{stats.trial_stats.trials_converted}</div>
+                </div>
+
+                <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-xl space-y-1">
+                  <div className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">Conversion Rate</div>
+                  <div className="text-xl font-extrabold text-indigo-800">{stats.trial_stats.trial_conversion_rate}%</div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

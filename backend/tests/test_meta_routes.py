@@ -5,6 +5,7 @@ import pytest
 import respx
 import httpx
 from unittest.mock import patch
+from datetime import datetime, timedelta
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -61,6 +62,10 @@ async def test_oauth_callback(db: AsyncSession):
         firebase_uid=MOCK_CLAIMS["uid"],
         email=MOCK_CLAIMS["email"],
         name=MOCK_CLAIMS["name"],
+        trial_status="active",
+        trial_started_at=datetime.utcnow(),
+        trial_ends_at=datetime.utcnow() + timedelta(days=7),
+        trial_used=True,
     )
     db.add(user)
     await db.commit()
@@ -128,6 +133,7 @@ async def test_meta_accounts_and_selection(mock_auth, db: AsyncSession):
         firebase_uid=MOCK_CLAIMS["uid"],
         email=MOCK_CLAIMS["email"],
         name=MOCK_CLAIMS["name"],
+        # Note: we don't start the trial initially here to test select_ad_accounts trial activation flow
     )
     db.add(user)
     await db.commit()
@@ -153,7 +159,7 @@ async def test_meta_accounts_and_selection(mock_auth, db: AsyncSession):
         assert accounts[0]["is_connected"] is False
 
         # 2. Select first ad account
-        payload = {"account_ids": ["act_101010101"]}
+        payload = {"account_ids": ["act_101010101"], "industries": {"act_101010101": "Ecommerce"}}
         select_response = await client.post("/api/v1/meta/accounts/select", json=payload)
         assert select_response.status_code == 200
         assert select_response.json()["status"] == "success"
