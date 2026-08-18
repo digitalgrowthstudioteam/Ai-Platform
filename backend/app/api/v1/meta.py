@@ -3,10 +3,10 @@ Digital Growth Studio — Meta Ads OAuth & Ad Accounts Management Router
 """
 import httpx
 from datetime import datetime, timedelta
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status, BackgroundTasks
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
-from sqlalchemy import select, delete, update
+from sqlalchemy import select, delete, update, String
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 
@@ -351,8 +351,35 @@ async def get_ad_accounts(
         )
 
 
+async def run_sync_inline(ad_account_uuid: str):
+    import structlog
+    from app.services.meta_sync import MetaSyncService
+    from app.services.recommendation_engine import RecommendationEngine
+    from app.database import async_session_factory
+    import uuid
+    
+    log = structlog.get_logger()
+    log.info("inline_sync_started", ad_account_uuid=ad_account_uuid)
+    try:
+        async with async_session_factory() as db:
+            service = MetaSyncService()
+            acc_uuid = uuid.UUID(ad_account_uuid)
+            stmt = select(MetaAdAccount).where(MetaAdAccount.id == acc_uuid)
+            res = await db.execute(stmt)
+            ad_acc = res.scalar_one_or_none()
+            if ad_acc:
+                await service.sync_ad_account(db, str(ad_acc.id))
+                await RecommendationEngine.compile_recommendations(db, ad_acc.id, ad_acc.user_id)
+                log.info("inline_sync_completed", ad_account_uuid=ad_account_uuid)
+            else:
+                log.error("inline_sync_account_not_found", ad_account_uuid=ad_account_uuid)
+    except Exception as e:
+        log.error("inline_sync_failed", ad_account_uuid=ad_account_uuid, error=str(e))
+
+
 @router.post("/accounts/select", summary="Save active ad account selections")
 async def select_ad_accounts(
+    background_tasks: BackgroundTasks,
     payload: SelectAdAccountsRequest,
     claims: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -522,6 +549,14 @@ async def select_ad_accounts(
         db.add(new_account)
     
     await db.commit()
+
+    # Trigger inline sync in background thread immediately after saving selection
+    stmt_sync = select(MetaAdAccount).where(MetaAdAccount.user_id == user.id)
+    res_sync = await db.execute(stmt_sync)
+    selected_db_accounts = res_sync.scalars().all()
+    for acc in selected_db_accounts:
+        background_tasks.add_task(run_sync_inline, str(acc.id))
+
     return {"status": "success", "message": "Ad account selections saved successfully."}
 
 
@@ -553,13 +588,14 @@ class SyncStatusResponse(BaseModel):
 
 @router.post("/sync/trigger", summary="Trigger Meta marketing database sync", dependencies=[Depends(require_active_subscription)])
 async def trigger_sync(
+    background_tasks: BackgroundTasks,
     payload: Optional[SyncTriggerRequest] = None,
     claims: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Enqueues Celery background tasks to sync Meta marketing structure and metrics.
-    Can sync a specific ad_account_id or all selected accounts of the user.
+    Enqueues Celery background tasks (if active) and triggers inline background tasks via FastAPI
+    to sync Meta marketing structure and metrics.
     """
     # Inline import to prevent circular loops
     from app.workers.tasks import sync_ad_account_task
@@ -584,8 +620,14 @@ async def trigger_sync(
         )
         
     for acc in accounts:
-        # Launch Celery background task
-        sync_ad_account_task.delay(str(acc.id))
+        # 1. Trigger Celery (if Celery worker and Redis are active in production environment)
+        try:
+            sync_ad_account_task.delay(str(acc.id))
+        except Exception:
+            pass
+            
+        # 2. Trigger inline BackgroundTask inside FastAPI process (guaranteed to run without Redis/Celery!)
+        background_tasks.add_task(run_sync_inline, str(acc.id))
         
     return {
         "status": "success", 
