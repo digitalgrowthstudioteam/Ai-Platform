@@ -4,47 +4,50 @@ services:
     env: python
     region: singapore
     rootDir: backend
-    buildCommand: pip install -r requirements.txt
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
       - key: PORT
-        value: 10000
+        value: "10000"
       - key: APP_ENV
-        value: production
+        value: "production"
       - key: APP_NAME
-        value: Digital Growth Studio
+        value: "Digital Growth Studio"
       - key: APP_VERSION
-        value: 1.0.0
+        value: "1.0.0"
       - key: DEBUG
         value: "false"
       - key: BACKEND_URL
-        value: https://digital-growth-studio-api.onrender.com
+        value: "https://digital-growth-studio-api.onrender.com"
       - key: FRONTEND_URL
-        value: https://digitalgrowthstudio.in
+        value: "https://digitalgrowthstudio.in"
       - key: ALLOWED_ORIGINS
-        value: http://localhost:3000,http://localhost:8000,https://digitalgrowthstudio.in,https://www.digitalgrowthstudio.in,https://digital-growth-studio.web.app,https://digital-growth-studio.firebaseapp.com,https://digital-growth-studio-api.onrender.com
+        value: "http://localhost:3000,http://localhost:8000,https://digitalgrowthstudio.in,https://www.digitalgrowthstudio.in,https://digital-growth-studio.web.app,https://digital-growth-studio.firebaseapp.com,https://digital-growth-studio-api.onrender.com"
       - key: DATABASE_URL
-        value: postgresql+asyncpg://postgres.fpvqcyvalruepwameeet:DB_PASSWORD_PLACEHOLDER@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres
+        value: "postgresql+asyncpg://postgres.fpvqcyvalruepwameeet:DB_PASSWORD_PLACEHOLDER@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres"
       - key: FIREBASE_PROJECT_ID
-        value: digital-growth-studio
+        value: "digital-growth-studio"
       - key: FIREBASE_PRIVATE_KEY_PATH
-        value: ./firebase-service-account.json
+        value: "./firebase-service-account.json"
       - key: ENCRYPTION_KEY
-        value: EiOYwJmobHAOGI2bhH4I4hcNQL4c5RL3qCul-CI4MdI=
+        value: "EiOYwJmobHAOGI2bhH4I4hcNQL4c5RL3qCul-CI4MdI="
       - key: RAZORPAY_KEY_ID
-        value: rzp_live_TMVFKc46c6u9N8
+        value: "rzp_live_TMVFKc46c6u9N8"
       - key: RAZORPAY_KEY_SECRET
-        value: J2K2x2GjmFz8au3bUmVZBJD6
+        value: "J2K2x2GjmFz8au3bUmVZBJD6"
       - key: META_APP_ID
-        value: mock_meta_app_id
+        value: "mock_meta_app_id"
       - key: META_APP_SECRET
-        value: mock_meta_app_secret
+        value: "mock_meta_app_secret"
       - key: META_REDIRECT_URI
-        value: https://digital-growth-studio-api.onrender.com/api/v1/meta/callback
+        value: "https://digital-growth-studio-api.onrender.com/api/v1/meta/callback"
       - key: META_API_VERSION
-        value: v21.0
+        value: "v21.0"
       - key: SYNC_COOLDOWN_MINUTES
         value: "15"
       - key: INITIAL_SYNC_DAYS
         value: "30"
+
 
