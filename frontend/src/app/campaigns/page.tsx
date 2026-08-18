@@ -29,14 +29,25 @@ export default function CampaignsPage() {
 
   const loadCampaigns = async () => {
     if (!selectedAccount) return;
+    const { startStr, endStr } = getDates(datePreset);
+    const cacheKey = `dgs_cached_campaigns_${selectedAccount.id}_${datePreset}`;
+
+    // Load cached campaigns instantly to make transitions feel instant
+    const cached = sessionStorage.getItem(cacheKey);
+    if (cached) {
+      try {
+        setCampaigns(JSON.parse(cached));
+      } catch (e) {}
+    }
+
     try {
-      setLoading(true);
-      const { startStr, endStr } = getDates(datePreset);
+      setLoading(!cached); // Show loader only if no cache is available
       const res = await api.getCampaigns(selectedAccount.id, startStr, endStr);
       setCampaigns(res);
+      sessionStorage.setItem(cacheKey, JSON.stringify(res));
     } catch (err) {
       console.error("Failed to load campaigns list:", err);
-      setCampaigns([]);
+      if (!cached) setCampaigns([]);
     } finally {
       setLoading(false);
     }

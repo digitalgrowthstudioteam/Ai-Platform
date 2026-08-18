@@ -27,14 +27,25 @@ export default function Topbar() {
   const fetchSyncStatus = async () => {
     try {
       const res = await api.getSyncStatus();
-      setSyncStatus({
+      const newStatus = {
         lastSyncAt: res.last_sync_at || null,
         status: res.last_sync_status || null,
-      });
+      };
+      setSyncStatus(newStatus);
+      sessionStorage.setItem("dgs_cached_sync_status", JSON.stringify(newStatus));
     } catch (err) {
       console.error("Failed to fetch sync status:", err);
     }
   };
+
+  useEffect(() => {
+    const cached = sessionStorage.getItem("dgs_cached_sync_status");
+    if (cached) {
+      try {
+        setSyncStatus(JSON.parse(cached));
+      } catch (e) {}
+    }
+  }, []);
 
   useEffect(() => {
     if (user) {

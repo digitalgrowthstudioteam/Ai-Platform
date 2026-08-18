@@ -44,6 +44,7 @@ export function AdAccountProvider({ children }: { children: React.ReactNode }) {
         }));
 
       setAdAccounts(activeAccounts);
+      sessionStorage.setItem("dgs_cached_ad_accounts", JSON.stringify(activeAccounts));
 
       if (activeAccounts.length > 0) {
         // Resolve default active selection
@@ -77,6 +78,23 @@ export function AdAccountProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // Load cached ad accounts from sessionStorage for instant page rendering
+  useEffect(() => {
+    const cached = sessionStorage.getItem("dgs_cached_ad_accounts");
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setAdAccounts(parsed);
+          const savedId = localStorage.getItem("dgs_active_ad_account_id");
+          const matched = parsed.find((acc) => acc.id === savedId);
+          setSelectedAccountState(matched || parsed[0]);
+          setLoadingAccounts(false);
+        }
+      } catch (e) {}
+    }
+  }, []);
+
   useEffect(() => {
     // Listen to Firebase auth state to load connected accounts
     const unsubscribe = auth.onAuthStateChanged((user) => {
@@ -86,6 +104,7 @@ export function AdAccountProvider({ children }: { children: React.ReactNode }) {
         setAdAccounts([]);
         setSelectedAccountState(null);
         setLoadingAccounts(false);
+        sessionStorage.removeItem("dgs_cached_ad_accounts");
       }
     });
 

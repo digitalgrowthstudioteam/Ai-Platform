@@ -66,27 +66,76 @@ export default function OverviewPage() {
 
   const loadDashboardData = async () => {
     if (!selectedAccount) return;
-    try {
-      setLoadingData(true);
-      const { startStr, endStr } = getDates(datePreset);
+    const { startStr, endStr } = getDates(datePreset);
+    const cacheKey = `dgs_cached_dashboard_${selectedAccount.id}_${datePreset}`;
 
-      // Run parallel queries to accelerate load times
-      const [overviewRes, chartRes, healthRes, campaignsRes, adsRes] = await Promise.all([
+    // Load cached dashboard overview and chart data for instant layout rendering
+    const cached = sessionStorage.getItem(cacheKey);
+    if (cached) {
+      try {
+        const { metrics: cachedMetrics, chartData: cachedChart, health: cachedHealth, campaigns: cachedCampaigns, ads: cachedAds } = JSON.parse(cached);
+        if (cachedMetrics) setMetrics(cachedMetrics);
+        if (cachedChart) setChartData(cachedChart);
+        if (cachedHealth) setHealth(cachedHealth);
+        if (cachedCampaigns) setCampaigns(cachedCampaigns);
+        if (cachedAds) setAds(cachedAds);
+      } catch (e) {}
+    }
+
+    try {
+      setLoadingData(!cached); // Show full spinner only if no cache is available
+
+      // 1. Fetch critical metrics and chart data first (critical path)
+      const [overviewRes, chartRes] = await Promise.all([
         api.getDashboardOverview(selectedAccount.id, startStr, endStr),
         api.getDashboardChart(selectedAccount.id, startStr, endStr),
-        api.getDashboardHealth(selectedAccount.id),
-        api.getCampaigns(selectedAccount.id, startStr, endStr),
-        api.getAds(selectedAccount.id, startStr, endStr),
       ]);
 
       setMetrics(overviewRes);
       setChartData(chartRes);
-      setHealth(healthRes);
-      setCampaigns(campaignsRes.slice(0, 4)); // Get top 4
-      setAds(adsRes.slice(0, 4)); // Get top 4
+      setLoadingData(false); // Hide spinner as soon as critical stats are ready
+
+      // 2. Fetch supplementary data in the background (non-blocking)
+      const healthPromise = api.getDashboardHealth(selectedAccount.id).then((res) => {
+        setHealth(res);
+        return res;
+      }).catch((e) => {
+        console.warn("Failed to load dashboard health:", e);
+        return null;
+      });
+
+      const campaignsPromise = api.getCampaigns(selectedAccount.id, startStr, endStr).then((res) => {
+        const topCampaigns = res.slice(0, 4);
+        setCampaigns(topCampaigns);
+        return topCampaigns;
+      }).catch((e) => {
+        console.warn("Failed to load dashboard campaigns:", e);
+        return [];
+      });
+
+      const adsPromise = api.getAds(selectedAccount.id, startStr, endStr).then((res) => {
+        const topAds = res.slice(0, 4);
+        setAds(topAds);
+        return topAds;
+      }).catch((e) => {
+        console.warn("Failed to load dashboard ads:", e);
+        return [];
+      });
+
+      // Update cache in the background when all finish
+      Promise.all([healthPromise, campaignsPromise, adsPromise]).then(([healthRes, campaignsRes, adsRes]) => {
+        const cacheData = {
+          metrics: overviewRes,
+          chartData: chartRes,
+          health: healthRes,
+          campaigns: campaignsRes,
+          ads: adsRes
+        };
+        sessionStorage.setItem(cacheKey, JSON.stringify(cacheData));
+      });
+
     } catch (err) {
       console.error("Failed to load dashboard statistics:", err);
-    } finally {
       setLoadingData(false);
     }
   };
