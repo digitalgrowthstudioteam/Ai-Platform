@@ -8,15 +8,22 @@ from typing import Optional
 
 logger = structlog.get_logger()
 
+import time
+
 _firebase_app = None
+_has_service_account = False
 GOOGLE_CERTS_URL = "https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com"
+
+# Cache structure for Google public x509 certs
+_cached_certs = None
+_cached_certs_expire = 0
 
 
 def initialize_firebase(service_account_path: Optional[str] = None):
     """
     Initialize Firebase Admin SDK cleanly on application startup.
     """
-    global _firebase_app
+    global _firebase_app, _has_service_account
     from app.config import get_settings
     settings = get_settings()
 
@@ -33,6 +40,7 @@ def initialize_firebase(service_account_path: Optional[str] = None):
             try:
                 cred = credentials.Certificate(service_account_path)
                 _firebase_app = firebase_admin.initialize_app(cred)
+                _has_service_account = True
                 logger.info("firebase_initialized_with_certificate_file")
                 return
             except Exception as cert_err:
@@ -43,12 +51,35 @@ def initialize_firebase(service_account_path: Optional[str] = None):
             _firebase_app = firebase_admin.initialize_app(
                 options={"projectId": project_id}
             )
+            _has_service_account = False
             logger.info("firebase_initialized_with_project_id", project_id=project_id)
         except Exception:
             pass
 
     except Exception as e:
         logger.error("firebase_initialization_failed", error=str(e))
+
+
+def _get_google_public_certs() -> dict:
+    """Helper to fetch and cache Google's public certs for 1 hour."""
+    global _cached_certs, _cached_certs_expire
+    now = time.time()
+
+    if _cached_certs and now < _cached_certs_expire:
+        return _cached_certs
+
+    try:
+        res = requests.get(GOOGLE_CERTS_URL, timeout=4.0)
+        if res.ok:
+            _cached_certs = res.json()
+            _cached_certs_expire = now + 3600
+            logger.info("google_public_certs_cached", expire_in=3600)
+            return _cached_certs
+    except Exception as e:
+        logger.warning("failed_to_fetch_google_public_certs_trying_fallback", error=str(e))
+        if _cached_certs:
+            return _cached_certs
+    return {}
 
 
 def _verify_id_token_public(id_token: str, project_id: str = "digital-growth-studio") -> Optional[dict]:
@@ -58,10 +89,9 @@ def _verify_id_token_public(id_token: str, project_id: str = "digital-growth-stu
     """
     try:
         from jose import jwt
-        res = requests.get(GOOGLE_CERTS_URL, timeout=10)
-        if not res.ok:
+        certs = _get_google_public_certs()
+        if not certs:
             return None
-        certs = res.json()
 
         header = jwt.get_unverified_header(id_token)
         kid = header.get("kid")
@@ -86,18 +116,22 @@ async def verify_firebase_token(id_token: str) -> Optional[dict]:
     """
     Verify a Firebase ID token and return decoded claims.
     """
+    global _has_service_account
     from app.config import get_settings
     settings = get_settings()
     project_id = getattr(settings, "FIREBASE_PROJECT_ID", "digital-growth-studio")
 
-    try:
-        from firebase_admin import auth
-        decoded_token = auth.verify_id_token(id_token)
-        logger.info("firebase_token_verified_sdk", uid=decoded_token.get("uid"))
-        return decoded_token
-    except Exception as sdk_err:
-        logger.debug("firebase_sdk_verify_failed_trying_public", error=str(sdk_err))
+    # If Firebase initialized with a service account file, use Admin SDK verification
+    if _has_service_account:
+        try:
+            from firebase_admin import auth
+            decoded_token = auth.verify_id_token(id_token)
+            logger.info("firebase_token_verified_sdk", uid=decoded_token.get("uid"))
+            return decoded_token
+        except Exception as sdk_err:
+            logger.debug("firebase_sdk_verify_failed_trying_public", error=str(sdk_err))
 
+    # Fast Path: Verify using Google Public Key Certificates locally
     decoded_public = _verify_id_token_public(id_token, project_id)
     if decoded_public:
         if "uid" not in decoded_public:
