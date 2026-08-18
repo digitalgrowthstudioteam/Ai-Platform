@@ -6,9 +6,13 @@ import structlog
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional, List, Dict, Any
+
+class PlansAvailabilityResponse(BaseModel):
+    starter_available: bool
+    active_starter_count: int
 
 from app.database import get_db
 from app.dependencies import get_current_user
@@ -190,6 +194,26 @@ async def get_subscription_details(
     )
 
 
+@router.get("/plans/availability", response_model=PlansAvailabilityResponse, summary="Query pricing plan availability limits")
+async def get_plans_availability(
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Returns whether limited tiers (like Starter/Pro Early Access) are still open for registration.
+    """
+    stmt = select(func.count(User.id)).where(User.plan_id == "starter").where(User.status == "active")
+    res = await db.execute(stmt)
+    active_count = res.scalar_one()
+
+    # Starter plan is available if count is less than 100
+    starter_available = active_count < 100
+
+    return PlansAvailabilityResponse(
+        starter_available=starter_available,
+        active_starter_count=active_count,
+    )
+
+
 @router.post("/order", response_model=OrderCreationResponse, summary="Create a subscription payment order")
 async def create_billing_order(
     req: OrderCreationRequest,
@@ -217,6 +241,30 @@ async def create_billing_order(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Invalid plan subscription '{req.plan_id}'."
             )
+        
+        # Enforce 100 active users cap on starter plan (Pro Early Access)
+        if plan == "starter":
+            stmt = select(func.count(User.id)).where(User.plan_id == "starter").where(User.status == "active")
+            res = await db.execute(stmt)
+            active_count = res.scalar_one()
+            if active_count >= 100:
+                is_admin = False
+                try:
+                    email = claims.get("email", "")
+                    whitelisted_admins = {
+                        "flasshgames2026@gmail.com",
+                        "digitalgrowthstudioteam@gmail.com",
+                    }
+                    if email in whitelisted_admins:
+                        is_admin = True
+                except Exception:
+                    pass
+                if not is_admin:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Early Access Tier has reached its limit of 100 active users. Subscriptions are temporarily closed."
+                    )
+        
         amount = PLAN_PRICES_PAISE[plan]
 
     currency = "INR"

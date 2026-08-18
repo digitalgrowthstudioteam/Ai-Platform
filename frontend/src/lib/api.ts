@@ -256,6 +256,10 @@ class ApiClient {
     });
   }
 
+  async getPlansAvailability() {
+    return this.request<{ starter_available: boolean; active_starter_count: number }>("/billing/plans/availability");
+  }
+
   // Phase 10: Admin Panel endpoints
   async getAdminStats() {
     return this.request<{
