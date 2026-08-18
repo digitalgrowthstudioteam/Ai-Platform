@@ -30,6 +30,11 @@ export default function AdAccountsPage() {
   
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  
+  const [pendingAccountId, setPendingAccountId] = useState<string | null>(null);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [upgradeModalMessage, setUpgradeModalMessage] = useState("");
 
   // Check connection status and load ad accounts
   const checkStatus = async () => {
@@ -121,29 +126,56 @@ export default function AdAccountsPage() {
     }
   };
 
+  // Trigger toggle on (deactivation is blocked / locked)
+  const handleToggleOn = (accountId: string) => {
+    // 1. Verify industry vertical is selected
+    if (!industries[accountId] || industries[accountId] === "") {
+      setError("Please select an Industry Vertical before activating this ad account.");
+      return;
+    }
+    setError(null);
+    setPendingAccountId(accountId);
+    setShowConfirmModal(true);
+  };
+
   // Save changes to selected ad accounts list
-  const handleSaveSelection = async () => {
+  const saveAccountSelection = async (accountId: string) => {
     try {
       setSaving(true);
       setError(null);
       setSuccess(null);
+      setShowConfirmModal(false);
+
+      // Add the new account to the selected ones list
+      const newSelected = [...selectedAccounts, accountId];
       
-      // Verify mandatory industry selections
-      for (const accId of selectedAccounts) {
-        if (!industries[accId] || industries[accId] === "") {
-          const acc = accounts.find(a => a.id === accId);
-          throw new Error(`Industry vertical selection is mandatory for: ${acc?.name || accId}`);
-        }
-      }
+      // Save changes immediately
+      await api.selectMetaAccounts(newSelected, industries);
+      setSuccess("Ad account pipeline activated successfully.");
       
-      await api.selectMetaAccounts(selectedAccounts, industries);
-      setSuccess("Ad account preferences saved successfully.");
-      await checkStatus(); // Reload list
-      await refreshAccounts(); // Refresh global header selector
+      // Reload list and refresh context dropdown
+      await checkStatus();
+      await refreshAccounts();
     } catch (err: any) {
-      setError(err.message || "Failed to save selected ad accounts");
+      console.error("Failed to activate ad account:", err);
+      const errMsg = err.message || "Failed to activate ad account";
+      
+      // Check if error is related to plan limits or trial limits
+      if (
+        errMsg.toLowerCase().includes("limit") || 
+        errMsg.toLowerCase().includes("upgrade") || 
+        errMsg.toLowerCase().includes("plan") ||
+        errMsg.toLowerCase().includes("402") ||
+        errMsg.toLowerCase().includes("exceed")
+      ) {
+        setUpgradeModalMessage(errMsg);
+        setShowUpgradeModal(true);
+      } else {
+        setError(errMsg);
+      }
     } finally {
       setSaving(false);
+      setPendingAccountId(null);
     }
   };
 
@@ -170,15 +202,6 @@ export default function AdAccountsPage() {
     } finally {
       setDisconnecting(false);
     }
-  };
-
-  // Toggle selection checkbox
-  const toggleAccount = (accountId: string) => {
-    setSelectedAccounts(prev => 
-      prev.includes(accountId)
-        ? prev.filter(id => id !== accountId)
-        : [...prev, accountId]
-    );
   };
 
   if (loading) {
@@ -270,7 +293,7 @@ export default function AdAccountsPage() {
           <div className="card border border-border bg-white shadow-sm">
             <div className="card-header border-b border-border p-6">
               <h3 className="text-base font-bold text-foreground">Select Active Ad Accounts</h3>
-              <p className="text-xs text-subtle">Toggle which connected ad accounts should synchronize historical analytics</p>
+              <p className="text-xs text-subtle">Toggle to activate ad account pipelines (active pipelines are locked and cannot be switched)</p>
             </div>
             
             <div className="divide-y divide-border">
@@ -286,93 +309,168 @@ export default function AdAccountsPage() {
                   return (
                     <div 
                       key={acc.id} 
-                      onClick={() => isActive && toggleAccount(acc.id)}
-                      className={`p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition cursor-pointer hover:bg-slate-50 ${
-                        !isActive ? "opacity-60 cursor-not-allowed bg-slate-50/50" : ""
+                      className={`p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition ${
+                        !isActive ? "opacity-60 cursor-not-allowed bg-slate-50/50" : "bg-white"
                       }`}
                     >
-                      <div className="flex items-start gap-3">
-                        <div className="text-primary shrink-0 mt-0.5">
-                          {isChecked ? (
-                            <CheckSquare size={20} className="fill-blue-50 text-blue-600" />
-                          ) : (
-                            <Square size={20} className="text-slate-400" />
+                      <div className="flex-1 space-y-2">
+                        <div className="font-bold text-sm text-slate-800 flex items-center gap-2">
+                          {acc.name}
+                          {!isActive && (
+                            <span className="text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider animate-pulse">
+                              Disabled
+                            </span>
                           )}
-                        </div>
-                        <div className="space-y-1">
-                          <div className="font-bold text-sm text-slate-800 flex items-center gap-2">
-                            {acc.name}
-                            {!isActive && (
-                              <span className="text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
-                                Disabled
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-xs text-slate-400 font-medium">
-                            ID: {acc.id} &bull; {acc.currency} ({acc.timezone})
-                          </div>
-                          
                           {isChecked && (
-                            <div className="pt-2 flex flex-col gap-1" onClick={(e) => e.stopPropagation()}>
-                              <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">
-                                Industry Vertical (Mandatory)
-                              </label>
-                              <select
-                                value={industries[acc.id] || ""}
-                                onChange={(e) => {
-                                  setIndustries(prev => ({
-                                    ...prev,
-                                    [acc.id]: e.target.value
-                                  }));
-                                }}
-                                className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-xs font-bold text-slate-700 outline-none cursor-pointer w-48"
-                              >
-                                <option value="">-- Select Industry --</option>
-                                <option value="E-commerce">E-commerce</option>
-                                <option value="SaaS">SaaS / Software</option>
-                                <option value="Real Estate">Real Estate</option>
-                                <option value="Healthcare">Healthcare & Medical</option>
-                                <option value="Education">Education & Learning</option>
-                                <option value="Retail">Retail & Fashion</option>
-                                <option value="Entertainment">Entertainment & Media</option>
-                                <option value="Agency">Agency & Consulting</option>
-                                <option value="Financial Services">Financial Services</option>
-                                <option value="Travel">Travel & Hospitality</option>
-                                <option value="Local Business">Local Business</option>
-                                <option value="Other">Other</option>
-                              </select>
-                            </div>
+                            <span className="text-[10px] bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block animate-ping" />
+                              Active Pipeline (Locked)
+                            </span>
                           )}
                         </div>
-                      </div>
-
-                      <div className="text-xs font-semibold">
-                        {isChecked ? (
-                          <span className="text-green-600 bg-green-50 px-2 py-1 rounded">Active Pipeline</span>
-                        ) : (
-                          <span className="text-slate-400 bg-slate-100 px-2 py-1 rounded">Inactive</span>
+                        <div className="text-xs text-slate-400 font-medium">
+                          ID: {acc.id} &bull; {acc.currency} ({acc.timezone})
+                        </div>
+                        
+                        {isActive && (
+                          <div className="pt-2 flex flex-col gap-1.5" onClick={(e) => e.stopPropagation()}>
+                            <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                              Industry Vertical (Mandatory)
+                            </label>
+                            <select
+                              disabled={isChecked || saving}
+                              value={industries[acc.id] || ""}
+                              onChange={(e) => {
+                                setIndustries(prev => ({
+                                  ...prev,
+                                  [acc.id]: e.target.value
+                                }));
+                              }}
+                              className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-700 outline-none cursor-pointer w-48 disabled:opacity-75 disabled:cursor-not-allowed focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                            >
+                              <option value="">-- Select Industry --</option>
+                              <option value="E-commerce">E-commerce</option>
+                              <option value="SaaS">SaaS / Software</option>
+                              <option value="Real Estate">Real Estate</option>
+                              <option value="Healthcare">Healthcare & Medical</option>
+                              <option value="Education">Education & Learning</option>
+                              <option value="Retail">Retail & Fashion</option>
+                              <option value="Entertainment">Entertainment & Media</option>
+                              <option value="Agency">Agency & Consulting</option>
+                              <option value="Financial Services">Financial Services</option>
+                              <option value="Travel">Travel & Hospitality</option>
+                              <option value="Local Business">Local Business</option>
+                              <option value="Other">Other</option>
+                            </select>
+                          </div>
                         )}
+                      </div>
+ 
+                      <div className="flex items-center gap-3 shrink-0" onClick={(e) => e.stopPropagation()}>
+                        <span className={`text-[10px] font-bold uppercase tracking-wider ${isChecked ? 'text-blue-600' : 'text-slate-400'}`}>
+                          {isChecked ? "Active" : "Inactive"}
+                        </span>
+                        <button
+                          type="button"
+                          disabled={isChecked || !isActive || saving}
+                          onClick={() => isActive && !isChecked && handleToggleOn(acc.id)}
+                          className={`relative inline-flex h-6.5 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                            isChecked 
+                              ? 'bg-blue-600 cursor-not-allowed opacity-90' 
+                              : !isActive 
+                                ? 'bg-slate-200 cursor-not-allowed opacity-50' 
+                                : 'bg-slate-200 hover:bg-slate-300'
+                          }`}
+                          style={{ minHeight: "26px" }}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-5.5 w-5.5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                              isChecked ? 'translate-x-5.5' : 'translate-x-0'
+                            }`}
+                          />
+                        </button>
                       </div>
                     </div>
                   );
                 })
               )}
             </div>
-
-            {/* Save Selection Button */}
-            {accounts.length > 0 && (
-              <div className="card-footer border-t border-border p-6 flex justify-end">
-                <button
-                  onClick={handleSaveSelection}
-                  disabled={saving}
-                  className="btn btn-primary px-6 py-2 flex items-center gap-2 font-semibold text-sm"
-                >
-                  {saving && <Loader2 size={16} className="animate-spin text-white" />}
-                  Save Selected Accounts
-                </button>
-              </div>
-            )}
           </div>
+ 
+          {/* Confirmation Popup Modal */}
+          {showConfirmModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+              <div className="bg-white rounded-xl shadow-xl max-w-md w-full border border-slate-100 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                <div className="p-6 space-y-4">
+                  <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center">
+                    <Megaphone size={24} />
+                  </div>
+                  <div className="space-y-2">
+                    <h3 className="text-lg font-bold text-slate-900">Confirm Account Activation</h3>
+                    <p className="text-sm text-slate-500 leading-relaxed">
+                      Once you select the ads account, you will not be able to switch to any other account further. Do you want to proceed and activate this ad account pipeline?
+                    </p>
+                  </div>
+                </div>
+                <div className="bg-slate-50 border-t border-slate-100 px-6 py-4 flex items-center justify-end gap-3">
+                  <button
+                    disabled={saving}
+                    onClick={() => {
+                      setShowConfirmModal(false);
+                      setPendingAccountId(null);
+                    }}
+                    className="border border-slate-200 bg-white text-slate-700 font-semibold px-4 py-2 text-xs rounded-lg hover:bg-slate-100 transition disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    disabled={saving}
+                    onClick={() => pendingAccountId && saveAccountSelection(pendingAccountId)}
+                    className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 text-xs rounded-lg transition flex items-center gap-1.5"
+                  >
+                    {saving && <Loader2 size={12} className="animate-spin text-white" />}
+                    Confirm & Activate
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+ 
+          {/* Upgrade / Buy Add-on Modal */}
+          {showUpgradeModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+              <div className="bg-white rounded-xl shadow-xl max-w-md w-full border border-slate-100 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                <div className="p-6 space-y-4">
+                  <div className="w-12 h-12 bg-red-50 text-red-600 rounded-full flex items-center justify-center">
+                    <AlertCircle size={24} />
+                  </div>
+                  <div className="space-y-2">
+                    <h3 className="text-lg font-bold text-slate-900">Upgrade Required</h3>
+                    <p className="text-sm text-slate-500 leading-relaxed">
+                      {upgradeModalMessage || "Your selected connected accounts exceed your plan limit. Please upgrade your subscription plan or buy the Add-ons for an additional Meta Ads Account to continue."}
+                    </p>
+                  </div>
+                </div>
+                <div className="bg-slate-50 border-t border-slate-100 px-6 py-4 flex items-center justify-end gap-3">
+                  <button
+                    onClick={() => setShowUpgradeModal(false)}
+                    className="border border-slate-200 bg-white text-slate-700 font-semibold px-4 py-2 text-xs rounded-lg hover:bg-slate-100 transition"
+                  >
+                    Close
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowUpgradeModal(false);
+                      window.location.href = "/settings/billing";
+                    }}
+                    className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 text-xs rounded-lg transition"
+                  >
+                    Upgrade Plan / Buy Add-on
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
