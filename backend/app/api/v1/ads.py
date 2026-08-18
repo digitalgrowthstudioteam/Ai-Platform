@@ -14,13 +14,14 @@ from typing import List, Optional
 from app.database import get_db
 from app.dependencies import get_current_user, require_active_subscription
 from app.api.v1.meta import get_db_user_from_claims
-from app.core.config import settings
+from app.config import get_settings
 from app.models.meta import MetaAdAccount, MetaConnection
 from app.models.campaign import Campaign, AdSet, Ad
 from app.models.creative import Creative
 from app.models.metrics import AdDailyMetrics, AdSetDailyMetrics
 
 logger = structlog.get_logger()
+settings = get_settings()
 router = APIRouter(
     prefix="/ads",
     tags=["Ads & AdSets"],
