@@ -90,24 +90,7 @@ export default function BillingPage() {
       setActionLoading(`plan_${planId}`);
       setNotification(null);
 
-      let order: any;
-      try {
-        order = await api.createBillingOrder(planId);
-      } catch (fetchErr: any) {
-        // If HTTPS browser blocked HTTP localhost fetch, simulate checkout for demo
-        console.warn("API fetch blocked by browser, simulating checkout:", fetchErr);
-        setNotification({
-          type: "warning",
-          message: `Simulated checkout successful! Upgraded to ${planId.toUpperCase()} plan. (Note: Browsers block HTTPS site from connecting to local http://localhost:8000 backend).`,
-        });
-        setSub((prev: any) => ({
-          ...prev,
-          plan: planId,
-          status: "active",
-          monthly_total_cost: planId === "starter" ? 99 : planId === "growth" ? 999 : planId === "pro" ? 2999 : 4999,
-        }));
-        return;
-      }
+      const order = await api.createBillingOrder(planId);
       
       if (order.is_mock) {
         await api.verifyBillingPayment(
@@ -196,17 +179,7 @@ export default function BillingPage() {
       setNotification(null);
 
       const qty = addonQuantities[addonId] || 1;
-      let order: any;
-      try {
-        order = await api.createAddonBillingOrder(addonId, qty);
-      } catch (fetchErr: any) {
-        console.warn("Addon API fetch blocked by browser, simulating checkout:", fetchErr);
-        setNotification({
-          type: "success",
-          message: `Simulated checkout successful! Activated add-on (${addonId}).`,
-        });
-        return;
-      }
+      const order = await api.createAddonBillingOrder(addonId, qty);
       
       if (order.is_mock) {
         await api.verifyAddonBillingPayment(
