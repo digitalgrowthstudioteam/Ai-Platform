@@ -73,9 +73,21 @@ export default function BillingPage() {
     }
   };
 
+  const [starterAvailable, setStarterAvailable] = useState(true);
+
   useEffect(() => {
     fetchSubscription();
     loadRazorpayScript();
+
+    async function checkAvailability() {
+      try {
+        const res = await api.getPlansAvailability();
+        setStarterAvailable(res.starter_available);
+      } catch (e) {
+        console.error("Failed to check plan availability:", e);
+      }
+    }
+    checkAvailability();
   }, [user]);
 
   // Load Razorpay checkout script dynamically
@@ -491,69 +503,71 @@ export default function BillingPage() {
                 </div>
               </div>
 
-              {/* 2. STARTER PLAN (₹99/mo) */}
-              <div className={`bg-white border-2 rounded-2xl overflow-hidden shadow-sm flex flex-col justify-between relative ${
-                sub?.plan === "starter" ? "ring-2 ring-emerald-600 border-emerald-600" : "border-emerald-500/80"
-              }`}>
-                <div className="bg-emerald-600 text-white text-[10px] font-extrabold uppercase tracking-wider text-center py-1">
-                  Primary Entry Plan
-                </div>
-                <div className="p-5 space-y-3">
-                  <div>
-                    <h4 className="text-base font-bold text-slate-900">Starter</h4>
-                    <p className="text-[11px] text-slate-500">Low-cost entry for advertisers</p>
+              {/* 2. PRO EARLY ACCESS PLAN (₹99/mo) */}
+              {(starterAvailable || sub?.plan === "starter") && (
+                <div className={`bg-white border-2 rounded-2xl overflow-hidden shadow-sm flex flex-col justify-between relative ${
+                  sub?.plan === "starter" ? "ring-2 ring-blue-600 border-blue-600" : "border-blue-500/80"
+                }`}>
+                  <div className="bg-blue-600 text-white text-[10px] font-extrabold uppercase tracking-wider text-center py-1">
+                    🔥 Early Access Tier
                   </div>
-                  <div className="text-2xl font-extrabold text-slate-950">
-                    ₹99<span className="text-xs text-slate-400 font-normal">/mo</span>
+                  <div className="p-5 space-y-3">
+                    <div>
+                      <h4 className="text-base font-bold text-slate-900">Pro Early Access</h4>
+                      <p className="text-[11px] text-slate-500">Low-cost entry for advertisers</p>
+                    </div>
+                    <div className="text-2xl font-extrabold text-slate-950">
+                      ₹99<span className="text-xs text-slate-400 font-normal">/mo</span>
+                    </div>
+
+                    <div className="space-y-2 border-t border-slate-150 pt-3 text-[11px] font-medium text-slate-600">
+                      <div className="flex items-center gap-1.5 font-bold text-blue-700">
+                        <Check size={13} className="text-blue-600 shrink-0" />
+                        <span>1 Meta Ad Account</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Check size={13} className="text-blue-600 shrink-0" />
+                        <span>Unlimited Campaigns</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Check size={13} className="text-blue-600 shrink-0" />
+                        <span>30 Days historical data</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Check size={13} className="text-blue-600 shrink-0" />
+                        <span>Every 48 Hours data sync</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Check size={13} className="text-blue-600 shrink-0" />
+                        <span>Full Ad & Creative Analysis</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Check size={13} className="text-blue-600 shrink-0" />
+                        <span>Headline & Copy Analysis</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Check size={13} className="text-blue-600 shrink-0" />
+                        <span>Account Health Score</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Check size={13} className="text-blue-600 shrink-0" />
+                        <span>PDF/CSV Export</span>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="space-y-2 border-t border-slate-150 pt-3 text-[11px] font-medium text-slate-600">
-                    <div className="flex items-center gap-1.5 font-bold text-emerald-700">
-                      <Check size={13} className="text-emerald-600 shrink-0" />
-                      <span>1 Meta Ad Account</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <Check size={13} className="text-emerald-600 shrink-0" />
-                      <span>Unlimited Campaigns</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <Check size={13} className="text-emerald-600 shrink-0" />
-                      <span>30 Days historical data</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <Check size={13} className="text-emerald-600 shrink-0" />
-                      <span>Every 48 Hours data sync</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <Check size={13} className="text-emerald-600 shrink-0" />
-                      <span>Full Ad & Creative Analysis</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <Check size={13} className="text-emerald-600 shrink-0" />
-                      <span>Headline & Copy Analysis</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <Check size={13} className="text-emerald-600 shrink-0" />
-                      <span>Account Health Score</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <Check size={13} className="text-emerald-600 shrink-0" />
-                      <span>PDF/CSV Export</span>
-                    </div>
+                  <div className="p-4 border-t border-slate-100 bg-slate-50">
+                    <button
+                      disabled={sub?.plan === "starter" || actionLoading !== null}
+                      onClick={() => handlePlanCheckout("starter")}
+                      className="w-full py-2 rounded-xl font-bold text-xs bg-blue-600 hover:bg-blue-700 text-white transition flex items-center justify-center gap-1.5 shadow-xs"
+                    >
+                      {actionLoading === "plan_starter" && <Loader2 size={12} className="animate-spin" />}
+                      {sub?.plan === "starter" ? "Current Plan" : "Upgrade to Pro Early Access"}
+                    </button>
                   </div>
                 </div>
-
-                <div className="p-4 border-t border-slate-100 bg-slate-50">
-                  <button
-                    disabled={sub?.plan === "starter" || actionLoading !== null}
-                    onClick={() => handlePlanCheckout("starter")}
-                    className="w-full py-2 rounded-xl font-bold text-xs bg-emerald-600 hover:bg-emerald-700 text-white transition flex items-center justify-center gap-1.5 shadow-xs"
-                  >
-                    {actionLoading === "plan_starter" && <Loader2 size={12} className="animate-spin" />}
-                    {sub?.plan === "starter" ? "Current Plan" : "Upgrade to ₹99"}
-                  </button>
-                </div>
-              </div>
+              )}
 
               {/* 3. GROWTH PLAN (₹999/mo) */}
               <div className={`bg-white border-2 rounded-2xl overflow-hidden shadow-md flex flex-col justify-between relative ${

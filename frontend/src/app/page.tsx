@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
+import { api } from "@/lib/api";
 import {
   Sparkles,
   Zap,
@@ -45,6 +46,20 @@ export default function LandingPage() {
 
   // Interactive mock dashboard state
   const [mockDatePreset, setMockDatePreset] = useState<"7d" | "30d">("30d");
+
+  const [starterAvailable, setStarterAvailable] = useState(true);
+
+  useEffect(() => {
+    async function checkAvailability() {
+      try {
+        const res = await api.getPlansAvailability();
+        setStarterAvailable(res.starter_available);
+      } catch (e) {
+        console.error("Failed to check plan availability:", e);
+      }
+    }
+    checkAvailability();
+  }, []);
 
   const faqs = [
     {
@@ -765,56 +780,70 @@ export default function LandingPage() {
           </p>
         </div>
 
-        <div className="max-w-md mx-auto bg-white border-2 border-blue-600 rounded-2xl p-8 shadow-xl relative">
-          <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-[11px] font-extrabold uppercase tracking-wider px-4 py-1 rounded-full shadow-xs">
-            🔥 Early Access Tier
-          </div>
-
-          <div className="text-center space-y-2">
-            <h3 className="text-xl font-bold text-slate-900">Pro Early Access</h3>
-            <div className="flex items-baseline justify-center gap-1">
-              <span className="text-5xl font-extrabold text-slate-950 tracking-tight">₹99</span>
-              <span className="text-sm font-semibold text-slate-500">/ month</span>
+        {starterAvailable ? (
+          <div className="max-w-md mx-auto bg-white border-2 border-blue-600 rounded-2xl p-8 shadow-xl relative">
+            <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-[11px] font-extrabold uppercase tracking-wider px-4 py-1 rounded-full shadow-xs">
+              🔥 Early Access Tier
             </div>
-            <p className="text-xs text-emerald-600 font-semibold bg-emerald-50 py-1 px-3 rounded-md inline-block">
-              Includes 3-Day Free Trial • Cancel Anytime
-            </p>
+
+            <div className="text-center space-y-2">
+              <h3 className="text-xl font-bold text-slate-900">Pro Early Access</h3>
+              <div className="flex items-baseline justify-center gap-1">
+                <span className="text-5xl font-extrabold text-slate-950 tracking-tight">₹99</span>
+                <span className="text-sm font-semibold text-slate-500">/ month</span>
+              </div>
+              <p className="text-xs text-emerald-600 font-semibold bg-emerald-50 py-1 px-3 rounded-md inline-block">
+                Includes 3-Day Free Trial • Cancel Anytime
+              </p>
+            </div>
+
+            <ul className="mt-8 space-y-3.5 text-xs font-semibold text-slate-700">
+              <li className="flex items-center gap-2.5">
+                <Check size={16} className="text-blue-600 shrink-0" />
+                <span>Full Meta Ad Accounts Sync</span>
+              </li>
+              <li className="flex items-center gap-2.5">
+                <Check size={16} className="text-blue-600 shrink-0" />
+                <span>Automated Campaign & Ad-Level Audit</span>
+              </li>
+              <li className="flex items-center gap-2.5">
+                <Check size={16} className="text-blue-600 shrink-0" />
+                <span>Creative Breakdown (Video vs Image vs Reels)</span>
+              </li>
+              <li className="flex items-center gap-2.5">
+                <Check size={16} className="text-blue-600 shrink-0" />
+                <span>Ad Copy & Headline Insights</span>
+              </li>
+              <li className="flex items-center gap-2.5">
+                <Check size={16} className="text-blue-600 shrink-0" />
+                <span>AI Recommendations & Budget Scaling Tips</span>
+              </li>
+              <li className="flex items-center gap-2.5">
+                <Check size={16} className="text-blue-600 shrink-0" />
+                <span>Read-Only Official OAuth Security</span>
+              </li>
+            </ul>
+
+            <Link
+              href="/signup"
+              className="mt-8 w-full block text-center bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm py-3.5 rounded-xl transition shadow-lg shadow-blue-500/25 active:scale-98"
+            >
+              Start Free 3-Day Trial
+            </Link>
           </div>
-
-          <ul className="mt-8 space-y-3.5 text-xs font-semibold text-slate-700">
-            <li className="flex items-center gap-2.5">
-              <Check size={16} className="text-blue-600 shrink-0" />
-              <span>Full Meta Ad Accounts Sync</span>
-            </li>
-            <li className="flex items-center gap-2.5">
-              <Check size={16} className="text-blue-600 shrink-0" />
-              <span>Automated Campaign & Ad-Level Audit</span>
-            </li>
-            <li className="flex items-center gap-2.5">
-              <Check size={16} className="text-blue-600 shrink-0" />
-              <span>Creative Breakdown (Video vs Image vs Reels)</span>
-            </li>
-            <li className="flex items-center gap-2.5">
-              <Check size={16} className="text-blue-600 shrink-0" />
-              <span>Ad Copy & Headline Insights</span>
-            </li>
-            <li className="flex items-center gap-2.5">
-              <Check size={16} className="text-blue-600 shrink-0" />
-              <span>AI Recommendations & Budget Scaling Tips</span>
-            </li>
-            <li className="flex items-center gap-2.5">
-              <Check size={16} className="text-blue-600 shrink-0" />
-              <span>Read-Only Official OAuth Security</span>
-            </li>
-          </ul>
-
-          <Link
-            href="/signup"
-            className="mt-8 w-full block text-center bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm py-3.5 rounded-xl transition shadow-lg shadow-blue-500/25 active:scale-98"
-          >
-            Start Free 3-Day Trial
-          </Link>
-        </div>
+        ) : (
+          <div className="max-w-md mx-auto bg-white border-2 border-slate-200 rounded-2xl p-8 shadow-md text-center space-y-4">
+            <div className="text-slate-400 font-bold text-sm uppercase tracking-wider">Early Access Tier</div>
+            <h3 className="text-2xl font-extrabold text-slate-950">SOLD OUT</h3>
+            <p className="text-slate-500 text-xs">
+              Our Pro Early Access tier has reached its maximum capacity of 100 active members.
+              Subscriptions are currently closed as we scale our optimization engines.
+            </p>
+            <div className="py-2.5 px-4 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold text-slate-600">
+              Stay tuned for our upcoming public release!
+            </div>
+          </div>
+        )}
       </section>
 
       {/* 9. FAQ ACCORDION SECTION */}
