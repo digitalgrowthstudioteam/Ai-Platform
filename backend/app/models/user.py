@@ -67,3 +67,13 @@ class User(BaseModel):
         back_populates="user",
         cascade="all, delete-orphan",
     )
+    team_members: Mapped[List["TeamMember"]] = relationship(
+        "TeamMember",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    support_tickets: Mapped[List["SupportTicket"]] = relationship(
+        "SupportTicket",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
