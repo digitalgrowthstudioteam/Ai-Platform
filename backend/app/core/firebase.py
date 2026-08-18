@@ -37,7 +37,16 @@ def initialize_firebase(service_account_path: Optional[str] = None):
             _firebase_app = firebase_admin.initialize_app(cred)
             logger.info("firebase_initialized_with_certificate_file")
         elif os.environ.get("FIREBASE_SERVICE_ACCOUNT_JSON"):
-            service_account_info = json.loads(os.environ["FIREBASE_SERVICE_ACCOUNT_JSON"])
+            raw_json = os.environ["FIREBASE_SERVICE_ACCOUNT_JSON"]
+            try:
+                service_account_info = json.loads(raw_json)
+            except Exception:
+                try:
+                    service_account_info = json.loads(raw_json, strict=False)
+                except Exception:
+                    cleaned = raw_json.replace('\\\\n', '\n').replace('\\n', '\n')
+                    service_account_info = json.loads(cleaned, strict=False)
+
             cred = credentials.Certificate(service_account_info)
             _firebase_app = firebase_admin.initialize_app(cred)
             logger.info("firebase_initialized_with_env_json")
