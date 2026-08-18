@@ -29,14 +29,25 @@ export default function AdsPage() {
 
   const loadAds = async () => {
     if (!selectedAccount) return;
+    const { startStr, endStr } = getDates(datePreset);
+    const cacheKey = `dgs_cached_ads_${selectedAccount.id}_${datePreset}`;
+
+    // Load cached ads instantly to make transitions feel instant
+    const cached = sessionStorage.getItem(cacheKey);
+    if (cached) {
+      try {
+        setAds(JSON.parse(cached));
+      } catch (e) {}
+    }
+
     try {
-      setLoading(true);
-      const { startStr, endStr } = getDates(datePreset);
+      setLoading(!cached); // Show loader only if no cache is available
       const res = await api.getAds(selectedAccount.id, startStr, endStr);
       setAds(res);
+      sessionStorage.setItem(cacheKey, JSON.stringify(res));
     } catch (err) {
       console.error("Failed to load ads list:", err);
-      setAds([]);
+      if (!cached) setAds([]);
     } finally {
       setLoading(false);
     }
