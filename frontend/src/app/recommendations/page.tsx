@@ -13,12 +13,15 @@ import {
   TrendingUp,
   ArrowRight,
   ShieldCheck,
+  LayoutGrid,
+  List,
 } from "lucide-react";
 
 export default function RecommendationsPage() {
   const { selectedAccount, loadingAccounts } = useAdAccount();
   const [recs, setRecs] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [viewMode, setViewMode] = useState<"card" | "list">("card");
   
   // Notification states
   const [notification, setNotification] = useState<{
@@ -93,13 +96,41 @@ export default function RecommendationsPage() {
   return (
     <div className="animate-fade-in space-y-6">
       {/* Page Header */}
-      <div className="page-header">
+      <div className="page-header flex justify-between items-center">
         <div>
           <h1 className="page-title text-2xl font-bold text-slate-800">AI Recommendations</h1>
           <p className="page-subtitle text-sm text-subtle mt-1">
             Actionable rule-based campaign adjustments compiled by our analyzer engine
           </p>
         </div>
+
+        {/* View Mode Toggle */}
+        {selectedAccount && recs.length > 0 && (
+          <div className="flex items-center border border-border bg-white rounded-md p-1 shadow-sm gap-1">
+            <button
+              onClick={() => setViewMode("card")}
+              className={`p-1.5 rounded-md transition flex items-center justify-center cursor-pointer ${
+                viewMode === "card"
+                  ? "bg-slate-100 text-blue-600 font-bold"
+                  : "text-slate-400 hover:text-slate-600"
+              }`}
+              title="Card View"
+            >
+              <LayoutGrid size={16} />
+            </button>
+            <button
+              onClick={() => setViewMode("list")}
+              className={`p-1.5 rounded-md transition flex items-center justify-center cursor-pointer ${
+                viewMode === "list"
+                  ? "bg-slate-100 text-blue-600 font-bold"
+                  : "text-slate-400 hover:text-slate-600"
+              }`}
+              title="List View"
+            >
+              <List size={16} />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Floating Notification */}
@@ -137,8 +168,8 @@ export default function RecommendationsPage() {
             </div>
           </div>
         </div>
-      ) : (
-        /* Recommendations List Grid */
+      ) : viewMode === "card" ? (
+        /* Recommendations List Grid (Card View) */
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {recs.map((r) => {
             // Icon and styling mapping based on priority & type
@@ -237,6 +268,73 @@ export default function RecommendationsPage() {
               </div>
             );
           })}
+        </div>
+      ) : (
+        /* Recommendations Scan-friendly List Table View */
+        <div className="card border border-border bg-white shadow-sm rounded-lg overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-xs text-left divide-y divide-border">
+              <thead className="bg-slate-50/50">
+                <tr className="text-subtle font-bold uppercase tracking-wider border-b border-border">
+                  <th className="p-4">Suggestion / Scope</th>
+                  <th className="p-4">Priority & Type</th>
+                  <th className="p-4 text-center">Confidence</th>
+                  <th className="p-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border font-medium text-slate-700">
+                {recs.map((r, idx) => {
+                  let badgeClass = "bg-slate-100 text-slate-700";
+                  if (r.priority === "high") badgeClass = "bg-red-50 text-red-700";
+                  else if (r.priority === "medium") badgeClass = "bg-amber-50 text-amber-700";
+                  else badgeClass = "bg-blue-50 text-blue-700";
+
+                  return (
+                    <tr key={idx} className="hover:bg-slate-50 transition">
+                      <td className="p-4 max-w-lg">
+                        <div className="font-bold text-sm text-slate-800">{r.title}</div>
+                        <div className="text-xs text-slate-500 mt-1">{r.description}</div>
+                        <div className="text-[11px] text-slate-400 italic mt-2 bg-slate-50 p-2 rounded border border-slate-100">
+                          <span className="font-semibold text-slate-500 not-italic">Reason: </span>
+                          {r.reason}
+                        </div>
+                      </td>
+                      <td className="p-4 space-y-1.5">
+                        <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full inline-block ${badgeClass}`}>
+                          {r.priority}
+                        </span>
+                        <div className="text-[9px] text-slate-400 font-bold uppercase">
+                          {r.recommendation_type.replace("_", " ")}
+                        </div>
+                      </td>
+                      <td className="p-4 text-center font-bold text-slate-800 text-sm">
+                        {Math.round(r.confidence_score * 100)}%
+                      </td>
+                      <td className="p-4 text-right">
+                        <div className="flex justify-end gap-2">
+                          <button 
+                            onClick={() => handleDismiss(r.id)}
+                            className="btn btn-outline p-1.5 text-slate-500 hover:text-red-600 border border-border hover:bg-slate-100 rounded-md transition"
+                            title="Dismiss"
+                          >
+                            <X size={14} />
+                          </button>
+                          <button 
+                            onClick={() => handleApply(r.id, r.title)}
+                            className="btn btn-primary py-1.5 px-3 text-white bg-blue-600 hover:bg-blue-700 rounded-md flex items-center gap-1 transition"
+                            title="Apply Action"
+                          >
+                            <Check size={12} />
+                            Apply
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
