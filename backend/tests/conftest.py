@@ -14,6 +14,14 @@ async def db() -> AsyncSession:
     Disable pooling with NullPool to prevent event loop teardown issues.
     """
     settings = get_settings()
+    
+    # Critical security guard to protect live production database from test runs!
+    if "supabase" in settings.DATABASE_URL or "pooler" in settings.DATABASE_URL:
+        raise RuntimeError(
+            "TEST ABORTED: Pytest is pointing to the live production Supabase database! "
+            "Please configure your local .env file to use a local development database for testing."
+        )
+
     engine = create_async_engine(
         settings.DATABASE_URL,
         poolclass=pool.NullPool,
