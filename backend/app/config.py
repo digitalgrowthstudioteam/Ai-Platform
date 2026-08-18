@@ -67,7 +67,20 @@ class Settings(BaseSettings):
     @property
     def cors_origins(self) -> list[str]:
         """Parse comma-separated CORS origins into a list."""
-        return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",")]
+        origins = [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",") if origin.strip()]
+        defaults = [
+            "https://digitalgrowthstudio.in",
+            "https://www.digitalgrowthstudio.in",
+            "https://digital-growth-studio.web.app",
+            "https://digital-growth-studio.firebaseapp.com",
+            "https://digital-growth-studio-api.onrender.com",
+            "http://localhost:3000",
+            "http://localhost:8000",
+        ]
+        for d in defaults:
+            if d not in origins:
+                origins.append(d)
+        return origins
 
     model_config = {
         "env_file": ".env",
