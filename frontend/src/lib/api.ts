@@ -160,6 +160,18 @@ class ApiClient {
     );
   }
 
+  async getAdSets(adAccountId: string, startDate: string, endDate: string) {
+    return this.request<any[]>(
+      `/ads/adsets?ad_account_id=${adAccountId}&start_date=${startDate}&end_date=${endDate}`
+    );
+  }
+
+  async getCreatives(adAccountId: string) {
+    return this.request<any[]>(
+      `/ads/creatives?ad_account_id=${adAccountId}`
+    );
+  }
+
   async getSyncStatus() {
     return this.request<{ last_sync_at?: string; last_sync_status?: string; last_sync_error?: string }>(
       "/meta/sync/status"
