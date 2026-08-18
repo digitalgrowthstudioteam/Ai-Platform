@@ -6,13 +6,15 @@
 import { auth } from "./firebase";
 
 const getBaseUrl = () => {
-  if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
   if (typeof window !== "undefined") {
     if (window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
       return "https://digital-growth-studio-api.onrender.com/api/v1";
     }
   }
-  return "http://localhost:8000/api/v1";
+  if (process.env.NEXT_PUBLIC_API_URL && !process.env.NEXT_PUBLIC_API_URL.includes("localhost")) {
+    return process.env.NEXT_PUBLIC_API_URL;
+  }
+  return "https://digital-growth-studio-api.onrender.com/api/v1";
 };
 
 const API_BASE_URL = getBaseUrl();
@@ -30,7 +32,7 @@ class ApiClient {
     this.baseUrl = baseUrl;
   }
 
-  private async request<T>(endpoint: string, options: ApiOptions = {}): Promise<T> {
+  private async request<T>(endpoint: string, options: ApiOptions = {}, retries = 2): Promise<T> {
     const { method = "GET", body, headers = {} } = options;
 
     const headersConfig: Record<string, string> = {
@@ -41,8 +43,12 @@ class ApiClient {
     // Inject Firebase Auth ID token if user is logged in
     const currentUser = auth.currentUser;
     if (currentUser) {
-      const token = await currentUser.getIdToken();
-      headersConfig["Authorization"] = `Bearer ${token}`;
+      try {
+        const token = await currentUser.getIdToken();
+        headersConfig["Authorization"] = `Bearer ${token}`;
+      } catch (tokenErr) {
+        console.warn("Failed to retrieve Firebase ID token:", tokenErr);
+      }
     }
 
     const config: RequestInit = {
@@ -54,14 +60,31 @@ class ApiClient {
       config.body = JSON.stringify(body);
     }
 
-    const response = await fetch(`${this.baseUrl}${endpoint}`, config);
+    try {
+      const response = await fetch(`${this.baseUrl}${endpoint}`, config);
 
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: "An error occurred" }));
-      throw new Error(error.detail || `API error: ${response.status}`);
+      if (!response.ok) {
+        if (response.status === 401 && currentUser && retries > 0) {
+          try {
+            const newToken = await currentUser.getIdToken(true);
+            headersConfig["Authorization"] = `Bearer ${newToken}`;
+            return this.request<T>(endpoint, { ...options, headers: headersConfig }, retries - 1);
+          } catch (refreshErr) {
+            console.warn("Token refresh failed:", refreshErr);
+          }
+        }
+        const error = await response.json().catch(() => ({ detail: "An error occurred" }));
+        throw new Error(error.detail || `API error: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (err: any) {
+      if (retries > 0 && (err.name === "TypeError" || err.message?.includes("Failed to fetch"))) {
+        await new Promise((resolve) => setTimeout(resolve, 2500));
+        return this.request<T>(endpoint, options, retries - 1);
+      }
+      throw err;
     }
-
-    return response.json();
   }
 
   // Health Check
