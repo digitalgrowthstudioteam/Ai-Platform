@@ -21,6 +21,7 @@ from app.api.v1.meta import get_db_user_from_claims
 from app.models.user import User
 from app.models.subscription import Subscription
 from app.models.subscription_addon import SubscriptionAddOn
+from app.models.notification import Notification
 from app.services.entitlement_engine import EntitlementEngine, PLANS_CONFIG, ADDONS_CONFIG
 
 try:
@@ -407,6 +408,15 @@ async def verify_billing_payment(
                 expires_at=now + timedelta(days=30),
             )
             db.add(sub)
+            
+            # Generate plan upgrade notification
+            notif = Notification(
+                user_id=user.id,
+                title="Subscription Activated",
+                message=f"Thank you! Your '{req.plan_id.upper()}' subscription is now active.",
+                read=False
+            )
+            db.add(notif)
             await db.commit()
 
             logger.info("subscription_plan_activated", user_id=user.id, plan=req.plan_id)

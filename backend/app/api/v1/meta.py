@@ -17,6 +17,7 @@ from app.core.firebase import verify_firebase_token
 from app.core.exceptions import NotAuthenticatedException
 from app.models.user import User
 from app.models.meta import MetaConnection, MetaAdAccount
+from app.models.notification import Notification
 
 
 router = APIRouter()
@@ -71,6 +72,24 @@ async def get_db_user_from_claims(claims: dict, db: AsyncSession) -> User:
         db.add(user)
         await db.commit()
         await db.refresh(user)
+
+        # Dynamic Welcome notification
+        welcome = Notification(
+            user_id=user.id,
+            title="Welcome to DGS!",
+            message="Your Meta Ads optimizer profile is active. Connect your Facebook Ad Account to begin optimizing.",
+            read=False,
+        )
+        db.add(welcome)
+        await db.commit()
+    else:
+        # JIT Permanent deletion cleanup after 7 days grace period
+        if user.status == "deletion_scheduled" and user.deletion_scheduled_at:
+            elapsed = datetime.utcnow() - user.deletion_scheduled_at.replace(tzinfo=None)
+            if elapsed.days >= 7:
+                await db.delete(user)
+                await db.commit()
+                raise NotAuthenticatedException("Your account has been permanently deleted.")
 
     return user
 

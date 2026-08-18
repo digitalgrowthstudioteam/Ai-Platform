@@ -16,21 +16,39 @@ export default function Topbar() {
   }>({ lastSyncAt: null, status: null });
 
   const [showNotifications, setShowNotifications] = useState(false);
-  const [notifications, setNotifications] = useState([
-    { id: 1, title: "System Ready", message: "Optimizations fully loaded.", time: "Just now", read: false },
-    { id: 2, title: "Pro Early Access Active", message: "Early Access entitlements activated.", time: "1h ago", read: false },
-    { id: 3, title: "Token Verification Success", message: "Decoded fallback signatures active.", time: "2h ago", read: false },
-    { id: 4, title: "Welcome to DGS!", message: "Your Meta Ads optimizer profile is active.", time: "1d ago", read: true },
-  ]);
+  const [notifications, setNotifications] = useState<any[]>([]);
+
+  const fetchNotifications = async () => {
+    try {
+      const res = await api.getNotifications();
+      setNotifications(res);
+    } catch (e) {
+      console.error("Failed to fetch notifications:", e);
+    }
+  };
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
-  const markAllAsRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+  const markAllAsRead = async () => {
+    try {
+      // Optimistic UI update
+      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+      await api.markAllNotificationsAsRead();
+    } catch (e) {
+      console.error("Failed to mark all notifications as read:", e);
+      fetchNotifications(); // rollback on error
+    }
   };
 
-  const toggleRead = (id: number) => {
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: !n.read } : n));
+  const handleMarkAsRead = async (id: string) => {
+    try {
+      // Optimistic UI update
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+      await api.markNotificationAsRead(id);
+    } catch (e) {
+      console.error("Failed to mark notification as read:", e);
+      fetchNotifications(); // rollback on error
+    }
   };
 
   const displayName = user?.displayName || user?.email || "User";
@@ -68,9 +86,13 @@ export default function Topbar() {
   useEffect(() => {
     if (user) {
       fetchSyncStatus();
+      fetchNotifications();
       
       // Set up periodic sync status polling every 60 seconds
-      const timer = setInterval(fetchSyncStatus, 60000);
+      const timer = setInterval(() => {
+        fetchSyncStatus();
+        fetchNotifications();
+      }, 60000);
       return () => clearInterval(timer);
     }
   }, [user]);
@@ -185,12 +207,14 @@ export default function Topbar() {
                 {notifications.map((n) => (
                   <div 
                     key={n.id} 
-                    onClick={() => toggleRead(n.id)}
+                    onClick={() => handleMarkAsRead(n.id)}
                     className={`p-3.5 hover:bg-slate-50 transition cursor-pointer text-left ${n.read ? "opacity-60" : "bg-blue-50/20"}`}
                   >
                     <div className="flex items-start justify-between gap-1">
                       <span className={`text-[11px] font-bold ${n.read ? "text-slate-700" : "text-slate-900"}`}>{n.title}</span>
-                      <span className="text-[9px] text-slate-400 shrink-0 font-medium">{n.time}</span>
+                      <span className="text-[9px] text-slate-400 shrink-0 font-medium">
+                        {timeAgo(new Date(n.created_at))}
+                      </span>
                     </div>
                     <p className="text-[10px] text-slate-500 mt-0.5 leading-relaxed">{n.message}</p>
                   </div>
@@ -208,7 +232,15 @@ export default function Topbar() {
           title="Click to log out"
           style={{ cursor: "pointer" }}
         >
-          <div className="topbar-avatar">{initials}</div>
+          {user?.photoURL ? (
+            <img 
+              src={user.photoURL} 
+              alt="Profile" 
+              className="w-8 h-8 rounded-full border border-blue-500 shadow-sm object-cover" 
+            />
+          ) : (
+            <div className="topbar-avatar">{initials}</div>
+          )}
           <div className="topbar-profile-info">
             <span className="topbar-profile-name">{displayName.split("@")[0]}</span>
             <span className="topbar-profile-role">Log Out</span>

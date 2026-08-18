@@ -16,6 +16,7 @@ from app.models.user import User
 from app.models.meta import MetaAdAccount, MetaConnection
 from app.models.subscription import Subscription
 from app.models.ticket import SupportTicket
+from app.models.notification import Notification
 
 logger = structlog.get_logger()
 router = APIRouter(prefix="/admin", tags=["Admin Control Panel"])
@@ -376,6 +377,15 @@ async def reply_to_ticket(
 
     ticket.admin_reply = req.reply
     ticket.status = req.status
+    
+    # Generate user notification
+    notif = Notification(
+        user_id=ticket.user_id,
+        title="Support Ticket Answered",
+        message=f"Admin replied to your ticket: '{ticket.subject}'. Status updated to {req.status.upper()}.",
+        read=False
+    )
+    db.add(notif)
     await db.commit()
 
     logger.info("admin_ticket_replied_success", ticket_id=ticket_id, status=req.status)

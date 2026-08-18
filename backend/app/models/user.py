@@ -1,7 +1,8 @@
 """
 Digital Growth Studio — User Model
 """
-from sqlalchemy import String
+from datetime import datetime
+from sqlalchemy import String, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import List, Optional
 
@@ -40,6 +41,10 @@ class User(BaseModel):
         nullable=False,
         default="active",  # active, inactive, suspended
     )
+    deletion_scheduled_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
 
     # Relationships
     subscriptions: Mapped[List["Subscription"]] = relationship(
@@ -74,6 +79,11 @@ class User(BaseModel):
     )
     support_tickets: Mapped[List["SupportTicket"]] = relationship(
         "SupportTicket",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    notifications: Mapped[List["Notification"]] = relationship(
+        "Notification",
         back_populates="user",
         cascade="all, delete-orphan",
     )

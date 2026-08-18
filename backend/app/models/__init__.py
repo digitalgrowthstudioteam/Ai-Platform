@@ -22,6 +22,7 @@ from app.models.metrics import (
 from app.models.recommendation import AIRecommendation
 from app.models.team import TeamMember
 from app.models.ticket import SupportTicket
+from app.models.notification import Notification
 
 __all__ = [
     "BaseModel",
@@ -44,4 +45,5 @@ __all__ = [
     "AIRecommendation",
     "TeamMember",
     "SupportTicket",
+    "Notification",
 ]

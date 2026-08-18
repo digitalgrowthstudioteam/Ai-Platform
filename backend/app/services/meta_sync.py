@@ -12,6 +12,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.config import get_settings
 from app.models.meta import MetaAdAccount, MetaConnection
+from app.models.notification import Notification
 from app.models.campaign import Campaign, AdSet, Ad
 from app.models.creative import Creative
 from app.models.metrics import CampaignDailyMetrics, AdSetDailyMetrics, AdDailyMetrics
@@ -72,6 +73,15 @@ class MetaSyncService:
             conn.last_sync_at = datetime.utcnow()
             conn.last_sync_error = None
             ad_acc.updated_at = datetime.utcnow()
+            
+            # Create success notification
+            notif = Notification(
+                user_id=conn.user_id,
+                title="Meta Sync Complete",
+                message=f"Sync cycle completed successfully for ad account: {ad_acc.name or ad_acc.meta_account_id}.",
+                read=False
+            )
+            db.add(notif)
             await db.commit()
             logger.info("meta_sync_success", ad_account_id=ad_acc.meta_account_id)
 
@@ -79,6 +89,15 @@ class MetaSyncService:
             # Revert to error status on exception
             conn.last_sync_status = "failed"
             conn.last_sync_error = str(e)
+            
+            # Create failure notification
+            notif = Notification(
+                user_id=conn.user_id,
+                title="Meta Sync Failed",
+                message=f"Sync failed for ad account {ad_acc.name or ad_acc.meta_account_id}: {str(e)[:100]}.",
+                read=False
+            )
+            db.add(notif)
             await db.commit()
             logger.error("meta_sync_failed", ad_account_id=ad_acc.meta_account_id, error=str(e))
             raise e
