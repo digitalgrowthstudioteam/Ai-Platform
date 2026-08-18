@@ -51,9 +51,13 @@ class ApiClient {
       }
     }
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
+
     const config: RequestInit = {
       method,
       headers: headersConfig,
+      signal: controller.signal,
     };
 
     if (body) {
@@ -62,6 +66,7 @@ class ApiClient {
 
     try {
       const response = await fetch(`${this.baseUrl}${endpoint}`, config);
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         if (response.status === 401 && currentUser && retries > 0) {
@@ -79,8 +84,9 @@ class ApiClient {
 
       return await response.json();
     } catch (err: any) {
-      if (retries > 0 && (err.name === "TypeError" || err.message?.includes("Failed to fetch"))) {
-        await new Promise((resolve) => setTimeout(resolve, 2500));
+      clearTimeout(timeoutId);
+      if (retries > 0 && (err.name === "TypeError" || err.name === "AbortError" || err.message?.includes("Failed to fetch"))) {
+        await new Promise((resolve) => setTimeout(resolve, 1500));
         return this.request<T>(endpoint, options, retries - 1);
       }
       throw err;
