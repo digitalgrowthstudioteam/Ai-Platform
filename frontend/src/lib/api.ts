@@ -51,8 +51,9 @@ class ApiClient {
       }
     }
 
+    const isGet = method === "GET";
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 6000);
+    const timeoutId = setTimeout(() => controller.abort(), isGet ? 8000 : 60000);
 
     const config: RequestInit = {
       method,
