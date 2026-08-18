@@ -63,9 +63,7 @@ export default function BillingPage() {
   };
 
   useEffect(() => {
-    if (user) {
-      fetchSubscription();
-    }
+    fetchSubscription();
   }, [user]);
 
   // Load Razorpay checkout script dynamically
