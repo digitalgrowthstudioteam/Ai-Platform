@@ -100,7 +100,9 @@ async def verify_firebase_token(id_token: str) -> Optional[dict]:
 
     decoded_public = _verify_id_token_public(id_token, project_id)
     if decoded_public:
-        logger.info("firebase_token_verified_public", uid=decoded_public.get("uid") or decoded_public.get("sub"))
+        if "uid" not in decoded_public:
+            decoded_public["uid"] = decoded_public.get("sub") or decoded_public.get("user_id")
+        logger.info("firebase_token_verified_public", uid=decoded_public.get("uid"))
         return decoded_public
 
     return None
