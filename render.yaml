@@ -26,17 +26,17 @@ services:
       - key: ALLOWED_ORIGINS
         value: "http://localhost:3000,http://localhost:8000,https://digitalgrowthstudio.in,https://www.digitalgrowthstudio.in,https://digital-growth-studio.web.app,https://digital-growth-studio.firebaseapp.com,https://digital-growth-studio-api.onrender.com"
       - key: DATABASE_URL
-        value: "postgresql+asyncpg://postgres.fpvqcyvalruepwameeet:DB_PASSWORD_PLACEHOLDER@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres"
+        sync: true
       - key: FIREBASE_PROJECT_ID
         value: "digital-growth-studio"
       - key: FIREBASE_PRIVATE_KEY_PATH
         value: "./firebase-service-account.json"
       - key: ENCRYPTION_KEY
-        value: "EiOYwJmobHAOGI2bhH4I4hcNQL4c5RL3qCul-CI4MdI="
+        sync: true
       - key: RAZORPAY_KEY_ID
-        value: "rzp_live_TMVFKc46c6u9N8"
+        sync: true
       - key: RAZORPAY_KEY_SECRET
-        value: "J2K2x2GjmFz8au3bUmVZBJD6"
+        sync: true
       - key: META_APP_ID
         value: "mock_meta_app_id"
       - key: META_APP_SECRET
