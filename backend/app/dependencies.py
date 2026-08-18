@@ -65,6 +65,10 @@ async def require_active_subscription(
     from app.api.v1.meta import get_db_user_from_claims
     user = await get_db_user_from_claims(claims, db)
     
+    # Super admins bypass subscription guards
+    if user.email in ["flasshgames2026@gmail.com", "digitalgrowthstudioteam@gmail.com"]:
+        return user
+        
     if user.status == "suspended":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
