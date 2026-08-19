@@ -4,7 +4,7 @@ Digital Growth Studio — Meta Marketing API Synchronization Service
 import uuid
 import httpx
 import structlog
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -57,7 +57,7 @@ class MetaSyncService:
 
         # Update last sync status
         conn.last_sync_status = "in_progress"
-        conn.last_sync_at = datetime.utcnow()
+        conn.last_sync_at = datetime.now(timezone.utc)
         await db.commit()
 
         try:
@@ -71,9 +71,9 @@ class MetaSyncService:
 
             # Mark connection status as success
             conn.last_sync_status = "success"
-            conn.last_sync_at = datetime.utcnow()
+            conn.last_sync_at = datetime.now(timezone.utc)
             conn.last_sync_error = None
-            ad_acc.updated_at = datetime.utcnow()
+            ad_acc.updated_at = datetime.now(timezone.utc)
             
             # Create success notification
             notif = Notification(
