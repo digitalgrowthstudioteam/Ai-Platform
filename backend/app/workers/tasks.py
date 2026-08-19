@@ -8,7 +8,7 @@ from sqlalchemy import select
 import uuid
 from app.workers.celery_app import celery_app
 from app.database import async_session_factory
-from app.models.meta import MetaAdAccount
+from app.models.meta import MetaAdAccount, MetaConnection
 
 logger = structlog.get_logger()
 
@@ -75,6 +75,9 @@ def trigger_all_active_syncs():
 async def trigger_all_active_syncs_async():
     """
     Asynchronous runner for periodic ad account synchronization.
+    Only syncs accounts where:
+      - MetaConnection.status == 'connected'
+      - MetaAdAccount.account_status == 1 (ACTIVE)
     Fetches user subscription entitlements, evaluates last sync time,
     and schedules Celery or inline FastAPI task executions.
     """
@@ -85,8 +88,15 @@ async def trigger_all_active_syncs_async():
     from app.api.v1.meta import run_sync_inline
 
     async with async_session_factory() as db:
-        # Query all ad accounts currently saved in DB
-        stmt = select(MetaAdAccount)
+        # Query only ad accounts with active connection and active account status
+        stmt = (
+            select(MetaAdAccount)
+            .join(MetaConnection, MetaAdAccount.meta_connection_id == MetaConnection.id)
+            .where(
+                MetaConnection.status == "connected",
+                MetaAdAccount.account_status == 1,  # 1 = ACTIVE
+            )
+        )
         res = await db.execute(stmt)
         accounts = res.scalars().all()
         
@@ -97,6 +107,11 @@ async def trigger_all_active_syncs_async():
             res_conn = await db.execute(stmt_conn)
             conn = res_conn.scalar_one_or_none()
             
+            # Skip if connection is missing or not connected
+            if not conn or conn.status != "connected":
+                logger.info("sync_skipped_connection_inactive", ad_account_id=acc.meta_account_id, status=conn.status if conn else "missing")
+                continue
+
             # 2. Fetch User to resolve entitlements
             stmt_user = select(User).where(User.id == acc.user_id)
             res_user = await db.execute(stmt_user)
@@ -123,4 +138,5 @@ async def trigger_all_active_syncs_async():
                         pass
                     # B. Trigger inline sync in background thread as guaranteed fallback
                     asyncio.create_task(run_sync_inline(str(acc.id)))
+
 
