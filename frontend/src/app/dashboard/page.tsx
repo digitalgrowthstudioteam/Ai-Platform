@@ -734,12 +734,14 @@ export default function OverviewPage() {
               
               <div className="bg-slate-50/50 p-5 rounded-xl border border-slate-200">
                 <span className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4 block">Secondary Lead Indicators</span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-4">
                   {renderKpiCard("CTR", metrics.ctr.value, metrics.ctr.trend, "percent", MousePointer, "blue")}
                   {renderKpiCard("CPC", metrics.cpc.value, metrics.cpc.trend, "currency", Target, "purple")}
                   {renderKpiCard("CPM", metrics.cpm.value, metrics.cpm.trend, "currency", Eye, "orange")}
                   {renderKpiCard("Reach", metrics.reach.value, metrics.reach.trend, "number", Users, "blue")}
                   {renderKpiCard("Frequency", metrics.frequency.value, metrics.frequency.trend, "multiplier", Activity, "orange")}
+                  {renderKpiCard("Landing Page Views", metrics.landing_page_views.value, metrics.landing_page_views.trend, "number", Eye, "orange")}
+                  {renderKpiCard("LPV Rate", metrics.lpv_rate.value, metrics.lpv_rate.trend, "percent", MousePointer, "blue")}
                 </div>
               </div>
             </div>
