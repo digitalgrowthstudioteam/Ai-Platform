@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { useParams, useRouter, usePathname } from "next/navigation";
+import { useParams, useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useAdAccount } from "@/context/AdAccountContext";
 import { api } from "@/lib/api";
 import { 
@@ -56,6 +56,11 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
     }
     return propSlug || [];
   }, [pathname, propSlug]);
+
+  const searchParams = useSearchParams();
+  const campaignId = searchParams.get("c") || slug?.[0];
+  const adSetId = searchParams.get("as") || slug?.[1];
+  const adId = searchParams.get("ad") || slug?.[2];
 
   // Programmatic client-side Cache & Service Worker Buster
   useEffect(() => {
@@ -302,13 +307,9 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
     }
   }, [selectedAccount, datePreset, customStartDate, customEndDate]);
 
-  // Sync URL slug with react selection states
+  // Sync URL query parameters / slug with react selection states
   useEffect(() => {
     if (!campaigns || campaigns.length === 0) return;
-
-    const campaignId = slug?.[0];
-    const adSetId = slug?.[1];
-    const adId = slug?.[2];
 
     if (!campaignId) {
       setSelectedCampaign(null);
@@ -349,7 +350,7 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
                 }
               }
             } else if (adSets.length > 0) {
-              router.replace(`/campaigns/${campaignId}`);
+              router.replace(`/campaigns?c=${campaignId}`);
             }
           }
         }
@@ -357,7 +358,7 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
         router.replace('/campaigns');
       }
     }
-  }, [slug, campaigns, adSets, ads]);
+  }, [campaignId, adSetId, adId, campaigns, adSets, ads]);
 
   // Load campaign details (adsets and ads) when campaign selection or date filters change
   useEffect(() => {
@@ -569,19 +570,19 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
   };
 
   const handleSelectCampaign = (c: any) => {
-    router.push(`/campaigns/${c.id}`);
+    router.push(`/campaigns?c=${c.id}`);
   };
 
   const handleSelectAdSetFromList = (as: any) => {
     if (!selectedCampaign) return;
-    router.push(`/campaigns/${selectedCampaign.id}/${as.id}`);
+    router.push(`/campaigns?c=${selectedCampaign.id}&as=${as.id}`);
   };
 
   const handleSelectAdFromList = (ad: any) => {
     if (!selectedCampaign) return;
     const matchingAdSet = adSets.find(as => as.name === ad.adset_name);
     const adSetId = matchingAdSet ? matchingAdSet.id : "all";
-    router.push(`/campaigns/${selectedCampaign.id}/${adSetId}/${ad.id}`);
+    router.push(`/campaigns?c=${selectedCampaign.id}&as=${adSetId}&ad=${ad.id}`);
   };
 
   // Generate mock chart data based on totals
@@ -1223,12 +1224,12 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
               <div className="flex items-center gap-2 text-xs text-slate-400 font-bold">
                 <button onClick={() => router.push('/campaigns')} className="hover:text-slate-600 transition">Campaigns</button>
                 <span>/</span>
-                <button onClick={() => router.push(`/campaigns/${selectedCampaign.id}`)} className="hover:text-slate-600 transition">{selectedCampaign.name}</button>
+                <button onClick={() => router.push(`/campaigns?c=${selectedCampaign.id}`)} className="hover:text-slate-600 transition">{selectedCampaign.name}</button>
                 <span>/</span>
                 <span className="text-slate-800">{selectedAdSet.name}</span>
               </div>
               <button
-                onClick={() => router.push(`/campaigns/${selectedCampaign.id}`)}
+                onClick={() => router.push(`/campaigns?c=${selectedCampaign.id}`)}
                 className="flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-slate-800 transition cursor-pointer"
               >
                 <ArrowLeft size={14} /> Back to Campaign
@@ -1735,12 +1736,12 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
               <div className="flex items-center gap-2 text-xs text-slate-400 font-bold">
                 <button onClick={() => router.push('/campaigns')} className="hover:text-slate-600 transition">Campaigns</button>
                 <span>/</span>
-                <button onClick={() => router.push(`/campaigns/${selectedCampaign.id}`)} className="hover:text-slate-600 transition">{selectedCampaign.name}</button>
+                <button onClick={() => router.push(`/campaigns?c=${selectedCampaign.id}`)} className="hover:text-slate-600 transition">{selectedCampaign.name}</button>
                 <span>/</span>
                 <span className="text-slate-800">{selectedAdSet.name}</span>
               </div>
               <button
-                onClick={() => router.push(`/campaigns/${selectedCampaign.id}`)}
+                onClick={() => router.push(`/campaigns?c=${selectedCampaign.id}`)}
                 className="flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-slate-800 transition cursor-pointer"
               >
                 <ArrowLeft size={14} /> Back to Campaign
