@@ -50,9 +50,20 @@ async def test_daily_metrics_routes(db: AsyncSession, mock_auth):
     await db.commit()
     await db.refresh(user)
 
-    # 2. Setup mock MetaAdAccount
+    # 2. Setup mock MetaConnection and MetaAdAccount
+    conn = MetaConnection(
+        user_id=user.id,
+        meta_user_id="meta_daily_user_888",
+        status="connected",
+        access_token="mock_access_token",
+    )
+    db.add(conn)
+    await db.commit()
+    await db.refresh(conn)
+
     ad_acc = MetaAdAccount(
         user_id=user.id,
+        meta_connection_id=conn.id,
         meta_account_id="act_daily_test_123",
         account_name="Daily Test Ad Account",
         currency="INR",
