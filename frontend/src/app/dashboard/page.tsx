@@ -30,6 +30,7 @@ import {
   FileText,
   RefreshCw,
   Brain,
+  MessageSquare,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -352,17 +353,20 @@ export default function OverviewPage() {
   // Render metric card helper
   const renderKpiCard = (title: string, value: number, trend: number, formatType: "currency" | "percent" | "multiplier" | "number", icon: any, color: string) => {
     const Icon = icon;
-    const isUp = trend >= 0;
+    const isUp = (trend || 0) >= 0;
     
-    let formattedVal = "";
-    if (formatType === "currency") {
-      formattedVal = formatCurrency(value);
-    } else if (formatType === "percent") {
-      formattedVal = `${(value * 100).toFixed(2)}%`;
-    } else if (formatType === "multiplier") {
-      formattedVal = title.includes("Frequency") ? value.toFixed(2) : `${value.toFixed(2)}x`;
-    } else {
-      formattedVal = formatNumber(value);
+    let formattedVal = "—";
+    if (value !== null && value !== undefined && !isNaN(value)) {
+      const valNum = Number(value);
+      if (formatType === "currency") {
+        formattedVal = formatCurrency(valNum);
+      } else if (formatType === "percent") {
+        formattedVal = `${(valNum * 100).toFixed(2)}%`;
+      } else if (formatType === "multiplier") {
+        formattedVal = title.includes("Frequency") ? valNum.toFixed(2) : `${valNum.toFixed(2)}x`;
+      } else {
+        formattedVal = formatNumber(valNum);
+      }
     }
 
     const bgColors: Record<string, string> = {
@@ -372,6 +376,8 @@ export default function OverviewPage() {
       orange: "bg-amber-50 text-amber-600 border-amber-100",
       red: "bg-rose-50 text-rose-650 border-rose-100",
     };
+
+    const safeTrend = trend !== null && trend !== undefined && !isNaN(trend) ? trend : 0;
 
     return (
       <div className="bg-white border border-slate-150 rounded-xl p-5 hover:shadow-md transition duration-200 flex flex-col justify-between">
@@ -385,9 +391,9 @@ export default function OverviewPage() {
           </div>
         </div>
         <div className="mt-4 pt-3 border-t border-slate-100">
-          <span className={`text-[11px] font-semibold flex items-center gap-0.5 ${isUp ? "text-emerald-600" : "text-rose-500"}`}>
-            {isUp ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
-            <span className="font-bold">{Math.abs(trend).toFixed(1)}%</span> vs prev period
+          <span className={`text-[11px] font-semibold flex items-center gap-0.5 ${safeTrend >= 0 ? "text-emerald-600" : "text-rose-500"}`}>
+            {safeTrend >= 0 ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
+            <span className="font-bold">{Math.abs(safeTrend).toFixed(1)}%</span> vs prev period
           </span>
         </div>
       </div>
@@ -673,7 +679,7 @@ export default function OverviewPage() {
                     {renderKpiCard("CPM", metrics.cpm.value, metrics.cpm.trend, "currency", Eye, "orange")}
                     {renderKpiCard("CPC", metrics.cpc.value, metrics.cpc.trend, "currency", Target, "purple")}
                     {renderKpiCard("Link Clicks", metrics.link_clicks.value, metrics.link_clicks.trend, "number", MousePointer, "blue")}
-                    {renderKpiCard("Outbound Clicks", metrics.clicks.value, metrics.clicks.trend, "number", ArrowUpRight, "blue")}
+                    {renderKpiCard("Total Clicks", metrics.clicks.value, metrics.clicks.trend, "number", MousePointer, "blue")}
                   </div>
                 </div>
 
@@ -685,6 +691,8 @@ export default function OverviewPage() {
                     {renderKpiCard("CPL", metrics.cpl.value, metrics.cpl.trend, "currency", Target, "purple")}
                     {renderKpiCard("Add to Cart", metrics.add_to_cart.value, metrics.add_to_cart.trend, "number", ShoppingCart, "blue")}
                     {renderKpiCard("Initiate Checkout", metrics.initiate_checkout.value, metrics.initiate_checkout.trend, "number", Target, "purple")}
+                    {renderKpiCard("Conversations", metrics.conversations.value, metrics.conversations.trend, "number", MessageSquare, "blue")}
+                    {renderKpiCard("Cost per Conversation", metrics.cost_per_conversation.value, metrics.cost_per_conversation.trend, "currency", Target, "purple")}
                     {renderKpiCard("AOV", metrics.aov.value, metrics.aov.trend, "currency", RefreshCw, "green")}
                   </div>
                 </div>
@@ -716,6 +724,8 @@ export default function OverviewPage() {
                 <div className="kpi-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
                   {renderKpiCard("Spend", metrics.spend.value, metrics.spend.trend, "currency", DollarSign, "blue")}
                   {renderKpiCard("Leads", metrics.leads.value, metrics.leads.trend, "number", FileText, "green")}
+                  {renderKpiCard("Conversations", metrics.conversations.value, metrics.conversations.trend, "number", MessageSquare, "blue")}
+                  {renderKpiCard("Cost per Conversation", metrics.cost_per_conversation.value, metrics.cost_per_conversation.trend, "currency", Target, "purple")}
                   {renderKpiCard("Cost per Lead (CPL)", metrics.cpl.value, metrics.cpl.trend, "currency", Target, "purple")}
                   {renderKpiCard("Link Clicks", metrics.link_clicks.value, metrics.link_clicks.trend, "number", MousePointer, "blue")}
                   {renderKpiCard("Impressions", metrics.impressions.value, metrics.impressions.trend, "number", Eye, "orange")}
@@ -784,6 +794,8 @@ export default function OverviewPage() {
                 <span className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4 block">Interactive Social Ratios</span>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
                   {renderKpiCard("Post Engagement", metrics.post_engagement.value, metrics.post_engagement.trend, "number", Heart, "red")}
+                  {renderKpiCard("Conversations", metrics.conversations.value, metrics.conversations.trend, "number", MessageSquare, "blue")}
+                  {renderKpiCard("Cost per Conversation", metrics.cost_per_conversation.value, metrics.cost_per_conversation.trend, "currency", Target, "purple")}
                   {renderKpiCard("Video Views", metrics.video_views.value, metrics.video_views.trend, "number", Video, "blue")}
                   {renderKpiCard("ThruPlays", metrics.thruplays.value, metrics.thruplays.trend, "number", Video, "purple")}
                   {renderKpiCard("CPM", metrics.cpm.value, metrics.cpm.trend, "currency", Eye, "orange")}
@@ -842,7 +854,7 @@ export default function OverviewPage() {
                           />
                         </div>
                         <span className="text-xs font-extrabold text-slate-700 w-16 text-right">
-                          {item.value !== null ? formatNumber(item.value) : `${item.pct.toFixed(1)}%`}
+                          {item.value !== null ? formatNumber(item.value) : (item.pct !== null && item.pct !== undefined) ? `${item.pct.toFixed(1)}%` : "—"}
                         </span>
                       </div>
                     ))}
@@ -876,11 +888,15 @@ export default function OverviewPage() {
                   <div className="text-[10px] font-bold text-slate-400 uppercase">Actual Spend</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-lg font-extrabold text-slate-800">{metrics.budget.budget_utilization_percentage.toFixed(1)}%</div>
+                  <div className="text-lg font-extrabold text-slate-800">
+                    {(metrics.budget.budget_utilization_percentage !== null && metrics.budget.budget_utilization_percentage !== undefined) ? `${metrics.budget.budget_utilization_percentage.toFixed(1)}%` : "—"}
+                  </div>
                   <div className="text-[10px] font-bold text-slate-400 uppercase">Utilization</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-lg font-extrabold text-slate-800">{metrics.budget.pacing_percentage.toFixed(1)}%</div>
+                  <div className="text-lg font-extrabold text-slate-800">
+                    {(metrics.budget.pacing_percentage !== null && metrics.budget.pacing_percentage !== undefined) ? `${metrics.budget.pacing_percentage.toFixed(1)}%` : "—"}
+                  </div>
                   <div className="text-[10px] font-bold text-slate-400 uppercase">Pacing</div>
                 </div>
                 <div className="text-center">
@@ -1098,7 +1114,9 @@ export default function OverviewPage() {
                           </td>
                           <td className="py-3 text-right">{formatCurrency(c.metrics.spend)}</td>
                           <td className="py-3 text-right">{c.metrics.purchases}</td>
-                          <td className="py-3 text-right text-green-600 font-bold">{c.metrics.roas.toFixed(2)}x</td>
+                          <td className="py-3 text-right text-green-600 font-bold">
+                            {(c.metrics.roas !== null && c.metrics.roas !== undefined) ? `${c.metrics.roas.toFixed(2)}x` : "—"}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -1142,9 +1160,15 @@ export default function OverviewPage() {
                               {ad.campaign_name}
                             </div>
                           </td>
-                          <td className="py-3 text-right">{formatPercent(ad.metrics.ctr)}</td>
-                          <td className="py-3 text-right">{formatCurrency(ad.metrics.cpc)}</td>
-                          <td className="py-3 text-right text-green-600 font-bold">{ad.metrics.roas.toFixed(2)}x</td>
+                          <td className="py-3 text-right">
+                            {(ad.metrics.ctr !== null && ad.metrics.ctr !== undefined) ? formatPercent(ad.metrics.ctr) : "—"}
+                          </td>
+                          <td className="py-3 text-right">
+                            {(ad.metrics.cpc !== null && ad.metrics.cpc !== undefined) ? formatCurrency(ad.metrics.cpc) : "—"}
+                          </td>
+                          <td className="py-3 text-right text-green-600 font-bold">
+                            {(ad.metrics.roas !== null && ad.metrics.roas !== undefined) ? `${ad.metrics.roas.toFixed(2)}x` : "—"}
+                          </td>
                         </tr>
                       ))}
                     </tbody>

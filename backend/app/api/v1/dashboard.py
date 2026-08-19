@@ -97,6 +97,8 @@ class DashboardOverviewResponse(BaseModel):
     thruplays: MetricValue
     engagement_rate: MetricValue
     hook_rate: MetricValue
+    conversations: MetricValue
+    cost_per_conversation: MetricValue
 
     # Materialized Funnel Rates
     lpv_rate: MetricValue
@@ -203,6 +205,7 @@ async def query_aggregated_metrics(
         "shares": 0,
         "saves": 0,
         "reactions": 0,
+        "conversations": 0,
     }
     
     for row in rows:
@@ -231,6 +234,7 @@ async def query_aggregated_metrics(
             sums["shares"] += int(actions.get("shares") or 0)
             sums["saves"] += int(actions.get("saves") or 0)
             sums["reactions"] += int(actions.get("reactions") or 0)
+            sums["conversations"] += int(actions.get("conversations") or 0)
             
     return sums
 
@@ -259,6 +263,7 @@ def calculate_rates(data: dict) -> dict:
     shares = data.get("shares") or 0
     saves = data.get("saves") or 0
     reactions = data.get("reactions") or 0
+    conversations = data.get("conversations") or 0
 
     # Basic calculations
     frequency = (impressions / reach) if reach > 0 else 1.0
@@ -270,6 +275,7 @@ def calculate_rates(data: dict) -> dict:
     roas = (revenue / spend) if spend > 0 else 0.0
     cpa = (spend / purchases) if purchases > 0 else 0.0
     cpl = (spend / leads) if leads > 0 else 0.0
+    cost_per_conversation = (spend / conversations) if conversations > 0 else 0.0
     
     # E-commerce rates
     cost_per_add_to_cart = (spend / add_to_cart) if add_to_cart > 0 else 0.0
@@ -309,6 +315,7 @@ def calculate_rates(data: dict) -> dict:
         "shares": shares,
         "saves": saves,
         "reactions": reactions,
+        "conversations": conversations,
         "ctr": ctr,
         "link_ctr": link_ctr,
         "cpc": cpc,
@@ -317,6 +324,7 @@ def calculate_rates(data: dict) -> dict:
         "roas": roas,
         "cpa": cpa,
         "cpl": cpl,
+        "cost_per_conversation": cost_per_conversation,
         "cost_per_add_to_cart": cost_per_add_to_cart,
         "cost_per_initiate_checkout": cost_per_initiate_checkout,
         "aov": aov,
@@ -462,6 +470,8 @@ async def get_overview_analytics(
         thruplays=MetricValue(value=curr_rates["thruplays"], trend=calculate_trend(curr_rates["thruplays"], prev_rates["thruplays"])),
         engagement_rate=MetricValue(value=curr_rates["engagement_rate"], trend=calculate_trend(curr_rates["engagement_rate"], prev_rates["engagement_rate"])),
         hook_rate=MetricValue(value=curr_rates["hook_rate"], trend=calculate_trend(curr_rates["hook_rate"], prev_rates["hook_rate"])),
+        conversations=MetricValue(value=curr_rates["conversations"], trend=calculate_trend(curr_rates["conversations"], prev_rates["conversations"])),
+        cost_per_conversation=MetricValue(value=curr_rates["cost_per_conversation"], trend=calculate_trend(curr_rates["cost_per_conversation"], prev_rates["cost_per_conversation"])),
         
         # Funnel Rates
         lpv_rate=MetricValue(value=curr_rates["lpv_rate"], trend=calculate_trend(curr_rates["lpv_rate"], prev_rates["lpv_rate"])),
