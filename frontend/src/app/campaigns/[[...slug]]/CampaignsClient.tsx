@@ -453,7 +453,7 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
   return (
     <div className="animate-fade-in space-y-6">
       <div className="bg-rose-600 text-white text-xs font-bold p-3 text-center rounded-lg shadow-md">
-        DEBUG: params: {JSON.stringify(params)} | slug: {JSON.stringify(slug)} | propSlug: {JSON.stringify(propSlug)} | campaigns count: {campaigns.length} | found campaign: {campaigns.find(c => c.id === slug?.[0] || c.meta_campaign_id === slug?.[0])?.name || 'NONE'}
+        DEBUG: params: {JSON.stringify(params)} | slug: {JSON.stringify(slug)} | propSlug: {JSON.stringify(propSlug)} | campaigns count: {campaigns.length} | found campaign: {campaigns.find(c => c.id === slug?.[0] || c.meta_campaign_id === slug?.[0])?.name || 'NONE'} | selectedCampaign: {selectedCampaign ? selectedCampaign.name : 'NULL'}
       </div>
       {/* ──────────────────────────────────────────────────────────── */}
       {/* 1. Campaigns List Table View */}
