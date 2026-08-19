@@ -87,6 +87,14 @@ async def require_active_subscription(
     sub = res.scalar_one_or_none()
     
     if sub:
+        # Self-healing trial cleanup if user has active paid subscription
+        if user.trial_status != "none" or user.trial_ends_at is not None:
+            user.trial_status = "none"
+            user.trial_ends_at = None
+            user.trial_started_at = None
+            user.trial_used = True
+            db.add(user)
+            await db.commit()
         return user
 
     # 2. Check trial status

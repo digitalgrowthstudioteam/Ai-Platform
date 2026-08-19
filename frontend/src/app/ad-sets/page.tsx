@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAdAccount } from "@/context/AdAccountContext";
 import { api } from "@/lib/api";
@@ -7,12 +8,29 @@ import { Calendar, Layers, Loader2, X, TrendingUp, TrendingDown, Sparkles, Light
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/utils";
 
 export default function AdSetsPage() {
+  const router = useRouter();
   const { selectedAccount, loadingAccounts } = useAdAccount();
   const [adsets, setAdsets] = useState<any[]>([]);
   const [recs, setRecs] = useState<any[]>([]);
   const [selectedAdSet, setSelectedAdSet] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
-  const [datePreset, setDatePreset] = useState<"7d" | "30d">("30d");
+  
+  // State for subscription and upgrade limits
+  const [subscription, setSubscription] = useState<any>(null);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [upgradeModalMessage, setUpgradeModalMessage] = useState("");
+  
+  // State for date presets
+  const [datePreset, setDatePreset] = useState<string>("30d");
+  const [customStartDate, setCustomStartDate] = useState<string>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 7);
+    return d.toISOString().split("T")[0];
+  });
+  const [customEndDate, setCustomEndDate] = useState<string>(() => {
+    return new Date().toISOString().split("T")[0];
+  });
+
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [sortBy, setSortBy] = useState<string>("spend");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
@@ -25,6 +43,125 @@ export default function AdSetsPage() {
   const [loadingPerf, setLoadingPerf] = useState(false);
   const [perfError, setPerfError] = useState<string | null>(null);
 
+  // Fetch subscription on mount
+  useEffect(() => {
+    const fetchSub = async () => {
+      try {
+        const res = await api.getSubscription();
+        setSubscription(res);
+      } catch (err) {
+        console.error("Failed to load subscription:", err);
+      }
+    };
+    fetchSub();
+  }, []);
+
+  const checkDateRangeLimit = (start: Date, end: Date) => {
+    const diffTime = Math.abs(end.getTime() - start.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    let limit = 7; // default trial
+    let nextPlan = "Starter";
+    if (subscription) {
+      if (subscription.status === "trialing") {
+        limit = 7;
+        nextPlan = "Starter";
+      } else if (subscription.plan === "starter") {
+        limit = 90;
+        nextPlan = "Pro";
+      } else if (subscription.plan === "growth") {
+        limit = 90;
+        nextPlan = "Pro";
+      } else if (subscription.plan === "pro" || subscription.plan === "agency") {
+        limit = 99999; // lifetime
+      }
+    }
+
+    if (diffDays > limit) {
+      setUpgradeModalMessage(
+        `Your plan (${subscription?.status === "trialing" ? "Free Trial" : subscription?.plan ? subscription.plan.toUpperCase() : "FREE TRIAL"}) is limited to ${limit} days of historical data. Please upgrade to the ${nextPlan} plan to analyze ${diffDays} days.`
+      );
+      setShowUpgradeModal(true);
+      return false;
+    }
+    return true;
+  };
+
+  // Date helper
+  const getDates = (preset: string, customStart?: string, customEnd?: string) => {
+    const end = new Date();
+    const start = new Date();
+    
+    switch (preset) {
+      case "today":
+        break;
+      case "yesterday":
+        start.setDate(end.getDate() - 1);
+        end.setDate(end.getDate() - 1);
+        break;
+      case "3d":
+        start.setDate(end.getDate() - 2);
+        break;
+      case "5d":
+        start.setDate(end.getDate() - 4);
+        break;
+      case "7d":
+        start.setDate(end.getDate() - 6);
+        break;
+      case "last_week": {
+        const day = end.getDay();
+        const diffToLastMonday = (day === 0 ? 6 : day - 1) + 7;
+        start.setDate(end.getDate() - diffToLastMonday);
+        end.setDate(start.getDate() + 6);
+        break;
+      }
+      case "last_month": {
+        start.setMonth(end.getMonth() - 1);
+        start.setDate(1);
+        end.setDate(0);
+        break;
+      }
+      case "current_month":
+        start.setDate(1);
+        break;
+      case "last_year":
+        start.setFullYear(end.getFullYear() - 1);
+        start.setMonth(0);
+        start.setDate(1);
+        end.setFullYear(end.getFullYear() - 1);
+        end.setMonth(11);
+        end.setDate(31);
+        break;
+      case "this_year":
+        start.setMonth(0);
+        start.setDate(1);
+        break;
+      case "lifetime":
+        start.setFullYear(end.getFullYear() - 5);
+        break;
+      case "custom":
+        if (customStart && customEnd) {
+          return {
+            startStr: customStart,
+            endStr: customEnd,
+            startDateObj: new Date(customStart),
+            endDateObj: new Date(customEnd),
+          };
+        }
+        break;
+      default:
+        start.setDate(end.getDate() - 29); // Default 30d
+        break;
+    }
+
+    return {
+      startStr: start.toISOString().split("T")[0],
+      endStr: end.toISOString().split("T")[0],
+      startDateObj: start,
+      endDateObj: end,
+    };
+  };
+
   // Helper to load adset performance and ads when clicked
   const handleSelectAdSet = async (as: any) => {
     setSelectedAdSet(as);
@@ -36,7 +173,7 @@ export default function AdSetsPage() {
     
     if (!selectedAccount) return;
     
-    const { startStr, endStr } = getDates(datePreset);
+    const { startStr, endStr } = getDates(datePreset, customStartDate, customEndDate);
     setLoadingPerf(true);
     try {
       const [perfRes, allAds] = await Promise.all([
@@ -53,25 +190,10 @@ export default function AdSetsPage() {
     }
   };
 
-  // Date helper
-  const getDates = (preset: "7d" | "30d") => {
-    const end = new Date();
-    const start = new Date();
-    if (preset === "7d") {
-      start.setDate(end.getDate() - 6);
-    } else {
-      start.setDate(end.getDate() - 29);
-    }
-    return {
-      startStr: start.toISOString().split("T")[0],
-      endStr: end.toISOString().split("T")[0],
-    };
-  };
-
   const loadAdSets = async () => {
     if (!selectedAccount) return;
-    const { startStr, endStr } = getDates(datePreset);
-    const cacheKey = `dgs_cached_adsets_${selectedAccount.id}_${datePreset}`;
+    const { startStr, endStr } = getDates(datePreset, customStartDate, customEndDate);
+    const cacheKey = `dgs_cached_adsets_${selectedAccount.id}_${datePreset}_${startStr}_${endStr}`;
 
     // Load cached adsets instantly to make transitions feel instant
     const cached = sessionStorage.getItem(cacheKey);
@@ -109,15 +231,15 @@ export default function AdSetsPage() {
       loadAdSets();
       loadRecommendations();
     }
-  }, [selectedAccount, datePreset]);
+  }, [selectedAccount, datePreset, customStartDate, customEndDate]);
 
   // Date Range string
-  const { startStr, endStr } = getDates(datePreset);
+  const { startStr, endStr } = getDates(datePreset, customStartDate, customEndDate);
   const formatDateHeader = (dStr: string) => {
     const d = new Date(dStr);
-    return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   };
-  const dateRangeLabel = `${formatDateHeader(startStr)} – ${formatDateHeader(endStr)}, 2026`;
+  const dateRangeLabel = `${formatDateHeader(startStr)} – ${formatDateHeader(endStr)}`;`;
 
   const filteredAndSortedAdSets = adsets
     .filter(a => statusFilter === "ALL" || a.status === statusFilter)
@@ -155,18 +277,109 @@ export default function AdSetsPage() {
             <p className="page-subtitle text-sm text-subtle mt-1">Analyze ad set performance, audiences, and budget allocation</p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Custom Date Range Select Inputs */}
+            {datePreset === "custom" && (
+              <div className="flex items-center gap-2">
+                <input 
+                  type="date" 
+                  value={customStartDate} 
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setCustomStartDate(val);
+                    if (val && customEndDate) {
+                      checkDateRangeLimit(new Date(val), new Date(customEndDate));
+                    }
+                  }} 
+                  className="btn btn-outline py-1.5 px-3 border border-border text-xs font-semibold rounded-md bg-white outline-none cursor-pointer"
+                />
+                <span className="text-slate-400 font-bold text-xs">to</span>
+                <input 
+                  type="date" 
+                  value={customEndDate} 
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setCustomEndDate(val);
+                    if (customStartDate && val) {
+                      checkDateRangeLimit(new Date(customStartDate), new Date(val));
+                    }
+                  }} 
+                  className="btn btn-outline py-1.5 px-3 border border-border text-xs font-semibold rounded-md bg-white outline-none cursor-pointer"
+                />
+              </div>
+            )}
+
+            {/* Preset Toggle Dropdown */}
             <select
               value={datePreset}
-              onChange={(e: any) => setDatePreset(e.target.value)}
+              onChange={(e: any) => {
+                const val = e.target.value;
+                if (val !== "custom") {
+                  const { startDateObj, endDateObj } = getDates(val);
+                  if (checkDateRangeLimit(startDateObj, endDateObj)) {
+                    setDatePreset(val);
+                  }
+                } else {
+                  setDatePreset(val);
+                }
+              }}
               className="btn btn-outline flex items-center gap-2 py-2 px-4 border border-border text-sm font-semibold rounded-md bg-white cursor-pointer hover:bg-slate-50 outline-none"
             >
+              <option value="today">Today</option>
+              <option value="yesterday">Yesterday</option>
+              <option value="3d">Last 3 Days</option>
+              <option value="5d">Last 5 Days</option>
               <option value="7d">Last 7 Days</option>
               <option value="30d">Last 30 Days</option>
+              <option value="last_week">Last Week</option>
+              <option value="last_month">Last Month</option>
+              <option value="current_month">Current Month</option>
+              <option value="last_year">Last Year</option>
+              <option value="this_year">This Year</option>
+              <option value="lifetime">Lifetime</option>
+              <option value="custom">Custom Range</option>
             </select>
+
             <div className="text-xs font-semibold text-slate-500 bg-slate-100 py-2 px-3 rounded-md border border-border flex items-center gap-1.5">
               <Calendar size={14} />
               {dateRangeLabel}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Upgrade Modal */}
+      {showUpgradeModal && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white border border-slate-150 rounded-2xl p-6 max-w-sm w-full text-center space-y-4 shadow-xl">
+            <div className="mx-auto w-12 h-12 bg-amber-50 text-amber-500 rounded-xl flex items-center justify-center border border-amber-100">
+              <Zap size={24} className="fill-amber-500" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-base font-extrabold text-slate-900">Historical Limit Reached</h3>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                {upgradeModalMessage}
+              </p>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={() => {
+                  setShowUpgradeModal(false);
+                  router.push("/settings/billing");
+                }}
+                className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg transition cursor-pointer"
+              >
+                Upgrade Plan
+              </button>
+              <button
+                onClick={() => {
+                  setShowUpgradeModal(false);
+                  setDatePreset("7d"); // Fallback to safe default
+                }}
+                className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs rounded-lg transition cursor-pointer"
+              >
+                Dismiss
+              </button>
             </div>
           </div>
         </div>

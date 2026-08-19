@@ -33,7 +33,7 @@ PLANS_CONFIG = {
     },
     "starter": {
         "max_meta_accounts": 1,
-        "historical_days": 30,
+        "historical_days": 90,
         "sync_interval_hours": 48,
         "max_team_members": 1,
         "ai_recommendations_limit": 999999,
@@ -67,7 +67,7 @@ PLANS_CONFIG = {
     },
     "pro": {
         "max_meta_accounts": 10,
-        "historical_days": 180,
+        "historical_days": 99999,
         "sync_interval_hours": 6,
         "max_team_members": 10,
         "ai_recommendations_limit": 999999,
@@ -84,7 +84,7 @@ PLANS_CONFIG = {
     },
     "agency": {
         "max_meta_accounts": 25,
-        "historical_days": 365,
+        "historical_days": 99999,
         "sync_interval_hours": 6,
         "max_team_members": 25,
         "ai_recommendations_limit": 999999,
@@ -200,7 +200,16 @@ class EntitlementEngine:
         sub = res.scalar_one_or_none()
 
         if sub:
+            # Self-healing trial removal if user has a paid subscription
+            if user.trial_status != "none" or user.trial_ends_at is not None:
+                user.trial_status = "none"
+                user.trial_ends_at = None
+                user.trial_started_at = None
+                user.trial_used = True
+                db.add(user)
+                # Note: db.commit() is expected to be called by the caller, but we can safely call it or flush
             plan_id = sub.plan.lower()
+            is_trial_active = False
         elif is_trial_active:
             plan_id = "starter"
         else:
@@ -228,7 +237,16 @@ class EntitlementEngine:
             a.addon_id in ["lifetime_history_monthly", "lifetime_history_annual"] 
             for a in addons
         )
-        historical_days = 99999 if has_lifetime_history else base_config["historical_days"]
+        
+        # Resolve dynamic historical days limits
+        if is_trial_active:
+            historical_days = 7
+        elif plan_id in ["starter", "growth"]:
+            historical_days = 90
+        elif plan_id in ["pro", "agency"]:
+            historical_days = 99999
+        else:
+            historical_days = 99999 if has_lifetime_history else base_config["historical_days"]
 
         # 5. AI Deep Analysis entitlement
         has_ai_deep = any(a.addon_id == "ai_deep_analysis" for a in addons) or (plan_id.lower() in ["growth", "pro", "agency"])
