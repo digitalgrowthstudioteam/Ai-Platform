@@ -20,6 +20,7 @@ from app.models.metrics import (
     AdMetricsAggregate,
 )
 from app.models.recommendation import AIRecommendation
+from app.models.experiment import AccountMemory, AdExperiment
 from app.models.team import TeamMember
 from app.models.ticket import SupportTicket
 from app.models.notification import Notification
@@ -43,6 +44,8 @@ __all__ = [
     "AdSetMetricsAggregate",
     "AdMetricsAggregate",
     "AIRecommendation",
+    "AccountMemory",
+    "AdExperiment",
     "TeamMember",
     "SupportTicket",
     "Notification",
