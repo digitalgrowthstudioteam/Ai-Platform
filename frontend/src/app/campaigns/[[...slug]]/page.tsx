@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import { useAdAccount } from "@/context/AdAccountContext";
 import { api } from "@/lib/api";
 import { 
@@ -42,6 +43,10 @@ import {
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/utils";
 
 export default function CampaignsPage() {
+  const router = useRouter();
+  const params = useParams();
+  const slug = params?.slug as string[] | undefined;
+
   // Programmatic client-side Cache & Service Worker Buster
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -86,6 +91,7 @@ export default function CampaignsPage() {
   const [selectedAd, setSelectedAd] = useState<any | null>(null);
   const [loadingPerf, setLoadingPerf] = useState(false);
   const [perfError, setPerfError] = useState<string | null>(null);
+  const [adSetPerformance, setAdSetPerformance] = useState<any | null>(null);
   const [adSetTab, setAdSetTab] = useState<"overview" | "ads" | "breakdowns" | "aidiagnosis">("overview");
   const [perfErrorState, setPerfErrorState] = useState<string | null>(null);
 
@@ -146,6 +152,71 @@ export default function CampaignsPage() {
     }
   }, [selectedAccount, datePreset]);
 
+  // Sync URL slug with react selection states
+  useEffect(() => {
+    if (!campaigns || campaigns.length === 0) return;
+
+    const campaignId = slug?.[0];
+    const adSetId = slug?.[1];
+    const adId = slug?.[2];
+
+    if (!campaignId) {
+      setSelectedCampaign(null);
+      setSelectedAdSet(null);
+      setSelectedAd(null);
+    } else {
+      const camp = campaigns.find(c => c.id === campaignId || c.meta_campaign_id === campaignId);
+      if (camp) {
+        setSelectedCampaign(camp);
+        
+        if (adSets.length === 0 && !loadingDetails) {
+          loadCampaignDetails(camp.name);
+        }
+
+        if (!adSetId) {
+          setSelectedAdSet(null);
+          setSelectedAd(null);
+        } else {
+          if (adSetId === "all") {
+            setSelectedAdSet(null);
+            if (adId) {
+              const ad = ads.find(item => item.id === adId || item.meta_ad_id === adId);
+              if (ad) {
+                setSelectedAd(ad);
+                const matchingAdSet = adSets.find(as => as.name === ad.adset_name);
+                if (matchingAdSet) {
+                  setSelectedAdSet(matchingAdSet);
+                }
+              }
+            }
+          } else {
+            const as = adSets.find(item => item.id === adSetId || item.meta_adset_id === adSetId);
+            if (as) {
+              setSelectedAdSet(as);
+              
+              if (!adSetPerformance && !loadingPerf) {
+                loadAdSetPerformance(camp.id, as.id);
+              }
+
+              if (!adId) {
+                setSelectedAd(null);
+              } else {
+                const ad = ads.find(item => item.id === adId || item.meta_ad_id === adId);
+                if (ad) {
+                  setSelectedAd(ad);
+                }
+              }
+            } else if (adSets.length > 0) {
+              router.replace(`/campaigns/${campaignId}`);
+            }
+          }
+        }
+      } else {
+        router.replace('/campaigns');
+      }
+    }
+  }, [slug, campaigns, adSets, ads]);
+
   // Date Range string
   const { startStr, endStr } = getDates(datePreset);
   const formatDateHeader = (dStr: string) => {
@@ -161,6 +232,7 @@ export default function CampaignsPage() {
     const impressions = c.metrics.impressions || 0;
     const clicks = c.metrics.clicks || 0;
     const purchases = c.metrics.purchases || 0;
+    const leads = c.metrics.leads || 0;
     const roas = c.metrics.roas || 0;
 
     if (obj.includes("TRAFFIC") || obj.includes("LINK_CLICKS")) {
@@ -181,9 +253,36 @@ export default function CampaignsPage() {
         roasLabel: "—",
         isRoasRelevant: false
       };
+    } else if (obj.includes("LEAD")) {
+      return {
+        resultLabel: "Leads",
+        resultValue: formatNumber(leads),
+        costPerResult: leads > 0 ? formatCurrency(spend / leads) : "—",
+        ctrLabel: formatPercent(c.metrics.ctr),
+        roasLabel: "—",
+        isRoasRelevant: false
+      };
+    } else if (obj.includes("ENGAGEMENT")) {
+      return {
+        resultLabel: "Engagements",
+        resultValue: formatNumber(clicks),
+        costPerResult: clicks > 0 ? formatCurrency(spend / clicks) : "—",
+        ctrLabel: formatPercent(c.metrics.ctr),
+        roasLabel: "—",
+        isRoasRelevant: false
+      };
+    } else if (obj.includes("APP_PROMOTION") || obj.includes("APP_INSTALLS")) {
+      return {
+        resultLabel: "App Installs",
+        resultValue: formatNumber(clicks),
+        costPerResult: clicks > 0 ? formatCurrency(spend / clicks) : "—",
+        ctrLabel: formatPercent(c.metrics.ctr),
+        roasLabel: "—",
+        isRoasRelevant: false
+      };
     } else {
       return {
-        resultLabel: obj.includes("LEAD") ? "Leads" : "Purchases",
+        resultLabel: "Purchases",
         resultValue: formatNumber(purchases),
         costPerResult: purchases > 0 ? formatCurrency(spend / purchases) : "—",
         ctrLabel: formatPercent(c.metrics.ctr),
@@ -218,26 +317,16 @@ export default function CampaignsPage() {
     );
   };
 
-  const handleSelectCampaign = async (c: any) => {
-    setSelectedCampaign(c);
-    setSelectedAdSet(null);
-    setSelectedAd(null);
-    setActiveTab("overview");
-    setAdSets([]);
-    setAds([]);
-
+  const loadCampaignDetails = async (campaignName: string) => {
     if (!selectedAccount) return;
-
     setLoadingDetails(true);
     try {
       const [allAdSets, allAds] = await Promise.all([
         api.getAdSets(selectedAccount.id, startStr, endStr),
         api.getAds(selectedAccount.id, startStr, endStr)
       ]);
-
-      const filteredAdSets = allAdSets.filter((as: any) => as.campaign_name === c.name);
-      const filteredAds = allAds.filter((ad: any) => ad.campaign_name === c.name);
-
+      const filteredAdSets = allAdSets.filter((as: any) => as.campaign_name === campaignName);
+      const filteredAds = allAds.filter((ad: any) => ad.campaign_name === campaignName);
       setAdSets(filteredAdSets);
       setAds(filteredAds);
     } catch (err) {
@@ -247,17 +336,11 @@ export default function CampaignsPage() {
     }
   };
 
-  const handleSelectAdSetFromList = async (as: any) => {
-    setSelectedAdSet(as);
-    setSelectedAd(null);
-    setAdSetPerformance(null);
-    setPerfError(null);
-    setAdSetTab("overview");
-    if (!selectedCampaign) return;
-
+  const loadAdSetPerformance = async (campaignId: string, adSetId: string) => {
     setLoadingPerf(true);
+    setPerfError(null);
     try {
-      const res = await api.getAdSetPerformance(selectedCampaign.id, as.id, startStr, endStr);
+      const res = await api.getAdSetPerformance(campaignId, adSetId, startStr, endStr);
       setAdSetPerformance(res);
     } catch (err: any) {
       console.error("Failed to load adset performance goal profile:", err);
@@ -267,13 +350,20 @@ export default function CampaignsPage() {
     }
   };
 
+  const handleSelectCampaign = (c: any) => {
+    router.push(`/campaigns/${c.id}`);
+  };
+
+  const handleSelectAdSetFromList = (as: any) => {
+    if (!selectedCampaign) return;
+    router.push(`/campaigns/${selectedCampaign.id}/${as.id}`);
+  };
+
   const handleSelectAdFromList = (ad: any) => {
-    setSelectedAd(ad);
-    // Auto-resolve AdSet reference if exists
+    if (!selectedCampaign) return;
     const matchingAdSet = adSets.find(as => as.name === ad.adset_name);
-    if (matchingAdSet) {
-      setSelectedAdSet(matchingAdSet);
-    }
+    const adSetId = matchingAdSet ? matchingAdSet.id : "all";
+    router.push(`/campaigns/${selectedCampaign.id}/${adSetId}/${ad.id}`);
   };
 
   // Generate mock chart data based on totals
