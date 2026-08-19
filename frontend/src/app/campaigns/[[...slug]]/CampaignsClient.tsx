@@ -18,7 +18,18 @@ import {
   AlertCircle, 
   Zap, 
   Users, 
-  Image as ImageIcon 
+  Image as ImageIcon,
+  Target,
+  Info,
+  ThumbsUp,
+  ThumbsDown,
+  ChevronDown,
+  ChevronUp,
+  FileText,
+  Activity,
+  ExternalLink,
+  X,
+  Lightbulb
 } from "lucide-react";
 import { 
   ResponsiveContainer, 
@@ -27,7 +38,9 @@ import {
   XAxis, 
   YAxis, 
   CartesianGrid, 
-  Tooltip 
+  Tooltip,
+  LineChart,
+  Line
 } from "recharts";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/utils";
 
