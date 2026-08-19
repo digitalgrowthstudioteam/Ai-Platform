@@ -784,14 +784,21 @@ export default function BillingPage() {
                   </p>
                 </div>
 
-                <button
-                  disabled={actionLoading === "addon_faster_sync"}
-                  onClick={() => handleAddonCheckout("faster_sync")}
-                  className="w-full py-2.5 rounded-xl font-bold text-xs bg-slate-900 hover:bg-slate-800 text-white transition flex items-center justify-center gap-1.5 shadow-xs"
-                >
-                  {actionLoading === "addon_faster_sync" && <Loader2 size={12} className="animate-spin" />}
-                  <span>Enable 3-Hour Sync</span>
-                </button>
+                {sub?.active_addons_list?.some((a: any) => a.addon_id === "faster_sync") ? (
+                  <div className="w-full py-2.5 rounded-xl font-bold text-xs bg-emerald-50 border border-emerald-200 text-emerald-700 text-center flex items-center justify-center gap-1.5 shadow-xs">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>Subscribed</span>
+                  </div>
+                ) : (
+                  <button
+                    disabled={actionLoading === "addon_faster_sync"}
+                    onClick={() => handleAddonCheckout("faster_sync")}
+                    className="w-full py-2.5 rounded-xl font-bold text-xs bg-slate-900 hover:bg-slate-800 text-white transition flex items-center justify-center gap-1.5 shadow-xs"
+                  >
+                    {actionLoading === "addon_faster_sync" && <Loader2 size={12} className="animate-spin" />}
+                    <span>Enable 3-Hour Sync</span>
+                  </button>
+                )}
               </div>
 
               {/* Addon 3: Lifetime History (Monthly vs Annual) */}
