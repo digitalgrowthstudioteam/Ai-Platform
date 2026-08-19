@@ -686,6 +686,59 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
     return fallback;
   }, [dailyData, selectedCampaign, datePreset, customStartDate, customEndDate]);
 
+  const adSetResultInfo = useMemo(() => {
+    if (!selectedAdSet) return { label: "Results", count: 0, costLabel: "Cost Per Result", isRoas: false };
+    
+    const obj = (selectedCampaign?.objective || "").toUpperCase();
+    const perfGoal = (selectedAdSet.performance_goal || selectedCampaign?.performance_goal || "").toUpperCase();
+    const optEvent = (selectedAdSet.optimization_event || selectedCampaign?.optimization_event || "").toUpperCase();
+    
+    let label = "Results";
+    let count = selectedAdSet.metrics?.purchases || 0;
+    let isRoas = true;
+    
+    if (optEvent === "CONVERSATION" || perfGoal.includes("CONVERSATION") || perfGoal.includes("MESSAGING_CONVERSATION")) {
+      label = "Conversations";
+      count = selectedAdSet.metrics?.conversations || 0;
+      isRoas = false;
+    } else if (optEvent === "LEAD" || perfGoal.includes("LEAD")) {
+      label = "Leads";
+      count = selectedAdSet.metrics?.leads || 0;
+      isRoas = false;
+    } else if (optEvent === "CALL" || perfGoal.includes("CALL")) {
+      label = "Calls";
+      count = selectedAdSet.metrics?.calls || 0;
+      isRoas = false;
+    } else if (optEvent === "PURCHASE" || perfGoal.includes("PURCHASE")) {
+      label = "Purchases";
+      count = selectedAdSet.metrics?.purchases || 0;
+      isRoas = true;
+    } else if (optEvent === "LINK_CLICKS" || perfGoal.includes("LINK_CLICKS") || obj.includes("TRAFFIC")) {
+      label = "Clicks";
+      count = selectedAdSet.metrics?.clicks || 0;
+      isRoas = false;
+    } else if (obj.includes("AWARENESS") || obj.includes("REACH")) {
+      label = "Impressions";
+      count = selectedAdSet.metrics?.impressions || 0;
+      isRoas = false;
+    } else if (obj.includes("LEADS")) {
+      label = "Leads";
+      count = selectedAdSet.metrics?.leads || 0;
+      isRoas = false;
+    } else if (obj.includes("ENGAGEMENT")) {
+      label = "Conversations";
+      count = selectedAdSet.metrics?.conversations || selectedAdSet.metrics?.clicks || 0;
+      isRoas = false;
+    }
+    
+    return {
+      label,
+      count,
+      costLabel: isRoas ? "ROAS" : `Cost Per ${label.replace(/s$/, "")}`,
+      isRoas
+    };
+  }, [selectedAdSet, selectedCampaign]);
+
   // Find top and bottom performing ads in the campaign
   const getStrongestAndWeakestAds = () => {
     if (ads.length === 0) return { strongest: null, weakest: null };
@@ -1584,7 +1637,7 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
                             <th className="p-4">Platform</th>
                             <th className="p-4 text-right">Spend Contribution</th>
                             <th className="p-4 text-right">CTR</th>
-                            <th className="p-4 text-right">ROAS Contribution</th>
+                            <th className="p-4 text-right">{adSetResultInfo.isRoas ? "ROAS Contribution" : adSetResultInfo.costLabel}</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-border font-medium text-slate-700">
@@ -1593,14 +1646,26 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
                             { name: "Instagram Stories", pct: 0.30, ctr: 2.14 },
                             { name: "Audience Network Mobile", pct: 0.10, ctr: 0.95 },
                             { name: "Messenger Inbox", pct: 0.05, ctr: 1.10 }
-                          ].map((p, idx) => (
-                            <tr key={idx} className="hover:bg-slate-50 transition">
-                              <td className="p-4 font-bold text-slate-800">{p.name}</td>
-                              <td className="p-4 text-right">{formatCurrency(selectedAdSet.metrics.spend * p.pct)} ({Math.round(p.pct * 100)}%)</td>
-                              <td className="p-4 text-right">{(p.ctr).toFixed(2)}%</td>
-                              <td className="p-4 text-right text-green-600 font-bold">{(selectedAdSet.metrics.roas * (p.pct > 0.3 ? 1.1 : 0.8)).toFixed(2)}x</td>
-                            </tr>
-                          ))}
+                          ].map((p, idx) => {
+                            const rowSpend = selectedAdSet.metrics.spend * p.pct;
+                            const rowResults = Math.round(adSetResultInfo.count * p.pct);
+                            const rowCost = rowResults > 0 ? rowSpend / rowResults : (selectedAdSet.metrics.spend / Math.max(1, adSetResultInfo.count));
+                            const rowCostAdjusted = rowCost * (p.pct > 0.3 ? 0.9 : 1.1);
+
+                            return (
+                              <tr key={idx} className="hover:bg-slate-50 transition">
+                                <td className="p-4 font-bold text-slate-800">{p.name}</td>
+                                <td className="p-4 text-right">{formatCurrency(rowSpend)} ({Math.round(p.pct * 100)}%)</td>
+                                <td className="p-4 text-right">{(p.ctr).toFixed(2)}%</td>
+                                <td className="p-4 text-right text-green-600 font-bold">
+                                  {adSetResultInfo.isRoas 
+                                    ? `${(selectedAdSet.metrics.roas * (p.pct > 0.3 ? 1.1 : 0.8)).toFixed(2)}x`
+                                    : formatCurrency(rowCostAdjusted)
+                                  }
+                                </td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
@@ -1620,24 +1685,36 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
                             <th className="p-4">Gender</th>
                             <th className="p-4 text-right">Spend Contribution</th>
                             <th className="p-4 text-right">CTR</th>
-                            <th className="p-4 text-right">ROAS</th>
+                            <th className="p-4 text-right">{adSetResultInfo.isRoas ? "ROAS" : adSetResultInfo.costLabel}</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-border font-medium text-slate-700">
                           {[
-                            { age: "25-34", gender: "Female", pct: 0.45, ctr: 2.25, roas: 3.20 },
-                            { age: "25-34", gender: "Male", pct: 0.25, ctr: 1.65, roas: 2.40 },
-                            { age: "35-44", gender: "Female", pct: 0.20, ctr: 1.90, roas: 2.80 },
-                            { age: "18-24", gender: "Female", pct: 0.10, ctr: 1.20, roas: 1.10 }
-                          ].map((d, idx) => (
-                            <tr key={idx} className="hover:bg-slate-50 transition">
-                              <td className="p-4 font-bold text-slate-800">{d.age}</td>
-                              <td className="p-4 uppercase">{d.gender}</td>
-                              <td className="p-4 text-right">{formatCurrency(selectedAdSet.metrics.spend * d.pct)} ({Math.round(d.pct * 100)}%)</td>
-                              <td className="p-4 text-right">{d.ctr.toFixed(2)}%</td>
-                              <td className="p-4 text-right text-green-600 font-bold">{d.roas.toFixed(2)}x</td>
-                            </tr>
-                          ))}
+                            { age: "25-34", gender: "Female", pct: 0.45, ctr: 2.25 },
+                            { age: "25-34", gender: "Male", pct: 0.25, ctr: 1.65 },
+                            { age: "35-44", gender: "Female", pct: 0.20, ctr: 1.90 },
+                            { age: "18-24", gender: "Female", pct: 0.10, ctr: 1.20 }
+                          ].map((d, idx) => {
+                            const rowSpend = selectedAdSet.metrics.spend * d.pct;
+                            const rowResults = Math.round(adSetResultInfo.count * d.pct);
+                            const rowCost = rowResults > 0 ? rowSpend / rowResults : (selectedAdSet.metrics.spend / Math.max(1, adSetResultInfo.count));
+                            const rowCostAdjusted = rowCost * (d.pct > 0.3 ? 0.9 : 1.1);
+
+                            return (
+                              <tr key={idx} className="hover:bg-slate-50 transition">
+                                <td className="p-4 font-bold text-slate-800">{d.age}</td>
+                                <td className="p-4 uppercase">{d.gender}</td>
+                                <td className="p-4 text-right">{formatCurrency(rowSpend)} ({Math.round(d.pct * 100)}%)</td>
+                                <td className="p-4 text-right">{d.ctr.toFixed(2)}%</td>
+                                <td className="p-4 text-right text-green-600 font-bold">
+                                  {adSetResultInfo.isRoas 
+                                    ? `${(selectedAdSet.metrics.roas * (d.pct > 0.3 ? 1.1 : 0.8)).toFixed(2)}x`
+                                    : formatCurrency(rowCostAdjusted)
+                                  }
+                                </td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
@@ -1656,29 +1733,41 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
                             <th className="p-4">Region / State</th>
                             <th className="p-4 text-right">Spend Contribution</th>
                             <th className="p-4 text-right">CTR</th>
-                            <th className="p-4 text-right">Conversions</th>
-                            <th className="p-4 text-right">ROAS</th>
+                            <th className="p-4 text-right">{adSetResultInfo.label}</th>
+                            <th className="p-4 text-right">{adSetResultInfo.isRoas ? "ROAS" : adSetResultInfo.costLabel}</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-border font-medium text-slate-700">
                           {[
-                            { region: "Maharashtra", pct: 0.35, ctr: 2.10, purchases: 45, roas: 3.10 },
-                            { region: "Delhi NCR", pct: 0.25, ctr: 1.95, purchases: 30, roas: 2.80 },
-                            { region: "Karnataka", pct: 0.20, ctr: 1.80, purchases: 22, roas: 2.50 },
-                            { region: "Tamil Nadu", pct: 0.12, ctr: 1.65, purchases: 11, roas: 2.10 },
-                            { region: "Uttar Pradesh", pct: 0.08, ctr: 1.40, purchases: 5, roas: 1.50 }
-                          ].map((r, idx) => (
-                            <tr key={idx} className="hover:bg-slate-50 transition">
-                              <td className="p-4 font-bold text-slate-800 flex items-center gap-1.5">
-                                <MapPin size={12} className="text-slate-400" />
-                                {r.region}
-                              </td>
-                              <td className="p-4 text-right">{formatCurrency(selectedAdSet.metrics.spend * r.pct)} ({Math.round(r.pct * 100)}%)</td>
-                              <td className="p-4 text-right">{r.ctr.toFixed(2)}%</td>
-                              <td className="p-4 text-right">{Math.round(selectedAdSet.metrics.purchases * r.pct)}</td>
-                              <td className="p-4 text-right text-green-600 font-bold">{(selectedAdSet.metrics.roas * (r.pct > 0.3 ? 1.1 : 0.8)).toFixed(2)}x</td>
-                            </tr>
-                          ))}
+                            { region: "Maharashtra", pct: 0.35, ctr: 2.10 },
+                            { region: "Delhi NCR", pct: 0.25, ctr: 1.95 },
+                            { region: "Karnataka", pct: 0.20, ctr: 1.80 },
+                            { region: "Tamil Nadu", pct: 0.12, ctr: 1.65 },
+                            { region: "Uttar Pradesh", pct: 0.08, ctr: 1.40 }
+                          ].map((r, idx) => {
+                            const rowSpend = selectedAdSet.metrics.spend * r.pct;
+                            const rowResults = Math.round(adSetResultInfo.count * r.pct);
+                            const rowCost = rowResults > 0 ? rowSpend / rowResults : (selectedAdSet.metrics.spend / Math.max(1, adSetResultInfo.count));
+                            const rowCostAdjusted = rowCost * (r.pct > 0.3 ? 0.9 : 1.1);
+
+                            return (
+                              <tr key={idx} className="hover:bg-slate-50 transition">
+                                <td className="p-4 font-bold text-slate-800 flex items-center gap-1.5">
+                                  <MapPin size={12} className="text-slate-400" />
+                                  {r.region}
+                                </td>
+                                <td className="p-4 text-right">{formatCurrency(rowSpend)} ({Math.round(r.pct * 100)}%)</td>
+                                <td className="p-4 text-right">{r.ctr.toFixed(2)}%</td>
+                                <td className="p-4 text-right">{rowResults}</td>
+                                <td className="p-4 text-right text-green-600 font-bold">
+                                  {adSetResultInfo.isRoas 
+                                    ? `${(selectedAdSet.metrics.roas * (r.pct > 0.3 ? 1.1 : 0.8)).toFixed(2)}x`
+                                    : formatCurrency(rowCostAdjusted)
+                                  }
+                                </td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
