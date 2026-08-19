@@ -449,12 +449,8 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
       </div>
     );
   }
-
   return (
     <div className="animate-fade-in space-y-6">
-      <div className="bg-rose-600 text-white text-xs font-bold p-3 text-center rounded-lg shadow-md">
-        DEBUG: params: {JSON.stringify(params)} | slug: {JSON.stringify(slug)} | propSlug: {JSON.stringify(propSlug)} | campaigns count: {campaigns.length} | found campaign: {campaigns.find(c => c.id === slug?.[0] || c.meta_campaign_id === slug?.[0])?.name || 'NONE'} | selectedCampaign: {selectedCampaign ? selectedCampaign.name : 'NULL'}
-      </div>
       {/* ──────────────────────────────────────────────────────────── */}
       {/* 1. Campaigns List Table View */}
       {/* ──────────────────────────────────────────────────────────── */}
@@ -847,37 +843,47 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
             {/* Breadcrumb Navigation */}
             <div className="flex justify-between items-center bg-white p-4 border border-border rounded-lg shadow-xs">
               <div className="flex items-center gap-2 text-xs text-slate-400 font-bold">
-                <button onClick={() => { setSelectedAd(null); setSelectedAdSet(null); setSelectedCampaign(null); }} className="hover:text-slate-600 transition">Campaigns</button>
+                <button onClick={() => router.push('/campaigns')} className="hover:text-slate-600 transition">Campaigns</button>
                 <span>/</span>
-                <button onClick={() => { setSelectedAd(null); setSelectedAdSet(null); }} className="hover:text-slate-600 transition">{selectedCampaign.name}</button>
+                <button onClick={() => router.push(`/campaigns/${selectedCampaign.id}`)} className="hover:text-slate-600 transition">{selectedCampaign.name}</button>
                 <span>/</span>
                 <span className="text-slate-800">{selectedAdSet.name}</span>
               </div>
               <button
-                onClick={() => setSelectedAdSet(null)}
+                onClick={() => router.push(`/campaigns/${selectedCampaign.id}`)}
                 className="flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-slate-800 transition cursor-pointer"
               >
                 <ArrowLeft size={14} /> Back to Campaign
               </button>
             </div>
 
-            {/* Performance Goal Header */}
-            <div className="card border border-border bg-gradient-to-r from-slate-900 to-slate-800 shadow-xl rounded-xl p-6 text-white space-y-4">
-              <div className="flex justify-between items-start gap-4">
-                <div className="space-y-1">
-                  <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest flex items-center gap-1">
-                    <Target size={12} /> Performance Goal Intelligence Active
-                  </span>
-                  <h2 className="text-2xl font-black">{selectedAdSet.name}</h2>
-                  <p className="text-sm text-slate-300 max-w-2xl">{adSetPerformance.performance_goal.name}: {adSetPerformance.performance_goal.description}</p>
+            {/* Ad Set Header */}
+            <div className="card border border-border bg-white shadow-sm rounded-lg p-5 space-y-4">
+              <div className="flex flex-wrap justify-between items-start gap-4">
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Ad Set Details</span>
+                  <h2 className="text-xl font-black text-slate-800 mt-1">{selectedAdSet.name}</h2>
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${selectedAdSet.status === "ACTIVE" ? "text-green-600 bg-green-50 animate-pulse" : "text-slate-500 bg-slate-100"}`}>
+                      {selectedAdSet.status}
+                    </span>
+                    <span className="text-[10px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded font-bold uppercase">
+                      Goal: {selectedAdSet.optimization_goal?.replace(/_/g, " ") || "N/A"}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className={`text-[10px] px-2 py-1 rounded font-bold uppercase ${selectedAdSet.status === "ACTIVE" ? "text-green-400 bg-green-500/10 border border-green-500/20" : "text-slate-400 bg-slate-500/10 border border-slate-500/20"}`}>
-                    {selectedAdSet.status}
-                  </span>
-                  <span className="text-[10px] text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2 py-1 rounded font-bold uppercase">
-                    Motive: {adSetPerformance.performance_goal.motive}
-                  </span>
+                <div className="flex flex-wrap items-center gap-4">
+                  {[
+                    { label: "Spend", val: formatCurrency(selectedAdSet.metrics.spend) },
+                    { label: "CTR", val: formatPercent(selectedAdSet.metrics.ctr) },
+                    { label: "Conversions", val: selectedAdSet.metrics.purchases },
+                    { label: "ROAS", val: `${selectedAdSet.metrics.roas.toFixed(2)}x`, highlight: true }
+                  ].map((k, i) => (
+                    <div key={i} className="bg-slate-50 border border-slate-100 p-2.5 rounded-lg text-center min-w-[90px]">
+                      <div className="text-[8px] font-bold text-slate-400 uppercase">{k.label}</div>
+                      <div className={`text-xs font-black mt-1 ${k.highlight ? "text-green-600 font-bold" : "text-slate-800"}`}>{k.val}</div>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
@@ -1337,14 +1343,14 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
             {/* Breadcrumb Navigation */}
             <div className="flex justify-between items-center bg-white p-4 border border-border rounded-lg shadow-xs">
               <div className="flex items-center gap-2 text-xs text-slate-400 font-bold">
-                <button onClick={() => { setSelectedAd(null); setSelectedAdSet(null); setSelectedCampaign(null); }} className="hover:text-slate-600 transition">Campaigns</button>
+                <button onClick={() => router.push('/campaigns')} className="hover:text-slate-600 transition">Campaigns</button>
                 <span>/</span>
-                <button onClick={() => { setSelectedAd(null); setSelectedAdSet(null); }} className="hover:text-slate-600 transition">{selectedCampaign.name}</button>
+                <button onClick={() => router.push(`/campaigns/${selectedCampaign.id}`)} className="hover:text-slate-600 transition">{selectedCampaign.name}</button>
                 <span>/</span>
                 <span className="text-slate-800">{selectedAdSet.name}</span>
               </div>
               <button
-                onClick={() => setSelectedAdSet(null)}
+                onClick={() => router.push(`/campaigns/${selectedCampaign.id}`)}
                 className="flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-slate-800 transition cursor-pointer"
               >
                 <ArrowLeft size={14} /> Back to Campaign
@@ -1514,12 +1520,12 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
           {/* Breadcrumb / Back Navigation */}
           <div className="flex justify-between items-center bg-white p-4 border border-border rounded-lg shadow-xs">
             <div className="flex items-center gap-2 text-xs text-slate-400 font-bold">
-              <button onClick={() => { setSelectedAd(null); setSelectedAdSet(null); setSelectedCampaign(null); }} className="hover:text-slate-600 transition">Campaigns</button>
+              <button onClick={() => router.push('/campaigns')} className="hover:text-slate-600 transition">Campaigns</button>
               <span>/</span>
               <span className="text-slate-800">{selectedCampaign.name}</span>
             </div>
             <button
-              onClick={() => { setSelectedAd(null); setSelectedAdSet(null); setSelectedCampaign(null); }}
+              onClick={() => router.push('/campaigns')}
               className="flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-slate-800 transition cursor-pointer"
             >
               <ArrowLeft size={14} /> Back to Campaigns
