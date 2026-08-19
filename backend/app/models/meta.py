@@ -140,3 +140,13 @@ class MetaAdAccount(BaseModel):
         back_populates="ad_account",
         cascade="all, delete-orphan",
     )
+    daily_briefs: Mapped[List["AIDailyBrief"]] = relationship(
+        "AIDailyBrief",
+        back_populates="ad_account",
+        cascade="all, delete-orphan",
+    )
+    weekly_briefs: Mapped[List["AIWeeklyBrief"]] = relationship(
+        "AIWeeklyBrief",
+        back_populates="ad_account",
+        cascade="all, delete-orphan",
+    )

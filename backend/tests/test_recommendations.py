@@ -159,35 +159,35 @@ async def setup_rec_data(db: AsyncSession):
     for i in range(10):
         day = today - timedelta(days=i)
         
-        # Scaling Campaign: spend = 10.00/day, revenue = 30.00/day => ROAS = 3.0x (Scale opportunity!)
+        # Scaling Campaign: spend = 60.00/day, revenue = 180.00/day => ROAS = 3.0x (Scale opportunity!)
         c_scale_metric = CampaignDailyMetrics(
             campaign_id=campaign_scale.id,
             date=day,
-            spend=10.00,
-            impressions=1000,
-            clicks=30,
-            purchases=1,
-            revenue=30.00,
+            spend=60.00,
+            impressions=2000,
+            clicks=60,
+            purchases=2,
+            revenue=180.00,
             ctr=0.03,
-            cpc=0.33,
-            cpm=10.00,
+            cpc=1.00,
+            cpm=30.00,
             roas=3.00,
         )
         db.add(c_scale_metric)
 
-        # Waste Campaign: spend = 15.00/day, revenue = 5.00/day => ROAS = 0.33x, CTR = 0.5% (Underperforming ad + Low CTR!)
+        # Waste Campaign: spend = 60.00/day, revenue = 15.00/day => ROAS = 0.25x, CTR = 0.5% (Underperforming ad + Low CTR!)
         c_waste_metric = CampaignDailyMetrics(
             campaign_id=campaign_waste.id,
             date=day,
-            spend=15.00,
-            impressions=1000,
-            clicks=5,
+            spend=60.00,
+            impressions=2000,
+            clicks=10,
             purchases=0,
-            revenue=5.00,
+            revenue=15.00,
             ctr=0.005,
-            cpc=3.00,
-            cpm=15.00,
-            roas=0.33,
+            cpc=6.00,
+            cpm=30.00,
+            roas=0.25,
         )
         db.add(c_waste_metric)
 
@@ -195,30 +195,31 @@ async def setup_rec_data(db: AsyncSession):
         ad_scale_metric = AdDailyMetrics(
             ad_id=ad_scale.id,
             date=day,
-            spend=10.00,
-            impressions=1000,
-            clicks=30,
-            purchases=1,
-            revenue=30.00,
+            spend=60.00,
+            impressions=2000,
+            clicks=60,
+            purchases=2,
+            revenue=180.00,
             ctr=0.03,
-            cpc=0.33,
-            cpm=10.00,
+            cpc=1.00,
+            cpm=30.00,
             roas=3.00,
         )
         db.add(ad_scale_metric)
 
+        # Ad waste metrics
         ad_waste_metric = AdDailyMetrics(
             ad_id=ad_waste.id,
             date=day,
-            spend=15.00,
-            impressions=1000,
-            clicks=5,
+            spend=60.00,
+            impressions=2000,
+            clicks=10,
             purchases=0,
-            revenue=5.00,
+            revenue=15.00,
             ctr=0.005,
-            cpc=3.00,
-            cpm=15.00,
-            roas=0.33,
+            cpc=6.00,
+            cpm=30.00,
+            roas=0.25,
         )
         db.add(ad_waste_metric)
 
@@ -266,7 +267,7 @@ async def test_recommendations_engine_generation(setup_rec_data, db: AsyncSessio
     recs = res.scalars().all()
     
     types = [r.recommendation_type for r in recs]
-    assert "SCALE_OPPORTUNITY" in types
+    assert "SCALING_OPPORTUNITY" in types
     assert "UNDERPERFORMING_AD" in types
     assert "UNDERPERFORMING_CREATIVE" in types
 

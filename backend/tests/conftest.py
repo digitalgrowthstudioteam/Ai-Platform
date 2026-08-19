@@ -1,42 +1,74 @@
 """
-Digital Growth Studio — Pytest Shared Fixtures
+Digital Growth Studio — Pytest Shared Fixtures for SQLite in-memory testing
 """
+import pytest
 import pytest_asyncio
-from sqlalchemy import pool
+from sqlalchemy.pool import StaticPool
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
-from app.config import get_settings
+from sqlalchemy import delete
+
+from app.database import Base, get_db
+from app.main import app as fastapi_app
+# Import all models to register on Base.metadata
+import app.models
+
+# In-memory SQLite async engine with StaticPool to share connection across sessions
+test_engine = create_async_engine(
+    "sqlite+aiosqlite:///:memory:",
+    connect_args={"check_same_thread": False},
+    poolclass=StaticPool,
+)
+
+test_sessionmaker = async_sessionmaker(
+    test_engine,
+    expire_on_commit=False,
+    class_=AsyncSession,
+)
+
+
+@pytest_asyncio.fixture(scope="session", autouse=True)
+async def setup_test_db():
+    """
+    Initializes the in-memory database schema before running any tests.
+    """
+    async with test_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    yield
+    await test_engine.dispose()
 
 
 @pytest_asyncio.fixture
 async def db() -> AsyncSession:
     """
-    Provide an AsyncSession instance connected to the test database.
-    Disable pooling with NullPool to prevent event loop teardown issues.
+    Provides an AsyncSession instance connected to the test database.
     """
-    settings = get_settings()
-    
-    # Critical security guard to protect live production database from test runs!
-    if "supabase" in settings.DATABASE_URL or "pooler" in settings.DATABASE_URL:
-        raise RuntimeError(
-            "TEST ABORTED: Pytest is pointing to the live production Supabase database! "
-            "Please configure your local .env file to use a local development database for testing."
-        )
-
-    engine = create_async_engine(
-        settings.DATABASE_URL,
-        poolclass=pool.NullPool,
-    )
-    
-    async_session = async_sessionmaker(
-        engine,
-        expire_on_commit=False,
-        class_=AsyncSession,
-    )
-    
-    async with async_session() as session:
+    async with test_sessionmaker() as session:
         yield session
-        
-    await engine.dispose()
+
+
+async def override_get_db():
+    """
+    FastAPI override callback for get_db dependency.
+    """
+    async with test_sessionmaker() as session:
+        try:
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
+        finally:
+            await session.close()
+
+
+@pytest_asyncio.fixture(autouse=True)
+def override_database_dependency():
+    """
+    Automatically overrides the database dependency for FastAPI routers during tests.
+    """
+    fastapi_app.dependency_overrides[get_db] = override_get_db
+    yield
+    fastapi_app.dependency_overrides.pop(get_db, None)
 
 
 @pytest_asyncio.fixture(autouse=True)
@@ -44,7 +76,6 @@ async def clean_database_state(db: AsyncSession):
     """
     Purge all tables before each test to ensure complete database test isolation.
     """
-    from sqlalchemy import delete
     from app.models.user import User
     from app.models.subscription import Subscription
     from app.models.subscription_addon import SubscriptionAddOn
@@ -52,7 +83,17 @@ async def clean_database_state(db: AsyncSession):
     from app.models.campaign import Campaign, AdSet, Ad
     from app.models.creative import Creative
     from app.models.recommendation import AIRecommendation
+    from app.models.daily_brief import AIDailyBrief, AIWeeklyBrief
+    from app.models.experiment import AccountMemory, AdExperiment
+    from app.models.ml_features import MLFeatureRecord, OptimizationAction
 
+    # Order of deletion is important to satisfy SQLite foreign keys if enabled
+    await db.execute(delete(MLFeatureRecord))
+    await db.execute(delete(OptimizationAction))
+    await db.execute(delete(AIDailyBrief))
+    await db.execute(delete(AIWeeklyBrief))
+    await db.execute(delete(AccountMemory))
+    await db.execute(delete(AdExperiment))
     await db.execute(delete(AIRecommendation))
     await db.execute(delete(Creative))
     await db.execute(delete(Ad))

@@ -235,6 +235,65 @@ class ApiClient {
     });
   }
 
+  // Phase 9: AI Decision Center and Brief endpoints
+  async getDecisionCenter(adAccountId: string) {
+    return this.request<any>(`/recommendations/decision-center?ad_account_id=${adAccountId}`);
+  }
+
+  async getDailyBrief(adAccountId: string, date?: string) {
+    const dateParam = date ? `&report_date=${date}` : "";
+    return this.request<any>(`/recommendations/brief/daily?ad_account_id=${adAccountId}${dateParam}`);
+  }
+
+  async refreshDailyBrief(adAccountId: string, date?: string) {
+    const dateParam = date ? `&report_date=${date}` : "";
+    return this.request<any>(`/recommendations/brief/daily/refresh?ad_account_id=${adAccountId}${dateParam}`, {
+      method: "POST",
+    });
+  }
+
+  async getWeeklyBrief(adAccountId: string, startDate?: string) {
+    const dateParam = startDate ? `&start_date=${startDate}` : "";
+    return this.request<any>(`/recommendations/brief/weekly?ad_account_id=${adAccountId}${dateParam}`);
+  }
+
+  async refreshWeeklyBrief(adAccountId: string, startDate?: string) {
+    const dateParam = startDate ? `&start_date=${startDate}` : "";
+    return this.request<any>(`/recommendations/brief/weekly/refresh?ad_account_id=${adAccountId}${dateParam}`, {
+      method: "POST",
+    });
+  }
+
+  // Phase 10: ML Feature Store & Optimization Actions
+  async getMLFeatures(adAccountId: string, date?: string) {
+    const dateParam = date ? `&feature_date=${date}` : "";
+    return this.request<any[]>(`/recommendations/features?ad_account_id=${adAccountId}${dateParam}`);
+  }
+
+  async extractMLFeatures(adAccountId: string, date?: string) {
+    const dateParam = date ? `&feature_date=${date}` : "";
+    return this.request<any>(`/recommendations/features/extract?ad_account_id=${adAccountId}${dateParam}`, {
+      method: "POST",
+    });
+  }
+
+  async getOptimizationActions(adAccountId: string, status?: string) {
+    const statusParam = status ? `&status_filter=${status}` : "";
+    return this.request<any[]>(`/recommendations/actions?ad_account_id=${adAccountId}${statusParam}`);
+  }
+
+  async approveOptimizationAction(actionId: string) {
+    return this.request<any>(`/recommendations/actions/approve/${actionId}`, {
+      method: "POST",
+    });
+  }
+
+  async cancelOptimizationAction(actionId: string) {
+    return this.request<any>(`/recommendations/actions/cancel/${actionId}`, {
+      method: "POST",
+    });
+  }
+
   // Phase 9: Billing & Subscription endpoints
   async getSubscription() {
     return this.request<{

@@ -20,7 +20,9 @@ from app.models.metrics import (
     AdMetricsAggregate,
 )
 from app.models.recommendation import AIRecommendation
+from app.models.daily_brief import AIDailyBrief, AIWeeklyBrief
 from app.models.experiment import AccountMemory, AdExperiment
+from app.models.ml_features import MLFeatureRecord, OptimizationAction
 from app.models.team import TeamMember
 from app.models.ticket import SupportTicket
 from app.models.notification import Notification
@@ -44,8 +46,12 @@ __all__ = [
     "AdSetMetricsAggregate",
     "AdMetricsAggregate",
     "AIRecommendation",
+    "AIDailyBrief",
+    "AIWeeklyBrief",
     "AccountMemory",
     "AdExperiment",
+    "MLFeatureRecord",
+    "OptimizationAction",
     "TeamMember",
     "SupportTicket",
     "Notification",
