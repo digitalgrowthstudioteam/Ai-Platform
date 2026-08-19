@@ -3,11 +3,11 @@
 import { useEffect, useState } from "react";
 import { useAdAccount } from "@/context/AdAccountContext";
 import { api } from "@/lib/api";
-import { 
-  Palette, 
-  Loader2, 
-  Sparkles, 
-  ArrowRight, 
+import {
+  Palette,
+  Loader2,
+  Sparkles,
+  ArrowRight,
   Image as ImageIcon,
   Video,
   Layers,
@@ -31,6 +31,7 @@ export default function CreativeAnalyzerPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isComparing, setIsComparing] = useState(false);
   const [activeTab, setActiveTab] = useState<"dna" | "patterns">("dna");
+  const [isMessaging, setIsMessaging] = useState(false);
 
   // Premium Augmented Mock Data with detailed DNA properties
   const getAugmentedMockData = () => {
@@ -243,11 +244,11 @@ export default function CreativeAnalyzerPage() {
       }
 
       const mocks = getAugmentedMockData();
-      
+
       if (!ads || ads.length === 0) {
         // Fallback to mocks
         setCreativePerformance(mocks);
-        
+
         // Group format metrics
         const formatGroups: Record<string, any> = {
           IMAGE: { spend: 0, impressions: 0, clicks: 0, purchases: 0, revenue: 0, count: 0 },
@@ -373,11 +374,24 @@ export default function CreativeAnalyzerPage() {
   const getComparisonSummary = () => {
     if (selectedIds.length < 2) return "";
     const selectedItems = creativePerformance.filter(x => selectedIds.includes(x.id));
-    
-    // Sort by ROAS
-    const sorted = [...selectedItems].sort((a, b) => b.roas - a.roas);
+
+    // Sort: if messaging, sort by lowest cost per conv, else by highest ROAS
+    const sorted = [...selectedItems].sort((a, b) => {
+      if (isMessaging) {
+        const costA = a.conversations > 0 ? a.spend / a.conversations : a.spend;
+        const costB = b.conversations > 0 ? b.spend / b.conversations : b.spend;
+        return costA - costB; // lower is better
+      }
+      return b.roas - a.roas; // higher is better
+    });
     const winner = sorted[0];
     const loser = sorted[sorted.length - 1];
+
+    if (isMessaging) {
+      const winnerCost = winner.conversations > 0 ? winner.spend / winner.conversations : 0;
+      const loserCost = loser.conversations > 0 ? loser.spend / loser.conversations : 0;
+      return `The data correlates with strongest performance in "${winner.creative.headline}" (${winnerCost > 0 ? formatCurrency(winnerCost) : "—"} cost per conversation). This correlates with its "${winner.dna.hook}" hook and UGC visual structure delivering a ${winner.ctr.toFixed(2)}% CTR. Conversely, "${loser.creative.headline}" (${loserCost > 0 ? formatCurrency(loserCost) : "—"} cost per conversation) correlates with weaker output primarily due to high frequency fatigue (${loser.frequency.toFixed(1)}x) and lower post-click conversion rates.`;
+    }
 
     return `The data correlates with strongest performance in "${winner.creative.headline}" (${winner.roas.toFixed(2)}x ROAS). This correlates with its "${winner.dna.hook}" hook and UGC visual structure delivering a ${winner.ctr.toFixed(2)}% CTR. Conversely, "${loser.creative.headline}" (${loser.roas.toFixed(2)}x ROAS) correlates with weaker output primarily due to high frequency fatigue (${loser.frequency.toFixed(1)}x) and lower post-click conversion rates.`;
   };
@@ -420,7 +434,14 @@ export default function CreativeAnalyzerPage() {
 
   // Selected comparison items
   const comparisonItems = creativePerformance.filter(x => selectedIds.includes(x.id));
-  const bestPerformer = comparisonItems.sort((a,b) => b.roas - a.roas)[0];
+  const bestPerformer = [...comparisonItems].sort((a, b) => {
+    if (isMessaging) {
+      const costA = a.conversations > 0 ? a.spend / a.conversations : a.spend;
+      const costB = b.conversations > 0 ? b.spend / b.conversations : b.spend;
+      return costA - costB;
+    }
+    return b.roas - a.roas;
+  })[0];
 
   return (
     <div className="animate-fade-in space-y-6">
@@ -440,32 +461,29 @@ export default function CreativeAnalyzerPage() {
       <div className="flex gap-2 border-b border-border pb-px">
         <button
           onClick={() => { setActiveTab("dna"); setIsComparing(false); }}
-          className={`pb-2.5 px-4 text-sm font-semibold border-b-2 transition ${
-            activeTab === "dna" && !isComparing
+          className={`pb-2.5 px-4 text-sm font-semibold border-b-2 transition ${activeTab === "dna" && !isComparing
               ? "border-primary text-primary"
               : "border-transparent text-subtle hover:text-slate-700"
-          }`}
+            }`}
         >
           Creative DNA List & Workspace
         </button>
         <button
           onClick={() => { setActiveTab("patterns"); setIsComparing(false); }}
-          className={`pb-2.5 px-4 text-sm font-semibold border-b-2 transition ${
-            activeTab === "patterns" && !isComparing
+          className={`pb-2.5 px-4 text-sm font-semibold border-b-2 transition ${activeTab === "patterns" && !isComparing
               ? "border-primary text-primary"
               : "border-transparent text-subtle hover:text-slate-700"
-          }`}
+            }`}
         >
           Winning Pattern Analyzer
         </button>
         {selectedIds.length >= 2 && (
           <button
             onClick={() => setIsComparing(true)}
-            className={`pb-2.5 px-4 text-sm font-semibold border-b-2 transition flex items-center gap-1.5 ${
-              isComparing
+            className={`pb-2.5 px-4 text-sm font-semibold border-b-2 transition flex items-center gap-1.5 ${isComparing
                 ? "border-primary text-primary"
                 : "border-transparent text-amber-600 hover:text-amber-700"
-            }`}
+              }`}
           >
             <Shuffle size={14} /> Compare selected ({selectedIds.length})
           </button>
@@ -490,19 +508,18 @@ export default function CreativeAnalyzerPage() {
               <div key={idx} className="card border border-border bg-white shadow-sm rounded-lg overflow-hidden flex flex-col">
                 <div className="bg-slate-50/60 p-4 border-b border-border flex justify-between items-center">
                   <span className="text-xs font-bold text-slate-800 truncate max-w-[180px]">{item.title}</span>
-                  <span className={`text-[9px] px-2 py-0.5 rounded font-black uppercase ${
-                    item.lifecycle === "Winner"
+                  <span className={`text-[9px] px-2 py-0.5 rounded font-black uppercase ${item.lifecycle === "Winner"
                       ? "bg-green-100 text-green-700"
                       : item.lifecycle === "Fatigue Risk"
-                      ? "bg-amber-100 text-amber-700"
-                      : item.lifecycle === "Learning"
-                      ? "bg-blue-100 text-blue-700"
-                      : "bg-red-100 text-red-700"
-                  }`}>
+                        ? "bg-amber-100 text-amber-700"
+                        : item.lifecycle === "Learning"
+                          ? "bg-blue-100 text-blue-700"
+                          : "bg-red-100 text-red-700"
+                    }`}>
                     {item.lifecycle}
                   </span>
                 </div>
-                
+
                 <div className="p-4 space-y-4 flex-1">
                   <div className="flex gap-3">
                     <img
@@ -640,8 +657,12 @@ export default function CreativeAnalyzerPage() {
                       <div className="text-xs font-black text-slate-700 mt-0.5">{ctr.toFixed(2)}%</div>
                     </div>
                     <div>
-                      <div className="text-[10px] text-slate-400 font-bold uppercase">Avg ROAS</div>
-                      <div className="text-xs font-black text-green-600 mt-0.5">{roas.toFixed(2)}x</div>
+                      <div className="text-[10px] text-slate-400 font-bold uppercase">{isMessaging ? "Cost/Conv" : "Avg ROAS"}</div>
+                      <div className="text-xs font-black text-green-600 mt-0.5">
+                        {isMessaging 
+                          ? (data.conversations > 0 ? formatCurrency(data.spend / data.conversations) : "—") 
+                          : `${roas.toFixed(2)}x`}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -654,7 +675,7 @@ export default function CreativeAnalyzerPage() {
               <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">Ad Creatives DNA Details</span>
               <span className="text-[10px] text-subtle font-medium">Select up to 3 ads below to compare attributes side-by-side</span>
             </div>
-            
+
             <div className="overflow-x-auto">
               <table className="min-w-full text-xs text-left divide-y divide-border">
                 <thead className="bg-slate-50/50">
@@ -666,7 +687,7 @@ export default function CreativeAnalyzerPage() {
                     <th className="p-4 text-center">Fatigue Trend</th>
                     <th className="p-4 text-center">Performance Score</th>
                     <th className="p-4 text-right">Spend</th>
-                    <th className="p-4 text-right">ROAS</th>
+                    <th className="p-4 text-right">{isMessaging ? "Cost/Conv" : "ROAS"}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border font-medium text-slate-700">
@@ -706,43 +727,41 @@ export default function CreativeAnalyzerPage() {
                           </span>
                         </td>
                         <td className="p-4">
-                          <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold inline-flex items-center gap-1 ${
-                            item.lifecycle === "Winner"
+                          <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold inline-flex items-center gap-1 ${item.lifecycle === "Winner"
                               ? "bg-green-100 text-green-700"
                               : item.lifecycle === "Fatigue Risk"
-                              ? "bg-amber-100 text-amber-700"
-                              : item.lifecycle === "Learning"
-                              ? "bg-blue-100 text-blue-700"
-                              : "bg-red-100 text-red-700"
-                          }`}>
-                            <span className={`w-1 h-1 rounded-full ${
-                              item.lifecycle === "Winner" ? "bg-green-500" : item.lifecycle === "Learning" ? "bg-blue-500" : "bg-amber-500"
-                            }`}></span>
+                                ? "bg-amber-100 text-amber-700"
+                                : item.lifecycle === "Learning"
+                                  ? "bg-blue-100 text-blue-700"
+                                  : "bg-red-100 text-red-700"
+                            }`}>
+                            <span className={`w-1 h-1 rounded-full ${item.lifecycle === "Winner" ? "bg-green-500" : item.lifecycle === "Learning" ? "bg-blue-500" : "bg-amber-500"
+                              }`}></span>
                             {item.lifecycle}
                           </span>
                         </td>
                         <td className="p-4 text-center">
-                          <span className={`text-[9px] px-2 py-0.5 rounded font-black uppercase ${
-                            item.fatigue === "Fatigued" 
-                              ? "bg-red-50 text-red-600 animate-pulse" 
-                              : item.fatigue === "Showing fatigue" 
-                              ? "bg-amber-50 text-amber-600" 
-                              : "bg-green-50 text-green-600"
-                          }`}>
+                          <span className={`text-[9px] px-2 py-0.5 rounded font-black uppercase ${item.fatigue === "Fatigued"
+                              ? "bg-red-50 text-red-600 animate-pulse"
+                              : item.fatigue === "Showing fatigue"
+                                ? "bg-amber-50 text-amber-600"
+                                : "bg-green-50 text-green-600"
+                            }`}>
                             {item.fatigue}
                           </span>
                         </td>
                         <td className="p-4 text-center">
                           <div className="flex flex-col items-center">
-                            <span className={`text-xs font-black ${
-                              item.score >= 90 ? "text-green-600" : item.score >= 70 ? "text-amber-600" : "text-red-500"
-                            }`}>{item.score}/100</span>
+                            <span className={`text-xs font-black ${item.score >= 90 ? "text-green-600" : item.score >= 70 ? "text-amber-600" : "text-red-500"
+                              }`}>{item.score}/100</span>
                             <span className="text-[8px] text-slate-400 uppercase font-bold mt-0.5">Objective Score</span>
                           </div>
                         </td>
                         <td className="p-4 text-right font-semibold">{formatCurrency(item.spend)}</td>
                         <td className="p-4 text-right text-green-600 font-bold text-sm">
-                          {item.roas.toFixed(2)}x
+                          {isMessaging 
+                            ? (item.conversations > 0 ? formatCurrency(item.spend / item.conversations) : "—") 
+                            : `${item.roas.toFixed(2)}x`}
                         </td>
                       </tr>
                     );
@@ -781,7 +800,10 @@ export default function CreativeAnalyzerPage() {
                 </div>
                 <div className="bg-white p-3 rounded-lg border border-green-100 text-[11px] leading-relaxed text-slate-600 font-medium">
                   <span className="font-bold text-slate-800">Winning Pattern: </span>
-                  Short-form video + problem-focused hook + outcome headline is currently your strongest creative pattern. This combination correlates with an average 3.65x ROAS and captures 72% of total conversions.
+                  {isMessaging 
+                    ? "Short-form video + problem-focused hook + outcome headline is currently your strongest creative pattern. This combination correlates with the lowest cost per conversation and captures 72% of total chat initiations."
+                    : "Short-form video + problem-focused hook + outcome headline is currently your strongest creative pattern. This combination correlates with an average 3.65x ROAS and captures 72% of total conversions."
+                  }
                 </div>
               </div>
             </div>
@@ -811,7 +833,10 @@ export default function CreativeAnalyzerPage() {
                 </div>
                 <div className="bg-white p-3 rounded-lg border border-red-100 text-[11px] leading-relaxed text-slate-600 font-medium">
                   <span className="font-bold text-slate-800">Losing Pattern: </span>
-                  Static image layouts combined with technical checklist headlines correlate with higher CPA (₹1,800+) and suffer from accelerated frequency wearout.
+                  {isMessaging 
+                    ? "Static image layouts combined with technical checklist headlines correlate with higher Cost Per Conversation (₹180+) and suffer from accelerated frequency wearout."
+                    : "Static image layouts combined with technical checklist headlines correlate with higher CPA (₹1,800+) and suffer from accelerated frequency wearout."
+                  }
                 </div>
               </div>
             </div>
@@ -822,15 +847,22 @@ export default function CreativeAnalyzerPage() {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs font-semibold text-slate-700">
               <div className="bg-slate-50 p-4 rounded-lg border border-border space-y-2">
                 <span className="text-slate-500 text-[10px] font-bold block uppercase">Creative count</span>
-                <span className="text-xl font-black text-slate-800">5 Creatives Analyzed</span>
+                <span className="text-xl font-black text-slate-800">{creativePerformance.length} Creatives Analyzed</span>
               </div>
               <div className="bg-slate-50 p-4 rounded-lg border border-border space-y-2">
                 <span className="text-slate-500 text-[10px] font-bold block uppercase">Aggregated Spend</span>
-                <span className="text-xl font-black text-slate-800">{formatCurrency(49400)}</span>
+                <span className="text-xl font-black text-slate-800">
+                  {formatCurrency(creativePerformance.reduce((acc, curr) => acc + (curr.spend || 0), 0))}
+                </span>
               </div>
               <div className="bg-slate-50 p-4 rounded-lg border border-border space-y-2">
                 <span className="text-slate-500 text-[10px] font-bold block uppercase">Total Results</span>
-                <span className="text-xl font-black text-slate-800">92 Purchases</span>
+                <span className="text-xl font-black text-slate-800">
+                  {isMessaging 
+                    ? `${creativePerformance.reduce((acc, curr) => acc + (curr.conversations || 0), 0)} Conversations`
+                    : `${creativePerformance.reduce((acc, curr) => acc + (curr.purchases || 0), 0)} Purchases`
+                  }
+                </span>
               </div>
               <div className="bg-slate-50 p-4 rounded-lg border border-border space-y-2">
                 <span className="text-slate-500 text-[10px] font-bold block uppercase">AI Model Confidence</span>

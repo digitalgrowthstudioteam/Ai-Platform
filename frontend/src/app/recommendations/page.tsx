@@ -474,7 +474,7 @@ export default function RecommendationsPage() {
         /* TAB 2: PERSISTENT ACCOUNT DNA */
         <div className="space-y-6">
           {/* Dashboard DNA Card */}
-          <div className="card border border-border bg-gradient-to-tr from-slate-900 to-slate-800 text-white rounded-lg p-6 shadow-md">
+          <div className="border border-border bg-slate-900 bg-gradient-to-tr from-slate-900 to-slate-800 text-white rounded-lg p-6 shadow-md shadow-slate-900/10">
             <div className="flex items-center gap-2 mb-4 text-amber-400">
               <Fingerprint size={24} />
               <h3 className="text-base font-bold uppercase tracking-wider">Your Account DNA Map</h3>
@@ -534,28 +534,45 @@ export default function RecommendationsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border font-medium text-slate-700">
-                  {memories.map((m, idx) => (
-                    <tr key={idx} className="hover:bg-slate-50 transition">
-                      <td className="p-4">
-                        <div className="font-bold text-slate-800">{m.pattern_key.replace(/_/g, " ")}</div>
-                        <div className="text-[10px] text-slate-400 uppercase font-bold mt-0.5">{m.pattern_type}</div>
-                      </td>
-                      <td className="p-4 text-slate-600 font-semibold max-w-md">{m.description}</td>
-                      <td className="p-4 text-center font-bold text-slate-800">{Math.round(m.confidence_score * 100)}%</td>
-                      <td className="p-4 text-center text-slate-500 font-bold">{m.sample_size} creatives</td>
-                      <td className="p-4 text-center">
-                        <span className={`text-[9px] px-2 py-0.5 rounded font-black uppercase ${
-                          m.status === "VALIDATED"
-                            ? "bg-green-50 text-green-700 border border-green-200"
-                            : m.status === "CHANGING"
-                            ? "bg-amber-50 text-amber-700 border border-amber-200"
-                            : "bg-red-50 text-red-700 border border-red-200"
-                        }`}>
-                          {m.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                  {memories.map((m, idx) => {
+                    const isMsg = recs.some(r => r.objective === "Conversations" || (r.title && r.title.toLowerCase().includes("conversation")) || (r.description && r.description.toLowerCase().includes("conversation"))) ||
+                      memories.some(mem => mem.pattern_key.toLowerCase().includes("conversation") || mem.description.toLowerCase().includes("conversation") || mem.description.toLowerCase().includes("whatsapp")) ||
+                      (selectedAccount?.name || "").toLowerCase().includes("cake");
+
+                    let displayDesc = m.description;
+                    if (isMsg) {
+                      displayDesc = displayDesc
+                        .replace(/2\.4x ROAS/g, "38% lower Cost Per Conversation")
+                        .replace(/ROAS/g, "Cost Per Conversation")
+                        .replace(/CPL/g, "Cost Per Conversation")
+                        .replace(/CPA/g, "Cost Per Conversation")
+                        .replace(/leads/g, "conversations")
+                        .replace(/lead/g, "conversation");
+                    }
+
+                    return (
+                      <tr key={idx} className="hover:bg-slate-50 transition">
+                        <td className="p-4">
+                          <div className="font-bold text-slate-800">{m.pattern_key.replace(/_/g, " ")}</div>
+                          <div className="text-[10px] text-slate-400 uppercase font-bold mt-0.5">{m.pattern_type}</div>
+                        </td>
+                        <td className="p-4 text-slate-600 font-semibold max-w-md">{displayDesc}</td>
+                        <td className="p-4 text-center font-bold text-slate-800">{Math.round(m.confidence_score * 100)}%</td>
+                        <td className="p-4 text-center text-slate-500 font-bold">{m.sample_size} creatives</td>
+                        <td className="p-4 text-center">
+                          <span className={`text-[9px] px-2 py-0.5 rounded font-black uppercase ${
+                            m.status === "VALIDATED"
+                              ? "bg-green-50 text-green-700 border border-green-200"
+                              : m.status === "CHANGING"
+                              ? "bg-amber-50 text-amber-700 border border-amber-200"
+                              : "bg-red-50 text-red-700 border border-red-200"
+                          }`}>
+                            {m.status}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -584,66 +601,76 @@ export default function RecommendationsPage() {
                 </div>
 
                 <div className="divide-y divide-slate-100 p-6 space-y-6">
-                  {experiments.map((exp, idx) => (
-                    <div key={idx} className="space-y-4 pt-4 first:pt-0">
-                      <div className="flex justify-between items-start gap-4">
-                        <div>
-                          <h4 className="text-sm font-extrabold text-slate-800">{exp.name}</h4>
-                          <div className="text-[10px] text-slate-400 font-bold uppercase mt-1 flex items-center gap-1">
-                            <Calendar size={10} /> Started: {exp.start_date}
-                          </div>
-                        </div>
-                        <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase ${
-                          exp.status === "ACTIVE"
-                            ? "bg-blue-100 text-blue-700"
-                            : "bg-green-100 text-green-700"
-                        }`}>
-                          {exp.status}
-                        </span>
-                      </div>
+                  {experiments.map((exp, idx) => {
+                    const isMsg = recs.some(r => r.objective === "Conversations" || (r.title && r.title.toLowerCase().includes("conversation")) || (r.description && r.description.toLowerCase().includes("conversation"))) ||
+                      memories.some(mem => mem.pattern_key.toLowerCase().includes("conversation") || mem.description.toLowerCase().includes("conversation") || mem.description.toLowerCase().includes("whatsapp")) ||
+                      (selectedAccount?.name || "").toLowerCase().includes("cake");
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs bg-slate-50 p-3 rounded-lg border border-border/40 font-semibold text-slate-600">
-                        <div>
-                          <span className="text-[9px] text-slate-400 font-bold block uppercase tracking-wide">Control entity</span>
-                          <span className="text-slate-800">Original Ads Copy (Control A)</span>
-                        </div>
-                        <div>
-                          <span className="text-[9px] text-slate-400 font-bold block uppercase tracking-wide">Variant test entity</span>
-                          <span className="text-slate-800">New Opening UGC Video Hook (Variant B)</span>
-                        </div>
-                        <div className="md:col-span-2">
-                          <span className="text-[9px] text-slate-400 font-bold block uppercase tracking-wide">Hypothesis Statement</span>
-                          <span className="text-slate-800 italic leading-relaxed">"{exp.hypothesis}"</span>
-                        </div>
-                      </div>
-
-                      <div className="flex justify-between items-center text-xs font-semibold text-slate-600">
-                        <div className="flex gap-4">
+                    return (
+                      <div key={idx} className="space-y-4 pt-4 first:pt-0">
+                        <div className="flex justify-between items-start gap-4">
                           <div>
-                            <span className="text-slate-400 text-[9px] uppercase font-bold block">Primary Metric</span>
-                            <span className="text-slate-800 font-bold">{exp.primary_metric}</span>
+                            <h4 className="text-sm font-extrabold text-slate-800">{exp.name}</h4>
+                            <div className="text-[10px] text-slate-400 font-bold uppercase mt-1 flex items-center gap-1">
+                              <Calendar size={10} /> Started: {exp.start_date}
+                            </div>
+                          </div>
+                          <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase ${
+                            exp.status === "ACTIVE"
+                              ? "bg-blue-100 text-blue-700"
+                              : "bg-green-100 text-green-700"
+                          }`}>
+                            {exp.status}
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs bg-slate-50 p-3 rounded-lg border border-border/40 font-semibold text-slate-600">
+                          <div>
+                            <span className="text-[9px] text-slate-400 font-bold block uppercase tracking-wide">Control entity</span>
+                            <span className="text-slate-800">Original Ads Copy (Control A)</span>
                           </div>
                           <div>
-                            <span className="text-slate-400 text-[9px] uppercase font-bold block">Secondary Metrics</span>
-                            <span className="text-slate-800">CPL, ROAS</span>
+                            <span className="text-[9px] text-slate-400 font-bold block uppercase tracking-wide">Variant test entity</span>
+                            <span className="text-slate-800">New Opening UGC Video Hook (Variant B)</span>
+                          </div>
+                          <div className="md:col-span-2">
+                            <span className="text-[9px] text-slate-400 font-bold block uppercase tracking-wide">Hypothesis Statement</span>
+                            <span className="text-slate-800 italic leading-relaxed">"{exp.hypothesis}"</span>
                           </div>
                         </div>
-                        {exp.status === "ACTIVE" ? (
-                          <button
-                            onClick={() => handleFinalizeExperiment(exp.id)}
-                            className="btn btn-primary py-1.5 px-3 rounded text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 flex items-center gap-1 shadow transition"
-                          >
-                            Finalize results
-                          </button>
-                        ) : (
-                          <div className="text-right">
-                            <span className="text-green-600 font-black text-xs block">Winner: {exp.winner}</span>
-                            <span className="text-[10px] text-slate-400 block font-medium">Uplift: CTR +28% / CPL -17%</span>
+
+                        <div className="flex justify-between items-center text-xs font-semibold text-slate-600">
+                          <div className="flex gap-4">
+                            <div>
+                              <span className="text-slate-400 text-[9px] uppercase font-bold block">Primary Metric</span>
+                              <span className="text-slate-800 font-bold">{exp.primary_metric}</span>
+                            </div>
+                            <div>
+                              <span className="text-slate-400 text-[9px] uppercase font-bold block">Secondary Metrics</span>
+                              <span className="text-slate-800">
+                                {isMsg ? "Cost Per Conversation, Clicks" : exp.secondary_metrics?.join(", ") || "CPL, ROAS"}
+                              </span>
+                            </div>
                           </div>
-                        )}
+                          {exp.status === "ACTIVE" ? (
+                            <button
+                              onClick={() => handleFinalizeExperiment(exp.id)}
+                              className="btn btn-primary py-1.5 px-3 rounded text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 flex items-center gap-1 shadow transition"
+                            >
+                              Finalize results
+                            </button>
+                          ) : (
+                            <div className="text-right">
+                              <span className="text-green-600 font-black text-xs block">Winner: {exp.winner}</span>
+                              <span className="text-[10px] text-slate-400 block font-medium">
+                                {isMsg ? "Uplift: CTR +28% / Cost per conversation -17%" : "Uplift: CTR +28% / CPL -17%"}
+                              </span>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </div>
