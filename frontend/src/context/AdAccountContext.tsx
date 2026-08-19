@@ -11,6 +11,8 @@ export interface AdAccount {
   timezone: string;
   account_status: number;
   industry?: string | null;
+  ai_intelligence_status?: string | null;
+  historical_intelligence_status?: string | null;
 }
 
 interface AdAccountContextType {
@@ -43,6 +45,8 @@ export function AdAccountProvider({ children }: { children: React.ReactNode }) {
           timezone: acc.timezone,
           account_status: acc.account_status,
           industry: acc.industry,
+          ai_intelligence_status: acc.ai_intelligence_status,
+          historical_intelligence_status: acc.historical_intelligence_status,
         }));
 
       setAdAccounts(activeAccounts);

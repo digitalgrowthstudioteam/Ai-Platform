@@ -24,6 +24,7 @@ import {
   Mail,
   User as UserIcon,
   Sparkles,
+  Brain,
 } from "lucide-react";
 
 export default function AdminPage() {
@@ -489,6 +490,76 @@ export default function AdminPage() {
               </div>
             </div>
           )}
+
+          {/* AI Intelligence Subscriptions & Revenue Tracking */}
+          <div className="bg-white border border-slate-150 rounded-2xl p-6 shadow-xs space-y-6">
+            <h3 className="text-sm font-bold text-slate-900 pb-3 border-b border-slate-100 flex items-center gap-1.5">
+              <Brain size={16} className="text-indigo-600" /> AI Intelligence Subscriptions & Revenue Tracking
+            </h3>
+
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+              <div className="p-4 bg-slate-50 border border-slate-200/80 rounded-xl space-y-1">
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Active Slots (Ind)</div>
+                <div className="text-xl font-extrabold text-slate-900">{stats.ai_individual_active_count}</div>
+              </div>
+
+              <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-xl space-y-1">
+                <div className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest">Active Workspace Plans (All)</div>
+                <div className="text-xl font-extrabold text-indigo-800">{stats.ai_all_accounts_active_count}</div>
+              </div>
+
+              <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-xl space-y-1">
+                <div className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">AI MRR</div>
+                <div className="text-xl font-extrabold text-emerald-800">
+                  ₹{(stats.ai_total_revenue_monthly_paise / 100).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                </div>
+              </div>
+
+              <div className="p-4 bg-rose-50 border border-rose-100 rounded-xl space-y-1">
+                <div className="text-[10px] font-bold text-rose-500 uppercase tracking-widest">AI Churned</div>
+                <div className="text-xl font-extrabold text-rose-800">{stats.ai_churn_count}</div>
+              </div>
+
+              <div className="p-4 bg-amber-50 border border-amber-100 rounded-xl space-y-1">
+                <div className="text-[10px] font-bold text-amber-600 uppercase tracking-widest">Processing Cost</div>
+                <div className="text-xl font-extrabold text-amber-800">
+                  ₹{(stats.ai_processing_cost_paise_estimate / 100).toFixed(2)}
+                </div>
+              </div>
+
+              <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-xl space-y-1">
+                <div className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">Gross Margin</div>
+                <div className="text-xl font-extrabold text-emerald-800">{stats.ai_gross_margin_percentage}%</div>
+              </div>
+            </div>
+
+            <div className="p-4 bg-slate-50 rounded-xl border border-slate-150 space-y-3">
+              <div className="flex justify-between text-xs font-bold text-slate-700">
+                <span>AI Revenue vs LLM Cost Breakdown</span>
+                <span>Margin: {stats.ai_gross_margin_percentage}%</span>
+              </div>
+              <div className="w-full bg-slate-200 h-3 rounded-full overflow-hidden flex">
+                <div 
+                  className="bg-emerald-500 h-full rounded-l-full transition-all" 
+                  style={{ width: `${stats.ai_total_revenue_monthly_paise > 0 ? ((stats.ai_total_revenue_monthly_paise - stats.ai_processing_cost_paise_estimate) / stats.ai_total_revenue_monthly_paise) * 100 : 100}%` }}
+                />
+                <div 
+                  className="bg-amber-500 h-full rounded-r-full transition-all" 
+                  style={{ width: `${stats.ai_total_revenue_monthly_paise > 0 ? (stats.ai_processing_cost_paise_estimate / stats.ai_total_revenue_monthly_paise) * 100 : 0}%` }}
+                />
+              </div>
+              <div className="flex gap-4 text-[10px] text-slate-500 font-semibold pt-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 bg-emerald-500 rounded-xs" />
+                  Net Profit (₹{((stats.ai_total_revenue_monthly_paise - stats.ai_processing_cost_paise_estimate) / 100).toFixed(2)})
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 bg-amber-500 rounded-xs" />
+                  LLM Infrastructure Cost (₹{(stats.ai_processing_cost_paise_estimate / 100).toFixed(2)})
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

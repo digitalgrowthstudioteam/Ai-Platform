@@ -120,6 +120,16 @@ class MetaAdAccount(BaseModel):
         String(100),
         nullable=True,
     )
+    ai_intelligence_status: Mapped[Optional[str]] = mapped_column(
+        String(50),
+        nullable=True,
+        default="none",
+    )
+    historical_intelligence_status: Mapped[Optional[str]] = mapped_column(
+        String(50),
+        nullable=True,
+        default="none",
+    )
 
     # Relationships
     user: Mapped["User"] = relationship(

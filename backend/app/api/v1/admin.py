@@ -50,6 +50,12 @@ class PlatformStatsResponse(BaseModel):
     total_campaigns: int
     total_addons_active: int
     trial_stats: TrialStats
+    ai_individual_active_count: int
+    ai_all_accounts_active_count: int
+    ai_total_revenue_monthly_paise: int
+    ai_churn_count: int
+    ai_processing_cost_paise_estimate: int
+    ai_gross_margin_percentage: float
 
 
 class AdminUserItem(BaseModel):
@@ -185,6 +191,48 @@ async def get_platform_stats(
         trial_conversion_rate=round(conversion_rate, 2),
     )
 
+    # Compute AI Intelligence specific admin metrics
+    stmt_ai_active = select(SubscriptionAddOn).where(SubscriptionAddOn.status == "active")
+    res_ai_active = await db.execute(stmt_ai_active)
+    active_addons_all = res_ai_active.scalars().all()
+
+    ai_ind_count = 0
+    ai_all_count = 0
+    ai_rev_monthly_paise = 0
+
+    for addon in active_addons_all:
+        if addon.addon_id == "AI_INTELLIGENCE_INDIVIDUAL_MONTHLY":
+            ai_ind_count += addon.quantity
+            ai_rev_monthly_paise += 49900 * addon.quantity
+        elif addon.addon_id == "AI_INTELLIGENCE_INDIVIDUAL_YEARLY":
+            ai_ind_count += addon.quantity
+            ai_rev_monthly_paise += int((499900 / 12) * addon.quantity)
+        elif addon.addon_id == "AI_INTELLIGENCE_ALL_MONTHLY":
+            ai_all_count += addon.quantity
+            ai_rev_monthly_paise += 999900 * addon.quantity
+        elif addon.addon_id == "AI_INTELLIGENCE_ALL_YEARLY":
+            ai_all_count += addon.quantity
+            ai_rev_monthly_paise += int((6999900 / 12) * addon.quantity)
+
+    # Churn count
+    stmt_churn = (
+        select(func.count(SubscriptionAddOn.id))
+        .where(SubscriptionAddOn.status.in_(["cancelled", "expired"]))
+        .where(SubscriptionAddOn.addon_id.like("AI_INTELLIGENCE_%"))
+    )
+    res_churn = await db.execute(stmt_churn)
+    ai_churn_count = res_churn.scalar_one()
+
+    # AI Processing Cost estimate: ₹14.50 (1450 paise) per active individual slot account,
+    # plus ₹43.50 (4350 paise) average per active All Accounts workspace subscription
+    ai_cost_paise = (1450 * ai_ind_count) + (4350 * ai_all_count)
+
+    # Gross Margin
+    if ai_rev_monthly_paise > 0:
+        ai_margin_pct = ((ai_rev_monthly_paise - ai_cost_paise) / ai_rev_monthly_paise) * 100.0
+    else:
+        ai_margin_pct = 0.0
+
     return PlatformStatsResponse(
         total_users=total_users,
         connected_ad_accounts=total_accs,
@@ -193,6 +241,12 @@ async def get_platform_stats(
         total_campaigns=total_camps,
         total_addons_active=total_addons,
         trial_stats=trial_stats_obj,
+        ai_individual_active_count=ai_ind_count,
+        ai_all_accounts_active_count=ai_all_count,
+        ai_total_revenue_monthly_paise=ai_rev_monthly_paise,
+        ai_churn_count=ai_churn_count,
+        ai_processing_cost_paise_estimate=ai_cost_paise,
+        ai_gross_margin_percentage=round(ai_margin_pct, 2),
     )
 
 

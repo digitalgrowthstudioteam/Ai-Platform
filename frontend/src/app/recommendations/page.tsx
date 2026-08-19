@@ -68,6 +68,33 @@ export default function RecommendationsPage() {
     message: string;
   } | null>(null);
 
+  const [performanceGoal, setPerformanceGoal] = useState<"ALL" | "CONVERSATIONS" | "LEADS" | "SALES">("ALL");
+
+  // Dynamically filter recommendations based on chosen performance goal
+  const getFilteredData = () => {
+    let rList = recs;
+    let mList = memories;
+    let eList = experiments;
+
+    if (performanceGoal === "CONVERSATIONS") {
+      rList = recs.filter(r => r.objective === "Conversations" || (r.title && r.title.toLowerCase().includes("conversation")) || (r.description && r.description.toLowerCase().includes("conversation")));
+      mList = memories.filter(m => m.pattern_key.toLowerCase().includes("conversation") || m.description.toLowerCase().includes("conversation") || m.description.toLowerCase().includes("whatsapp") || m.pattern_key === "FORMAT" || m.pattern_key === "OFFER_TEXT_OVERLAY");
+      eList = experiments.filter(e => e.primary_metric === "CTR" || e.name.toLowerCase().includes("conversation") || e.hypothesis.toLowerCase().includes("conversation"));
+    } else if (performanceGoal === "LEADS") {
+      rList = recs.filter(r => r.objective === "Lead Gen" || (r.title && r.title.toLowerCase().includes("lead")) || (r.description && r.description.toLowerCase().includes("lead")));
+      mList = memories.filter(m => m.pattern_key.toLowerCase().includes("lead") || m.description.toLowerCase().includes("lead") || m.pattern_key === "FORMAT" || m.pattern_key === "PROBLEM_HOOK_VS_GENERIC");
+      eList = experiments.filter(e => e.name.toLowerCase().includes("lead") || e.hypothesis.toLowerCase().includes("lead"));
+    } else if (performanceGoal === "SALES") {
+      rList = recs.filter(r => r.objective === "Sales" || (r.title && r.title.toLowerCase().includes("sales")) || (r.description && r.description.toLowerCase().includes("sales")) || (r.title && r.title.toLowerCase().includes("roas")));
+      mList = memories.filter(m => m.pattern_key.toLowerCase().includes("sales") || m.description.toLowerCase().includes("sales") || m.pattern_key === "FORMAT" || m.pattern_key === "OFFER_TEXT_OVERLAY");
+      eList = experiments.filter(e => e.name.toLowerCase().includes("sales") || e.hypothesis.toLowerCase().includes("sales") || e.name.toLowerCase().includes("copy"));
+    }
+
+    return { rList, mList, eList };
+  };
+
+  const { rList: filteredRecs, mList: filteredMemories, eList: filteredExperiments } = getFilteredData();
+
   const loadData = async () => {
     if (!selectedAccount) return;
     try {
@@ -163,41 +190,41 @@ export default function RecommendationsPage() {
 
   const getDnaMap = () => {
     // Check if there are any validated video memory keys
-    const hasVideoMemory = memories.some(m => m.pattern_key === "VIDEO_VS_STATIC" || m.description.toLowerCase().includes("video"));
+    const hasVideoMemory = filteredMemories.some(m => m.pattern_key === "VIDEO_VS_STATIC" || m.description.toLowerCase().includes("video"));
     
     // Resolve Best Format
     let bestFormat = "Single Image (1:1)";
     if (hasVideoMemory) {
       bestFormat = "Short Video (15-22s)";
-    } else if (memories.some(m => m.pattern_key === "CAROUSEL_VS_SINGLE_IMAGE")) {
+    } else if (filteredMemories.some(m => m.pattern_key === "CAROUSEL_VS_SINGLE_IMAGE")) {
       bestFormat = "Carousel Ads";
     }
 
     // Resolve Best Hook
     let bestHook = "Benefit-focused Hook";
-    if (memories.some(m => m.pattern_key === "OFFER_TEXT_OVERLAY")) {
+    if (filteredMemories.some(m => m.pattern_key === "OFFER_TEXT_OVERLAY")) {
       bestHook = "Offer Text Overlay";
-    } else if (memories.some(m => m.pattern_key === "PROBLEM_HOOK_VS_GENERIC")) {
+    } else if (filteredMemories.some(m => m.pattern_key === "PROBLEM_HOOK_VS_GENERIC")) {
       bestHook = "Problem-focused Hook";
     }
 
     // Resolve Best Headline
     let bestHeadline = "Outcome-focused";
-    if (memories.some(m => m.description.toLowerCase().includes("curiosity"))) {
+    if (filteredMemories.some(m => m.description.toLowerCase().includes("curiosity"))) {
       bestHeadline = "Curiosity-driven";
     }
 
     // Resolve Best Placement
     let bestPlacement = "Instagram Mobile Feed";
-    if (hasVideoMemory && memories.some(m => m.pattern_key === "REELS_CPL_EFFICIENCY" || m.pattern_key === "REELS_CONV_EFFICIENCY")) {
+    if (hasVideoMemory && filteredMemories.some(m => m.pattern_key === "REELS_CPL_EFFICIENCY" || m.pattern_key === "REELS_CONV_EFFICIENCY")) {
       bestPlacement = "Instagram Reels";
-    } else if (memories.some(m => m.pattern_key === "FEED_CPL_EFFICIENCY" || m.pattern_key === "FEED_CONV_EFFICIENCY")) {
+    } else if (filteredMemories.some(m => m.pattern_key === "FEED_CPL_EFFICIENCY" || m.pattern_key === "FEED_CONV_EFFICIENCY")) {
       bestPlacement = "Instagram Mobile Feed";
     }
 
     // Resolve Strongest CTA
-    const isMsg = recs.some(r => r.objective === "Conversations" || (r.title && r.title.toLowerCase().includes("conversation"))) ||
-      memories.some(mem => mem.pattern_key.toLowerCase().includes("conversation") || mem.description.toLowerCase().includes("whatsapp")) ||
+    const isMsg = filteredRecs.some(r => r.objective === "Conversations" || (r.title && r.title.toLowerCase().includes("conversation"))) ||
+      filteredMemories.some(mem => mem.pattern_key.toLowerCase().includes("conversation") || mem.description.toLowerCase().includes("whatsapp")) ||
       (selectedAccount?.name || "").toLowerCase().includes("cake");
       
     let strongestCta = isMsg ? "\"Send Message\" (WhatsApp)" : "\"Learn More\" Button";
@@ -228,32 +255,51 @@ export default function RecommendationsPage() {
         </div>
 
         {/* View Mode Toggle (Only for Recommendations tab) */}
-        {selectedAccount && recs.length > 0 && activeTab === "recs" && (
-          <div className="flex items-center border border-border bg-white rounded-md p-1 shadow-sm gap-1">
-            <button
-              onClick={() => setViewMode("card")}
-              className={`p-1.5 rounded-md transition flex items-center justify-center cursor-pointer ${
-                viewMode === "card"
-                  ? "bg-slate-100 text-blue-600 font-bold"
-                  : "text-slate-400 hover:text-slate-600"
-              }`}
-              title="Card View"
-            >
-              <LayoutGrid size={16} />
-            </button>
-            <button
-              onClick={() => setViewMode("list")}
-              className={`p-1.5 rounded-md transition flex items-center justify-center cursor-pointer ${
-                viewMode === "list"
-                  ? "bg-slate-100 text-blue-600 font-bold"
-                  : "text-slate-400 hover:text-slate-600"
-              }`}
-              title="List View"
-            >
-              <List size={16} />
-            </button>
-          </div>
-        )}
+        <div className="flex items-center gap-3">
+          {selectedAccount && (
+            <div className="flex items-center gap-1.5 bg-white border border-border rounded-md px-2.5 py-1.5 shadow-sm text-xs font-semibold text-slate-700">
+              <span className="text-slate-400 font-bold">Goal:</span>
+              <select
+                value={performanceGoal}
+                onChange={(e: any) => setPerformanceGoal(e.target.value)}
+                className="bg-transparent border-none outline-none font-bold text-slate-800 cursor-pointer"
+              >
+                <option value="ALL">🌐 Whole Account (All Goals)</option>
+                <option value="CONVERSATIONS">💬 Messaging & Engagement</option>
+                <option value="LEADS">🎯 Lead Generation</option>
+                <option value="SALES">🛒 Sales & conversions</option>
+              </select>
+            </div>
+          )}
+
+          {/* View Mode Toggle (Only for Recommendations tab) */}
+          {selectedAccount && filteredRecs.length > 0 && activeTab === "recs" && (
+            <div className="flex items-center border border-border bg-white rounded-md p-1 shadow-sm gap-1">
+              <button
+                onClick={() => setViewMode("card")}
+                className={`p-1.5 rounded-md transition flex items-center justify-center cursor-pointer ${
+                  viewMode === "card"
+                    ? "bg-slate-100 text-blue-600 font-bold"
+                    : "text-slate-400 hover:text-slate-600"
+                }`}
+                title="Card View"
+              >
+                <LayoutGrid size={16} />
+              </button>
+              <button
+                onClick={() => setViewMode("list")}
+                className={`p-1.5 rounded-md transition flex items-center justify-center cursor-pointer ${
+                  viewMode === "list"
+                    ? "bg-slate-100 text-blue-600 font-bold"
+                    : "text-slate-400 hover:text-slate-600"
+                }`}
+                title="List View"
+              >
+                <List size={16} />
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Floating Notification */}
@@ -278,7 +324,7 @@ export default function RecommendationsPage() {
               : "border-transparent text-subtle hover:text-slate-700"
           }`}
         >
-          <Lightbulb size={16} /> Suggestions ({recs.length})
+          <Lightbulb size={16} /> Suggestions ({filteredRecs.length})
         </button>
         <button
           onClick={() => setActiveTab("dna")}
@@ -315,7 +361,7 @@ export default function RecommendationsPage() {
         </div>
       ) : activeTab === "recs" ? (
         /* TAB 1: AI RECOMMENDATIONS */
-        recs.length === 0 ? (
+        filteredRecs.length === 0 ? (
           <div className="card shadow-sm border border-border bg-white rounded-lg">
             <div className="card-body py-16">
               <div className="empty-state text-center max-w-sm mx-auto space-y-3">
@@ -329,7 +375,7 @@ export default function RecommendationsPage() {
           </div>
         ) : viewMode === "card" ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {recs.map((r) => {
+            {filteredRecs.map((r) => {
               let cardBorder = "border-slate-200";
               let badgeClass = "bg-slate-100 text-slate-700";
               let iconClass = "bg-slate-100 text-slate-600";
@@ -453,7 +499,7 @@ export default function RecommendationsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border font-medium text-slate-700">
-                  {recs.map((r, idx) => {
+                  {filteredRecs.map((r, idx) => {
                     let badgeClass = "bg-slate-100 text-slate-700";
                     if (r.priority === "high") badgeClass = "bg-red-50 text-red-700";
                     else if (r.priority === "medium") badgeClass = "bg-amber-50 text-amber-700";
@@ -589,9 +635,9 @@ export default function RecommendationsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border font-medium text-slate-700">
-                  {memories.map((m, idx) => {
-                    const isMsg = recs.some(r => r.objective === "Conversations" || (r.title && r.title.toLowerCase().includes("conversation")) || (r.description && r.description.toLowerCase().includes("conversation"))) ||
-                      memories.some(mem => mem.pattern_key.toLowerCase().includes("conversation") || mem.description.toLowerCase().includes("conversation") || mem.description.toLowerCase().includes("whatsapp")) ||
+                  {filteredMemories.map((m, idx) => {
+                    const isMsg = filteredRecs.some(r => r.objective === "Conversations" || (r.title && r.title.toLowerCase().includes("conversation")) || (r.description && r.description.toLowerCase().includes("conversation"))) ||
+                      filteredMemories.some(mem => mem.pattern_key.toLowerCase().includes("conversation") || mem.description.toLowerCase().includes("conversation") || mem.description.toLowerCase().includes("whatsapp")) ||
                       (selectedAccount?.name || "").toLowerCase().includes("cake");
 
                     let displayDesc = m.description;
@@ -656,9 +702,9 @@ export default function RecommendationsPage() {
                 </div>
 
                 <div className="divide-y divide-slate-100 p-6 space-y-6">
-                  {experiments.map((exp, idx) => {
-                    const isMsg = recs.some(r => r.objective === "Conversations" || (r.title && r.title.toLowerCase().includes("conversation")) || (r.description && r.description.toLowerCase().includes("conversation"))) ||
-                      memories.some(mem => mem.pattern_key.toLowerCase().includes("conversation") || mem.description.toLowerCase().includes("conversation") || mem.description.toLowerCase().includes("whatsapp")) ||
+                  {filteredExperiments.map((exp, idx) => {
+                    const isMsg = filteredRecs.some(r => r.objective === "Conversations" || (r.title && r.title.toLowerCase().includes("conversation")) || (r.description && r.description.toLowerCase().includes("conversation"))) ||
+                      filteredMemories.some(mem => mem.pattern_key.toLowerCase().includes("conversation") || mem.description.toLowerCase().includes("conversation") || mem.description.toLowerCase().includes("whatsapp")) ||
                       (selectedAccount?.name || "").toLowerCase().includes("cake");
 
                     return (

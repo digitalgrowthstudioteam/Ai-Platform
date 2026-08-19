@@ -38,6 +38,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     "/settings/billing",
     "/settings/account",
     "/settings/ad-accounts",
+    "/settings/ai-intelligence",
     "/settings/admin",
   ].some(path => pathname === path || pathname.startsWith(path + "/"));
 

@@ -134,6 +134,26 @@ ADDONS_CONFIG = {
         "name": "Additional Team Member",
         "price_monthly": 199,
         "description": "Adds one additional team member beyond base plan limits",
+    },
+    "AI_INTELLIGENCE_INDIVIDUAL_MONTHLY": {
+        "name": "AI Intelligence - Individual (Monthly)",
+        "price_monthly": 499,
+        "description": "Unlock continuous full account intelligence for one selected Meta Ad Account",
+    },
+    "AI_INTELLIGENCE_INDIVIDUAL_YEARLY": {
+        "name": "AI Intelligence - Individual (Annual)",
+        "price_annual": 4999,
+        "description": "Unlock continuous full account intelligence for one selected Meta Ad Account (Annual)",
+    },
+    "AI_INTELLIGENCE_ALL_MONTHLY": {
+        "name": "AI Intelligence - All (Monthly)",
+        "price_monthly": 9999,
+        "description": "Unlock continuous full account intelligence for all Meta Ad Accounts",
+    },
+    "AI_INTELLIGENCE_ALL_YEARLY": {
+        "name": "AI Intelligence - All (Annual)",
+        "price_annual": 69999,
+        "description": "Unlock continuous full account intelligence for all Meta Ad Accounts (Annual)",
     }
 }
 
@@ -274,4 +294,133 @@ class EntitlementEngine:
                     "expires_at": a.expires_at,
                 } for a in addons
             ]
+        }
+
+    @classmethod
+    async def has_full_ai_intelligence(
+        cls, db: AsyncSession, user_id: Any, ad_account_id: str
+    ) -> dict:
+        """
+        Determines if the active Meta Ad Account has Full AI Intelligence.
+        Priority:
+          ALL_ACCOUNTS (active add-on) -> enabled
+          INDIVIDUAL_ACCOUNT (active add-on and selected) -> enabled
+          BASE_PLAN_AI_LIMIT -> disabled
+        """
+        import uuid
+        from app.models.meta import MetaAdAccount
+        
+        # Resolve targeted account link
+        stmt = select(MetaAdAccount).where(MetaAdAccount.user_id == user_id)
+        try:
+            acc_uuid = uuid.UUID(ad_account_id)
+            stmt = stmt.where(MetaAdAccount.id == acc_uuid)
+        except (ValueError, TypeError):
+            stmt = stmt.where(MetaAdAccount.meta_account_id == ad_account_id)
+        res = await db.execute(stmt)
+        acc = res.scalar_one_or_none()
+        if not acc:
+            return {
+                "enabled": False,
+                "scope": "BASE_LIMIT",
+                "source": "BASE_PLAN_AI_LIMIT",
+                "historical_access": "BASE",
+                "valid_until": None
+            }
+
+        # Resolve active addons to verify current validity
+        addons = await cls.get_active_addons(user_id, db)
+        
+        has_all_accounts = any(
+            a.addon_id in ["AI_INTELLIGENCE_ALL_MONTHLY", "AI_INTELLIGENCE_ALL_YEARLY"] 
+            for a in addons
+        )
+        
+        if has_all_accounts:
+            # Find earliest expiration date among active All Account subscriptions
+            expiry = max(a.expires_at for a in addons if a.addon_id in ["AI_INTELLIGENCE_ALL_MONTHLY", "AI_INTELLIGENCE_ALL_YEARLY"])
+            
+            # Sync meta account fields self-healingly
+            if acc.ai_intelligence_status != "active":
+                acc.ai_intelligence_status = "active"
+                acc.historical_intelligence_status = "active"
+                db.add(acc)
+                await db.commit()
+                
+            return {
+                "enabled": True,
+                "scope": "ALL_ACCOUNTS",
+                "source": "AI_INTELLIGENCE_ALL",
+                "ad_account_id": str(acc.id),
+                "historical_access": "FULL",
+                "valid_until": expiry
+            }
+            
+        # Check individual accounts active
+        has_individual = any(
+            a.addon_id in ["AI_INTELLIGENCE_INDIVIDUAL_MONTHLY", "AI_INTELLIGENCE_INDIVIDUAL_YEARLY"]
+            for a in addons
+        )
+        individual_slots = sum(
+            a.quantity for a in addons 
+            if a.addon_id in ["AI_INTELLIGENCE_INDIVIDUAL_MONTHLY", "AI_INTELLIGENCE_INDIVIDUAL_YEARLY"]
+        )
+        
+        if has_individual and individual_slots > 0:
+            # Check if this specific account is currently assigned
+            if acc.ai_intelligence_status == "active":
+                # Check that we are within the slots count limit self-healingly
+                stmt_active_assigned = (
+                    select(MetaAdAccount)
+                    .where(MetaAdAccount.user_id == user_id)
+                    .where(MetaAdAccount.ai_intelligence_status == "active")
+                )
+                res_active = await db.execute(stmt_active_assigned)
+                active_assigned = res_active.scalars().all()
+                
+                # If we exceed the slots (e.g. some slots expired), revert excess
+                if len(active_assigned) > individual_slots:
+                    # Keep the earliest active ones up to slot count, pause others
+                    active_assigned.sort(key=lambda x: x.created_at)
+                    for i, a_item in enumerate(active_assigned):
+                        if i >= individual_slots:
+                            a_item.ai_intelligence_status = "none"
+                            a_item.historical_intelligence_status = "paused"
+                            db.add(a_item)
+                    await db.commit()
+                    
+                    # Re-evaluate current account status
+                    if acc.ai_intelligence_status != "active":
+                        return {
+                            "enabled": False,
+                            "scope": "BASE_LIMIT",
+                            "source": "BASE_PLAN_AI_LIMIT",
+                            "historical_access": "BASE",
+                            "valid_until": None
+                        }
+                
+                expiry = max(a.expires_at for a in addons if a.addon_id in ["AI_INTELLIGENCE_INDIVIDUAL_MONTHLY", "AI_INTELLIGENCE_INDIVIDUAL_YEARLY"])
+                return {
+                    "enabled": True,
+                    "scope": "ACCOUNT",
+                    "source": "AI_INTELLIGENCE_INDIVIDUAL",
+                    "ad_account_id": str(acc.id),
+                    "historical_access": "FULL",
+                    "valid_until": expiry
+                }
+
+        # If we have no active AI Intelligence entitlements, but account is still marked active, self-heal revert it to paused!
+        if acc.ai_intelligence_status == "active":
+            acc.ai_intelligence_status = "none"
+            acc.historical_intelligence_status = "paused"
+            db.add(acc)
+            await db.commit()
+
+        # Check base plan historical days
+        return {
+            "enabled": False,
+            "scope": "BASE_LIMIT",
+            "source": "BASE_PLAN_AI_LIMIT",
+            "historical_access": "BASE",
+            "valid_until": None
         }

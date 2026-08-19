@@ -96,6 +96,10 @@ ADDON_PRICES_PAISE = {
     "lifetime_history_annual": 199900,  # ₹1,999
     "ai_deep_analysis": 49900,         # ₹499
     "additional_team_member": 19900,   # ₹199
+    "AI_INTELLIGENCE_INDIVIDUAL_MONTHLY": 49900,  # ₹499
+    "AI_INTELLIGENCE_INDIVIDUAL_YEARLY": 499900,  # ₹4,999
+    "AI_INTELLIGENCE_ALL_MONTHLY": 999900,        # ₹9,999
+    "AI_INTELLIGENCE_ALL_YEARLY": 6999900,       # ₹69,999
 }
 
 
@@ -135,9 +139,13 @@ async def get_subscription_details(
     for a in active_addons:
         cfg = ADDONS_CONFIG.get(a.addon_id, {})
         price_monthly = cfg.get("price_monthly", 0)
-        # If it is annual lifetime history, display monthly value approximation for stats
+        # If it is annual, display monthly value approximation for stats
         if a.addon_id == "lifetime_history_annual":
             price_monthly = 166  # ~₹1,999 / 12
+        elif a.addon_id == "AI_INTELLIGENCE_INDIVIDUAL_YEARLY":
+            price_monthly = 416  # ~₹4,999 / 12
+        elif a.addon_id == "AI_INTELLIGENCE_ALL_YEARLY":
+            price_monthly = 5833  # ~₹69,999 / 12
             
         addons_list.append(
             SubscriptionAddOnDetail(
@@ -150,11 +158,11 @@ async def get_subscription_details(
         )
         # Calculate monthly invoice totals
         # Quantities are multiplied by the base monthly price
-        cost_key = "price_monthly" if a.addon_id != "lifetime_history_annual" else "price_annual"
+        cost_key = "price_monthly" if a.addon_id not in ["lifetime_history_annual", "AI_INTELLIGENCE_INDIVIDUAL_YEARLY", "AI_INTELLIGENCE_ALL_YEARLY"] else "price_annual"
         unit_cost = cfg.get(cost_key, 0)
         
-        # If annual history, calculate its monthly equivalent
-        if a.addon_id == "lifetime_history_annual":
+        # If annual, calculate its monthly equivalent
+        if a.addon_id in ["lifetime_history_annual", "AI_INTELLIGENCE_INDIVIDUAL_YEARLY", "AI_INTELLIGENCE_ALL_YEARLY"]:
             addons_cost_paise += int((unit_cost / 12) * a.quantity)
         else:
             addons_cost_paise += unit_cost * a.quantity
@@ -381,7 +389,7 @@ async def verify_billing_payment(
         # Scenario A: User purchased an Add-On
         if req.addon_id:
             # Determine duration
-            days = 365 if req.addon_id == "lifetime_history_annual" else 30
+            days = 365 if req.addon_id in ["lifetime_history_annual", "AI_INTELLIGENCE_INDIVIDUAL_YEARLY", "AI_INTELLIGENCE_ALL_YEARLY"] else 30
             expiry = now + timedelta(days=days)
             
             # Check if user already has this active add-on
@@ -479,3 +487,205 @@ async def cancel_active_addon(
     
     logger.info("addon_auto_renewal_cancelled", user_id=user.id, addon_id=addon_id)
     return {"status": "success", "message": f"Successfully cancelled auto-renewal for add-on: {addon_id}."}
+
+
+# ──────────────────────────────────────────────
+# AI Intelligence Billing Schemas
+# ──────────────────────────────────────────────
+class AIIntelligenceAccountDetail(BaseModel):
+    id: uuid.UUID
+    meta_account_id: str
+    account_name: str
+    ai_intelligence_status: str
+    historical_intelligence_status: str
+
+
+class AIIntelligenceStatusResponse(BaseModel):
+    all_accounts_active: bool
+    individual_slots_total: int
+    individual_slots_used: int
+    individual_slots_available: int
+    accounts: List[AIIntelligenceAccountDetail]
+
+
+class AIAssignmentRequest(BaseModel):
+    ad_account_id: str
+
+
+# ──────────────────────────────────────────────
+# AI Assignment & Status Endpoints
+# ──────────────────────────────────────────────
+@router.get("/ai-intelligence/status", response_model=AIIntelligenceStatusResponse, summary="Get AI Intelligence subscription and accounts assignment status")
+async def get_ai_intelligence_status(
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    user = await get_db_user_from_claims(claims, db)
+    
+    # 1. Resolve active addons to count slots
+    addons = await EntitlementEngine.get_active_addons(user.id, db)
+    
+    all_accounts_active = any(
+        a.addon_id in ["AI_INTELLIGENCE_ALL_MONTHLY", "AI_INTELLIGENCE_ALL_YEARLY"] 
+        for a in addons
+    )
+    
+    individual_slots_total = sum(
+        a.quantity for a in addons 
+        if a.addon_id in ["AI_INTELLIGENCE_INDIVIDUAL_MONTHLY", "AI_INTELLIGENCE_INDIVIDUAL_YEARLY"]
+    )
+    
+    # 2. Get all Meta Ad Accounts for this user
+    from app.models.meta import MetaAdAccount
+    stmt = select(MetaAdAccount).where(MetaAdAccount.user_id == user.id)
+    res = await db.execute(stmt)
+    accounts = res.scalars().all()
+    
+    # Self-healing: if all_accounts is active, make sure all accounts are active in database
+    if all_accounts_active:
+        updated = False
+        for acc in accounts:
+            if acc.ai_intelligence_status != "active":
+                acc.ai_intelligence_status = "active"
+                acc.historical_intelligence_status = "active"
+                updated = True
+        if updated:
+            await db.commit()
+    else:
+        # Check that number of active assigned accounts doesn't exceed individual slots
+        active_assigned = [acc for acc in accounts if acc.ai_intelligence_status == "active"]
+        if len(active_assigned) > individual_slots_total:
+            # We exceed, let's revert the excess
+            active_assigned.sort(key=lambda x: x.created_at)
+            for i, acc in enumerate(active_assigned):
+                if i >= individual_slots_total:
+                    acc.ai_intelligence_status = "none"
+                    acc.historical_intelligence_status = "paused"
+            await db.commit()
+            
+    # Re-fetch after self-healing updates
+    stmt = select(MetaAdAccount).where(MetaAdAccount.user_id == user.id)
+    res = await db.execute(stmt)
+    accounts = res.scalars().all()
+    
+    individual_slots_used = sum(1 for acc in accounts if acc.ai_intelligence_status == "active" and not all_accounts_active)
+    individual_slots_available = max(0, individual_slots_total - individual_slots_used)
+    
+    accounts_list = [
+        AIIntelligenceAccountDetail(
+            id=acc.id,
+            meta_account_id=acc.meta_account_id,
+            account_name=acc.account_name,
+            ai_intelligence_status=acc.ai_intelligence_status or "none",
+            historical_intelligence_status=acc.historical_intelligence_status or "none",
+        ) for acc in accounts
+    ]
+    
+    return AIIntelligenceStatusResponse(
+        all_accounts_active=all_accounts_active,
+        individual_slots_total=individual_slots_total,
+        individual_slots_used=individual_slots_used,
+        individual_slots_available=individual_slots_available,
+        accounts=accounts_list
+    )
+
+
+@router.post("/ai-intelligence/assign", summary="Assign an individual AI Intelligence entitlement slot to an ad account")
+async def assign_ai_intelligence(
+    req: AIAssignmentRequest,
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    user = await get_db_user_from_claims(claims, db)
+    
+    # 1. Check if user has active ALL_ACCOUNTS
+    addons = await EntitlementEngine.get_active_addons(user.id, db)
+    all_accounts_active = any(
+        a.addon_id in ["AI_INTELLIGENCE_ALL_MONTHLY", "AI_INTELLIGENCE_ALL_YEARLY"] 
+        for a in addons
+    )
+    if all_accounts_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Assignment not required. All connected accounts are already covered by your All Accounts subscription."
+        )
+        
+    # 2. Check if user has available individual slots
+    individual_slots_total = sum(
+        a.quantity for a in addons 
+        if a.addon_id in ["AI_INTELLIGENCE_INDIVIDUAL_MONTHLY", "AI_INTELLIGENCE_INDIVIDUAL_YEARLY"]
+    )
+    if individual_slots_total <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No active Individual AI Intelligence subscriptions found. Please purchase a slot first."
+        )
+        
+    # 3. Find the target MetaAdAccount
+    from app.models.meta import MetaAdAccount
+    stmt = select(MetaAdAccount).where(MetaAdAccount.user_id == user.id)
+    try:
+        acc_uuid = uuid.UUID(req.ad_account_id)
+        stmt = stmt.where(MetaAdAccount.id == acc_uuid)
+    except (ValueError, TypeError):
+        stmt = stmt.where(MetaAdAccount.meta_account_id == req.ad_account_id)
+    res = await db.execute(stmt)
+    target_acc = res.scalar_one_or_none()
+    if not target_acc:
+        raise HTTPException(status_code=404, detail="Target ad account not found.")
+        
+    # If already active, nothing to do
+    if target_acc.ai_intelligence_status == "active":
+        return {"status": "success", "message": f"Account '{target_acc.account_name}' is already active."}
+        
+    # 4. Resolve current assignments
+    stmt_all = select(MetaAdAccount).where(MetaAdAccount.user_id == user.id)
+    res_all = await db.execute(stmt_all)
+    all_accounts = res_all.scalars().all()
+    active_assigned = [acc for acc in all_accounts if acc.ai_intelligence_status == "active"]
+    
+    # If active count is already at max slots, we must unassign/pause one to make space
+    if len(active_assigned) >= individual_slots_total:
+        active_assigned.sort(key=lambda x: x.created_at)
+        to_unassign = active_assigned[0]
+        to_unassign.ai_intelligence_status = "none"
+        to_unassign.historical_intelligence_status = "paused"
+        db.add(to_unassign)
+        logger.info("reassignment_unassigned_previous_account", user_id=user.id, ad_account_id=str(to_unassign.id))
+        
+    target_acc.ai_intelligence_status = "active"
+    target_acc.historical_intelligence_status = "active"
+    db.add(target_acc)
+    
+    await db.commit()
+    logger.info("assigned_ai_intelligence_to_account", user_id=user.id, ad_account_id=str(target_acc.id))
+    return {"status": "success", "message": f"Successfully activated Full AI Intelligence on account: {target_acc.account_name}."}
+
+
+@router.post("/ai-intelligence/unassign", summary="Unassign/pause AI Intelligence entitlement from an ad account")
+async def unassign_ai_intelligence(
+    req: AIAssignmentRequest,
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    user = await get_db_user_from_claims(claims, db)
+    
+    from app.models.meta import MetaAdAccount
+    stmt = select(MetaAdAccount).where(MetaAdAccount.user_id == user.id)
+    try:
+        acc_uuid = uuid.UUID(req.ad_account_id)
+        stmt = stmt.where(MetaAdAccount.id == acc_uuid)
+    except (ValueError, TypeError):
+        stmt = stmt.where(MetaAdAccount.meta_account_id == req.ad_account_id)
+    res = await db.execute(stmt)
+    target_acc = res.scalar_one_or_none()
+    if not target_acc:
+        raise HTTPException(status_code=404, detail="Target ad account not found.")
+        
+    target_acc.ai_intelligence_status = "none"
+    target_acc.historical_intelligence_status = "paused"
+    db.add(target_acc)
+    
+    await db.commit()
+    logger.info("unassigned_ai_intelligence_from_account", user_id=user.id, ad_account_id=str(target_acc.id))
+    return {"status": "success", "message": f"Successfully paused continuous Full AI Intelligence on account: {target_acc.account_name}."}

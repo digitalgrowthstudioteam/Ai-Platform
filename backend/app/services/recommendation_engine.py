@@ -125,8 +125,25 @@ class RecommendationEngine:
                 token = conn.access_token
                 is_mock = token.startswith("EAAGm0PX") or token == "mock_access_token"
 
+        # Resolve AI Intelligence entitlement
+        from app.services.entitlement_engine import EntitlementEngine
+        from app.models.user import User
+        
+        ent_check = await EntitlementEngine.has_full_ai_intelligence(db, user_uuid, str(ad_account_uuid))
+        if ent_check.get("enabled"):
+            historical_days = 365
+        else:
+            stmt_user = select(User).where(User.id == user_uuid)
+            res_user = await db.execute(stmt_user)
+            user_obj = res_user.scalar_one_or_none()
+            if user_obj:
+                base_ent = await EntitlementEngine.resolve_entitlements(user_obj, db)
+                historical_days = base_ent.get("historical_days", 90)
+            else:
+                historical_days = 90
+
         today = date.today()
-        start_date = today - timedelta(days=14)
+        start_date = today - timedelta(days=historical_days)
         recommendations_to_add = []
 
         # Resolve active campaigns in the account to determine primary objective (Conversations, Leads, etc.)
@@ -505,8 +522,8 @@ class RecommendationEngine:
 
             campaign = ad.ad_set.campaign
             obj = (campaign.objective or "").upper()
-            perf_goal = (ad.ad_set.performance_goal or campaign.performance_goal or "").upper()
-            opt_event = (ad.ad_set.optimization_event or campaign.optimization_event or "").upper()
+            perf_goal = (ad.ad_set.performance_goal or "").upper()
+            opt_event = (ad.ad_set.optimization_event or "").upper()
 
             is_conv = opt_event == "CONVERSATION" or "CONVERSATION" in perf_goal or "MESSAGING" in perf_goal or "ENGAGEMENT" in obj
             is_lead = opt_event == "LEAD" or "LEAD" in perf_goal or "LEADS" in obj
