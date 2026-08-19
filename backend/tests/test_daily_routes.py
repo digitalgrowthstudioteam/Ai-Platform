@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.main import app
 from app.dependencies import get_current_user
 from app.models.user import User
-from app.models.meta import MetaAdAccount
+from app.models.meta import MetaAdAccount, MetaConnection
 from app.models.campaign import Campaign, AdSet, Ad
 from app.models.metrics import CampaignDailyMetrics, AdSetDailyMetrics, AdDailyMetrics
 
