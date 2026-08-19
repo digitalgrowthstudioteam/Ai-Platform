@@ -715,7 +715,7 @@ export default function AdminPage() {
                             )}
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0">
-                            {addon.id !== "additional_account" && addon.id !== "additional_team_member" ? (
+                            {addon.id === "faster_sync" || addon.id === "ai_deep_analysis" ? (
                               <button
                                 disabled={actionLoading === `addon_${addon.id}`}
                                 onClick={() => handleAddonToggle(userDetails.user.id, addon.id, quantity === 0)}
