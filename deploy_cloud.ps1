@@ -23,8 +23,7 @@ if ($LASTEXITCODE -ne 0) {
 # 2. Deploy Frontend to Firebase Hosting
 Write-Host "🔥 Deploying Frontend to Firebase Hosting..." -ForegroundColor Cyan
 Set-Location -Path "$PSScriptRoot"
-npx --yes firebase-tools deploy --only hosting --site digital-growth-studio --non-interactive
-npx --yes firebase-tools deploy --only hosting --site digitalgrowthstudio --non-interactive
+npx --yes firebase-tools deploy --only hosting --non-interactive
 if ($LASTEXITCODE -ne 0) {
     Write-Host "❌ Firebase Hosting deploy failed!" -ForegroundColor Red
     exit 1
