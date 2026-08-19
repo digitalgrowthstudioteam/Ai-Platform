@@ -10,6 +10,7 @@ export interface AdAccount {
   currency: string;
   timezone: string;
   account_status: number;
+  industry?: string | null;
 }
 
 interface AdAccountContextType {
