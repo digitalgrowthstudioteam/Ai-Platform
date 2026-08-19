@@ -1,40 +1,29 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState, useMemo } from "react";
+import { useParams, useRouter, usePathname } from "next/navigation";
 import { useAdAccount } from "@/context/AdAccountContext";
 import { api } from "@/lib/api";
 import { 
   Calendar, 
   Megaphone, 
   Loader2, 
-  X, 
+  Layers, 
+  ArrowLeft, 
   TrendingUp, 
   TrendingDown, 
   Sparkles, 
-  Lightbulb, 
+  Check, 
+  MapPin, 
   AlertCircle, 
-  Check,
-  ChevronDown,
-  ChevronUp,
-  Image as ImageIcon,
-  Layers,
-  FileText,
-  Activity,
-  ArrowLeft,
-  ThumbsUp,
-  ThumbsDown,
-  Zap,
-  Info,
-  ExternalLink,
-  Target,
-  Users,
-  MapPin
+  Zap, 
+  Users, 
+  Image as ImageIcon 
 } from "lucide-react";
 import { 
   ResponsiveContainer, 
-  LineChart, 
-  Line, 
+  AreaChart, 
+  Area, 
   XAxis, 
   YAxis, 
   CartesianGrid, 
@@ -45,7 +34,15 @@ import { formatCurrency, formatNumber, formatPercent } from "@/lib/utils";
 export default function CampaignsClient({ slug: propSlug }: { slug?: string[] }) {
   const router = useRouter();
   const params = useParams();
-  const slug = (params?.slug as string[] | undefined) || propSlug;
+  const pathname = usePathname();
+  
+  const slug = useMemo(() => {
+    const parts = pathname.split("/").filter(Boolean);
+    if (parts[0] === "campaigns") {
+      return parts.slice(1);
+    }
+    return propSlug || [];
+  }, [pathname, propSlug]);
 
   // Programmatic client-side Cache & Service Worker Buster
   useEffect(() => {
