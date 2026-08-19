@@ -42,8 +42,10 @@ import {
 } from "recharts";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/utils";
 
-export default function CampaignsClient({ slug }: { slug?: string[] }) {
+export default function CampaignsClient({ slug: propSlug }: { slug?: string[] }) {
   const router = useRouter();
+  const params = useParams();
+  const slug = (params?.slug as string[] | undefined) || propSlug;
 
   // Programmatic client-side Cache & Service Worker Buster
   useEffect(() => {
