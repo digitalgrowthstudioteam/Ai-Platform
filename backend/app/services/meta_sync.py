@@ -57,6 +57,7 @@ class MetaSyncService:
 
         # Update last sync status
         conn.last_sync_status = "in_progress"
+        conn.last_sync_at = datetime.utcnow()
         await db.commit()
 
         try:
@@ -532,6 +533,8 @@ class MetaSyncService:
         """
         from app.services.metric_engine import MetricEngine
 
+        batch_size = 50
+        count = 0
         for item in insights:
             meta_id = item.get(f"{level}_id")
             if not meta_id or meta_id not in id_map:
@@ -698,6 +701,9 @@ class MetaSyncService:
                     }
                 )
             await db.execute(stmt)
+            count += 1
+            if count % batch_size == 0:
+                await db.commit()
 
     @staticmethod
     def _resolve_performance_goal_details(optimization_goal: str, destination_type: str, promoted_object: dict) -> dict:

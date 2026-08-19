@@ -614,6 +614,30 @@ async def trigger_sync(
 
     user = await get_db_user_from_claims(claims, db)
     
+    # Prevent concurrent syncs for the same connection
+    stmt_conn = select(MetaConnection).where(MetaConnection.user_id == user.id)
+    res_conn = await db.execute(stmt_conn)
+    conn = res_conn.scalar_one_or_none()
+    
+    if conn and conn.last_sync_status == "in_progress":
+        if conn.last_sync_at:
+            from datetime import timezone
+            # Support timezone-aware comparison
+            last_sync_time = conn.last_sync_at
+            if last_sync_time.tzinfo is None:
+                last_sync_time = last_sync_time.replace(tzinfo=timezone.utc)
+            elapsed = (datetime.now(timezone.utc) - last_sync_time).total_seconds()
+            if elapsed < 600:  # If in progress for less than 10 minutes, block triggering a new sync
+                return {
+                    "status": "in_progress",
+                    "message": "A synchronization is already in progress for your Meta connection. Please wait."
+                }
+            else:
+                # Force reset timed out/stuck status
+                conn.last_sync_status = "failed"
+                conn.last_sync_error = "Sync timed out / aborted"
+                await db.commit()
+    
     stmt = select(MetaAdAccount).where(MetaAdAccount.user_id == user.id)
     if payload and payload.ad_account_id:
         # Match either UUID or Meta Ad account ID string
