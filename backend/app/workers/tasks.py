@@ -63,50 +63,64 @@ def trigger_all_active_syncs():
     for all connected ad accounts.
     """
     logger.info("trigger_all_active_syncs_started")
-
-    async def _run():
-        from app.services.entitlement_engine import EntitlementEngine
-        from datetime import datetime, timezone, timedelta
-        from app.models.user import User
-        from app.models.meta import MetaConnection
-
-        async with async_session_factory() as db:
-            # Query all ad accounts currently saved in DB
-            stmt = select(MetaAdAccount)
-            res = await db.execute(stmt)
-            accounts = res.scalars().all()
-            
-            logger.info("active_ad_accounts_retrieved", count=len(accounts))
-            for acc in accounts:
-                # 1. Fetch connection last_sync_at
-                stmt_conn = select(MetaConnection).where(MetaConnection.user_id == acc.user_id)
-                res_conn = await db.execute(stmt_conn)
-                conn = res_conn.scalar_one_or_none()
-                
-                # 2. Fetch User to resolve entitlements
-                stmt_user = select(User).where(User.id == acc.user_id)
-                res_user = await db.execute(stmt_user)
-                user = res_user.scalar_one_or_none()
-                
-                if user:
-                    entitlements = await EntitlementEngine.resolve_entitlements(user, db)
-                    interval_hours = entitlements.get("sync_interval_hours", 48)
-                    
-                    should_sync = True
-                    if conn and conn.last_sync_at:
-                        now = datetime.now(timezone.utc)
-                        last_sync = conn.last_sync_at.replace(tzinfo=timezone.utc) if conn.last_sync_at.tzinfo is None else conn.last_sync_at
-                        if now - last_sync < timedelta(hours=interval_hours):
-                            should_sync = False
-                            logger.info("sync_skipped_within_interval", ad_account_id=acc.meta_account_id, interval_hours=interval_hours)
-                    
-                    if should_sync:
-                        sync_ad_account_task.delay(str(acc.id))
-
     try:
-        asyncio.run(_run())
+        asyncio.run(trigger_all_active_syncs_async())
         logger.info("trigger_all_active_syncs_completed")
         return {"status": "success"}
     except Exception as e:
         logger.error("trigger_all_active_syncs_failed", error=str(e))
         return {"status": "failed", "error": str(e)}
+
+
+async def trigger_all_active_syncs_async():
+    """
+    Asynchronous runner for periodic ad account synchronization.
+    Fetches user subscription entitlements, evaluates last sync time,
+    and schedules Celery or inline FastAPI task executions.
+    """
+    from app.services.entitlement_engine import EntitlementEngine
+    from datetime import datetime, timezone, timedelta
+    from app.models.user import User
+    from app.models.meta import MetaConnection
+    from app.api.v1.meta import run_sync_inline
+
+    async with async_session_factory() as db:
+        # Query all ad accounts currently saved in DB
+        stmt = select(MetaAdAccount)
+        res = await db.execute(stmt)
+        accounts = res.scalars().all()
+        
+        logger.info("active_ad_accounts_retrieved", count=len(accounts))
+        for acc in accounts:
+            # 1. Fetch connection last_sync_at
+            stmt_conn = select(MetaConnection).where(MetaConnection.user_id == acc.user_id)
+            res_conn = await db.execute(stmt_conn)
+            conn = res_conn.scalar_one_or_none()
+            
+            # 2. Fetch User to resolve entitlements
+            stmt_user = select(User).where(User.id == acc.user_id)
+            res_user = await db.execute(stmt_user)
+            user = res_user.scalar_one_or_none()
+            
+            if user:
+                entitlements = await EntitlementEngine.resolve_entitlements(user, db)
+                interval_hours = entitlements.get("sync_interval_hours", 48)
+                
+                should_sync = True
+                if conn and conn.last_sync_at:
+                    now = datetime.now(timezone.utc)
+                    last_sync = conn.last_sync_at.replace(tzinfo=timezone.utc) if conn.last_sync_at.tzinfo is None else conn.last_sync_at
+                    if now - last_sync < timedelta(hours=interval_hours):
+                        should_sync = False
+                        logger.info("sync_skipped_within_interval", ad_account_id=acc.meta_account_id, interval_hours=interval_hours)
+                
+                if should_sync:
+                    logger.info("triggering_overdue_sync", ad_account_id=acc.meta_account_id, interval_hours=interval_hours)
+                    # A. Trigger Celery task as fallback
+                    try:
+                        sync_ad_account_task.delay(str(acc.id))
+                    except Exception:
+                        pass
+                    # B. Trigger inline sync in background thread as guaranteed fallback
+                    asyncio.create_task(run_sync_inline(str(acc.id)))
+
