@@ -836,48 +836,69 @@ class RecommendationEngine:
         # ──────────────────────────────────────────────
         for camp in active_camps:
             m_stmt = (
-                select(
-                    func.coalesce(func.sum(CampaignDailyMetrics.spend), 0).label("spend"),
-                    func.coalesce(func.sum(CampaignDailyMetrics.revenue), 0).label("revenue"),
-                    func.coalesce(func.sum(CampaignDailyMetrics.purchases), 0).label("purchases"),
-                    func.coalesce(func.sum(CampaignDailyMetrics.impressions), 0).label("impressions"),
-                    func.coalesce(func.sum(CampaignDailyMetrics.clicks), 0).label("clicks"),
-                    func.coalesce(func.sum(CampaignDailyMetrics.link_clicks), 0).label("link_clicks"),
-                    func.coalesce(func.sum(CampaignDailyMetrics.leads), 0).label("leads"),
-                    func.coalesce(func.sum(CampaignDailyMetrics.reach), 0).label("reach"),
-                    func.coalesce(func.avg(CampaignDailyMetrics.frequency), 1.0).label("frequency"),
-                )
+                select(CampaignDailyMetrics)
                 .where(CampaignDailyMetrics.campaign_id == camp.id)
                 .where(CampaignDailyMetrics.date >= start_date)
             )
             m_res = await db.execute(m_stmt)
-            m_row = m_res.fetchone()
-            if not m_row or float(m_row.spend or 0.0) == 0.0:
+            metrics_rows = m_res.scalars().all()
+            if not metrics_rows:
                 continue
 
-            spend = float(m_row.spend)
-            revenue = float(m_row.revenue)
-            purchases = int(m_row.purchases or 0)
-            impressions = int(m_row.impressions or 0)
-            clicks = int(m_row.clicks or 0)
-            link_clicks = int(m_row.link_clicks or 0)
-            leads = int(m_row.leads or 0)
-            reach = int(m_row.reach or 0)
-            frequency = float(m_row.frequency or 1.0)
+            spend = sum(float(r.spend or 0.0) for r in metrics_rows)
+            if spend == 0.0:
+                continue
+
+            revenue = sum(float(r.revenue or 0.0) for r in metrics_rows)
+            purchases = sum(int(r.purchases or 0) for r in metrics_rows)
+            impressions = sum(int(r.impressions or 0) for r in metrics_rows)
+            clicks = sum(int(r.clicks or 0) for r in metrics_rows)
+            link_clicks = sum(int(r.link_clicks or 0) for r in metrics_rows)
+            leads = sum(int(r.leads or (r.actions or {}).get("leads", 0)) for r in metrics_rows)
+            reach = sum(int(r.reach or 0) for r in metrics_rows)
+            
+            frequency_list = [float(r.frequency) for r in metrics_rows if r.frequency is not None]
+            frequency = sum(frequency_list) / len(frequency_list) if frequency_list else 1.0
+            
+            conversations = sum(int((r.actions or {}).get("conversations", 0)) for r in metrics_rows)
+            calls = sum(int((r.actions or {}).get("calls", 0)) for r in metrics_rows)
 
             ctr = (clicks / impressions) if impressions > 0 else 0.0
             cpc = (spend / clicks) if clicks > 0 else 0.0
             roas = (revenue / spend) if spend > 0 else 0.0
-            cpa = (spend / purchases) if purchases > 0 else 0.0
             cpl = (spend / leads) if leads > 0 else 0.0
 
             obj = camp.objective.upper()
+            
+            # Identify exact campaign context
+            is_conv_camp = "CONVERSATION" in (camp.name or "").upper() or "MESSAGING" in (camp.name or "").upper() or "ENGAGEMENT" in obj or conversations > 0
+            is_lead_camp = "LEAD" in obj or "LEAD" in (camp.name or "").upper() or (leads > 0 and not is_conv_camp)
 
             # 1. Scaling Opportunity Check (8.7 Scaling Opportunity)
-            # Checked stability for 14 days and frequency <= 2.2
-            if spend >= 50.00 and roas >= 2.50 and frequency <= 2.2:
+            is_scale_candidate = False
+            scale_evidence = ""
+            scale_desc = ""
+            num_conversions = purchases
+            
+            if is_conv_camp:
+                num_conversions = conversations
+                cost_per_conv = spend / conversations if conversations > 0 else spend
+                is_scale_candidate = spend >= 50.00 and conversations >= 15 and cost_per_conv <= 25.00 and frequency <= 2.2
+                scale_evidence = f"Conversations: {conversations}, Cost: ₹{cost_per_conv:.2f}/conv, Frequency is {frequency:.2f}"
+                scale_desc = f"This campaign has maintained strong messaging efficiency ({scale_evidence}) for 14 days and is suitable for controlled budget testing."
+            elif is_lead_camp:
+                num_conversions = leads
+                is_scale_candidate = spend >= 50.00 and leads >= 10 and cpl <= 100.00 and frequency <= 2.2
+                scale_evidence = f"Leads: {leads}, Cost: ₹{cpl:.2f}/lead, Frequency is {frequency:.2f}"
+                scale_desc = f"This campaign has maintained strong lead acquisition efficiency ({scale_evidence}) for 14 days and is suitable for controlled budget testing."
+            else:
+                is_scale_candidate = spend >= 50.00 and purchases >= 5 and roas >= 2.50 and frequency <= 2.2
+                scale_evidence = f"ROAS is {roas:.2f}x, Frequency is {frequency:.2f}"
+                scale_desc = f"This campaign has maintained strong purchase returns (ROAS: {roas:.2f}x) for 14 days and is suitable for controlled budget testing."
+
+            if is_scale_candidate:
                 priority, confidence = cls.calculate_priority_and_confidence(
-                    impact=0.90, urgency=0.55, spend=spend, num_conversions=purchases, duration_days=14
+                    impact=0.90, urgency=0.55, spend=spend, num_conversions=num_conversions, duration_days=14
                 )
                 recommendations_to_add.append(
                     AIRecommendation(
@@ -888,13 +909,13 @@ class RecommendationEngine:
                         campaign_id=camp.id,
                         recommendation_type="SCALING_OPPORTUNITY",
                         title=f"Scaling Opportunity: controlled testing",
-                        description=f"This campaign has maintained strong performance (ROAS: {roas:.2f}x) for 14 days and is suitable for controlled budget testing.",
+                        description=scale_desc,
                         reason="Stable delivery efficiency and low audience frequency saturation.",
-                        objective=camp.objective,
+                        objective="Conversations" if is_conv_camp else ("Leads" if is_lead_camp else "Sales"),
                         problem=None,
                         root_cause=None,
-                        evidence=f"ROAS is {roas:.2f}x, Frequency is {frequency:.2f} under baseline 2.2 threshold.",
-                        expected_impact="Controlled budget increases of 15-20% will increase sales volume without triggering ad fatigue.",
+                        evidence=scale_evidence,
+                        expected_impact="Controlled budget increases of 15-20% will scale conversion volume without triggering creative fatigue.",
                         confidence_score=confidence,
                         priority=priority,
                         supporting_metrics={"spend": spend, "roas": roas, "frequency": frequency},
@@ -903,8 +924,37 @@ class RecommendationEngine:
                 )
 
             # 2. Conversion Opportunity Check (8.11 post-click / downstream funnel leak)
-            # Lead objective leak: CTR good, CPC good, link clicks good, lead conversion poor
-            if "LEAD" in obj:
+            if is_conv_camp:
+                if clicks >= 80 and ctr > 0.015 and cpc < 25.0:
+                    conversion_rate = (conversations / clicks) if clicks > 0 else 0.0
+                    if conversion_rate < 0.10:
+                        priority, confidence = cls.calculate_priority_and_confidence(
+                            impact=0.85, urgency=0.70, spend=spend, num_conversions=conversations
+                        )
+                        recommendations_to_add.append(
+                            AIRecommendation(
+                                user_id=user_uuid,
+                                ad_account_id=ad_account_uuid,
+                                entity_type="campaign",
+                                entity_id=camp.id,
+                                campaign_id=camp.id,
+                                recommendation_type="CONVERSION_OPPORTUNITY",
+                                title="Post-Click Messaging Funnel Leak",
+                                description=f"Ad click relevance is high (CTR: {ctr*100:.2f}%), but click-to-conversation initiation rate is only {conversion_rate*100:.2f}%.",
+                                reason="Post-click messaging entry barrier. Clicks are registering, but users fail to trigger the chat flow.",
+                                objective="Conversations",
+                                problem="Low chat trigger rate",
+                                root_cause="Messenger/WhatsApp welcome template friction or link destination latency",
+                                evidence=f"CTR: {ctr*100:.2f}%, Clicks: {clicks}, Conversations: {conversations}",
+                                expected_impact="Do not pause the ad. Optimize the greeting message template and ensure the call-to-action redirects immediately to the active chat screen.",
+                                confidence_score=confidence,
+                                priority=priority,
+                                supporting_metrics={"clicks": clicks, "conversations": conversations, "conversion_rate": conversion_rate},
+                                status="new"
+                            )
+                        )
+            
+            elif is_lead_camp:
                 if clicks >= 100 and ctr > 0.015 and cpc < 20.0:
                     conversion_rate = (leads / clicks) if clicks > 0 else 0.0
                     if conversion_rate < 0.02:
@@ -922,7 +972,7 @@ class RecommendationEngine:
                                 title="Post-Click Lead Conversion Leak",
                                 description=f"Ad delivery is highly efficient (CTR: {ctr*100:.2f}%, CPC: ₹{cpc:.2f}), but link click-to-lead conversion is only {conversion_rate*100:.2f}%.",
                                 reason="Post-click opportunity. Audience clicks but fails to submit lead form.",
-                                objective=camp.objective,
+                                objective="Leads",
                                 problem="Landing page/lead form dropoff",
                                 root_cause="Form complexity or landing page load latency",
                                 evidence=f"CTR: {ctr*100:.2f}%, CPC: ₹{cpc:.2f}, Form Conversion: {conversion_rate*100:.2f}%",
@@ -934,7 +984,7 @@ class RecommendationEngine:
                             )
                         )
             
-            # Sales objective leak: CTR good, CPC good, but purchases poor (downstream funnel leak)
+            # Sales objective leak
             elif "SALES" in obj or "CONVERSIONS" in obj:
                 if clicks >= 100 and ctr > 0.015 and purchases == 0 and spend > 150.00:
                     priority, confidence = cls.calculate_priority_and_confidence(
@@ -951,7 +1001,7 @@ class RecommendationEngine:
                             title="Post-Click Checkout Funnel Leak",
                             description=f"Ad click engagement is high (CTR: {ctr*100:.2f}%), but purchase conversion rate is 0.0%.",
                             reason="Checkout/purchase opportunity downstream.",
-                            objective=camp.objective,
+                            objective="Sales",
                             problem="High drop-off in checkout funnel stages",
                             root_cause="Friction during add to cart or payment steps",
                             evidence=f"CTR: {ctr*100:.2f}%, Clicks: {clicks}, Purchases: 0",
