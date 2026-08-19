@@ -790,6 +790,104 @@ export default function OverviewPage() {
                   {renderKpiCard("Frequency", metrics.frequency.value, metrics.frequency.trend, "multiplier", Activity, "orange")}
                 </div>
               </div>
+
+              {/* Social Breakdown Counters */}
+              {metrics.comments && (
+                <div className="bg-slate-50/50 p-5 rounded-xl border border-slate-200">
+                  <span className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4 block">Social Engagement Breakdown</span>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    <div className="bg-white rounded-lg border border-slate-200 p-4 text-center">
+                      <div className="text-2xl font-extrabold text-slate-800">{formatNumber(metrics.reactions?.value || 0)}</div>
+                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">Reactions</div>
+                    </div>
+                    <div className="bg-white rounded-lg border border-slate-200 p-4 text-center">
+                      <div className="text-2xl font-extrabold text-slate-800">{formatNumber(metrics.comments?.value || 0)}</div>
+                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">Comments</div>
+                    </div>
+                    <div className="bg-white rounded-lg border border-slate-200 p-4 text-center">
+                      <div className="text-2xl font-extrabold text-slate-800">{formatNumber(metrics.shares?.value || 0)}</div>
+                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">Shares</div>
+                    </div>
+                    <div className="bg-white rounded-lg border border-slate-200 p-4 text-center">
+                      <div className="text-2xl font-extrabold text-slate-800">{formatNumber(metrics.saves?.value || 0)}</div>
+                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">Saves</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Video Retention Funnel */}
+              {metrics.video_retention && metrics.video_retention.video_starts > 0 && (
+                <div className="bg-slate-50/50 p-5 rounded-xl border border-slate-200">
+                  <span className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4 block">Video Watch Retention Funnel</span>
+                  <div className="space-y-2">
+                    {[
+                      { label: "Video Starts", value: metrics.video_retention.video_starts, pct: 100 },
+                      { label: "25% Watched", value: null, pct: metrics.video_retention.video_25_rate },
+                      { label: "50% Watched", value: null, pct: metrics.video_retention.video_50_rate },
+                      { label: "75% Watched", value: null, pct: metrics.video_retention.video_75_rate },
+                      { label: "95% Watched", value: null, pct: metrics.video_retention.video_95_rate },
+                      { label: "100% Watched", value: null, pct: metrics.video_retention.video_100_rate },
+                      { label: "ThruPlay Rate", value: null, pct: metrics.video_retention.thruplay_rate },
+                    ].map((item, idx) => (
+                      <div key={idx} className="flex items-center gap-3">
+                        <span className="text-xs font-bold text-slate-600 w-28 shrink-0">{item.label}</span>
+                        <div className="flex-1 bg-slate-200 rounded-full h-4 overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all duration-700"
+                            style={{
+                              width: `${Math.min(item.pct, 100)}%`,
+                              background: `linear-gradient(90deg, #6366f1, #8b5cf6)`
+                            }}
+                          />
+                        </div>
+                        <span className="text-xs font-extrabold text-slate-700 w-16 text-right">
+                          {item.value !== null ? formatNumber(item.value) : `${item.pct.toFixed(1)}%`}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Budget Health Panel — shown for all goal filters */}
+          {metrics?.budget && (
+            <div className="card border border-border bg-white shadow-sm rounded-lg p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <DollarSign size={16} className="text-blue-600" />
+                <h3 className="text-sm font-bold text-slate-800">Budget Health</h3>
+                <span className={`ml-auto text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase tracking-wider border ${
+                  metrics.budget.pacing_status === 'ON_TRACK' ? 'bg-green-50 text-green-700 border-green-200' :
+                  metrics.budget.pacing_status === 'UNDERSPENDING' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                  metrics.budget.pacing_status === 'OVERSPENDING' ? 'bg-orange-50 text-orange-700 border-orange-200' :
+                  metrics.budget.pacing_status === 'CRITICALLY_OVERSPENDING' ? 'bg-red-50 text-red-700 border-red-200' :
+                  'bg-slate-50 text-slate-500 border-slate-200'
+                }`}>{metrics.budget.pacing_status.replace(/_/g, ' ')}</span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+                <div className="text-center">
+                  <div className="text-lg font-extrabold text-slate-800">{formatCurrency(metrics.budget.expected_budget)}</div>
+                  <div className="text-[10px] font-bold text-slate-400 uppercase">Expected Budget</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-lg font-extrabold text-slate-800">{formatCurrency(metrics.budget.actual_spend)}</div>
+                  <div className="text-[10px] font-bold text-slate-400 uppercase">Actual Spend</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-lg font-extrabold text-slate-800">{metrics.budget.budget_utilization_percentage.toFixed(1)}%</div>
+                  <div className="text-[10px] font-bold text-slate-400 uppercase">Utilization</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-lg font-extrabold text-slate-800">{metrics.budget.pacing_percentage.toFixed(1)}%</div>
+                  <div className="text-[10px] font-bold text-slate-400 uppercase">Pacing</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-lg font-extrabold text-green-600">{formatCurrency(metrics.budget.remaining_budget)}</div>
+                  <div className="text-[10px] font-bold text-slate-400 uppercase">Remaining</div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -1055,27 +1153,20 @@ export default function OverviewPage() {
               </div>
             </div>
 
-            {/* Health Score Circles Gauge */}
+            {/* Health Score Circles Gauge — Upgraded with Sub-Scores */}
             {health && (
               <div className="card border border-border bg-white shadow-sm rounded-lg p-6">
                 <h3 className="card-title font-bold text-slate-800 text-sm mb-4">Account Health Score</h3>
                 <div className="flex flex-col items-center justify-center">
                   <div className="relative w-32 h-32 flex items-center justify-center mb-3">
                     <svg width="120" height="120" viewBox="0 0 120 120" className="absolute transform -rotate-90">
+                      <circle cx="60" cy="60" r="50" fill="none" stroke="var(--border)" strokeWidth="8" />
                       <circle
-                        cx="60" cy="60" r="50"
-                        fill="none"
-                        stroke="var(--border)"
-                        strokeWidth="8"
-                      />
-                      <circle
-                        cx="60" cy="60" r="50"
-                        fill="none"
+                        cx="60" cy="60" r="50" fill="none"
                         stroke={health.statusClass === "good" ? "var(--success)" : health.statusClass === "attention" ? "var(--warning)" : "var(--critical)"}
                         strokeWidth="8"
                         strokeDasharray={`${2 * Math.PI * 50 * (health.score / 100)} ${2 * Math.PI * 50 * (1 - health.score / 100)}`}
-                        strokeLinecap="round"
-                        className="transition-all duration-500"
+                        strokeLinecap="round" className="transition-all duration-500"
                       />
                     </svg>
                     <div className="flex flex-col items-center justify-center">
@@ -1089,10 +1180,63 @@ export default function OverviewPage() {
                     health.statusClass === "attention" ? "bg-amber-50 text-amber-700 border-amber-200" :
                     "bg-red-50 text-red-700 border-red-200"
                   }`}>
-                    {health.status} Rating
+                    {health.grade || health.status} Rating
                   </span>
 
-                  <div className="w-full mt-6 divide-y divide-border text-xs border-t border-border">
+                  {/* Sub-Score Bars */}
+                  {health.business_score !== undefined && (
+                    <div className="w-full mt-5 space-y-2">
+                      {[
+                        { label: "Business", score: health.business_score },
+                        { label: "Efficiency", score: health.efficiency_score },
+                        { label: "Creative", score: health.creative_score },
+                        { label: "Budget", score: health.budget_score },
+                        { label: "Stability", score: health.stability_score },
+                        { label: "Data Quality", score: health.data_quality_score },
+                      ].map((sub, idx) => (
+                        <div key={idx} className="flex items-center gap-2">
+                          <span className="text-[10px] font-bold text-slate-500 w-20 shrink-0">{sub.label}</span>
+                          <div className="flex-1 bg-slate-100 rounded-full h-2 overflow-hidden">
+                            <div className="h-full rounded-full transition-all duration-500" style={{
+                              width: `${sub.score}%`,
+                              background: sub.score >= 80 ? '#22c55e' : sub.score >= 50 ? '#f59e0b' : '#ef4444'
+                            }} />
+                          </div>
+                          <span className="text-[10px] font-extrabold text-slate-600 w-8 text-right">{sub.score}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Positive / Negative Factors */}
+                  {health.positive_factors && health.positive_factors.length > 0 && (
+                    <div className="w-full mt-4">
+                      <span className="text-[10px] font-bold text-green-600 uppercase tracking-wider">Strengths</span>
+                      <ul className="mt-1 space-y-0.5">
+                        {health.positive_factors.slice(0, 3).map((f: string, i: number) => (
+                          <li key={i} className="text-[11px] text-slate-600 flex items-start gap-1">
+                            <CheckCircle2 size={12} className="text-green-500 mt-0.5 shrink-0" />
+                            <span>{f}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {health.negative_factors && health.negative_factors.length > 0 && (
+                    <div className="w-full mt-3">
+                      <span className="text-[10px] font-bold text-red-500 uppercase tracking-wider">Issues</span>
+                      <ul className="mt-1 space-y-0.5">
+                        {health.negative_factors.slice(0, 3).map((f: string, i: number) => (
+                          <li key={i} className="text-[11px] text-slate-600 flex items-start gap-1">
+                            <AlertTriangle size={12} className="text-red-400 mt-0.5 shrink-0" />
+                            <span>{f}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  <div className="w-full mt-5 divide-y divide-border text-xs border-t border-border">
                     {health.items.map((item: any, idx: number) => (
                       <div key={idx} className="flex items-center justify-between py-2">
                         <span className="font-bold text-slate-700">{item.label}</span>
