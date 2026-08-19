@@ -338,7 +338,10 @@ export default function CampaignsPage() {
           {/* Page Header */}
           <div className="page-header flex justify-between items-center">
             <div>
-              <h1 className="page-title text-2xl font-bold text-slate-800">Campaigns</h1>
+              <div className="flex items-center gap-2">
+                <h1 className="page-title text-2xl font-bold text-slate-800">Campaigns</h1>
+                <span className="text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded font-black uppercase border border-blue-200">v2.1.0</span>
+              </div>
               <p className="page-subtitle text-sm text-subtle mt-1">Analyze performance metrics and trigger dynamic breakdowns of active campaigns</p>
             </div>
 
