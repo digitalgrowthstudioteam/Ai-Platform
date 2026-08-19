@@ -1,8 +1,10 @@
 "use client";
 
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { api } from "@/lib/api";
 import {
   LayoutDashboard,
   Megaphone,
@@ -80,6 +82,31 @@ const navigation: NavSection[] = [
 export default function Sidebar() {
   const pathname = usePathname();
   const { user } = useAuth();
+  const [sub, setSub] = useState<any>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    
+    // Load cached subscription instantly
+    const cached = sessionStorage.getItem("dgs_cached_subscription");
+    if (cached) {
+      try {
+        setSub(JSON.parse(cached));
+      } catch (e) {}
+    }
+
+    // Load fresh subscription live
+    async function loadSub() {
+      try {
+        const res = await api.getSubscription();
+        setSub(res);
+        sessionStorage.setItem("dgs_cached_subscription", JSON.stringify(res));
+      } catch (e) {
+        console.error("Failed to load subscription in sidebar:", e);
+      }
+    }
+    loadSub();
+  }, [user]);
 
   const isAdmin = user?.email === "flasshgames2026@gmail.com" || user?.email === "digitalgrowthstudioteam@gmail.com";
 
@@ -161,10 +188,12 @@ export default function Sidebar() {
       <div className="sidebar-footer">
         <div className="sidebar-plan">
           <div className="sidebar-plan-label">Current Plan</div>
-          <div className="sidebar-plan-name">Starter</div>
-          <button className="sidebar-upgrade-btn">
+          <div className="sidebar-plan-name">
+            {sub?.plan ? sub.plan.charAt(0).toUpperCase() + sub.plan.slice(1) : "Starter"}
+          </div>
+          <Link href="/settings/billing" className="sidebar-upgrade-btn block text-center">
             Upgrade Plan
-          </button>
+          </Link>
         </div>
 
         {/* Help */}
