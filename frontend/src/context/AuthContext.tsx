@@ -44,20 +44,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   });
 
   useEffect(() => {
+    let nullTimeoutId: NodeJS.Timeout | null = null;
+    const hadCachedSession = localStorage.getItem("dgs_has_session") === "true";
+
     // Listen to Firebase Auth state change
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
+      // Clear any pending null-timeout
+      if (nullTimeoutId) {
+        clearTimeout(nullTimeoutId);
+        nullTimeoutId = null;
+      }
+
       if (currentUser) {
+        // User resolved — update state immediately
+        setUser(currentUser);
         localStorage.setItem("dgs_has_session", "true");
         setIsAuthCached(true);
+        setLoading(false);
+      } else if (hadCachedSession && !user) {
+        // Firebase briefly fires null before resolving from IndexedDB.
+        // If we had a cached session, wait briefly before clearing.
+        nullTimeoutId = setTimeout(() => {
+          setUser(null);
+          localStorage.removeItem("dgs_has_session");
+          setIsAuthCached(false);
+          setLoading(false);
+        }, 3000);
       } else {
+        // No cached session — clear immediately
+        setUser(null);
         localStorage.removeItem("dgs_has_session");
         setIsAuthCached(false);
+        setLoading(false);
       }
-      setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      if (nullTimeoutId) clearTimeout(nullTimeoutId);
+    };
   }, []);
 
   const loginWithEmail = async (email: string, pass: string) => {
