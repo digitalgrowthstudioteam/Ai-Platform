@@ -1261,7 +1261,6 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
                               ? formatPercent(k.value / 100)
                               : formatNumber(k.value)}
                           </div>
-                          <span className="text-[8px] text-slate-400 block mt-1">Formula: {k.formula}</span>
                         </div>
                       </div>
                     ))}
