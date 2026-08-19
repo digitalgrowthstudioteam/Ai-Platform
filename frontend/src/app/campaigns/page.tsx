@@ -73,7 +73,7 @@ export default function CampaignsPage() {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
   // Tab State
-  const [activeTab, setActiveTab] = useState<"overview" | "adsets" | "ads" | "breakdowns" | "aidiagnosis">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "adsets">("overview");
   const [breakdownView, setBreakdownView] = useState<"placement" | "demographic" | "region">("placement");
 
   // Hierarchy details states
@@ -86,7 +86,7 @@ export default function CampaignsPage() {
   const [selectedAd, setSelectedAd] = useState<any | null>(null);
   const [loadingPerf, setLoadingPerf] = useState(false);
   const [perfError, setPerfError] = useState<string | null>(null);
-  const [adSetTab, setAdSetTab] = useState<"overview" | "ads" | "aidiagnosis">("overview");
+  const [adSetTab, setAdSetTab] = useState<"overview" | "ads" | "breakdowns" | "aidiagnosis">("overview");
   const [perfErrorState, setPerfErrorState] = useState<string | null>(null);
 
   // Date helper
@@ -798,6 +798,14 @@ export default function CampaignsPage() {
                 Ads ({ads.filter(ad => ad.adset_name === selectedAdSet.name).length})
               </button>
               <button
+                onClick={() => setAdSetTab("breakdowns")}
+                className={`py-2 text-xs font-bold border-b-2 cursor-pointer transition ${
+                  adSetTab === "breakdowns" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-400 hover:text-slate-600"
+                }`}
+              >
+                Breakdowns
+              </button>
+              <button
                 onClick={() => setAdSetTab("aidiagnosis")}
                 className={`py-2 text-xs font-bold border-b-2 cursor-pointer transition ${
                   adSetTab === "aidiagnosis" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-400 hover:text-slate-600"
@@ -1016,6 +1024,144 @@ export default function CampaignsPage() {
                     </tbody>
                   </table>
                 </div>
+              </div>
+            )}
+
+            {adSetTab === "breakdowns" && (
+              <div className="space-y-4">
+                <div className="flex border-b border-slate-100 gap-4 text-xs font-bold text-slate-400">
+                  <button 
+                    onClick={() => setBreakdownView("placement")}
+                    className={`pb-2 border-b-2 transition ${breakdownView === "placement" ? "border-primary text-slate-700" : "border-transparent"}`}
+                  >
+                    Placements Breakdown
+                  </button>
+                  <button 
+                    onClick={() => setBreakdownView("demographic")}
+                    className={`pb-2 border-b-2 transition ${breakdownView === "demographic" ? "border-primary text-slate-700" : "border-transparent"}`}
+                  >
+                    Demographics Breakdown
+                  </button>
+                  <button 
+                    onClick={() => setBreakdownView("region")}
+                    className={`pb-2 border-b-2 transition ${breakdownView === "region" ? "border-primary text-slate-700" : "border-transparent"}`}
+                  >
+                    Regions Breakdown
+                  </button>
+                </div>
+
+                {breakdownView === "placement" && (
+                  <div className="card border border-border bg-white shadow-sm rounded-lg overflow-hidden">
+                    <div className="p-4 bg-slate-50/50 border-b border-border text-xs font-bold text-slate-600">
+                      Channel distribution breakdown relative to ad set metrics
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full text-xs text-left divide-y divide-border">
+                        <thead className="bg-slate-50/50">
+                          <tr className="text-subtle font-bold uppercase tracking-wider border-b border-border">
+                            <th className="p-4">Platform</th>
+                            <th className="p-4 text-right">Spend Contribution</th>
+                            <th className="p-4 text-right">CTR</th>
+                            <th className="p-4 text-right">ROAS Contribution</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border font-medium text-slate-700">
+                          {[
+                            { name: "Facebook Mobile Feed", pct: 0.55, ctr: 1.82 },
+                            { name: "Instagram Stories", pct: 0.30, ctr: 2.14 },
+                            { name: "Audience Network Mobile", pct: 0.10, ctr: 0.95 },
+                            { name: "Messenger Inbox", pct: 0.05, ctr: 1.10 }
+                          ].map((p, idx) => (
+                            <tr key={idx} className="hover:bg-slate-50 transition">
+                              <td className="p-4 font-bold text-slate-800">{p.name}</td>
+                              <td className="p-4 text-right">{formatCurrency(selectedAdSet.metrics.spend * p.pct)} ({Math.round(p.pct * 100)}%)</td>
+                              <td className="p-4 text-right">{(p.ctr).toFixed(2)}%</td>
+                              <td className="p-4 text-right text-green-600 font-bold">{(selectedAdSet.metrics.roas * (p.pct > 0.3 ? 1.1 : 0.8)).toFixed(2)}x</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {breakdownView === "demographic" && (
+                  <div className="card border border-border bg-white shadow-sm rounded-lg overflow-hidden">
+                    <div className="p-4 bg-slate-50/50 border-b border-border text-xs font-bold text-slate-600">
+                      Age and Gender performance segments matching ad set targeting
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full text-xs text-left divide-y divide-border">
+                        <thead className="bg-slate-50/50">
+                          <tr className="text-subtle font-bold uppercase tracking-wider border-b border-border">
+                            <th className="p-4">Age Segment</th>
+                            <th className="p-4">Gender</th>
+                            <th className="p-4 text-right">Spend Contribution</th>
+                            <th className="p-4 text-right">CTR</th>
+                            <th className="p-4 text-right">ROAS</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border font-medium text-slate-700">
+                          {[
+                            { age: "25-34", gender: "Female", pct: 0.45, ctr: 2.25, roas: 3.20 },
+                            { age: "25-34", gender: "Male", pct: 0.25, ctr: 1.65, roas: 2.40 },
+                            { age: "35-44", gender: "Female", pct: 0.20, ctr: 1.90, roas: 2.80 },
+                            { age: "18-24", gender: "Female", pct: 0.10, ctr: 1.20, roas: 1.10 }
+                          ].map((d, idx) => (
+                            <tr key={idx} className="hover:bg-slate-50 transition">
+                              <td className="p-4 font-bold text-slate-800">{d.age}</td>
+                              <td className="p-4 uppercase">{d.gender}</td>
+                              <td className="p-4 text-right">{formatCurrency(selectedAdSet.metrics.spend * d.pct)} ({Math.round(d.pct * 100)}%)</td>
+                              <td className="p-4 text-right">{d.ctr.toFixed(2)}%</td>
+                              <td className="p-4 text-right text-green-600 font-bold">{d.roas.toFixed(2)}x</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {breakdownView === "region" && (
+                  <div className="card border border-border bg-white shadow-sm rounded-lg overflow-hidden">
+                    <div className="p-4 bg-slate-50/50 border-b border-border text-xs font-bold text-slate-600">
+                      Geographic delivery and performance skew across key regions
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full text-xs text-left divide-y divide-border">
+                        <thead className="bg-slate-50/50">
+                          <tr className="text-subtle font-bold uppercase tracking-wider border-b border-border">
+                            <th className="p-4">Region / State</th>
+                            <th className="p-4 text-right">Spend Contribution</th>
+                            <th className="p-4 text-right">CTR</th>
+                            <th className="p-4 text-right">Conversions</th>
+                            <th className="p-4 text-right">ROAS</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border font-medium text-slate-700">
+                          {[
+                            { region: "Maharashtra", pct: 0.35, ctr: 2.10, purchases: 45, roas: 3.10 },
+                            { region: "Delhi NCR", pct: 0.25, ctr: 1.95, purchases: 30, roas: 2.80 },
+                            { region: "Karnataka", pct: 0.20, ctr: 1.80, purchases: 22, roas: 2.50 },
+                            { region: "Tamil Nadu", pct: 0.12, ctr: 1.65, purchases: 11, roas: 2.10 },
+                            { region: "Uttar Pradesh", pct: 0.08, ctr: 1.40, purchases: 5, roas: 1.50 }
+                          ].map((r, idx) => (
+                            <tr key={idx} className="hover:bg-slate-50 transition">
+                              <td className="p-4 font-bold text-slate-800 flex items-center gap-1.5">
+                                <MapPin size={12} className="text-slate-400" />
+                                {r.region}
+                              </td>
+                              <td className="p-4 text-right">{formatCurrency(selectedAdSet.metrics.spend * r.pct)} ({Math.round(r.pct * 100)}%)</td>
+                              <td className="p-4 text-right">{r.ctr.toFixed(2)}%</td>
+                              <td className="p-4 text-right">{Math.round(selectedAdSet.metrics.purchases * r.pct)}</td>
+                              <td className="p-4 text-right text-green-600 font-bold">{(selectedAdSet.metrics.roas * (r.pct > 0.3 ? 1.1 : 0.8)).toFixed(2)}x</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1345,10 +1491,7 @@ export default function CampaignsPage() {
           <div className="flex border-b border-border gap-6 text-sm font-bold text-slate-400">
             {[
               { id: "overview", label: "Overview" },
-              { id: "adsets", label: "Ad Sets" },
-              { id: "ads", label: "Ads" },
-              { id: "breakdowns", label: "Breakdowns" },
-              { id: "aidiagnosis", label: "AI Diagnosis" }
+              { id: "adsets", label: "Ad Sets" }
             ].map(tab => (
               <button
                 key={tab.id}
@@ -1665,269 +1808,7 @@ export default function CampaignsPage() {
               </div>
             )}
 
-            {/* Ads Tab */}
-            {activeTab === "ads" && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {ads.map((ad, idx) => {
-                  const cr = ad.creative;
-                  return (
-                    <div 
-                      key={idx} 
-                      onClick={() => handleSelectAdFromList(ad)}
-                      className="card border border-border bg-white shadow-xs rounded-lg p-5 flex flex-col justify-between gap-4 cursor-pointer hover:border-slate-300 transition"
-                    >
-                      <div className="flex items-start gap-4">
-                        {cr && cr.image_url ? (
-                          <img src={cr.image_url} alt="" className="w-16 h-16 object-cover rounded-md border border-border shrink-0" />
-                        ) : (
-                          <div className="w-16 h-16 bg-slate-100 text-slate-400 rounded-md border border-border flex items-center justify-center shrink-0">
-                            <ImageIcon size={20} />
-                          </div>
-                        )}
-
-                        <div className="space-y-1">
-                          <h4 className="text-sm font-bold text-slate-800">{ad.name}</h4>
-                          <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase inline-block ${
-                            ad.status === "ACTIVE" ? "text-green-600 bg-green-50" : "text-slate-500 bg-slate-100"
-                          }`}>
-                            {ad.status}
-                          </span>
-                          {cr && (
-                            <div className="text-[10px] text-slate-400 max-w-xs truncate" title={cr.headline || cr.primary_text}>
-                              Copy: {cr.headline || cr.primary_text}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-3 gap-2 border-t border-slate-50 pt-3 text-center">
-                        <div>
-                          <div className="text-[9px] text-slate-400 font-bold uppercase">Spend</div>
-                          <div className="text-xs font-bold text-slate-800 mt-0.5">{formatCurrency(ad.metrics.spend)}</div>
-                        </div>
-                        <div>
-                          <div className="text-[9px] text-slate-400 font-bold uppercase">CTR</div>
-                          <div className="text-xs font-bold text-slate-800 mt-0.5">{formatPercent(ad.metrics.ctr)}</div>
-                        </div>
-                        <div>
-                          <div className="text-[9px] text-slate-400 font-bold uppercase">ROAS</div>
-                          <div className="text-xs font-bold text-green-600 mt-0.5">{ad.metrics.roas.toFixed(2)}x</div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Breakdowns Tab */}
-            {activeTab === "breakdowns" && (
-              <div className="space-y-4">
-                <div className="flex border-b border-slate-100 gap-4 text-xs font-bold text-slate-400">
-                  <button 
-                    onClick={() => setBreakdownView("placement")}
-                    className={`pb-2 border-b-2 transition ${breakdownView === "placement" ? "border-primary text-slate-700" : "border-transparent"}`}
-                  >
-                    Placements Breakdown
-                  </button>
-                  <button 
-                    onClick={() => setBreakdownView("demographic")}
-                    className={`pb-2 border-b-2 transition ${breakdownView === "demographic" ? "border-primary text-slate-700" : "border-transparent"}`}
-                  >
-                    Demographics Breakdown
-                  </button>
-                  <button 
-                    onClick={() => setBreakdownView("region")}
-                    className={`pb-2 border-b-2 transition ${breakdownView === "region" ? "border-primary text-slate-700" : "border-transparent"}`}
-                  >
-                    Regions Breakdown
-                  </button>
-                </div>
-
-                {breakdownView === "placement" && (
-                  <div className="card border border-border bg-white shadow-sm rounded-lg overflow-hidden">
-                    <div className="p-4 bg-slate-50/50 border-b border-border text-xs font-bold text-slate-600">
-                      Channel distribution breakdown relative to campaign metrics
-                    </div>
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full text-xs text-left divide-y divide-border">
-                        <thead className="bg-slate-50/50">
-                          <tr className="text-subtle font-bold uppercase tracking-wider border-b border-border">
-                            <th className="p-4">Platform</th>
-                            <th className="p-4 text-right">Spend Contribution</th>
-                            <th className="p-4 text-right">CTR</th>
-                            <th className="p-4 text-right">ROAS Contribution</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border font-medium text-slate-700">
-                          {[
-                            { name: "Facebook Mobile Feed", pct: 0.55, ctr: 1.82 },
-                            { name: "Instagram Stories", pct: 0.30, ctr: 2.14 },
-                            { name: "Audience Network Mobile", pct: 0.10, ctr: 0.95 },
-                            { name: "Messenger Inbox", pct: 0.05, ctr: 1.10 }
-                          ].map((p, idx) => (
-                            <tr key={idx} className="hover:bg-slate-50 transition">
-                              <td className="p-4 font-bold text-slate-800">{p.name}</td>
-                              <td className="p-4 text-right">{formatCurrency(selectedCampaign.metrics.spend * p.pct)} ({Math.round(p.pct * 100)}%)</td>
-                              <td className="p-4 text-right">{(p.ctr).toFixed(2)}%</td>
-                              <td className="p-4 text-right text-green-600 font-bold">{(selectedCampaign.metrics.roas * (p.pct > 0.3 ? 1.1 : 0.8)).toFixed(2)}x</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-
-                {breakdownView === "demographic" && (
-                  <div className="card border border-border bg-white shadow-sm rounded-lg overflow-hidden">
-                    <div className="p-4 bg-slate-50/50 border-b border-border text-xs font-bold text-slate-600">
-                      Age and Gender performance segments matching campaign targeting
-                    </div>
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full text-xs text-left divide-y divide-border">
-                        <thead className="bg-slate-50/50">
-                          <tr className="text-subtle font-bold uppercase tracking-wider border-b border-border">
-                            <th className="p-4">Age Segment</th>
-                            <th className="p-4">Gender</th>
-                            <th className="p-4 text-right">Spend Contribution</th>
-                            <th className="p-4 text-right">CTR</th>
-                            <th className="p-4 text-right">ROAS</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border font-medium text-slate-700">
-                          {[
-                            { age: "25-34", gender: "Female", pct: 0.45, ctr: 2.25, roas: 3.20 },
-                            { age: "25-34", gender: "Male", pct: 0.25, ctr: 1.65, roas: 2.40 },
-                            { age: "35-44", gender: "Female", pct: 0.20, ctr: 1.90, roas: 2.80 },
-                            { age: "18-24", gender: "Female", pct: 0.10, ctr: 1.20, roas: 1.10 }
-                          ].map((d, idx) => (
-                            <tr key={idx} className="hover:bg-slate-50 transition">
-                              <td className="p-4 font-bold text-slate-800">{d.age}</td>
-                              <td className="p-4 uppercase">{d.gender}</td>
-                              <td className="p-4 text-right">{formatCurrency(selectedCampaign.metrics.spend * d.pct)} ({Math.round(d.pct * 100)}%)</td>
-                              <td className="p-4 text-right">{d.ctr.toFixed(2)}%</td>
-                              <td className="p-4 text-right text-green-600 font-bold">{d.roas.toFixed(2)}x</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-
-                {breakdownView === "region" && (
-                  <div className="card border border-border bg-white shadow-sm rounded-lg overflow-hidden">
-                    <div className="p-4 bg-slate-50/50 border-b border-border text-xs font-bold text-slate-600">
-                      Geographic delivery and performance skew across key regions
-                    </div>
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full text-xs text-left divide-y divide-border">
-                        <thead className="bg-slate-50/50">
-                          <tr className="text-subtle font-bold uppercase tracking-wider border-b border-border">
-                            <th className="p-4">Region / State</th>
-                            <th className="p-4 text-right">Spend Contribution</th>
-                            <th className="p-4 text-right">CTR</th>
-                            <th className="p-4 text-right">Conversions</th>
-                            <th className="p-4 text-right">ROAS</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border font-medium text-slate-700">
-                          {[
-                            { region: "Maharashtra", pct: 0.35, ctr: 2.10, purchases: 45, roas: 3.10 },
-                            { region: "Delhi NCR", pct: 0.25, ctr: 1.95, purchases: 30, roas: 2.80 },
-                            { region: "Karnataka", pct: 0.20, ctr: 1.80, purchases: 22, roas: 2.50 },
-                            { region: "Tamil Nadu", pct: 0.12, ctr: 1.65, purchases: 11, roas: 2.10 },
-                            { region: "Uttar Pradesh", pct: 0.08, ctr: 1.40, purchases: 5, roas: 1.50 }
-                          ].map((r, idx) => (
-                            <tr key={idx} className="hover:bg-slate-50 transition">
-                              <td className="p-4 font-bold text-slate-800 flex items-center gap-1.5">
-                                <MapPin size={12} className="text-slate-400" />
-                                {r.region}
-                              </td>
-                              <td className="p-4 text-right">{formatCurrency(selectedCampaign.metrics.spend * r.pct)} ({Math.round(r.pct * 100)}%)</td>
-                              <td className="p-4 text-right">{r.ctr.toFixed(2)}%</td>
-                              <td className="p-4 text-right">{r.purchases}</td>
-                              <td className="p-4 text-right text-green-600 font-bold">{r.roas.toFixed(2)}x</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* AI Diagnosis Tab */}
-            {activeTab === "aidiagnosis" && (
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-sm font-bold text-slate-800">Linked AI Recommendations</h3>
-                  <span className="text-[10px] text-slate-400 font-bold uppercase">
-                    {getCampaignRecommendations(selectedCampaign).length} Actionable Recommendations
-                  </span>
-                </div>
-
-                {getCampaignRecommendations(selectedCampaign).length === 0 ? (
-                  <div className="card border border-border bg-white p-6 text-center text-xs text-slate-400">
-                    No active recommendations triggered for this campaign. Overall metrics are stable!
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {getCampaignRecommendations(selectedCampaign).map((r, idx) => (
-                      <div key={idx} className="card border border-border bg-white shadow-sm rounded-lg p-5 space-y-4">
-                        <div className="flex justify-between items-start">
-                          <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
-                            r.priority === "high" ? "text-red-700 bg-red-50" : "text-amber-700 bg-amber-50"
-                          }`}>
-                            {r.priority} Priority
-                          </span>
-                          <span className="text-xs font-bold text-slate-700 bg-slate-50 border border-slate-100 px-2 py-0.5 rounded">
-                            {Math.round(r.confidence_score * 100)}% Match Confidence
-                          </span>
-                        </div>
-                        <h4 className="text-sm font-black text-slate-800">{r.title}</h4>
-                        <p className="text-xs text-slate-500 leading-relaxed">{r.description}</p>
-                        <div className="text-[10px] text-slate-400 italic bg-slate-50 p-2.5 rounded">
-                          <span className="font-semibold text-slate-500 not-italic">Diagnosis Reason: </span>
-                          {r.reason}
-                        </div>
-                        
-                        <div className="flex gap-2 border-t border-slate-50 pt-3">
-                          <button 
-                            onClick={async () => {
-                              try {
-                                await api.applyRecommendation(r.id);
-                                loadRecommendations();
-                              } catch (e) {
-                                console.error(e);
-                              }
-                            }}
-                            className="btn btn-primary text-[10px] font-bold py-1 px-3 bg-blue-500 text-white rounded cursor-pointer"
-                          >
-                            Apply Recommendation
-                          </button>
-                          <button 
-                            onClick={async () => {
-                              try {
-                                await api.dismissRecommendation(r.id);
-                                loadRecommendations();
-                              } catch (e) {
-                                console.error(e);
-                              }
-                            }}
-                            className="btn btn-outline text-[10px] font-bold py-1 px-3 border border-border rounded text-slate-500 cursor-pointer hover:bg-slate-50"
-                          >
-                            Dismiss
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+            {/* Campaign tabs cleaned (Ads, Breakdowns, AI Diagnosis removed) */}
           </div>
         </div>
       )}
