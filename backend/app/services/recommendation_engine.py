@@ -585,6 +585,14 @@ class RecommendationEngine:
                     )
                 )
 
+            # ──────────────────────────────────────────
+            # G. Root-Cause Diagnosis Evaluation
+            # ──────────────────────────────────────────
+            root_cause_diagnoses = await cls.evaluate_root_cause_diagnosis(
+                db, camp, user_uuid, ad_account_uuid
+            )
+            recommendations_to_add.extend(root_cause_diagnoses)
+
         # ──────────────────────────────────────────────
         # Idempotent database operations
         # ──────────────────────────────────────────────
@@ -605,3 +613,328 @@ class RecommendationEngine:
         await db.commit()
         logger.info("AI Recommendations compiled", count=count)
         return count
+
+    @classmethod
+    async def evaluate_root_cause_diagnosis(
+        cls, db: AsyncSession, camp: Campaign, user_uuid: uuid.UUID, ad_account_uuid: uuid.UUID
+    ) -> list:
+        """
+        Decomposes campaign performance trends to isolate the root cause behind metric changes
+        by comparing the current 7 days with the previous 7 days.
+        """
+        diagnoses = []
+        today = date.today()
+        current_start = today - timedelta(days=7)
+        prev_start = today - timedelta(days=14)
+
+        # 1. Fetch Current Period Metrics (last 7 days)
+        stmt_curr = (
+            select(
+                func.coalesce(func.sum(CampaignDailyMetrics.spend), 0).label("spend"),
+                func.coalesce(func.sum(CampaignDailyMetrics.revenue), 0).label("revenue"),
+                func.coalesce(func.sum(CampaignDailyMetrics.purchases), 0).label("purchases"),
+                func.coalesce(func.sum(CampaignDailyMetrics.impressions), 0).label("impressions"),
+                func.coalesce(func.sum(CampaignDailyMetrics.clicks), 0).label("clicks"),
+                func.coalesce(func.sum(CampaignDailyMetrics.link_clicks), 0).label("link_clicks"),
+                func.coalesce(func.sum(CampaignDailyMetrics.leads), 0).label("leads"),
+                func.coalesce(func.sum(CampaignDailyMetrics.reach), 0).label("reach"),
+                func.coalesce(func.avg(CampaignDailyMetrics.frequency), 1.0).label("frequency"),
+            )
+            .where(CampaignDailyMetrics.campaign_id == camp.id)
+            .where(CampaignDailyMetrics.date >= current_start)
+        )
+        res_curr = await db.execute(stmt_curr)
+        row_curr = res_curr.fetchone()
+
+        # 2. Fetch Previous Period Metrics (days 8-14)
+        stmt_prev = (
+            select(
+                func.coalesce(func.sum(CampaignDailyMetrics.spend), 0).label("spend"),
+                func.coalesce(func.sum(CampaignDailyMetrics.revenue), 0).label("revenue"),
+                func.coalesce(func.sum(CampaignDailyMetrics.purchases), 0).label("purchases"),
+                func.coalesce(func.sum(CampaignDailyMetrics.impressions), 0).label("impressions"),
+                func.coalesce(func.sum(CampaignDailyMetrics.clicks), 0).label("clicks"),
+                func.coalesce(func.sum(CampaignDailyMetrics.link_clicks), 0).label("link_clicks"),
+                func.coalesce(func.sum(CampaignDailyMetrics.leads), 0).label("leads"),
+                func.coalesce(func.sum(CampaignDailyMetrics.reach), 0).label("reach"),
+                func.coalesce(func.avg(CampaignDailyMetrics.frequency), 1.0).label("frequency"),
+            )
+            .where(CampaignDailyMetrics.campaign_id == camp.id)
+            .where(CampaignDailyMetrics.date >= prev_start)
+            .where(CampaignDailyMetrics.date < current_start)
+        )
+        res_prev = await db.execute(stmt_prev)
+        row_prev = res_prev.fetchone()
+
+        if not row_curr or not row_prev:
+            return diagnoses
+
+        # Current values
+        c_spend = float(row_curr.spend or 0.0)
+        c_impressions = int(row_curr.impressions or 0)
+        c_clicks = int(row_curr.clicks or 0)
+        c_link_clicks = int(row_curr.link_clicks or 0)
+        c_purchases = int(row_curr.purchases or 0)
+        c_leads = int(row_curr.leads or 0)
+        c_reach = int(row_curr.reach or 0)
+        c_frequency = float(row_curr.frequency or 1.0)
+        c_revenue = float(row_curr.revenue or 0.0)
+
+        # Previous values
+        p_spend = float(row_prev.spend or 0.0)
+        p_impressions = int(row_prev.impressions or 0)
+        p_clicks = int(row_prev.clicks or 0)
+        p_link_clicks = int(row_prev.link_clicks or 0)
+        p_purchases = int(row_prev.purchases or 0)
+        p_leads = int(row_prev.leads or 0)
+        p_reach = int(row_prev.reach or 0)
+        p_frequency = float(row_prev.frequency or 1.0)
+        p_revenue = float(row_prev.revenue or 0.0)
+
+        # ──────────────────────────────────────────
+        # Safeguard: Insufficient Data check
+        # ──────────────────────────────────────────
+        if c_spend < 500.00 or (c_purchases + c_leads) < 3:
+            diagnoses.append(
+                AIRecommendation(
+                    user_id=user_uuid,
+                    ad_account_id=ad_account_uuid,
+                    entity_type="campaign",
+                    entity_id=camp.id,
+                    recommendation_type="INSUFFICIENT_DATA",
+                    title="Learning Pacing: Insufficient Data",
+                    description=f"This campaign has spent only ₹{c_spend:.2f} and generated {c_purchases + c_leads} conversions in the last 7 days.",
+                    reason="Insufficient data volume to yield stable statistical diagnosis. Continue collecting delivery logs.",
+                    confidence_score=1.0000,
+                    priority="low",
+                    supporting_metrics={"spend": c_spend, "conversions": c_purchases + c_leads},
+                    status="new"
+                )
+            )
+            return diagnoses
+
+        # Calculate current rates
+        c_ctr = (c_clicks / c_impressions) if c_impressions > 0 else 0.0
+        c_cpc = (c_spend / c_clicks) if c_clicks > 0 else 0.0
+        c_cpm = (c_spend / c_impressions * 1000) if c_impressions > 0 else 0.0
+        c_roas = (c_revenue / c_spend) if c_spend > 0 else 0.0
+        c_cpl = (c_spend / c_leads) if c_leads > 0 else 0.0
+        c_cpa = (c_spend / c_purchases) if c_purchases > 0 else 0.0
+        c_cvr = (c_purchases / c_clicks) if c_clicks > 0 else 0.0
+
+        # Calculate previous rates
+        p_ctr = (p_clicks / p_impressions) if p_impressions > 0 else 0.0
+        p_cpc = (p_spend / p_clicks) if p_clicks > 0 else 0.0
+        p_cpm = (p_spend / p_impressions * 1000) if p_impressions > 0 else 0.0
+        p_roas = (p_revenue / p_spend) if p_spend > 0 else 0.0
+        p_cpl = (p_spend / p_leads) if p_leads > 0 else 0.0
+        p_cpa = (p_spend / p_purchases) if p_purchases > 0 else 0.0
+        p_cvr = (p_purchases / p_clicks) if p_clicks > 0 else 0.0
+
+        # Rate change ratios
+        cpm_change = ((c_cpm - p_cpm) / p_cpm) if p_cpm > 0 else 0.0
+        ctr_change = ((c_ctr - p_ctr) / p_ctr) if p_ctr > 0 else 0.0
+        cpc_change = ((c_cpc - p_cpc) / p_cpc) if p_cpc > 0 else 0.0
+        cpl_change = ((c_cpl - p_cpl) / p_cpl) if p_cpl > 0 else 0.0
+        cpa_change = ((c_cpa - p_cpa) / p_cpa) if p_cpa > 0 else 0.0
+        roas_change = ((c_roas - p_roas) / p_roas) if p_roas > 0 else 0.0
+        freq_change = ((c_frequency - p_frequency) / p_frequency) if p_frequency > 0 else 0.0
+
+        # ──────────────────────────────────────────
+        # 1. CPM Diagnosis (Auction Pressure vs Saturation Fatigue)
+        # ──────────────────────────────────────────
+        if cpm_change > 0.15:
+            if freq_change > 0.15 and ctr_change < -0.10:
+                diagnoses.append(
+                    AIRecommendation(
+                        user_id=user_uuid,
+                        ad_account_id=ad_account_uuid,
+                        entity_type="campaign",
+                        entity_id=camp.id,
+                        recommendation_type="CREATIVE_FATIGUE",
+                        title=f"CPM Surge - Audience Saturation: {camp.name}",
+                        description=f"CPM increased by {cpm_change*100:.1f}% over the last 7 days. This is caused by audience saturation and creative fatigue, as frequency has increased and click engagement (CTR) has declined.",
+                        reason="Evidence: Frequency increased, CTR decreased, CPM increased across placements.",
+                        confidence_score=0.89,
+                        priority="high",
+                        supporting_metrics={"cpm_change": cpm_change, "freq_change": freq_change, "ctr_change": ctr_change},
+                        status="new"
+                    )
+                )
+            elif ctr_change >= -0.05 and cpc_change > 0.10:
+                diagnoses.append(
+                    AIRecommendation(
+                        user_id=user_uuid,
+                        ad_account_id=ad_account_uuid,
+                        entity_type="campaign",
+                        entity_id=camp.id,
+                        recommendation_type="HIGH_CPM",
+                        title=f"CPM Surge - Auction Pressure: {camp.name}",
+                        description=f"CPM increased by {cpm_change*100:.1f}% over the last 7 days. However, CTR remains stable, indicating that auction competition has increased.",
+                        reason="Evidence: Frequency stable, CTR stable, CPM increased across placements. Bidding pressure is systemic.",
+                        confidence_score=0.84,
+                        priority="medium",
+                        supporting_metrics={"cpm_change": cpm_change, "ctr_change": ctr_change},
+                        status="new"
+                    )
+                )
+
+        # ──────────────────────────────────────────
+        # 2. CTR Diagnosis (Creative Fatigue vs Message Mismatch)
+        # ──────────────────────────────────────────
+        if ctr_change < -0.15:
+            if c_frequency > 3.0 and cpc_change > 0.10:
+                diagnoses.append(
+                    AIRecommendation(
+                        user_id=user_uuid,
+                        ad_account_id=ad_account_uuid,
+                        entity_type="campaign",
+                        entity_id=camp.id,
+                        recommendation_type="CREATIVE_FATIGUE",
+                        title=f"CTR Drop - Creative Fatigue: {camp.name}",
+                        description=f"CTR decreased by {abs(ctr_change)*100:.1f}%. Frequency has risen to {c_frequency:.2f} while CPM remains stable, confirming fatigue.",
+                        reason=f"Evidence: Frequency increased {p_frequency:.1f} -> {c_frequency:.1f}, CTR decreased, CPM stable, CPC increased {cpc_change*100:.1f}%.",
+                        confidence_score=0.89,
+                        priority="high",
+                        supporting_metrics={"ctr_change": ctr_change, "frequency": c_frequency, "cpc_change": cpc_change},
+                        status="new"
+                    )
+                )
+
+        # ──────────────────────────────────────────
+        # 3. CPC Diagnosis (Creative Lag vs Bidding Spikes)
+        # ──────────────────────────────────────────
+        if cpc_change > 0.15:
+            if ctr_change < -0.10 and abs(cpm_change) < 0.10:
+                diagnoses.append(
+                    AIRecommendation(
+                        user_id=user_uuid,
+                        ad_account_id=ad_account_uuid,
+                        entity_type="campaign",
+                        entity_id=camp.id,
+                        recommendation_type="HIGH_CPC",
+                        title=f"CPC Surge - Creative Lag: {camp.name}",
+                        description=f"CPC increased by {cpc_change*100:.1f}% primarily because click engagement (CTR) fell by {abs(ctr_change)*100:.1f}% while auction cost remained stable.",
+                        reason="Evidence: CPC increased, CTR decreased, CPM stable.",
+                        confidence_score=0.88,
+                        priority="medium",
+                        supporting_metrics={"cpc_change": cpc_change, "ctr_change": ctr_change, "cpm_change": cpm_change},
+                        status="new"
+                    )
+                )
+            elif ctr_change >= -0.05 and cpm_change > 0.10:
+                diagnoses.append(
+                    AIRecommendation(
+                        user_id=user_uuid,
+                        ad_account_id=ad_account_uuid,
+                        entity_type="campaign",
+                        entity_id=camp.id,
+                        recommendation_type="HIGH_CPC",
+                        title=f"CPC Surge - Auction Pressure: {camp.name}",
+                        description=f"CPC increased by {cpc_change*100:.1f}% because CPM rose by {cpm_change*100:.1f}% despite stable CTR.",
+                        reason="Evidence: CPC increased, CTR stable, CPM increased.",
+                        confidence_score=0.85,
+                        priority="medium",
+                        supporting_metrics={"cpc_change": cpc_change, "cpm_change": cpm_change, "ctr_change": ctr_change},
+                        status="new"
+                    )
+                )
+
+        # ──────────────────────────────────────────
+        # 4. CPL Diagnosis (Leads Campaigns)
+        # ──────────────────────────────────────────
+        if "LEAD" in camp.objective.upper() and cpl_change > 0.15:
+            if cpc_change > 0.10:
+                if ctr_change < -0.10:
+                    diagnoses.append(
+                        AIRecommendation(
+                            user_id=user_uuid,
+                            ad_account_id=ad_account_uuid,
+                            entity_type="campaign",
+                            entity_id=camp.id,
+                            recommendation_type="HIGH_CPL",
+                            title=f"CPL Surge - Creative Issue: {camp.name}",
+                            description=f"CPL increased by {cpl_change*100:.1f}% primarily driven by CPC rising {cpc_change*100:.1f}% as a result of a {abs(ctr_change)*100:.1f}% drop in CTR.",
+                            reason="Evidence: CPL increased, CPC increased, CTR decreased, CPM stable.",
+                            confidence_score=0.91,
+                            priority="high",
+                            supporting_metrics={"cpl_change": cpl_change, "cpc_change": cpc_change, "ctr_change": ctr_change},
+                            status="new"
+                        )
+                    )
+                elif ctr_change >= -0.05 and cpm_change > 0.10:
+                    diagnoses.append(
+                        AIRecommendation(
+                            user_id=user_uuid,
+                            ad_account_id=ad_account_uuid,
+                            entity_type="campaign",
+                            entity_id=camp.id,
+                            recommendation_type="HIGH_CPL",
+                            title=f"CPL Surge - Auction Cost: {camp.name}",
+                            description=f"CPL increased by {cpl_change*100:.1f}% due to rising auction costs (CPM rose {cpm_change*100:.1f}%).",
+                            reason="Evidence: CPL increased, CPC increased, CTR stable, CPM increased.",
+                            confidence_score=0.88,
+                            priority="medium",
+                            supporting_metrics={"cpl_change": cpl_change, "cpm_change": cpm_change},
+                            status="new"
+                        )
+                    )
+            elif abs(cpc_change) <= 0.05 and abs(ctr_change) <= 0.05:
+                # Post-click conversion issue
+                diagnoses.append(
+                    AIRecommendation(
+                        user_id=user_uuid,
+                        ad_account_id=ad_account_uuid,
+                        entity_type="campaign",
+                        entity_id=camp.id,
+                        recommendation_type="LANDING_PAGE_TO_LEAD_DROP",
+                        title=f"CPL Surge - Post-Click Lead Drop: {camp.name}",
+                        description=f"CPL increased by {cpl_change*100:.1f}% despite stable CPC and CTR, because the lead conversion rate dropped.",
+                        reason="Evidence: CTR stable, CPC stable, Lead conversion rate decreased.",
+                        confidence_score=0.92,
+                        priority="high",
+                        supporting_metrics={"cpl_change": cpl_change, "cpc_change": cpc_change},
+                        status="new"
+                    )
+                )
+
+        # ──────────────────────────────────────────
+        # 5. CPA & ROAS Diagnosis (Sales Campaigns)
+        # ──────────────────────────────────────────
+        if ("SALES" in camp.objective.upper() or "CONVERSIONS" in camp.objective.upper()) and cpa_change > 0.15:
+            if ctr_change < -0.10:
+                diagnoses.append(
+                    AIRecommendation(
+                        user_id=user_uuid,
+                        ad_account_id=ad_account_uuid,
+                        entity_type="campaign",
+                        entity_id=camp.id,
+                        recommendation_type="HIGH_CPA",
+                        title=f"CPA Surge - Creative Issue: {camp.name}",
+                        description=f"CPA increased by {cpa_change*100:.1f}% because click-through CTR decreased by {abs(ctr_change)*100:.1f}%, indicating creative lag.",
+                        reason="Evidence: CPA increased, CTR decreased, CPC increased.",
+                        confidence_score=0.90,
+                        priority="high",
+                        supporting_metrics={"cpa_change": cpa_change, "ctr_change": ctr_change},
+                        status="new"
+                    )
+                )
+            elif cpc_change > 0.15:
+                diagnoses.append(
+                    AIRecommendation(
+                        user_id=user_uuid,
+                        ad_account_id=ad_account_uuid,
+                        entity_type="campaign",
+                        entity_id=camp.id,
+                        recommendation_type="HIGH_CPA",
+                        title=f"CPA Surge - Click Cost Inflation: {camp.name}",
+                        description=f"CPA increased by {cpa_change*100:.1f}% driven primarily by CPC rising {cpc_change*100:.1f}%.",
+                        reason="Evidence: CPA increased, CPC increased, CTR stable.",
+                        confidence_score=0.88,
+                        priority="medium",
+                        supporting_metrics={"cpa_change": cpa_change, "cpc_change": cpc_change},
+                        status="new"
+                    )
+                )
+
+        return diagnoses
