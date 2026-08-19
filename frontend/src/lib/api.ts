@@ -213,6 +213,28 @@ class ApiClient {
     });
   }
 
+  async getAccountMemory(adAccountId: string) {
+    return this.request<any[]>(`/recommendations/memory?ad_account_id=${adAccountId}`);
+  }
+
+  async getExperiments(adAccountId: string) {
+    return this.request<any[]>(`/recommendations/experiments?ad_account_id=${adAccountId}`);
+  }
+
+  async createExperiment(adAccountId: string, payload: any) {
+    return this.request<any>(`/recommendations/experiments?ad_account_id=${adAccountId}`, {
+      method: "POST",
+      body: payload,
+    });
+  }
+
+  async completeExperiment(experimentId: string, payload: any) {
+    return this.request<any>(`/recommendations/experiments/${experimentId}/complete`, {
+      method: "POST",
+      body: payload,
+    });
+  }
+
   // Phase 9: Billing & Subscription endpoints
   async getSubscription() {
     return this.request<{
