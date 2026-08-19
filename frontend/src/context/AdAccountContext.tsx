@@ -42,6 +42,7 @@ export function AdAccountProvider({ children }: { children: React.ReactNode }) {
           currency: acc.currency,
           timezone: acc.timezone,
           account_status: acc.account_status,
+          industry: acc.industry,
         }));
 
       setAdAccounts(activeAccounts);
