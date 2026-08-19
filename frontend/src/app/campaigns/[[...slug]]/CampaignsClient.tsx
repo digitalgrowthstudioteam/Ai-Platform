@@ -987,9 +987,15 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
               <div className="grid grid-cols-4 gap-3">
                 {[
                   { label: "Spend", val: formatCurrency(selectedAd.metrics.spend) },
-                  { label: "Conversions", val: selectedAd.metrics.purchases },
-                  { label: "CTR", val: formatPercent(selectedAd.metrics.ctr) },
-                  { label: "ROAS", val: `${selectedAd.metrics.roas.toFixed(2)}x`, highlight: true }
+                  ...((selectedAdSet?.optimization_goal?.toUpperCase().includes("CONVERSATION") || false) ? [
+                    { label: "Messaging Connections", val: selectedAd.metrics.conversations || 0 },
+                    { label: "CTR", val: formatPercent(selectedAd.metrics.ctr) },
+                    { label: "CPM", val: formatCurrency(selectedAd.metrics.cpm || 0), highlight: true }
+                  ] : [
+                    { label: "Conversions", val: selectedAd.metrics.purchases },
+                    { label: "CTR", val: formatPercent(selectedAd.metrics.ctr) },
+                    { label: "ROAS", val: `${selectedAd.metrics.roas.toFixed(2)}x`, highlight: true }
+                  ])
                 ].map((k, i) => (
                   <div key={i} className="bg-white border border-border p-3 rounded-lg text-center shadow-xs">
                     <div className="text-[8px] font-bold text-slate-400 uppercase">{k.label}</div>
@@ -1135,11 +1141,15 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
                 <div className="flex flex-wrap items-center gap-4">
                   {[
                     { label: "Spend", val: formatCurrency(selectedAdSet.metrics.spend) },
-                    { label: "CTR", val: formatPercent(selectedAdSet.metrics.ctr) },
-                    ...(!(selectedAdSet.optimization_goal?.toUpperCase().includes("CONVERSATION") || false) ? [
+                    ...((selectedAdSet.optimization_goal?.toUpperCase().includes("CONVERSATION") || false) ? [
+                      { label: "Messaging Connections", val: selectedAdSet.metrics.conversations || 0 },
+                      { label: "CTR", val: formatPercent(selectedAdSet.metrics.ctr) },
+                      { label: "CPM", val: formatCurrency(selectedAdSet.metrics.cpm || 0), highlight: true }
+                    ] : [
                       { label: "Conversions", val: selectedAdSet.metrics.purchases },
+                      { label: "CTR", val: formatPercent(selectedAdSet.metrics.ctr) },
                       { label: "ROAS", val: `${selectedAdSet.metrics.roas.toFixed(2)}x`, highlight: true }
-                    ] : [])
+                    ])
                   ].map((k, i) => (
                     <div key={i} className="bg-slate-50 border border-slate-100 p-2.5 rounded-lg text-center min-w-[90px]">
                       <div className="text-[8px] font-bold text-slate-400 uppercase">{k.label}</div>
@@ -1645,11 +1655,15 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
                 <div className="flex flex-wrap items-center gap-4">
                   {[
                     { label: "Spend", val: formatCurrency(selectedAdSet.metrics.spend) },
-                    { label: "CTR", val: formatPercent(selectedAdSet.metrics.ctr) },
-                    ...(!(selectedAdSet.optimization_goal?.toUpperCase().includes("CONVERSATION") || false) ? [
+                    ...((selectedAdSet.optimization_goal?.toUpperCase().includes("CONVERSATION") || false) ? [
+                      { label: "Messaging Connections", val: selectedAdSet.metrics.conversations || 0 },
+                      { label: "CTR", val: formatPercent(selectedAdSet.metrics.ctr) },
+                      { label: "CPM", val: formatCurrency(selectedAdSet.metrics.cpm || 0), highlight: true }
+                    ] : [
                       { label: "Conversions", val: selectedAdSet.metrics.purchases },
+                      { label: "CTR", val: formatPercent(selectedAdSet.metrics.ctr) },
                       { label: "ROAS", val: `${selectedAdSet.metrics.roas.toFixed(2)}x`, highlight: true }
-                    ] : [])
+                    ])
                   ].map((k, i) => (
                     <div key={i} className="bg-slate-50 border border-slate-100 p-2.5 rounded-lg text-center min-w-[90px]">
                       <div className="text-[8px] font-bold text-slate-400 uppercase">{k.label}</div>

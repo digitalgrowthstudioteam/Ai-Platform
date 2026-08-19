@@ -39,6 +39,7 @@ class CampaignMetrics(BaseModel):
     cpc: float
     cpm: float
     roas: float
+    conversations: Optional[int] = 0
 
 
 class CampaignItemResponse(BaseModel):
@@ -120,6 +121,23 @@ async def list_campaigns(
     res = await db.execute(stmt)
     rows = res.all()
 
+    # Query and sum conversations from actions JSON daily logs
+    daily_stmt = (
+        select(CampaignDailyMetrics.campaign_id, CampaignDailyMetrics.actions)
+        .join(Campaign, CampaignDailyMetrics.campaign_id == Campaign.id)
+        .where(Campaign.ad_account_id == ad_acc.id)
+        .where(CampaignDailyMetrics.date >= start_date)
+        .where(CampaignDailyMetrics.date <= end_date)
+    )
+    daily_res = await db.execute(daily_stmt)
+    daily_rows = daily_res.all()
+    
+    conversations_map = {}
+    for r in daily_rows:
+        c_id = r.campaign_id
+        actions = r.actions or {}
+        conversations_map[c_id] = conversations_map.get(c_id, 0) + int(actions.get("conversations", 0))
+
     campaigns = []
     for row in rows:
         camp = row.Campaign
@@ -134,6 +152,7 @@ async def list_campaigns(
         cpc = (spend / clicks) if clicks > 0 else 0.0
         cpm = (spend / impressions * 1000) if impressions > 0 else 0.0
         roas = (revenue / spend) if spend > 0 else 0.0
+        conversations = conversations_map.get(camp.id, 0)
 
         campaigns.append(
             CampaignItemResponse(
@@ -155,6 +174,7 @@ async def list_campaigns(
                     cpc=cpc,
                     cpm=cpm,
                     roas=roas,
+                    conversations=conversations,
                 ),
             )
         )
