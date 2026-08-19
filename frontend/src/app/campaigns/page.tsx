@@ -1121,6 +1121,21 @@ export default function CampaignsPage() {
         /* 4. Campaign Detail Tabbed View (Overview / Tabs Cockpit) */
         /* ──────────────────────────────────────────────────────────── */
         <div className="space-y-6">
+          {/* Breadcrumb / Back Navigation */}
+          <div className="flex justify-between items-center bg-white p-4 border border-border rounded-lg shadow-xs">
+            <div className="flex items-center gap-2 text-xs text-slate-400 font-bold">
+              <button onClick={() => { setSelectedAd(null); setSelectedAdSet(null); setSelectedCampaign(null); }} className="hover:text-slate-600 transition">Campaigns</button>
+              <span>/</span>
+              <span className="text-slate-800">{selectedCampaign.name}</span>
+            </div>
+            <button
+              onClick={() => { setSelectedAd(null); setSelectedAdSet(null); setSelectedCampaign(null); }}
+              className="flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-slate-800 transition cursor-pointer"
+            >
+              <ArrowLeft size={14} /> Back to Campaigns
+            </button>
+          </div>
+
           {/* Campaign Header Details */}
           <div className="card border border-border bg-white shadow-sm rounded-lg p-6 space-y-4">
             <div className="flex flex-wrap justify-between items-start gap-4">
