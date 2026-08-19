@@ -27,7 +27,11 @@ Set-Location -Path "$PSScriptRoot"
 $oldCreds = $env:GOOGLE_APPLICATION_CREDENTIALS
 $env:GOOGLE_APPLICATION_CREDENTIALS = ""
 
-npx --yes firebase-tools deploy --only hosting --non-interactive
+Write-Host "🔥 Deploying to Staging (digital-growth-studio)..." -ForegroundColor Cyan
+npx --yes firebase-tools deploy --only hosting:staging --project digital-growth-studio --non-interactive
+
+Write-Host "🔥 Deploying to Production (partner-dgs)..." -ForegroundColor Cyan
+npx --yes firebase-tools deploy --only hosting:prod --project partner-dgs --non-interactive
 
 # Restore credentials
 $env:GOOGLE_APPLICATION_CREDENTIALS = $oldCreds
