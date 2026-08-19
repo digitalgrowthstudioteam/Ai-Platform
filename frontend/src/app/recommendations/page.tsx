@@ -161,6 +161,61 @@ export default function RecommendationsPage() {
     );
   }
 
+  const getDnaMap = () => {
+    // Check if there are any validated video memory keys
+    const hasVideoMemory = memories.some(m => m.pattern_key === "VIDEO_VS_STATIC" || m.description.toLowerCase().includes("video"));
+    
+    // Resolve Best Format
+    let bestFormat = "Single Image (1:1)";
+    if (hasVideoMemory) {
+      bestFormat = "Short Video (15-22s)";
+    } else if (memories.some(m => m.pattern_key === "CAROUSEL_VS_SINGLE_IMAGE")) {
+      bestFormat = "Carousel Ads";
+    }
+
+    // Resolve Best Hook
+    let bestHook = "Benefit-focused Hook";
+    if (memories.some(m => m.pattern_key === "OFFER_TEXT_OVERLAY")) {
+      bestHook = "Offer Text Overlay";
+    } else if (memories.some(m => m.pattern_key === "PROBLEM_HOOK_VS_GENERIC")) {
+      bestHook = "Problem-focused Hook";
+    }
+
+    // Resolve Best Headline
+    let bestHeadline = "Outcome-focused";
+    if (memories.some(m => m.description.toLowerCase().includes("curiosity"))) {
+      bestHeadline = "Curiosity-driven";
+    }
+
+    // Resolve Best Placement
+    let bestPlacement = "Instagram Mobile Feed";
+    if (hasVideoMemory && memories.some(m => m.pattern_key === "REELS_CPL_EFFICIENCY" || m.pattern_key === "REELS_CONV_EFFICIENCY")) {
+      bestPlacement = "Instagram Reels";
+    } else if (memories.some(m => m.pattern_key === "FEED_CPL_EFFICIENCY" || m.pattern_key === "FEED_CONV_EFFICIENCY")) {
+      bestPlacement = "Instagram Mobile Feed";
+    }
+
+    // Resolve Strongest CTA
+    const isMsg = recs.some(r => r.objective === "Conversations" || (r.title && r.title.toLowerCase().includes("conversation"))) ||
+      memories.some(mem => mem.pattern_key.toLowerCase().includes("conversation") || mem.description.toLowerCase().includes("whatsapp")) ||
+      (selectedAccount?.name || "").toLowerCase().includes("cake");
+      
+    let strongestCta = isMsg ? "\"Send Message\" (WhatsApp)" : "\"Learn More\" Button";
+
+    return {
+      bestFormat,
+      bestHook,
+      bestHeadline,
+      bestPlacement,
+      bestAudience: "Broad targeting pool",
+      fatigueRate: "~14 Days wearout pacing",
+      strongestCta,
+      scope: "Active 90d window"
+    };
+  };
+
+  const dnaMap = getDnaMap();
+
   return (
     <div className="animate-fade-in space-y-6">
       {/* Page Header */}
@@ -483,35 +538,35 @@ export default function RecommendationsPage() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-xs">
               <div className="space-y-1 bg-white/5 p-3.5 rounded border border-white/10">
                 <span className="text-white/40 block font-bold uppercase tracking-wider text-[10px]">Best Format</span>
-                <span className="text-sm font-black text-white">Short Video (15-22s)</span>
+                <span className="text-sm font-black text-white">{dnaMap.bestFormat}</span>
               </div>
               <div className="space-y-1 bg-white/5 p-3.5 rounded border border-white/10">
                 <span className="text-white/40 block font-bold uppercase tracking-wider text-[10px]">Best Hook Structure</span>
-                <span className="text-sm font-black text-white">Problem ➔ Solution</span>
+                <span className="text-sm font-black text-white">{dnaMap.bestHook}</span>
               </div>
               <div className="space-y-1 bg-white/5 p-3.5 rounded border border-white/10">
                 <span className="text-white/40 block font-bold uppercase tracking-wider text-[10px]">Best Headline format</span>
-                <span className="text-sm font-black text-white">Outcome-focused</span>
+                <span className="text-sm font-black text-white">{dnaMap.bestHeadline}</span>
               </div>
               <div className="space-y-1 bg-white/5 p-3.5 rounded border border-white/10">
                 <span className="text-white/40 block font-bold uppercase tracking-wider text-[10px]">Best Placement</span>
-                <span className="text-sm font-black text-white">Instagram Reels</span>
+                <span className="text-sm font-black text-white">{dnaMap.bestPlacement}</span>
               </div>
               <div className="space-y-1 bg-white/5 p-3.5 rounded border border-white/10">
                 <span className="text-white/40 block font-bold uppercase tracking-wider text-[10px]">Best Audience Segment</span>
-                <span className="text-sm font-black text-white">Broad 25–44 target pool</span>
+                <span className="text-sm font-black text-white">{dnaMap.bestAudience}</span>
               </div>
               <div className="space-y-1 bg-white/5 p-3.5 rounded border border-white/10">
                 <span className="text-white/40 block font-bold uppercase tracking-wider text-[10px]">Avg Fatigue Rate</span>
-                <span className="text-sm font-black text-white">~18 Days wearout pacing</span>
+                <span className="text-sm font-black text-white">{dnaMap.fatigueRate}</span>
               </div>
               <div className="space-y-1 bg-white/5 p-3.5 rounded border border-white/10">
                 <span className="text-white/40 block font-bold uppercase tracking-wider text-[10px]">Strongest Call-To-Action</span>
-                <span className="text-sm font-black text-white">"Learn More" Button</span>
+                <span className="text-sm font-black text-white">{dnaMap.strongestCta}</span>
               </div>
               <div className="space-y-1 bg-white/5 p-3.5 rounded border border-white/10">
                 <span className="text-white/40 block font-bold uppercase tracking-wider text-[10px]">Analysis Scope</span>
-                <span className="text-sm font-black text-white">Active 90d window</span>
+                <span className="text-sm font-black text-white">{dnaMap.scope}</span>
               </div>
             </div>
           </div>
@@ -627,11 +682,19 @@ export default function RecommendationsPage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs bg-slate-50 p-3 rounded-lg border border-border/40 font-semibold text-slate-600">
                           <div>
                             <span className="text-[9px] text-slate-400 font-bold block uppercase tracking-wide">Control entity</span>
-                            <span className="text-slate-800">Original Ads Copy (Control A)</span>
+                            <span className="text-slate-800">
+                              {exp.name.toLowerCase().includes("video") 
+                                ? "Original Ads Copy (Control A)" 
+                                : "Generic Product Discount Offer (Control A)"}
+                            </span>
                           </div>
                           <div>
                             <span className="text-[9px] text-slate-400 font-bold block uppercase tracking-wide">Variant test entity</span>
-                            <span className="text-slate-800">New Opening UGC Video Hook (Variant B)</span>
+                            <span className="text-slate-800">
+                              {exp.name.toLowerCase().includes("video") 
+                                ? "New Opening UGC Video Hook (Variant B)" 
+                                : "Verified Customer Cake Testimonials Overlay (Variant B)"}
+                            </span>
                           </div>
                           <div className="md:col-span-2">
                             <span className="text-[9px] text-slate-400 font-bold block uppercase tracking-wide">Hypothesis Statement</span>
