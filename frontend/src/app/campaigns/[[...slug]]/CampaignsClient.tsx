@@ -1362,48 +1362,55 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
                   <span className="text-xs text-slate-400 font-medium">{ads.filter(ad => ad.adset_name === selectedAdSet.name).length} Ads Active</span>
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="min-w-full text-xs text-left divide-y divide-border">
-                    <thead className="bg-slate-50/50">
-                      <tr className="text-slate-400 font-bold uppercase border-b border-border">
-                        <th className="p-4">Ad Name</th>
-                        <th className="p-4">Status</th>
-                        <th className="p-4 text-right">Spend</th>
-                        <th className="p-4 text-right">CTR</th>
-                        <th className="p-4 text-right">ROAS</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border font-medium text-slate-700">
-                      {ads.filter(ad => ad.adset_name === selectedAdSet.name).map((ad, idx) => (
-                        <tr 
-                          key={idx} 
-                          onClick={() => handleSelectAdFromList(ad)}
-                          className="hover:bg-slate-50 transition cursor-pointer"
-                        >
-                          <td className="p-4 flex items-center gap-3">
-                            {ad.creative?.image_url ? (
-                              <img src={ad.creative.image_url} alt="" className="w-10 h-10 object-cover rounded border border-border shrink-0" />
-                            ) : (
-                              <div className="w-10 h-10 bg-slate-100 rounded border border-border flex items-center justify-center shrink-0 text-slate-400">
-                                <ImageIcon size={16} />
-                              </div>
-                            )}
-                            <div>
-                              <div className="font-bold text-slate-800">{ad.name}</div>
-                              <div className="text-[10px] text-slate-400 mt-0.5">ID: {ad.meta_ad_id}</div>
-                            </div>
-                          </td>
-                          <td className="p-4">
-                            <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${ad.status === "ACTIVE" ? "text-green-600 bg-green-50" : "text-slate-500 bg-slate-100"}`}>
-                              {ad.status}
-                            </span>
-                          </td>
-                          <td className="p-4 text-right font-semibold">{formatCurrency(ad.metrics.spend)}</td>
-                          <td className="p-4 text-right text-slate-500">{formatPercent(ad.metrics.ctr)}</td>
-                          <td className="p-4 text-right text-green-600 font-bold">{ad.metrics.roas > 0 ? `${ad.metrics.roas.toFixed(2)}x` : "—"}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  {(() => {
+                    const isAdSetConversations = selectedAdSet?.optimization_goal?.toUpperCase().includes("CONVERSATION");
+                    return (
+                      <table className="min-w-full text-xs text-left divide-y divide-border">
+                        <thead className="bg-slate-50/50">
+                          <tr className="text-slate-400 font-bold uppercase border-b border-border">
+                            <th className="p-4">Ad Name</th>
+                            <th className="p-4">Status</th>
+                            <th className="p-4 text-right">Spend</th>
+                            <th className="p-4 text-right">CTR</th>
+                            <th className="p-4 text-right">{isAdSetConversations ? "CPM" : "ROAS"}</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border font-medium text-slate-700">
+                          {ads.filter(ad => ad.adset_name === selectedAdSet.name).map((ad, idx) => (
+                            <tr 
+                              key={idx} 
+                              onClick={() => handleSelectAdFromList(ad)}
+                              className="hover:bg-slate-50 transition cursor-pointer"
+                            >
+                              <td className="p-4 flex items-center gap-3">
+                                {ad.creative?.image_url ? (
+                                  <img src={ad.creative.image_url} alt="" className="w-10 h-10 object-cover rounded border border-border shrink-0" />
+                                ) : (
+                                  <div className="w-10 h-10 bg-slate-100 rounded border border-border flex items-center justify-center shrink-0 text-slate-400">
+                                    <ImageIcon size={16} />
+                                  </div>
+                                )}
+                                <div>
+                                  <div className="font-bold text-slate-800">{ad.name}</div>
+                                  <div className="text-[10px] text-slate-400 mt-0.5">ID: {ad.meta_ad_id}</div>
+                                </div>
+                              </td>
+                              <td className="p-4">
+                                <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${ad.status === "ACTIVE" ? "text-green-600 bg-green-50" : "text-slate-500 bg-slate-100"}`}>
+                                  {ad.status}
+                                </span>
+                              </td>
+                              <td className="p-4 text-right font-semibold">{formatCurrency(ad.metrics.spend)}</td>
+                              <td className="p-4 text-right text-slate-500">{formatPercent(ad.metrics.ctr)}</td>
+                              <td className={`p-4 text-right font-bold ${isAdSetConversations ? "text-slate-700" : "text-green-600"}`}>
+                                {isAdSetConversations ? formatCurrency(ad.metrics.cpm || 0) : (ad.metrics.roas > 0 ? `${ad.metrics.roas.toFixed(2)}x` : "—")}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    );
+                  })()}
                 </div>
               </div>
             )}
@@ -1753,37 +1760,44 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
                 <div className="card border border-border bg-white shadow-sm rounded-lg p-5 space-y-3">
                   <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Active Ads in this Ad Set ({ads.filter(ad => ad.adset_name === selectedAdSet.name).length})</h4>
                   <div className="overflow-x-auto">
-                    <table className="min-w-full text-xs text-left divide-y divide-border">
-                      <thead className="bg-slate-50/50">
-                        <tr className="text-[10px] font-bold text-slate-400 uppercase border-b border-border">
-                          <th className="p-2">Ad Name</th>
-                          <th className="p-2 text-right">Spend</th>
-                          <th className="p-2 text-right">CTR</th>
-                          <th className="p-2 text-right">ROAS</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {ads.filter(ad => ad.adset_name === selectedAdSet.name).map((ad, idx) => (
-                          <tr 
-                            key={idx} 
-                            onClick={() => handleSelectAdFromList(ad)}
-                            className="hover:bg-slate-50 transition cursor-pointer"
-                          >
-                            <td className="p-2 font-bold text-slate-700 flex items-center gap-2">
-                              {ad.creative?.image_url ? (
-                                <img src={ad.creative.image_url} alt="" className="w-8 h-8 object-cover rounded border border-border shrink-0" />
-                              ) : (
-                                <div className="w-8 h-8 bg-slate-100 rounded border border-border flex items-center justify-center shrink-0 text-slate-400"><ImageIcon size={12} /></div>
-                              )}
-                              <span className="truncate max-w-[200px]">{ad.name}</span>
-                            </td>
-                            <td className="p-2 text-right font-semibold">{formatCurrency(ad.metrics.spend)}</td>
-                            <td className="p-2 text-right">{formatPercent(ad.metrics.ctr)}</td>
-                            <td className="p-2 text-right text-green-600 font-bold">{ad.metrics.roas.toFixed(2)}x</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                    {(() => {
+                      const isAdSetConversations = selectedAdSet?.optimization_goal?.toUpperCase().includes("CONVERSATION");
+                      return (
+                        <table className="min-w-full text-xs text-left divide-y divide-border">
+                          <thead className="bg-slate-50/50">
+                            <tr className="text-[10px] font-bold text-slate-400 uppercase border-b border-border">
+                              <th className="p-2">Ad Name</th>
+                              <th className="p-2 text-right">Spend</th>
+                              <th className="p-2 text-right">CTR</th>
+                              <th className="p-2 text-right">{isAdSetConversations ? "CPM" : "ROAS"}</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {ads.filter(ad => ad.adset_name === selectedAdSet.name).map((ad, idx) => (
+                              <tr 
+                                key={idx} 
+                                onClick={() => handleSelectAdFromList(ad)}
+                                className="hover:bg-slate-50 transition cursor-pointer"
+                              >
+                                <td className="p-2 font-bold text-slate-700 flex items-center gap-2">
+                                  {ad.creative?.image_url ? (
+                                    <img src={ad.creative.image_url} alt="" className="w-8 h-8 object-cover rounded border border-border shrink-0" />
+                                  ) : (
+                                    <div className="w-8 h-8 bg-slate-100 rounded border border-border flex items-center justify-center shrink-0 text-slate-400"><ImageIcon size={12} /></div>
+                                  )}
+                                  <span className="truncate max-w-[200px]">{ad.name}</span>
+                                </td>
+                                <td className="p-2 text-right font-semibold">{formatCurrency(ad.metrics.spend)}</td>
+                                <td className="p-2 text-right">{formatPercent(ad.metrics.ctr)}</td>
+                                <td className={`p-2 text-right font-bold ${isAdSetConversations ? "text-slate-700" : "text-green-600"}`}>
+                                  {isAdSetConversations ? formatCurrency(ad.metrics.cpm || 0) : `${ad.metrics.roas.toFixed(2)}x`}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>
@@ -2025,34 +2039,46 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
                   </div>
 
                   <div className="overflow-x-auto">
-                    <table className="min-w-full text-xs text-left divide-y divide-border">
-                      <thead className="bg-slate-50/50">
-                        <tr className="text-[10px] font-bold text-slate-400 uppercase border-b border-border">
-                          <th className="p-2">Ad Set Name</th>
-                          <th className="p-2">Status</th>
-                          <th className="p-2 text-right">Spend</th>
-                          <th className="p-2 text-right">CTR</th>
-                          <th className="p-2 text-right">Conversions</th>
-                          <th className="p-2 text-right">ROAS</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {adSets.map((as, idx) => (
-                          <tr key={idx} onClick={() => handleSelectAdSetFromList(as)} className="hover:bg-slate-50 transition cursor-pointer">
-                            <td className="p-2 font-bold text-slate-700">{as.name}</td>
-                            <td className="p-2 uppercase">
-                              <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${as.status === "ACTIVE" ? "text-green-600 bg-green-50" : "text-slate-500 bg-slate-100"}`}>
-                                {as.status}
-                              </span>
-                            </td>
-                            <td className="p-2 text-right font-semibold">{formatCurrency(as.metrics.spend)}</td>
-                            <td className="p-2 text-right">{formatPercent(as.metrics.ctr)}</td>
-                            <td className="p-2 text-right">{as.metrics.purchases}</td>
-                            <td className="p-2 text-right font-bold text-slate-700">{as.metrics.roas.toFixed(2)}x</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                    {(() => {
+                      const hasConversations = adSets.some(as => as.optimization_goal?.toUpperCase().includes("CONVERSATION"));
+                      return (
+                        <table className="min-w-full text-xs text-left divide-y divide-border">
+                          <thead className="bg-slate-50/50">
+                            <tr className="text-[10px] font-bold text-slate-400 uppercase border-b border-border">
+                              <th className="p-2">Ad Set Name</th>
+                              <th className="p-2">Status</th>
+                              <th className="p-2 text-right">Spend</th>
+                              <th className="p-2 text-right">CTR</th>
+                              <th className="p-2 text-right">{hasConversations ? "Messaging Connections" : "Conversions"}</th>
+                              <th className="p-2 text-right">{hasConversations ? "CPM" : "ROAS"}</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {adSets.map((as, idx) => {
+                              const isAdSetConversations = as.optimization_goal?.toUpperCase().includes("CONVERSATION");
+                              return (
+                                <tr key={idx} onClick={() => handleSelectAdSetFromList(as)} className="hover:bg-slate-50 transition cursor-pointer">
+                                  <td className="p-2 font-bold text-slate-700">{as.name}</td>
+                                  <td className="p-2 uppercase">
+                                    <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${as.status === "ACTIVE" ? "text-green-600 bg-green-50" : "text-slate-500 bg-slate-100"}`}>
+                                      {as.status}
+                                    </span>
+                                  </td>
+                                  <td className="p-2 text-right font-semibold">{formatCurrency(as.metrics.spend)}</td>
+                                  <td className="p-2 text-right">{formatPercent(as.metrics.ctr)}</td>
+                                  <td className="p-2 text-right">
+                                    {isAdSetConversations ? (as.metrics.conversations || 0) : as.metrics.purchases}
+                                  </td>
+                                  <td className={`p-2 text-right font-bold ${isAdSetConversations ? "text-slate-700" : "text-green-600"}`}>
+                                    {isAdSetConversations ? formatCurrency(as.metrics.cpm || 0) : `${as.metrics.roas.toFixed(2)}x`}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      );
+                    })()}
                   </div>
                 </div>
 
@@ -2151,46 +2177,58 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
             {activeTab === "adsets" && (
               <div className="card border border-border bg-white shadow-sm rounded-lg overflow-hidden">
                 <div className="overflow-x-auto">
-                  <table className="min-w-full text-xs text-left divide-y divide-border">
-                    <thead className="bg-slate-50/50">
-                      <tr className="text-subtle font-bold uppercase tracking-wider border-b border-border">
-                        <th className="p-4">Ad Set Details</th>
-                        <th className="p-4 text-right">Spend</th>
-                        <th className="p-4 text-right">Impressions</th>
-                        <th className="p-4 text-right">Clicks</th>
-                        <th className="p-4 text-right">CTR</th>
-                        <th className="p-4 text-right">Conversions</th>
-                        <th className="p-4 text-right">ROAS</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border font-medium text-slate-700">
-                      {adSets.map((as, idx) => (
-                        <tr 
-                          key={idx} 
-                          onClick={() => handleSelectAdSetFromList(as)}
-                          className="hover:bg-slate-50 transition cursor-pointer"
-                        >
-                          <td className="p-4">
-                            <div className="font-bold text-sm text-slate-800">{as.name}</div>
-                            <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                              <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${as.status === "ACTIVE" ? "text-green-600 bg-green-50" : "text-slate-500 bg-slate-100"}`}>
-                                {as.status}
-                              </span>
-                              <span className="text-[9px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded font-bold uppercase">
-                                {as.optimization_goal.replace(/_/g, " ")}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="p-4 text-right font-semibold">{formatCurrency(as.metrics.spend)}</td>
-                          <td className="p-4 text-right">{formatNumber(as.metrics.impressions)}</td>
-                          <td className="p-4 text-right">{formatNumber(as.metrics.clicks)}</td>
-                          <td className="p-4 text-right">{formatPercent(as.metrics.ctr)}</td>
-                          <td className="p-4 text-right">{as.metrics.purchases}</td>
-                          <td className="p-4 text-right text-green-600 font-bold">{as.metrics.roas.toFixed(2)}x</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  {(() => {
+                    const hasConversations = adSets.some(as => as.optimization_goal?.toUpperCase().includes("CONVERSATION"));
+                    return (
+                      <table className="min-w-full text-xs text-left divide-y divide-border">
+                        <thead className="bg-slate-50/50">
+                          <tr className="text-subtle font-bold uppercase tracking-wider border-b border-border">
+                            <th className="p-4">Ad Set Details</th>
+                            <th className="p-4 text-right">Spend</th>
+                            <th className="p-4 text-right">Impressions</th>
+                            <th className="p-4 text-right">Clicks</th>
+                            <th className="p-4 text-right">CTR</th>
+                            <th className="p-4 text-right">{hasConversations ? "Messaging Connections" : "Conversions"}</th>
+                            <th className="p-4 text-right">{hasConversations ? "CPM" : "ROAS"}</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border font-medium text-slate-700">
+                          {adSets.map((as, idx) => {
+                            const isAdSetConversations = as.optimization_goal?.toUpperCase().includes("CONVERSATION");
+                            return (
+                              <tr 
+                                key={idx} 
+                                onClick={() => handleSelectAdSetFromList(as)}
+                                className="hover:bg-slate-50 transition cursor-pointer"
+                              >
+                                <td className="p-4">
+                                  <div className="font-bold text-sm text-slate-800">{as.name}</div>
+                                  <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                                    <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${as.status === "ACTIVE" ? "text-green-600 bg-green-50" : "text-slate-500 bg-slate-100"}`}>
+                                      {as.status}
+                                    </span>
+                                    <span className="text-[9px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded font-bold uppercase">
+                                      {as.optimization_goal.replace(/_/g, " ")}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td className="p-4 text-right font-semibold">{formatCurrency(as.metrics.spend)}</td>
+                                <td className="p-4 text-right">{formatNumber(as.metrics.impressions)}</td>
+                                <td className="p-4 text-right">{formatNumber(as.metrics.clicks)}</td>
+                                <td className="p-4 text-right">{formatPercent(as.metrics.ctr)}</td>
+                                <td className="p-4 text-right">
+                                  {isAdSetConversations ? (as.metrics.conversations || 0) : as.metrics.purchases}
+                                </td>
+                                <td className={`p-4 text-right font-bold ${isAdSetConversations ? "text-slate-700" : "text-green-600"}`}>
+                                  {isAdSetConversations ? formatCurrency(as.metrics.cpm || 0) : `${as.metrics.roas.toFixed(2)}x`}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    );
+                  })()}
                 </div>
               </div>
             )}
