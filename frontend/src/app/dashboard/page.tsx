@@ -78,24 +78,35 @@ export default function OverviewPage() {
     fetchSub();
   }, []);
 
-  const checkDateRangeLimit = (start: Date, end: Date) => {
-    const diffTime = Math.abs(end.getTime() - start.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
+  const getSubscriptionLimit = () => {
     let limit = 7; // default trial
-    let nextPlan = "Starter";
     if (subscription) {
       if (subscription.status === "trialing") {
         limit = 7;
-        nextPlan = "Starter";
       } else if (subscription.plan === "starter") {
         limit = 90;
-        nextPlan = "Pro";
       } else if (subscription.plan === "growth") {
         limit = 90;
-        nextPlan = "Pro";
       } else if (subscription.plan === "pro" || subscription.plan === "agency") {
         limit = 99999; // lifetime
+      }
+    }
+    return limit;
+  };
+
+  const checkDateRangeLimit = (start: Date, end: Date) => {
+    const diffTime = Math.abs(end.getTime() - start.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const limit = getSubscriptionLimit();
+    
+    let nextPlan = "Starter";
+    if (subscription) {
+      if (subscription.status === "trialing") {
+        nextPlan = "Starter";
+      } else if (subscription.plan === "starter") {
+        nextPlan = "Pro";
+      } else if (subscription.plan === "growth") {
+        nextPlan = "Pro";
       }
     }
 
@@ -129,6 +140,15 @@ export default function OverviewPage() {
         break;
       case "7d":
         start.setDate(end.getDate() - 6);
+        break;
+      case "14d":
+        start.setDate(end.getDate() - 13);
+        break;
+      case "30d":
+        start.setDate(end.getDate() - 29);
+        break;
+      case "90d":
+        start.setDate(end.getDate() - 89);
         break;
       case "last_week": {
         const day = end.getDay();
@@ -383,6 +403,14 @@ export default function OverviewPage() {
               <input 
                 type="date" 
                 value={customStartDate} 
+                min={(() => {
+                  const limit = getSubscriptionLimit();
+                  if (limit >= 99999) return undefined;
+                  const d = new Date();
+                  d.setDate(d.getDate() - limit);
+                  return d.toISOString().split("T")[0];
+                })()}
+                max={new Date().toISOString().split("T")[0]}
                 onChange={(e) => {
                   const val = e.target.value;
                   setCustomStartDate(val);
@@ -396,6 +424,14 @@ export default function OverviewPage() {
               <input 
                 type="date" 
                 value={customEndDate} 
+                min={(() => {
+                  const limit = getSubscriptionLimit();
+                  if (limit >= 99999) return undefined;
+                  const d = new Date();
+                  d.setDate(d.getDate() - limit);
+                  return d.toISOString().split("T")[0];
+                })()}
+                max={new Date().toISOString().split("T")[0]}
                 onChange={(e) => {
                   const val = e.target.value;
                   setCustomEndDate(val);
@@ -424,19 +460,27 @@ export default function OverviewPage() {
             }}
             className="btn btn-outline flex items-center gap-2 py-2 px-4 border border-border text-sm font-semibold rounded-md bg-white cursor-pointer hover:bg-slate-50 outline-none"
           >
-            <option value="today">Today</option>
-            <option value="yesterday">Yesterday</option>
-            <option value="3d">Last 3 Days</option>
-            <option value="5d">Last 5 Days</option>
-            <option value="7d">Last 7 Days</option>
-            <option value="30d">Last 30 Days</option>
-            <option value="last_week">Last Week</option>
-            <option value="last_month">Last Month</option>
-            <option value="current_month">Current Month</option>
-            <option value="last_year">Last Year</option>
-            <option value="this_year">This Year</option>
-            <option value="lifetime">Lifetime</option>
-            <option value="custom">Custom Range</option>
+            {[
+              { value: "today", label: "Today", days: 1 },
+              { value: "yesterday", label: "Yesterday", days: 2 },
+              { value: "3d", label: "Last 3 Days", days: 3 },
+              { value: "5d", label: "Last 5 Days", days: 5 },
+              { value: "7d", label: "Last 7 Days", days: 7 },
+              { value: "14d", label: "Last 14 Days", days: 14 },
+              { value: "30d", label: "Last 30 Days", days: 30 },
+              { value: "90d", label: "Last 90 Days", days: 90 },
+              { value: "last_week", label: "Last Week", days: 14 },
+              { value: "last_month", label: "Last Month", days: 60 },
+              { value: "current_month", label: "Current Month", days: 31 },
+              { value: "last_year", label: "Last Year", days: 365 },
+              { value: "this_year", label: "This Year", days: 365 },
+              { value: "lifetime", label: "Lifetime", days: 99999 },
+              { value: "custom", label: "Custom Range", days: 0 },
+            ]
+              .filter(p => p.value === "custom" || p.days <= getSubscriptionLimit())
+              .map(p => (
+                <option key={p.value} value={p.value}>{p.label}</option>
+              ))}
           </select>
 
           <div className="text-xs font-semibold text-slate-500 bg-slate-100 py-2 px-3 rounded-md border border-border flex items-center gap-1.5">
