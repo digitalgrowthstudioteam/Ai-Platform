@@ -233,8 +233,15 @@ export default function CreativeAnalyzerPage() {
       const startStr = start.toISOString().split("T")[0];
       const endStr = end.toISOString().split("T")[0];
 
-      // Fetch live ads
+      // Fetch live ads and feature records
       const ads = await api.getAds(selectedAccount.id, startStr, endStr);
+      let features: any[] = [];
+      try {
+        features = await api.getFeatures(selectedAccount.id);
+      } catch (err) {
+        console.error("Failed to load creative features:", err);
+      }
+
       const mocks = getAugmentedMockData();
       
       if (!ads || ads.length === 0) {
@@ -274,10 +281,25 @@ export default function CreativeAnalyzerPage() {
 
           const cId = cr.meta_creative_id || cr.id;
           const cType = (cr.creative_type || "IMAGE").toUpperCase();
+          const adFeature = features.find(f => f.ad_id === ad.id || f.creative_type === cType);
 
           if (!creativeGroups[cId]) {
-            // Apply mock template DNA to make it visually spectacular
+            // Apply mock template DNA blended with DB features
             const mockDnaTemplate = mocks[index % mocks.length];
+            const resolvedDna = {
+              format: adFeature?.creative_type || mockDnaTemplate.dna.format,
+              aspect: mockDnaTemplate.dna.aspect,
+              duration: adFeature?.creative_length ? `${adFeature.creative_length}s` : mockDnaTemplate.dna.duration,
+              hook: adFeature?.hook_type ? `${adFeature.hook_type.charAt(0).toUpperCase() + adFeature.hook_type.slice(1)}-focused` : mockDnaTemplate.dna.hook,
+              visuals: mockDnaTemplate.dna.visuals,
+              copy: {
+                hook: adFeature?.hook_type ? `${adFeature.hook_type.charAt(0).toUpperCase() + adFeature.hook_type.slice(1)} Hook` : mockDnaTemplate.dna.copy.hook,
+                benefit: adFeature?.has_social_proof ? "Social Proof element present" : (adFeature?.has_price ? "Price detail highlighted" : mockDnaTemplate.dna.copy.benefit),
+                offer: adFeature?.has_offer ? "Offer details configured" : "None",
+                cta: adFeature?.cta_type || mockDnaTemplate.dna.copy.cta
+              }
+            };
+
             creativeGroups[cId] = {
               id: cId,
               creative: cr,
@@ -290,7 +312,7 @@ export default function CreativeAnalyzerPage() {
               score: mockDnaTemplate.score,
               lifecycle: mockDnaTemplate.lifecycle,
               fatigue: mockDnaTemplate.fatigue,
-              dna: mockDnaTemplate.dna
+              dna: resolvedDna
             };
           }
           creativeGroups[cId].spend += ad.metrics.spend;

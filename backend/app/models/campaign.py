@@ -109,6 +109,23 @@ class AdSet(BaseModel):
         String(100),
         nullable=False,
     )
+    motive: Mapped[Optional[str]] = mapped_column(
+        String(100),
+        nullable=True,
+    )
+    performance_goal: Mapped[Optional[str]] = mapped_column(
+        String(100),
+        nullable=True,
+        index=True,
+    )
+    optimization_event: Mapped[Optional[str]] = mapped_column(
+        String(100),
+        nullable=True,
+    )
+    performance_goal_profile_id: Mapped[Optional[str]] = mapped_column(
+        String(100),
+        nullable=True,
+    )
     daily_budget: Mapped[Optional[float]] = mapped_column(
         Numeric(precision=14, scale=2),
         nullable=True,

@@ -135,9 +135,9 @@ class MetaSyncService:
 
         # Create ad sets
         mock_adsets = [
-            {"id": "adset_111", "campaign_id": "camp_111", "name": "Broad Audience (India)", "status": "ACTIVE", "optimization_goal": "OFFSITE_CONVERSIONS", "billing_event": "IMPRESSIONS", "daily_budget": 1000.00},
-            {"id": "adset_112", "campaign_id": "camp_111", "name": "Lookalike (1%) Purchase", "status": "ACTIVE", "optimization_goal": "OFFSITE_CONVERSIONS", "billing_event": "IMPRESSIONS", "daily_budget": 500.00},
-            {"id": "adset_221", "campaign_id": "camp_222", "name": "Website Visitors 30d", "status": "ACTIVE", "optimization_goal": "OFFSITE_CONVERSIONS", "billing_event": "IMPRESSIONS", "daily_budget": 800.00},
+            {"id": "adset_111", "campaign_id": "camp_111", "name": "Broad Audience (India)", "status": "ACTIVE", "optimization_goal": "OFFSITE_CONVERSIONS", "billing_event": "IMPRESSIONS", "daily_budget": 1000.00, "motive": "website", "performance_goal": "purchases", "optimization_event": "purchase", "performance_goal_profile_id": "purchases"},
+            {"id": "adset_112", "campaign_id": "camp_111", "name": "Lookalike (1%) Purchase", "status": "ACTIVE", "optimization_goal": "OFFSITE_CONVERSIONS", "billing_event": "IMPRESSIONS", "daily_budget": 500.00, "motive": "website", "performance_goal": "purchases", "optimization_event": "purchase", "performance_goal_profile_id": "purchases"},
+            {"id": "adset_221", "campaign_id": "camp_222", "name": "Website Visitors 30d", "status": "ACTIVE", "optimization_goal": "OFFSITE_CONVERSIONS", "billing_event": "IMPRESSIONS", "daily_budget": 800.00, "motive": "website", "performance_goal": "leads", "optimization_event": "lead", "performance_goal_profile_id": "leads"},
         ]
         adset_map = {}
         for ma in mock_adsets:
@@ -148,12 +148,20 @@ class MetaSyncService:
                 status=ma["status"],
                 optimization_goal=ma["optimization_goal"],
                 billing_event=ma["billing_event"],
+                motive=ma["motive"],
+                performance_goal=ma["performance_goal"],
+                optimization_event=ma["optimization_event"],
+                performance_goal_profile_id=ma["performance_goal_profile_id"],
                 daily_budget=ma["daily_budget"],
             ).on_conflict_do_update(
                 index_elements=["meta_adset_id"],
                 set_={
                     "name": ma["name"],
                     "status": ma["status"],
+                    "motive": ma["motive"],
+                    "performance_goal": ma["performance_goal"],
+                    "optimization_event": ma["optimization_event"],
+                    "performance_goal_profile_id": ma["performance_goal_profile_id"],
                     "daily_budget": ma["daily_budget"],
                     "updated_at": datetime.utcnow()
                 }
@@ -388,8 +396,8 @@ class MetaSyncService:
                 res = await db.execute(stmt)
                 campaign_map[mc["id"]] = res.scalar()
 
-            # 2. Fetch ad sets
-            adsets_url = f"https://graph.facebook.com/{api_ver}/{account_id}/adsets?fields=id,name,campaign{{id}},status,optimization_goal,billing_event,daily_budget,lifetime_budget&limit=250"
+            # 2. Fetch ad sets with Performance Goal fields
+            adsets_url = f"https://graph.facebook.com/{api_ver}/{account_id}/adsets?fields=id,name,campaign{{id}},status,optimization_goal,billing_event,destination_type,promoted_object,daily_budget,lifetime_budget&limit=250"
             r = await client.get(adsets_url, headers=headers)
             r.raise_for_status()
             adsets_list = r.json().get("data", [])
@@ -400,6 +408,12 @@ class MetaSyncService:
                 if not parent_camp_meta_id or parent_camp_meta_id not in campaign_map:
                     continue  # Orphan check
                 
+                goal_details = self._resolve_performance_goal_details(
+                    ma.get("optimization_goal"), 
+                    ma.get("destination_type"), 
+                    ma.get("promoted_object")
+                )
+
                 stmt = pg_insert(AdSet).values(
                     campaign_id=campaign_map[parent_camp_meta_id],
                     meta_adset_id=ma["id"],
@@ -407,6 +421,10 @@ class MetaSyncService:
                     status=ma.get("status", "ACTIVE"),
                     optimization_goal=ma.get("optimization_goal", "OFFSITE_CONVERSIONS"),
                     billing_event=ma.get("billing_event", "IMPRESSIONS"),
+                    motive=goal_details["motive"],
+                    performance_goal=goal_details["performance_goal"],
+                    optimization_event=goal_details["optimization_event"],
+                    performance_goal_profile_id=goal_details["performance_goal_profile_id"],
                     daily_budget=float(ma["daily_budget"]) / 100 if "daily_budget" in ma else None,
                     lifetime_budget=float(ma["lifetime_budget"]) / 100 if "lifetime_budget" in ma else None,
                 ).on_conflict_do_update(
@@ -414,6 +432,10 @@ class MetaSyncService:
                     set_={
                         "name": ma["name"],
                         "status": ma.get("status", "ACTIVE"),
+                        "motive": goal_details["motive"],
+                        "performance_goal": goal_details["performance_goal"],
+                        "optimization_event": goal_details["optimization_event"],
+                        "performance_goal_profile_id": goal_details["performance_goal_profile_id"],
                         "daily_budget": float(ma["daily_budget"]) / 100 if "daily_budget" in ma else None,
                         "lifetime_budget": float(ma["lifetime_budget"]) / 100 if "lifetime_budget" in ma else None,
                         "updated_at": datetime.utcnow()
@@ -508,6 +530,8 @@ class MetaSyncService:
         """
         Parses insights JSON array and upserts them into daily statistics tables.
         """
+        from app.services.metric_engine import MetricEngine
+
         for item in insights:
             meta_id = item.get(f"{level}_id")
             if not meta_id or meta_id not in id_map:
@@ -518,25 +542,33 @@ class MetaSyncService:
             spend = float(item.get("spend", 0))
             impressions = int(item.get("impressions", 0))
             clicks = int(item.get("clicks", 0))
+            reach = int(item.get("reach", 0)) if "reach" in item else None
+            frequency = float(item.get("frequency", 0)) if "frequency" in item else None
 
-            # Parse purchase count and conversion revenue from actions mapping
-            purchases = 0
-            revenue = 0.0
-            actions = item.get("actions", [])
-            for act in actions:
-                if act.get("action_type") == "purchase":
-                    purchases = int(act.get("value", 0))
+            # Normalized action parsing
+            parsed = self._parse_meta_actions(
+                item.get("actions", []), 
+                item.get("action_values", [])
+            )
             
-            act_vals = item.get("action_values", [])
-            for val in act_vals:
-                if val.get("action_type") == "purchase":
-                    revenue = float(val.get("value", 0.0))
+            purchases = parsed["purchases"]
+            leads = parsed["leads"]
+            revenue = parsed["revenue"]
+            link_clicks = parsed["link_clicks"] or clicks
 
-            # Math aggregates
-            ctr = clicks / impressions if impressions > 0 else 0.0
-            cpc = spend / clicks if clicks > 0 else 0.0
-            cpm = (spend / impressions) * 1000 if impressions > 0 else 0.0
-            roas = revenue / spend if spend > 0 else 0.0
+            # Call MetricEngine to calculate derived fields
+            raw_metrics = {
+                "spend": spend,
+                "impressions": impressions,
+                "reach": reach,
+                "clicks": clicks,
+                "link_clicks": link_clicks,
+                "leads": leads,
+                "purchases": purchases,
+                "revenue": revenue,
+                **parsed
+            }
+            derived = MetricEngine.calculate_derived_metrics(raw_metrics)
 
             if level == "campaign":
                 stmt = pg_insert(CampaignDailyMetrics).values(
@@ -544,25 +576,39 @@ class MetaSyncService:
                     date=sync_date,
                     spend=spend,
                     impressions=impressions,
+                    reach=reach,
+                    frequency=frequency,
                     clicks=clicks,
+                    link_clicks=link_clicks,
+                    leads=leads,
                     purchases=purchases,
                     revenue=revenue,
-                    ctr=ctr,
-                    cpc=cpc,
-                    cpm=cpm,
-                    roas=roas,
+                    actions=parsed,
+                    cpl=derived["cpl"],
+                    roas=derived["roas"],
+                    cpc=derived["cpc"],
+                    cpm=derived["cpm"],
+                    ctr=derived["ctr"],
+                    link_ctr=derived["link_ctr"],
                 ).on_conflict_do_update(
                     index_elements=["campaign_id", "date"],
                     set_={
                         "spend": spend,
                         "impressions": impressions,
+                        "reach": reach,
+                        "frequency": frequency,
                         "clicks": clicks,
+                        "link_clicks": link_clicks,
+                        "leads": leads,
                         "purchases": purchases,
                         "revenue": revenue,
-                        "ctr": ctr,
-                        "cpc": cpc,
-                        "cpm": cpm,
-                        "roas": roas,
+                        "actions": parsed,
+                        "cpl": derived["cpl"],
+                        "roas": derived["roas"],
+                        "cpc": derived["cpc"],
+                        "cpm": derived["cpm"],
+                        "ctr": derived["ctr"],
+                        "link_ctr": derived["link_ctr"],
                         "updated_at": datetime.utcnow()
                     }
                 )
@@ -572,25 +618,39 @@ class MetaSyncService:
                     date=sync_date,
                     spend=spend,
                     impressions=impressions,
+                    reach=reach,
+                    frequency=frequency,
                     clicks=clicks,
+                    link_clicks=link_clicks,
+                    leads=leads,
                     purchases=purchases,
                     revenue=revenue,
-                    ctr=ctr,
-                    cpc=cpc,
-                    cpm=cpm,
-                    roas=roas,
+                    actions=parsed,
+                    cpl=derived["cpl"],
+                    roas=derived["roas"],
+                    cpc=derived["cpc"],
+                    cpm=derived["cpm"],
+                    ctr=derived["ctr"],
+                    link_ctr=derived["link_ctr"],
                 ).on_conflict_do_update(
                     index_elements=["ad_set_id", "date"],
                     set_={
                         "spend": spend,
                         "impressions": impressions,
+                        "reach": reach,
+                        "frequency": frequency,
                         "clicks": clicks,
+                        "link_clicks": link_clicks,
+                        "leads": leads,
                         "purchases": purchases,
                         "revenue": revenue,
-                        "ctr": ctr,
-                        "cpc": cpc,
-                        "cpm": cpm,
-                        "roas": roas,
+                        "actions": parsed,
+                        "cpl": derived["cpl"],
+                        "roas": derived["roas"],
+                        "cpc": derived["cpc"],
+                        "cpm": derived["cpm"],
+                        "ctr": derived["ctr"],
+                        "link_ctr": derived["link_ctr"],
                         "updated_at": datetime.utcnow()
                     }
                 )
@@ -600,26 +660,218 @@ class MetaSyncService:
                     date=sync_date,
                     spend=spend,
                     impressions=impressions,
+                    reach=reach,
+                    frequency=frequency,
                     clicks=clicks,
+                    link_clicks=link_clicks,
+                    leads=leads,
                     purchases=purchases,
                     revenue=revenue,
-                    ctr=ctr,
-                    cpc=cpc,
-                    cpm=cpm,
-                    roas=roas,
+                    actions=parsed,
+                    cpl=derived["cpl"],
+                    roas=derived["roas"],
+                    cpc=derived["cpc"],
+                    cpm=derived["cpm"],
+                    ctr=derived["ctr"],
+                    link_ctr=derived["link_ctr"],
                 ).on_conflict_do_update(
                     index_elements=["ad_id", "date"],
                     set_={
                         "spend": spend,
                         "impressions": impressions,
+                        "reach": reach,
+                        "frequency": frequency,
                         "clicks": clicks,
+                        "link_clicks": link_clicks,
+                        "leads": leads,
                         "purchases": purchases,
                         "revenue": revenue,
-                        "ctr": ctr,
-                        "cpc": cpc,
-                        "cpm": cpm,
-                        "roas": roas,
+                        "actions": parsed,
+                        "cpl": derived["cpl"],
+                        "roas": derived["roas"],
+                        "cpc": derived["cpc"],
+                        "cpm": derived["cpm"],
+                        "ctr": derived["ctr"],
+                        "link_ctr": derived["link_ctr"],
                         "updated_at": datetime.utcnow()
                     }
                 )
             await db.execute(stmt)
+
+    @staticmethod
+    def _resolve_performance_goal_details(optimization_goal: str, destination_type: str, promoted_object: dict) -> dict:
+        """
+        Maps Meta's ad set optimization configuration to our standardized 
+        Performance Goal Profile Registry attributes.
+        """
+        opt_goal = (optimization_goal or "").upper()
+        dest_type = (destination_type or "").upper()
+        prom_obj = promoted_object or {}
+        custom_event = (prom_obj.get("custom_event_type") or "").upper()
+
+        motive = "website"
+        if dest_type:
+            motive = dest_type.lower()
+        elif prom_obj.get("application_id"):
+            motive = "app"
+        elif "messenger" in opt_goal or "whatsapp" in opt_goal:
+            motive = "messaging"
+
+        perf_goal = "conversions"
+        opt_event = custom_event.lower() if custom_event else None
+
+        if opt_goal == "REACH":
+            perf_goal = "reach"
+            motive = "awareness"
+        elif opt_goal in ("IMPRESSIONS", "AD_RECALL_LIFT"):
+            perf_goal = "impressions" if opt_goal == "IMPRESSIONS" else "brand_awareness"
+            motive = "awareness"
+        elif opt_goal in ("CLICKS", "LINK_CLICKS"):
+            perf_goal = "link_clicks"
+            motive = "traffic"
+        elif opt_goal == "LANDING_PAGE_VIEWS":
+            perf_goal = "landing_page_views"
+            motive = "traffic"
+        elif opt_goal == "LEADS":
+            perf_goal = "leads"
+            motive = "leads"
+        elif opt_goal == "VALUE":
+            perf_goal = "value"
+            motive = "sales"
+        elif opt_goal in ("THRUPLAY", "VIDEO_VIEWS"):
+            perf_goal = "thruplay" if opt_goal == "THRUPLAY" else "video_views"
+            motive = "awareness"
+        elif opt_goal == "PAGE_LIKES":
+            perf_goal = "page_likes"
+            motive = "engagement"
+        elif opt_goal == "POST_ENGAGEMENT":
+            perf_goal = "post_engagement"
+            motive = "engagement"
+        elif opt_goal == "APP_INSTALLS":
+            perf_goal = "app_installs"
+            motive = "app"
+        elif opt_goal == "APP_EVENTS":
+            perf_goal = "app_events"
+            motive = "app"
+        elif opt_goal in ("CONVERSATIONS", "MESSAGING_CONVERSATIONS"):
+            perf_goal = "conversations"
+            motive = "messaging"
+        elif opt_goal in ("CALLS", "LINKED_CALLS"):
+            perf_goal = "calls"
+            motive = "phone"
+        elif opt_goal == "OFFSITE_CONVERSIONS":
+            # Conversions/Sales: inspect custom event to refine
+            if opt_event in ("purchase", "subscribe", "start_trial"):
+                perf_goal = "purchases"
+            elif opt_event in ("lead", "complete_registration", "submit_application"):
+                perf_goal = "leads"
+            else:
+                perf_goal = "conversions"
+
+        from app.core.performance_goals import get_goal_profile
+        profile = get_goal_profile(perf_goal)
+
+        return {
+            "motive": motive,
+            "performance_goal": perf_goal,
+            "optimization_event": opt_event or profile.get("optimization_event"),
+            "performance_goal_profile_id": profile.get("id", perf_goal)
+        }
+
+    @classmethod
+    def _parse_meta_actions(cls, actions_list: list, action_values_list: list) -> dict:
+        """
+        Parses Meta's raw actions and action_values insight logs into a normalized, 
+        standardized dictionary of internal metrics, matching all 51+ Goals.
+        """
+        out = {
+            "leads": 0,
+            "qualified_leads": 0,
+            "calls": 0,
+            "qualified_calls": 0,
+            "conversations": 0,
+            "messaging_leads": 0,
+            "messaging_purchases": 0,
+            "purchases": 0,
+            "revenue": 0.0,
+            "thruplays": 0,
+            "video_views": 0,
+            "video_play_2": 0,
+            "video_play_25": 0,
+            "video_play_50": 0,
+            "video_play_75": 0,
+            "video_play_95": 0,
+            "video_play_100": 0,
+            "event_responses": 0,
+            "app_installs": 0,
+            "app_events": 0,
+            "post_engagement": 0,
+            "page_likes": 0,
+            "profile_visits": 0,
+            "reminders": 0,
+            "ad_recall_lift": 0,
+            "add_to_cart": 0,
+            "initiate_checkout": 0,
+            "link_clicks": 0
+        }
+
+        # Parse action counts
+        for act in (actions_list or []):
+            atype = act.get("action_type", "")
+            val = int(act.get("value", 0))
+
+            if atype in ("purchase", "offsite_conversion.fb_pixel_purchase", "onsite_conversion.purchase"):
+                out["purchases"] += val
+            elif atype in ("lead", "offsite_conversion.fb_pixel_lead", "leadgen_grouped"):
+                out["leads"] += val
+            elif atype in ("onsite_conversion.messaging_first_reply", "onsite_conversion.messaging_conversation_started_7d", "onsite_conversion.messaging_welcome_message_viewed"):
+                out["conversations"] += val
+            elif atype == "onsite_conversion.messaging_purchase":
+                out["messaging_purchases"] += val
+            elif atype == "onsite_conversion.messaging_first_reply":
+                out["messaging_leads"] += val
+            elif atype in ("thruplay", "video_thruplay_watched_actions"):
+                out["thruplays"] += val
+            elif atype in ("video_view", "video_play_actions"):
+                out["video_views"] += val
+            elif atype == "video_play_2":
+                out["video_play_2"] += val
+            elif atype == "post_engagement":
+                out["post_engagement"] += val
+            elif atype in ("like", "page_like"):
+                out["page_likes"] += val
+            elif atype == "instagram_profile_visit":
+                out["profile_visits"] += val
+            elif atype == "reminder_set":
+                out["reminders"] += val
+            elif atype == "event_response":
+                out["event_responses"] += val
+            elif atype == "app_custom_event":
+                out["app_events"] += val
+            elif atype == "mobile_app_install":
+                out["app_installs"] += val
+            elif atype == "add_to_cart":
+                out["add_to_cart"] += val
+            elif atype == "initiate_checkout":
+                out["initiate_checkout"] += val
+            elif atype == "video_play_25_watched_actions":
+                out["video_play_25"] += val
+            elif atype == "video_play_50_watched_actions":
+                out["video_play_50"] += val
+            elif atype == "video_play_75_watched_actions":
+                out["video_play_75"] += val
+            elif atype == "video_play_95_watched_actions":
+                out["video_play_95"] += val
+            elif atype == "video_play_100_watched_actions":
+                out["video_play_100"] += val
+            elif atype == "link_click":
+                out["link_clicks"] += val
+
+        # Parse action values (revenue)
+        for val_node in (action_values_list or []):
+            atype = val_node.get("action_type", "")
+            val = float(val_node.get("value", 0.0))
+            if atype in ("purchase", "offsite_conversion.fb_pixel_purchase", "onsite_conversion.purchase"):
+                out["revenue"] += val
+
+        return out

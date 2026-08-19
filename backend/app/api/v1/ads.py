@@ -87,6 +87,10 @@ class AdSetItemResponse(BaseModel):
     campaign_name: str
     optimization_goal: str
     billing_event: str
+    motive: Optional[str] = None
+    performance_goal: Optional[str] = None
+    optimization_event: Optional[str] = None
+    performance_goal_profile_id: Optional[str] = None
     metrics: AdSetMetrics
 
 
@@ -318,6 +322,10 @@ async def list_adsets(
                 campaign_name=row.campaign_name,
                 optimization_goal=adset.optimization_goal,
                 billing_event=adset.billing_event,
+                motive=adset.motive,
+                performance_goal=adset.performance_goal,
+                optimization_event=adset.optimization_event,
+                performance_goal_profile_id=adset.performance_goal_profile_id,
                 metrics=AdSetMetrics(
                     spend=spend,
                     impressions=impressions,
