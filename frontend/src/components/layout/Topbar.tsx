@@ -74,6 +74,44 @@ export default function Topbar() {
     }
   };
 
+  const handleSyncClick = async () => {
+    if (syncStatus.status === "in_progress") {
+      await fetchSyncStatus();
+      return;
+    }
+
+    try {
+      setSyncStatus(prev => ({ ...prev, status: "in_progress" }));
+      sessionStorage.setItem("dgs_cached_sync_status", JSON.stringify({
+        lastSyncAt: syncStatus.lastSyncAt,
+        status: "in_progress",
+      }));
+      await api.triggerSync(selectedAccount?.id || undefined);
+      
+      let attempts = 0;
+      const pollTimer = setInterval(async () => {
+        attempts += 1;
+        try {
+          const res = await api.getSyncStatus();
+          if (res.last_sync_status !== "in_progress" || attempts > 30) {
+            clearInterval(pollTimer);
+            const finalStatus = {
+              lastSyncAt: res.last_sync_at || null,
+              status: res.last_sync_status || null,
+            };
+            setSyncStatus(finalStatus);
+            sessionStorage.setItem("dgs_cached_sync_status", JSON.stringify(finalStatus));
+          }
+        } catch (e) {
+          clearInterval(pollTimer);
+        }
+      }, 5000);
+    } catch (e) {
+      console.error("Failed to trigger metadata sync:", e);
+      fetchSyncStatus();
+    }
+  };
+
   useEffect(() => {
     const cached = sessionStorage.getItem("dgs_cached_sync_status");
     if (cached) {
@@ -167,10 +205,10 @@ export default function Topbar() {
       <div className="topbar-actions">
         {/* Sync Status Badge */}
         <button 
-          onClick={fetchSyncStatus}
+          onClick={handleSyncClick}
           className={`topbar-sync ${syncClass} flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border border-border transition`} 
           id="sync-status"
-          title="Click to refresh sync status"
+          title="Click to trigger or refresh metadata sync"
         >
           {syncIcon}
           <span>{syncLabel}</span>
