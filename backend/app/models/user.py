@@ -98,6 +98,16 @@ class User(BaseModel):
         back_populates="user",
         cascade="all, delete-orphan",
     )
+    daily_briefs: Mapped[List["AIDailyBrief"]] = relationship(
+        "AIDailyBrief",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    weekly_briefs: Mapped[List["AIWeeklyBrief"]] = relationship(
+        "AIWeeklyBrief",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
     team_members: Mapped[List["TeamMember"]] = relationship(
         "TeamMember",
         back_populates="user",

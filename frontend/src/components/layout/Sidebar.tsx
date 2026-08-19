@@ -56,7 +56,7 @@ const navigation: NavSection[] = [
     label: "AI INTELLIGENCE",
     items: [
       { label: "Recommendations", href: "/recommendations", icon: Lightbulb },
-      { label: "Account Intelligence", href: "/insights", icon: TrendingUp },
+      { label: "AI Decision Center", href: "/insights", icon: TrendingUp },
       { label: "Creative Intelligence", href: "/creative-analyzer", icon: Palette },
     ],
   },

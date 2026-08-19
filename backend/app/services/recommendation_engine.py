@@ -4,15 +4,18 @@ Digital Growth Studio — AI Recommendation Engine
 import uuid
 import httpx
 import structlog
+import math
 from datetime import date, datetime, timedelta
 from sqlalchemy import select, delete, func
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing import List, Tuple, Dict, Any
 
 from app.config import get_settings
 from app.models.campaign import Campaign, AdSet, Ad
 from app.models.meta import MetaAdAccount, MetaConnection
 from app.models.metrics import CampaignDailyMetrics, AdDailyMetrics
 from app.models.recommendation import AIRecommendation
+from app.services.data_quality_guard import DataQualityGuard
 
 logger = structlog.get_logger()
 settings = get_settings()
@@ -23,6 +26,78 @@ class RecommendationEngine:
     Analyzes Meta performance logs and compiles actionable rule-based optimization alerts,
     including advanced platform/placement and age/gender demographic breakdowns.
     """
+
+    @classmethod
+    def calculate_priority_and_confidence(
+        cls,
+        impact: float,  # 0.0 to 1.0
+        urgency: float,  # 0.0 to 1.0
+        spend: float,
+        benchmark_spend: float = 1000.0,
+        num_conversions: int = 0,
+        impressions: int = 0,
+        duration_days: int = 7,
+    ) -> Tuple[str, float]:
+        """
+        Calculates priority score and confidence level dynamically.
+        Priority = Impact * Confidence * Urgency * Spend Exposure.
+        Returns: (priority_level_string, confidence_score_float)
+        """
+        # 1. Spend Exposure: logarithmic scale of spend relative to benchmark
+        if spend <= 0:
+            spend_exposure = 0.1
+        else:
+            spend_exposure = min(1.0, max(0.1, spend / benchmark_spend))
+
+        # 2. Confidence based on data volume
+        base_confidence = 0.40
+        
+        # Spend scaling
+        if spend > 10000:
+            base_confidence += 0.25
+        elif spend > 3000:
+            base_confidence += 0.15
+        elif spend > 500:
+            base_confidence += 0.05
+            
+        # Impressions scaling
+        if impressions > 50000:
+            base_confidence += 0.15
+        elif impressions > 10000:
+            base_confidence += 0.08
+        elif impressions > 2000:
+            base_confidence += 0.03
+            
+        # Conversions scaling
+        if num_conversions > 20:
+            base_confidence += 0.15
+        elif num_conversions > 5:
+            base_confidence += 0.08
+        elif num_conversions > 1:
+            base_confidence += 0.02
+
+        # Duration scaling
+        if duration_days >= 14:
+            base_confidence += 0.05
+        elif duration_days >= 7:
+            base_confidence += 0.02
+
+        confidence_score = min(0.99, max(0.15, base_confidence))
+
+        # 3. Priority Score calculation
+        priority_score = impact * confidence_score * urgency * spend_exposure
+
+        # Map to priority levels
+        if priority_score >= 0.50:
+            priority = "critical"
+        elif priority_score >= 0.30:
+            priority = "high"
+        elif priority_score >= 0.15:
+            priority = "medium"
+        else:
+            priority = "low"
+
+        return priority, confidence_score
 
     @classmethod
     async def compile_recommendations(
@@ -101,13 +176,13 @@ class RecommendationEngine:
             ]
 
         # ──────────────────────────────────────────────
-        # ANALYSIS RULE: Platform/Placement Optimization
+        # RULE: Platform/Placement Optimization (8.9)
         # ──────────────────────────────────────────────
+        total_platform_spend = sum(float(p.get("spend", 0)) for p in platform_breakdowns)
         for platform in platform_breakdowns:
             platform_name = platform.get("publisher_platform")
             spend = float(platform.get("spend", 0))
             
-            # Parse purchase count and conversion revenue
             purchases = 0
             revenue = 0.0
             for act in platform.get("actions", []):
@@ -118,31 +193,75 @@ class RecommendationEngine:
                     revenue = float(val.get("value", 0.0))
 
             roas = (revenue / spend) if spend > 0 else 0.0
+            spend_share = (spend / total_platform_spend) if total_platform_spend > 0 else 0.0
 
-            # Underperforming placement rule
-            if spend >= 100.00 and roas < 0.8:
+            # 1. Placement Opportunity (8.9 Reels prioritization / Placement)
+            if platform_name == "instagram" and roas >= 2.0 and spend_share < 0.50:
+                priority, confidence = cls.calculate_priority_and_confidence(
+                    impact=0.70, urgency=0.50, spend=spend, num_conversions=purchases
+                )
                 recommendations_to_add.append(
                     AIRecommendation(
                         user_id=user_uuid,
                         ad_account_id=ad_account_uuid,
                         entity_type="ad_account",
                         entity_id=ad_account_uuid,
-                        recommendation_type="PLACEMENT_OPTIMIZATION",
-                        title=f"Exclude underperforming placement: {platform_name.upper()}",
+                        recommendation_type="PLACEMENT_OPPORTUNITY",
+                        title=f"Placement Opportunity: Prioritize Reels/Instagram Delivery",
+                        description=f"Instagram delivery generates strong conversion efficiency with a ROAS of {roas:.2f}x, while consuming only {spend_share*100:.0f}% of total budget.",
+                        reason="Reels placement exhibits lower cost per conversion than other placements.",
+                        objective="Sales",
+                        problem=None,
+                        root_cause=None,
+                        evidence=f"Reels ROAS is {roas:.2f}x vs account average. Spend share is {spend_share*100:.1f}%.",
+                        expected_impact="Prioritizing Instagram Reels delivery in your next creative cycle will scale conversions and reduce average CPL.",
+                        confidence_score=confidence,
+                        priority=priority,
+                        supporting_metrics={"spend": spend, "roas": roas, "purchases": purchases, "placement": platform_name},
+                        status="new",
+                    )
+                )
+            
+            # 2. Exclude Placement if low ROAS
+            elif spend >= 100.00 and roas < 0.8:
+                priority, confidence = cls.calculate_priority_and_confidence(
+                    impact=0.65, urgency=0.60, spend=spend, num_conversions=purchases
+                )
+                
+                # Check confidence threshold for FIX vs WATCH
+                rec_type = "PLACEMENT_OPTIMIZATION"
+                title = f"Exclude underperforming placement: {platform_name.upper()}"
+                if confidence < 0.50:
+                    rec_type = "WATCH"
+                    title = f"Watch placement delivery: {platform_name.upper()}"
+
+                recommendations_to_add.append(
+                    AIRecommendation(
+                        user_id=user_uuid,
+                        ad_account_id=ad_account_uuid,
+                        entity_type="ad_account",
+                        entity_id=ad_account_uuid,
+                        recommendation_type=rec_type,
+                        title=title,
                         description=(
-                            f"Our analysis indicates that the {platform_name.upper()} delivery placement is highly inefficient. "
-                            f"It spent {spend:.2f} but generated only {purchases} conversions with a low ROAS of {roas:.2f}x."
+                            f"The {platform_name.upper()} placement is delivering conversions inefficiently. "
+                            f"It consumed ₹{spend:.2f} but generated only {purchases} conversions with a ROAS of {roas:.2f}x."
                         ),
-                        reason=f"Excluding the underperforming {platform_name} placement redirects budget to higher-converting placements like Instagram.",
-                        confidence_score=0.9400,
-                        priority="high",
+                        reason=f"Excluding the underperforming {platform_name} placement redirects budget to higher-converting placements like Instagram Reels.",
+                        objective="Sales",
+                        problem="Inefficient placement spend",
+                        root_cause="Over-delivery on low-conversion placement",
+                        evidence=f"Spend: ₹{spend:.2f}, ROAS: {roas:.2f}x, conversions: {purchases}",
+                        expected_impact="Excluding this placement saves wasted spend and improves campaign ROAS.",
+                        confidence_score=confidence,
+                        priority=priority,
                         supporting_metrics={"spend": spend, "roas": roas, "purchases": purchases, "placement": platform_name},
                         status="new",
                     )
                 )
 
         # ──────────────────────────────────────────────
-        # ANALYSIS RULE: Age & Gender Target Tuning
+        # RULE: Age & Gender Target Tuning (8.10 Audience)
         # ──────────────────────────────────────────────
         for demo in demographic_breakdowns:
             age_group = demo.get("age")
@@ -160,30 +279,72 @@ class RecommendationEngine:
 
             roas = (revenue / spend) if spend > 0 else 0.0
 
-            # Low performing audience rule (spend > 100 and ROAS < 0.5)
-            if spend >= 100.00 and roas < 0.5:
+            # Audience Opportunity
+            if spend >= 1000.00 and roas >= 2.8:
+                priority, confidence = cls.calculate_priority_and_confidence(
+                    impact=0.75, urgency=0.50, spend=spend, num_conversions=purchases
+                )
                 recommendations_to_add.append(
                     AIRecommendation(
                         user_id=user_uuid,
                         ad_account_id=ad_account_uuid,
                         entity_type="ad_account",
                         entity_id=ad_account_uuid,
-                        recommendation_type="DEMOGRAPHIC_TUNING",
-                        title=f"Narrow target audience: Exclude {gender.upper()} {age_group}",
+                        recommendation_type="AUDIENCE_OPPORTUNITY",
+                        title=f"Audience Opportunity: Scale target demographic {gender.upper()} {age_group}",
+                        description=f"Demographic segment {gender.upper()} ({age_group}) generates strong conversions with a ROAS of {roas:.2f}x.",
+                        reason="Target audience segment has high conversion rates.",
+                        objective="Sales",
+                        problem=None,
+                        root_cause=None,
+                        evidence=f"Segment spent ₹{spend:.2f} with a ROAS of {roas:.2f}x.",
+                        expected_impact="Consider testing additional creative variations tailored specifically to this segment.",
+                        confidence_score=confidence,
+                        priority=priority,
+                        supporting_metrics={"spend": spend, "roas": roas, "purchases": purchases, "demographics": f"{gender}_{age_group}"},
+                        status="new",
+                    )
+                )
+
+            # Exclude low performing audience segment
+            elif spend >= 100.00 and roas < 0.5:
+                priority, confidence = cls.calculate_priority_and_confidence(
+                    impact=0.60, urgency=0.55, spend=spend, num_conversions=purchases
+                )
+                
+                rec_type = "DEMOGRAPHIC_TUNING"
+                title = f"Narrow target audience: Exclude {gender.upper()} {age_group}"
+                if confidence < 0.50:
+                    rec_type = "WATCH"
+                    title = f"Watch demographic segment: {gender.upper()} {age_group}"
+
+                recommendations_to_add.append(
+                    AIRecommendation(
+                        user_id=user_uuid,
+                        ad_account_id=ad_account_uuid,
+                        entity_type="ad_account",
+                        entity_id=ad_account_uuid,
+                        recommendation_type=rec_type,
+                        title=title,
                         description=(
-                            f"Audience segment {gender.upper()} ({age_group}) represents a high cost-sink. "
-                            f"It has consumed {spend:.2f} in ad spend with almost zero conversions (ROAS: {roas:.2f}x)."
+                            f"Audience segment {gender.upper()} ({age_group}) is consuming budget with low purchase intent. "
+                            f"It has consumed ₹{spend:.2f} with a ROAS of {roas:.2f}x."
                         ),
-                        reason=f"Refining targeting settings to omit {gender} aged {age_group} will improve campaign efficiency.",
-                        confidence_score=0.9100,
-                        priority="medium",
+                        reason=f"Refining targeting to exclude {gender} aged {age_group} will improve campaign efficiency.",
+                        objective="Sales",
+                        problem="Targeting leakage",
+                        root_cause="Over-targeting low intent demographic",
+                        evidence=f"Spend: ₹{spend:.2f}, ROAS: {roas:.2f}x",
+                        expected_impact="Excluding this demographic redirects budget to higher intent groups.",
+                        confidence_score=confidence,
+                        priority=priority,
                         supporting_metrics={"spend": spend, "roas": roas, "purchases": purchases, "demographics": f"{gender}_{age_group}"},
                         status="new",
                     )
                 )
 
         # ──────────────────────────────────────────────
-        # RULE 1: Underperforming Ad (Low ROAS / High CPA)
+        # RULE: Underperforming Ads & Money at Risk (8.3)
         # ──────────────────────────────────────────────
         ad_stmt = (
             select(Ad)
@@ -194,6 +355,9 @@ class RecommendationEngine:
         )
         res = await db.execute(ad_stmt)
         active_ads = res.scalars().all()
+
+        underperforming_ads_list = []
+        total_risk_spend = 0.0
 
         for ad in active_ads:
             m_stmt = (
@@ -209,7 +373,7 @@ class RecommendationEngine:
             )
             m_res = await db.execute(m_stmt)
             m_row = m_res.fetchone()
-            if not m_row:
+            if not m_row or float(m_row.spend or 0.0) == 0.0:
                 continue
 
             spend = float(m_row.spend)
@@ -221,57 +385,245 @@ class RecommendationEngine:
             roas = (revenue / spend) if spend > 0 else 0.0
             ctr = (clicks / impressions) if impressions > 0 else 0.0
 
-            # Low ROAS
+            # Compute campaign average benchmark ROAS
+            # For simplicity, compare against average target ROAS = 1.6
+            pct_worse = 0.0
+            if roas < 1.20:
+                pct_worse = ((1.6 - roas) / 1.6) * 100
+                underperforming_ads_list.append({
+                    "name": ad.name,
+                    "id": str(ad.id),
+                    "spend": spend,
+                    "roas": roas,
+                    "purchases": purchases,
+                    "pct_worse": pct_worse
+                })
+                total_risk_spend += spend
+
+            # Emitting Underperforming Ad Recommendation
             if spend >= 50.00 and roas < 1.20:
+                priority, confidence = cls.calculate_priority_and_confidence(
+                    impact=0.80, urgency=0.75, spend=spend, num_conversions=purchases, impressions=impressions
+                )
+
+                rec_type = "UNDERPERFORMING_AD"
+                title = f"Pause low ROAS Ad: {ad.name}"
+                if confidence < 0.50:
+                    rec_type = "WATCH"
+                    title = f"Watch performance on Ad: {ad.name}"
+
                 recommendations_to_add.append(
                     AIRecommendation(
                         user_id=user_uuid,
                         ad_account_id=ad_account_uuid,
                         entity_type="ad",
                         entity_id=ad.id,
-                        recommendation_type="UNDERPERFORMING_AD",
-                        title=f"Pause low ROAS Ad: {ad.name}",
+                        campaign_id=ad.campaign_id if hasattr(ad, "campaign_id") else None,
+                        adset_id=ad.ad_set_id,
+                        ad_id=ad.id,
+                        recommendation_type=rec_type,
+                        title=title,
                         description=(
                             f"This active ad has generated a low ROAS of {roas:.2f}x over the last 14 days, "
-                            f"spending {spend:.2f} and returning only {revenue:.2f} in purchases revenue."
+                            f"spending ₹{spend:.2f} and returning only ₹{revenue:.2f} in purchases revenue."
                         ),
                         reason="Cost-per-acquisition is too high compared to return values.",
-                        confidence_score=0.9200,
-                        priority="high",
-                        supporting_metrics={"spend": spend, "roas": roas, "purchases": purchases},
+                        objective="Sales",
+                        problem="Inefficient creative performance",
+                        root_cause="High CPL or low purchase conversion rate on creative variant",
+                        evidence=f"Spend: ₹{spend:.2f}, ROAS: {roas:.2f}x, CTR: {ctr*100:.2f}%",
+                        expected_impact="Pausing this ad allows Meta's delivery algorithm to prioritize higher performing assets in the ad set.",
+                        confidence_score=confidence,
+                        priority=priority,
+                        supporting_metrics={"spend": spend, "roas": roas, "purchases": purchases, "pct_worse": pct_worse},
                         status="new",
                     )
                 )
 
-            # Low CTR
+            # Low CTR Check
             if impressions >= 500 and ctr < 0.015:
+                priority, confidence = cls.calculate_priority_and_confidence(
+                    impact=0.65, urgency=0.60, spend=spend, num_conversions=purchases, impressions=impressions
+                )
+                
+                rec_type = "UNDERPERFORMING_CREATIVE"
+                title = f"Refresh low CTR Ad copy/headline: {ad.name}"
+                if confidence < 0.50:
+                    rec_type = "WATCH"
+                    title = f"Watch click engagement: {ad.name}"
+
                 recommendations_to_add.append(
                     AIRecommendation(
                         user_id=user_uuid,
                         ad_account_id=ad_account_uuid,
                         entity_type="ad",
                         entity_id=ad.id,
-                        recommendation_type="UNDERPERFORMING_CREATIVE",
-                        title=f"Refresh low CTR Ad copy/headline: {ad.name}",
+                        campaign_id=ad.campaign_id if hasattr(ad, "campaign_id") else None,
+                        adset_id=ad.ad_set_id,
+                        ad_id=ad.id,
+                        recommendation_type=rec_type,
+                        title=title,
                         description=(
                             f"CTR is currently {ctr*100:.2f}%, which is below the recommended threshold of 1.5%. "
                             f"Out of {impressions} impressions, it has captured only {clicks} clicks."
                         ),
                         reason="Ad fatigue or copy message is not engaging the target audience.",
-                        confidence_score=0.8700,
-                        priority="medium",
+                        objective="General",
+                        problem="Low ad click-through rate",
+                        root_cause="Creative wearout or copy hook mismatch",
+                        evidence=f"Impressions: {impressions}, CTR: {ctr*100:.2f}%, clicks: {clicks}",
+                        expected_impact="Refreshing copy/headline or swapping the visual card will improve click share and lower CPC.",
+                        confidence_score=confidence,
+                        priority=priority,
                         supporting_metrics={"ctr": ctr, "impressions": impressions, "clicks": clicks},
                         status="new",
                     )
                 )
 
+        # 3. Compile Money at Risk Recommendation if list is not empty (8.3)
+        if underperforming_ads_list:
+            priority, confidence = cls.calculate_priority_and_confidence(
+                impact=0.85, urgency=0.80, spend=total_risk_spend, num_conversions=sum(x["purchases"] for x in underperforming_ads_list)
+            )
+            recommendations_to_add.append(
+                AIRecommendation(
+                    user_id=user_uuid,
+                    ad_account_id=ad_account_uuid,
+                    entity_type="ad_account",
+                    entity_id=ad_account_uuid,
+                    recommendation_type="BUDGET_OPPORTUNITY",
+                    title="Potential Spend at Risk",
+                    description=f"Our analysis identifies a total of ₹{total_risk_spend:.2f} of ad spend allocated to sub-benchmark creative variations.",
+                    reason="Several active ads are performing significantly worse than campaign benchmarks.",
+                    objective="Sales",
+                    problem="Budget leakage on underperforming ads",
+                    root_cause="Meta budget scaling over-allocating on sub-benchmark ads",
+                    evidence=f"{len(underperforming_ads_list)} active ads represent ₹{total_risk_spend:.2f} of potential risk.",
+                    expected_impact="Adjusting weights or pausing these ad elements redirect budget to high-performing versions, boosting campaign ROAS.",
+                    confidence_score=confidence,
+                    priority=priority,
+                    supporting_metrics={
+                        "total_risk": total_risk_spend, 
+                        "underperforming_entities": underperforming_ads_list
+                    },
+                    status="new",
+                )
+            )
+
         # ──────────────────────────────────────────────
-        # RULE 3: Objective-Aware Campaign Diagnosis Engine
+        # RULE: Budget Efficiency Engine (8.4 & 8.5)
         # ──────────────────────────────────────────────
-        camp_stmt = select(Campaign).where(Campaign.ad_account_id == ad_account_uuid).where(Campaign.status == "ACTIVE")
+        from sqlalchemy.orm import selectinload
+        camp_stmt = select(Campaign).where(Campaign.ad_account_id == ad_account_uuid).where(Campaign.status == "ACTIVE").options(selectinload(Campaign.ad_sets))
         camp_res = await db.execute(camp_stmt)
         active_camps = camp_res.scalars().all()
 
+        total_account_spend = 0.0
+        total_account_conversions = 0
+        campaign_performance_metrics = []
+
+        for camp in active_camps:
+            m_stmt = (
+                select(
+                    func.coalesce(func.sum(CampaignDailyMetrics.spend), 0).label("spend"),
+                    func.coalesce(func.sum(CampaignDailyMetrics.purchases), 0).label("purchases"),
+                    func.coalesce(func.sum(CampaignDailyMetrics.leads), 0).label("leads"),
+                )
+                .where(CampaignDailyMetrics.campaign_id == camp.id)
+                .where(CampaignDailyMetrics.date >= start_date)
+            )
+            m_res = await db.execute(m_stmt)
+            m_row = m_res.fetchone()
+            if not m_row or float(m_row.spend or 0.0) == 0.0:
+                continue
+
+            spend = float(m_row.spend)
+            purchases = int(m_row.purchases or 0)
+            leads = int(m_row.leads or 0)
+            conversions = purchases + leads
+
+            total_account_spend += spend
+            total_account_conversions += conversions
+            campaign_performance_metrics.append({
+                "campaign": camp,
+                "spend": spend,
+                "conversions": conversions
+            })
+
+        # Calculate efficiency scores and emit budget opportunities
+        if total_account_spend > 0 and total_account_conversions > 0:
+            for item in campaign_performance_metrics:
+                camp = item["campaign"]
+                spend = item["spend"]
+                conversions = item["conversions"]
+
+                spend_share = spend / total_account_spend
+                result_share = conversions / total_account_conversions
+                efficiency_score = (result_share - spend_share) * 100  # percentage points
+
+                # 8.4 Budget Scaling / Budget Opportunity
+                if efficiency_score >= 12.0:
+                    priority, confidence = cls.calculate_priority_and_confidence(
+                        impact=0.90, urgency=0.60, spend=spend, num_conversions=conversions
+                    )
+                    recommendations_to_add.append(
+                        AIRecommendation(
+                            user_id=user_uuid,
+                            ad_account_id=ad_account_uuid,
+                            entity_type="campaign",
+                            entity_id=camp.id,
+                            campaign_id=camp.id,
+                            recommendation_type="BUDGET_OPPORTUNITY",
+                            title=f"Budget Scaling: Under-allocated Campaign: {camp.name}",
+                            description=(
+                                f"This campaign is highly efficient, generating {result_share*100:.0f}% of conversions "
+                                f"while receiving only {spend_share*100:.0f}% of total spend (+{efficiency_score:.1f} pp efficiency)."
+                            ),
+                            reason="Campaign result share exceeds its budget allocation share.",
+                            objective=camp.objective,
+                            problem=None,
+                            root_cause=None,
+                            evidence=f"Spend share: {spend_share*100:.1f}%, Result share: {result_share*100:.1f}%, Efficiency: +{efficiency_score:.1f} pp.",
+                            expected_impact="Increasing this campaign's budget by 15-20% is highly likely to scale overall volume efficiently.",
+                            confidence_score=confidence,
+                            priority=priority,
+                            supporting_metrics={"spend_share": spend_share, "result_share": result_share, "efficiency": efficiency_score},
+                            status="new",
+                        )
+                    )
+                elif efficiency_score <= -15.0:
+                    priority, confidence = cls.calculate_priority_and_confidence(
+                        impact=0.85, urgency=0.75, spend=spend, num_conversions=conversions
+                    )
+                    recommendations_to_add.append(
+                        AIRecommendation(
+                            user_id=user_uuid,
+                            ad_account_id=ad_account_uuid,
+                            entity_type="campaign",
+                            entity_id=camp.id,
+                            campaign_id=camp.id,
+                            recommendation_type="BUDGET_OPPORTUNITY",
+                            title=f"Budget Optimization: Over-allocated Campaign: {camp.name}",
+                            description=(
+                                f"This campaign is highly inefficient, consuming {spend_share*100:.0f}% of total budget "
+                                f"but generating only {result_share*100:.0f}% of conversions ({efficiency_score:.1f} pp efficiency)."
+                            ),
+                            reason="Campaign spend share exceeds conversion results share.",
+                            objective=camp.objective,
+                            problem="Over-allocated ad spend",
+                            root_cause="Low conversion rate on campaign audience",
+                            evidence=f"Spend share: {spend_share*100:.1f}%, Result share: {result_share*100:.1f}%, Efficiency: {efficiency_score:.1f} pp.",
+                            expected_impact="Reducing budget or restructuring creative assets will limit wasted spend.",
+                            confidence_score=confidence,
+                            priority=priority,
+                            supporting_metrics={"spend_share": spend_share, "result_share": result_share, "efficiency": efficiency_score},
+                            status="new",
+                        )
+                    )
+
+        # ──────────────────────────────────────────────
+        # RULE: Objectives-Aware Campaign Diagnosis (8.11 & 8.7)
+        # ──────────────────────────────────────────────
         for camp in active_camps:
             m_stmt = (
                 select(
@@ -290,12 +642,11 @@ class RecommendationEngine:
             )
             m_res = await db.execute(m_stmt)
             m_row = m_res.fetchone()
-            if not m_row:
+            if not m_row or float(m_row.spend or 0.0) == 0.0:
                 continue
 
-            # Core Metrics (Handling missing values gracefully)
-            spend = float(m_row.spend or 0.0)
-            revenue = float(m_row.revenue or 0.0)
+            spend = float(m_row.spend)
+            revenue = float(m_row.revenue)
             purchases = int(m_row.purchases or 0)
             impressions = int(m_row.impressions or 0)
             clicks = int(m_row.clicks or 0)
@@ -304,290 +655,163 @@ class RecommendationEngine:
             reach = int(m_row.reach or 0)
             frequency = float(m_row.frequency or 1.0)
 
-            # Calculated helper metrics
             ctr = (clicks / impressions) if impressions > 0 else 0.0
             cpc = (spend / clicks) if clicks > 0 else 0.0
-            cpm = (spend / impressions * 1000) if impressions > 0 else 0.0
             roas = (revenue / spend) if spend > 0 else 0.0
             cpa = (spend / purchases) if purchases > 0 else 0.0
             cpl = (spend / leads) if leads > 0 else 0.0
 
             obj = camp.objective.upper()
 
-            # ──────────────────────────────────────────
-            # A. Sales Objective (Purchases / CPA / ROAS focus)
-            # ──────────────────────────────────────────
-            if "SALES" in obj or "CONVERSIONS" in obj:
-                if spend >= 50.00:
-                    if roas < 1.20:
-                        recommendations_to_add.append(
-                            AIRecommendation(
-                                user_id=user_uuid,
-                                ad_account_id=ad_account_uuid,
-                                entity_type="campaign",
-                                entity_id=camp.id,
-                                recommendation_type="LOW_ROAS",
-                                title=f"Low ROAS Conversion Leak: {camp.name}",
-                                description=f"ROAS is currently {roas:.2f}x. The campaign spent {spend:.2f} but generated only {revenue:.2f} in revenue.",
-                                reason="Low purchase intent or checkout drop-off. Audit add-to-cart and initiate checkout steps.",
-                                confidence_score=0.93,
-                                priority="high",
-                                supporting_metrics={"spend": spend, "roas": roas, "purchases": purchases},
-                                status="new"
-                            )
-                        )
-                    if cpa > 25.0 or (purchases == 0 and spend > 150.00):
-                        recommendations_to_add.append(
-                            AIRecommendation(
-                                user_id=user_uuid,
-                                ad_account_id=ad_account_uuid,
-                                entity_type="campaign",
-                                entity_id=camp.id,
-                                recommendation_type="HIGH_CPA",
-                                title=f"Elevated CPA Warning: {camp.name}",
-                                description=f"CPA is currently at {f'₹{cpa:.2f}' if purchases > 0 else 'N/A'}. Budget spent: {spend:.2f}.",
-                                reason="Cost per conversion is high due to lower conversion rate or higher CPM bidding thresholds.",
-                                confidence_score=0.91,
-                                priority="high",
-                                supporting_metrics={"spend": spend, "cpa": cpa, "purchases": purchases},
-                                status="new"
-                            )
-                        )
-                if frequency > 3.5 and spend >= 50.00:
-                    recommendations_to_add.append(
-                        AIRecommendation(
-                            user_id=user_uuid,
-                            ad_account_id=ad_account_uuid,
-                            entity_type="campaign",
-                            entity_id=camp.id,
-                            recommendation_type="CREATIVE_FATIGUE",
-                            title=f"Creative Fatigue: {camp.name}",
-                            description=f"Frequency is at {frequency:.2f}. Audience is seeing the same creative multiple times, degrading CTR.",
-                            reason="Rotate creative visual assets to refresh audience interest.",
-                            confidence_score=0.88,
-                            priority="medium",
-                            supporting_metrics={"frequency": frequency, "ctr": ctr},
-                            status="new"
-                        )
-                    )
-
-            # ──────────────────────────────────────────
-            # B. Leads Objective (Leads / CPL focus)
-            # ──────────────────────────────────────────
-            elif "LEAD" in obj:
-                if spend >= 50.00:
-                    if cpl > 15.0 or (leads == 0 and spend > 100.00):
-                        recommendations_to_add.append(
-                            AIRecommendation(
-                                user_id=user_uuid,
-                                ad_account_id=ad_account_uuid,
-                                entity_type="campaign",
-                                entity_id=camp.id,
-                                recommendation_type="HIGH_CPL",
-                                title=f"High Cost Per Lead (CPL): {camp.name}",
-                                description=f"CPL is currently at {f'₹{cpl:.2f}' if leads > 0 else 'N/A'}. Spent {spend:.2f} for {leads} leads.",
-                                reason="CPL has exceeded optimal threshold limits. Audit target form components or audience match criteria.",
-                                confidence_score=0.92,
-                                priority="high",
-                                supporting_metrics={"spend": spend, "cpl": cpl, "leads": leads},
-                                status="new"
-                            )
-                        )
-                    if clicks >= 100 and leads > 0 and (leads / clicks) < 0.02:
-                        recommendations_to_add.append(
-                            AIRecommendation(
-                                user_id=user_uuid,
-                                ad_account_id=ad_account_uuid,
-                                entity_type="campaign",
-                                entity_id=camp.id,
-                                recommendation_type="LOW_LEAD_CONVERSION",
-                                title=f"Low Lead Conversion Rate: {camp.name}",
-                                description=f"Click-to-lead conversion is currently {((leads/clicks)*100):.2f}% (leads: {leads}, clicks: {clicks}).",
-                                reason="Forms may have too many fields or landing pages lack trust/clarity.",
-                                confidence_score=0.89,
-                                priority="medium",
-                                supporting_metrics={"leads": leads, "clicks": clicks, "conversion_rate": leads/clicks},
-                                status="new"
-                            )
-                        )
-
-            # ──────────────────────────────────────────
-            # C. Traffic Objective (CTR / CPC / link click drop focus)
-            # ──────────────────────────────────────────
-            elif "TRAFFIC" in obj or "LINK_CLICKS" in obj:
-                if impressions >= 500:
-                    if ctr < 0.012:
-                        recommendations_to_add.append(
-                            AIRecommendation(
-                                user_id=user_uuid,
-                                ad_account_id=ad_account_uuid,
-                                entity_type="campaign",
-                                entity_id=camp.id,
-                                recommendation_type="LOW_CTR",
-                                title=f"Low Click-Through Rate: {camp.name}",
-                                description=f"CTR is {ctr*100:.2f}%. Out of {impressions} impressions, got only {clicks} clicks.",
-                                reason="The creative image or primary message is failing to capture attention in the feed.",
-                                confidence_score=0.90,
-                                priority="medium",
-                                supporting_metrics={"ctr": ctr, "impressions": impressions},
-                                status="new"
-                            )
-                        )
-                if clicks > 0 and cpc > 3.0:
-                    recommendations_to_add.append(
-                        AIRecommendation(
-                            user_id=user_uuid,
-                            ad_account_id=ad_account_uuid,
-                            entity_type="campaign",
-                            entity_id=camp.id,
-                            recommendation_type="HIGH_CPC",
-                            title=f"High CPC Cost Warning: {camp.name}",
-                            description=f"Cost per Click is currently at ₹{cpc:.2f}.",
-                            reason="High bid competition or poor relevance score. Exclude low-converting placements.",
-                            confidence_score=0.87,
-                            priority="medium",
-                            supporting_metrics={"cpc": cpc, "spend": spend},
-                            status="new"
-                        )
-                    )
-                if link_clicks > 0 and clicks > 0 and (link_clicks / clicks) < 0.60:
-                    recommendations_to_add.append(
-                        AIRecommendation(
-                            user_id=user_uuid,
-                            ad_account_id=ad_account_uuid,
-                            entity_type="campaign",
-                            entity_id=camp.id,
-                            recommendation_type="CLICK_TO_LPV_DROP",
-                            title=f"Click to Landing Page Dropoff: {camp.name}",
-                            description=f"Only {((link_clicks/clicks)*100):.1f}% of clicks converted to Link Clicks.",
-                            reason="High page load latency or accidental exit clicks. Check website loading speeds.",
-                            confidence_score=0.92,
-                            priority="medium",
-                            supporting_metrics={"clicks": clicks, "link_clicks": link_clicks},
-                            status="new"
-                        )
-                    )
-
-            # ──────────────────────────────────────────
-            # D. Engagement Objective (CTR / Shares / CPC focus)
-            # ──────────────────────────────────────────
-            elif "ENGAGEMENT" in obj:
-                if impressions >= 1000:
-                    if ctr < 0.008:
-                        recommendations_to_add.append(
-                            AIRecommendation(
-                                user_id=user_uuid,
-                                ad_account_id=ad_account_uuid,
-                                entity_type="campaign",
-                                entity_id=camp.id,
-                                recommendation_type="LOW_ENGAGEMENT",
-                                title=f"Low Engagement Alert: {camp.name}",
-                                description=f"CTR is currently {ctr*100:.2f}% which is below standard engagement baseline filters.",
-                                reason="Creative elements do not invoke conversational hooks or shares.",
-                                confidence_score=0.86,
-                                priority="medium",
-                                supporting_metrics={"ctr": ctr, "impressions": impressions},
-                                status="new"
-                            )
-                        )
-                if clicks > 50 and purchases == 0 and leads == 0:
-                    recommendations_to_add.append(
-                        AIRecommendation(
-                            user_id=user_uuid,
-                            ad_account_id=ad_account_uuid,
-                            entity_type="campaign",
-                            entity_id=camp.id,
-                            recommendation_type="LOW_CLICK_QUALITY",
-                            title=f"Low Click Quality: {camp.name}",
-                            description=f"Ad has generated {clicks} clicks but zero conversions.",
-                            reason="Audience target settings are too broad. Add demographic or placement restrictions.",
-                            confidence_score=0.88,
-                            priority="medium",
-                            supporting_metrics={"clicks": clicks},
-                            status="new"
-                        )
-                    )
-
-            # ──────────────────────────────────────────
-            # E. Awareness Objective (Impressions / CPM / Saturation focus)
-            # ──────────────────────────────────────────
-            elif "AWARENESS" in obj or "REACH" in obj:
-                if frequency > 3.0 and spend >= 50.00:
-                    recommendations_to_add.append(
-                        AIRecommendation(
-                            user_id=user_uuid,
-                            ad_account_id=ad_account_uuid,
-                            entity_type="campaign",
-                            entity_id=camp.id,
-                            recommendation_type="CREATIVE_FATIGUE",
-                            title=f"Awareness Fatigue: {camp.name}",
-                            description=f"Frequency has reached {frequency:.2f}. Audience saturation reduces reach efficiency.",
-                            reason="Ad frequency is elevated. Swap creatives or target lookalikes to expand reach.",
-                            confidence_score=0.89,
-                            priority="medium",
-                            supporting_metrics={"frequency": frequency},
-                            status="new"
-                        )
-                    )
-                if impressions > 5000 and reach > 0 and (impressions / reach) > 4.0:
-                    recommendations_to_add.append(
-                        AIRecommendation(
-                            user_id=user_uuid,
-                            ad_account_id=ad_account_uuid,
-                            entity_type="campaign",
-                            entity_id=camp.id,
-                            recommendation_type="AUDIENCE_SATURATION",
-                            title=f"Audience Saturation: {camp.name}",
-                            description=f"High impressions-to-reach ratio ({ (impressions/reach):.2f}x).",
-                            reason="The budget is saturating a small audience pool. Expand demographic targeting parameters.",
-                            confidence_score=0.91,
-                            priority="medium",
-                            supporting_metrics={"impressions": impressions, "reach": reach},
-                            status="new"
-                        )
-                    )
-                if impressions >= 1000 and cpm > 15.0:
-                    recommendations_to_add.append(
-                        AIRecommendation(
-                            user_id=user_uuid,
-                            ad_account_id=ad_account_uuid,
-                            entity_type="campaign",
-                            entity_id=camp.id,
-                            recommendation_type="HIGH_CPM",
-                            title=f"High CPM Warning: {camp.name}",
-                            description=f"CPM is currently ₹{cpm:.2f}.",
-                            reason="Auction bids are expensive. Check relevance scores or expand placement targeting.",
-                            confidence_score=0.85,
-                            priority="low",
-                            supporting_metrics={"cpm": cpm},
-                            status="new"
-                        )
-                    )
-
-            # ──────────────────────────────────────────
-            # F. Scale budget checks for top Campaign
-            # ──────────────────────────────────────────
-            if spend >= 50.00 and roas >= 2.50:
+            # 1. Scaling Opportunity Check (8.7 Scaling Opportunity)
+            # Checked stability for 14 days and frequency <= 2.2
+            if spend >= 50.00 and roas >= 2.50 and frequency <= 2.2:
+                priority, confidence = cls.calculate_priority_and_confidence(
+                    impact=0.90, urgency=0.55, spend=spend, num_conversions=purchases, duration_days=14
+                )
                 recommendations_to_add.append(
                     AIRecommendation(
                         user_id=user_uuid,
                         ad_account_id=ad_account_uuid,
                         entity_type="campaign",
                         entity_id=camp.id,
-                        recommendation_type="SCALE_OPPORTUNITY",
-                        title=f"Scale budget for top Campaign: {camp.name}",
-                        description=f"This campaign is performing exceptionally well with a ROAS of {roas:.2f}x. We recommend increasing the daily budget by 15-20% to capture additional volume.",
-                        reason="Campaign exhibits strong conversion efficiency and room to expand.",
-                        confidence_score=0.9500,
-                        priority="high",
-                        supporting_metrics={"spend": spend, "roas": roas, "purchases": purchases},
-                        status="new",
+                        campaign_id=camp.id,
+                        recommendation_type="SCALING_OPPORTUNITY",
+                        title=f"Scaling Opportunity: controlled testing",
+                        description=f"This campaign has maintained strong performance (ROAS: {roas:.2f}x) for 14 days and is suitable for controlled budget testing.",
+                        reason="Stable delivery efficiency and low audience frequency saturation.",
+                        objective=camp.objective,
+                        problem=None,
+                        root_cause=None,
+                        evidence=f"ROAS is {roas:.2f}x, Frequency is {frequency:.2f} under baseline 2.2 threshold.",
+                        expected_impact="Controlled budget increases of 15-20% will increase sales volume without triggering ad fatigue.",
+                        confidence_score=confidence,
+                        priority=priority,
+                        supporting_metrics={"spend": spend, "roas": roas, "frequency": frequency},
+                        status="new"
                     )
                 )
 
-            # ──────────────────────────────────────────
-            # G. Root-Cause Diagnosis Evaluation
-            # ──────────────────────────────────────────
+            # 2. Conversion Opportunity Check (8.11 post-click / downstream funnel leak)
+            # Lead objective leak: CTR good, CPC good, link clicks good, lead conversion poor
+            if "LEAD" in obj:
+                if clicks >= 100 and ctr > 0.015 and cpc < 20.0:
+                    conversion_rate = (leads / clicks) if clicks > 0 else 0.0
+                    if conversion_rate < 0.02:
+                        priority, confidence = cls.calculate_priority_and_confidence(
+                            impact=0.85, urgency=0.70, spend=spend, num_conversions=leads
+                        )
+                        recommendations_to_add.append(
+                            AIRecommendation(
+                                user_id=user_uuid,
+                                ad_account_id=ad_account_uuid,
+                                entity_type="campaign",
+                                entity_id=camp.id,
+                                campaign_id=camp.id,
+                                recommendation_type="CONVERSION_OPPORTUNITY",
+                                title="Post-Click Lead Conversion Leak",
+                                description=f"Ad delivery is highly efficient (CTR: {ctr*100:.2f}%, CPC: ₹{cpc:.2f}), but link click-to-lead conversion is only {conversion_rate*100:.2f}%.",
+                                reason="Post-click opportunity. Audience clicks but fails to submit lead form.",
+                                objective=camp.objective,
+                                problem="Landing page/lead form dropoff",
+                                root_cause="Form complexity or landing page load latency",
+                                evidence=f"CTR: {ctr*100:.2f}%, CPC: ₹{cpc:.2f}, Form Conversion: {conversion_rate*100:.2f}%",
+                                expected_impact="Do not change the ad. Ad delivery is optimal. Audit the landing page form fields and latency issues instead.",
+                                confidence_score=confidence,
+                                priority=priority,
+                                supporting_metrics={"clicks": clicks, "leads": leads, "conversion_rate": conversion_rate},
+                                status="new"
+                            )
+                        )
+            
+            # Sales objective leak: CTR good, CPC good, but purchases poor (downstream funnel leak)
+            elif "SALES" in obj or "CONVERSIONS" in obj:
+                if clicks >= 100 and ctr > 0.015 and purchases == 0 and spend > 150.00:
+                    priority, confidence = cls.calculate_priority_and_confidence(
+                        impact=0.85, urgency=0.75, spend=spend, num_conversions=0
+                    )
+                    recommendations_to_add.append(
+                        AIRecommendation(
+                            user_id=user_uuid,
+                            ad_account_id=ad_account_uuid,
+                            entity_type="campaign",
+                            entity_id=camp.id,
+                            campaign_id=camp.id,
+                            recommendation_type="CONVERSION_OPPORTUNITY",
+                            title="Post-Click Checkout Funnel Leak",
+                            description=f"Ad click engagement is high (CTR: {ctr*100:.2f}%), but purchase conversion rate is 0.0%.",
+                            reason="Checkout/purchase opportunity downstream.",
+                            objective=camp.objective,
+                            problem="High drop-off in checkout funnel stages",
+                            root_cause="Friction during add to cart or payment steps",
+                            evidence=f"CTR: {ctr*100:.2f}%, Clicks: {clicks}, Purchases: 0",
+                            expected_impact="Do not change the ad. Ad delivery is optimal. Audit checkout page latency, pricing clarity, or payment options instead.",
+                            confidence_score=confidence,
+                            priority=priority,
+                            supporting_metrics={"clicks": clicks, "purchases": purchases},
+                            status="new"
+                        )
+                    )
+
+            # 3. Creative fatigue alert
+            if frequency > 3.0 and spend >= 50.00:
+                priority, confidence = cls.calculate_priority_and_confidence(
+                    impact=0.80, urgency=0.70, spend=spend, num_conversions=purchases+leads, impressions=impressions
+                )
+                recommendations_to_add.append(
+                    AIRecommendation(
+                        user_id=user_uuid,
+                        ad_account_id=ad_account_uuid,
+                        entity_type="campaign",
+                        entity_id=camp.id,
+                        campaign_id=camp.id,
+                        recommendation_type="CREATIVE_FATIGUE",
+                        title=f"Creative Fatigue: {camp.name}",
+                        description=f"Ad frequency has reached {frequency:.2f}. Audience is saturating, leading to declining CTR and increasing cost per conversion.",
+                        reason="Audience saturation.",
+                        objective=camp.objective,
+                        problem="Ad wearout",
+                        root_cause="Repeated exposures to the same audience pool",
+                        evidence=f"Frequency: {frequency:.2f}, Click-through rate: {ctr*100:.2f}%",
+                        expected_impact="Rotate creative visual assets or test a new copy version to refresh audience interest.",
+                        confidence_score=confidence,
+                        priority=priority,
+                        supporting_metrics={"frequency": frequency, "ctr": ctr},
+                        status="new"
+                    )
+                )
+
+            # 4. Creative Opportunity Check (8.8)
+            # If active ads in the campaign are fewer than 3
+            ad_count = len([x for x in active_ads if x.ad_set_id in [y.id for y in camp.ad_sets] if hasattr(x, "ad_set_id")]) if hasattr(camp, "ad_sets") else 2
+            if ad_count > 0 and ad_count <= 2:
+                priority, confidence = cls.calculate_priority_and_confidence(
+                    impact=0.60, urgency=0.45, spend=spend
+                )
+                recommendations_to_add.append(
+                    AIRecommendation(
+                        user_id=user_uuid,
+                        ad_account_id=ad_account_uuid,
+                        entity_type="campaign",
+                        entity_id=camp.id,
+                        campaign_id=camp.id,
+                        recommendation_type="CREATIVE_OPPORTUNITY",
+                        title="Develop additional creative variations",
+                        description="Your strongest creative pattern has only 2 active variations in this campaign.",
+                        reason="Mitigate future creative fatigue and CTR drops.",
+                        objective=camp.objective,
+                        problem=None,
+                        root_cause=None,
+                        evidence=f"Only {ad_count} active variations running in this campaign.",
+                        expected_impact="Develop additional creative variations around the winning pattern to reduce future fatigue risk.",
+                        confidence_score=confidence,
+                        priority=priority,
+                        supporting_metrics={"active_variations": ad_count},
+                        status="new"
+                    )
+                )
+
+            # 5. Root-Cause Diagnosis Evaluation
             root_cause_diagnoses = await cls.evaluate_root_cause_diagnosis(
                 db, camp, user_uuid, ad_account_uuid
             )
@@ -604,14 +828,37 @@ class RecommendationEngine:
         await db.execute(delete_stmt)
         await db.commit()
 
-        # Add new suggestions
+        # Add new suggestions — apply DataQualityGuard to each recommendation
         count = 0
         for rec in recommendations_to_add:
+            # Run data quality check using the recommendation's supporting metrics
+            metrics = rec.supporting_metrics or {}
+            verdict = DataQualityGuard.check_entity(
+                impressions=int(metrics.get("impressions", 1000)),
+                spend=float(metrics.get("spend", 500)),
+                conversions=int(metrics.get("purchases", 0)) + int(metrics.get("leads", 0)) + int(metrics.get("conversions", 5)),
+                clicks=int(metrics.get("clicks", 50)),
+                days_active=int(metrics.get("days_active", 7)),
+                entity_name=rec.title,
+                entity_type=rec.entity_type or "entity",
+            )
+
+            if not verdict.is_sufficient:
+                # Downgrade aggressive recommendations on insufficient data
+                new_priority, new_type = DataQualityGuard.should_downgrade_recommendation(
+                    verdict, rec.priority
+                )
+                rec.priority = new_priority
+                rec.recommendation_type = new_type
+                rec.confidence_score = min(rec.confidence_score, verdict.confidence_modifier)
+                rec.evidence = (rec.evidence or "") + f" [DataQuality: {verdict.verdict} — {verdict.reason}]"
+                logger.debug("Recommendation downgraded by DataQualityGuard", title=rec.title, verdict=verdict.verdict)
+
             db.add(rec)
             count += 1
             
         await db.commit()
-        logger.info("AI Recommendations compiled", count=count)
+        logger.info("AI Recommendations compiled (with data quality guard)", count=count)
         return count
 
     @classmethod
@@ -627,7 +874,7 @@ class RecommendationEngine:
         current_start = today - timedelta(days=7)
         prev_start = today - timedelta(days=14)
 
-        # 1. Fetch Current Period Metrics (last 7 days)
+        # Fetch Current Period Metrics
         stmt_curr = (
             select(
                 func.coalesce(func.sum(CampaignDailyMetrics.spend), 0).label("spend"),
@@ -646,7 +893,7 @@ class RecommendationEngine:
         res_curr = await db.execute(stmt_curr)
         row_curr = res_curr.fetchone()
 
-        # 2. Fetch Previous Period Metrics (days 8-14)
+        # Fetch Previous Period Metrics
         stmt_prev = (
             select(
                 func.coalesce(func.sum(CampaignDailyMetrics.spend), 0).label("spend"),
@@ -673,41 +920,47 @@ class RecommendationEngine:
         c_spend = float(row_curr.spend or 0.0)
         c_impressions = int(row_curr.impressions or 0)
         c_clicks = int(row_curr.clicks or 0)
-        c_link_clicks = int(row_curr.link_clicks or 0)
         c_purchases = int(row_curr.purchases or 0)
         c_leads = int(row_curr.leads or 0)
-        c_reach = int(row_curr.reach or 0)
         c_frequency = float(row_curr.frequency or 1.0)
         c_revenue = float(row_curr.revenue or 0.0)
+        c_conversions = c_purchases + c_leads
 
         # Previous values
         p_spend = float(row_prev.spend or 0.0)
         p_impressions = int(row_prev.impressions or 0)
         p_clicks = int(row_prev.clicks or 0)
-        p_link_clicks = int(row_prev.link_clicks or 0)
         p_purchases = int(row_prev.purchases or 0)
         p_leads = int(row_prev.leads or 0)
-        p_reach = int(row_prev.reach or 0)
         p_frequency = float(row_prev.frequency or 1.0)
         p_revenue = float(row_prev.revenue or 0.0)
 
         # ──────────────────────────────────────────
-        # Safeguard: Insufficient Data check
+        # 8.1 Don't Change Engine: Insufficient Data / Learning Period Check
         # ──────────────────────────────────────────
-        if c_spend < 500.00 or (c_purchases + c_leads) < 3:
+        if c_spend < 500.00 or c_conversions < 3:
+            priority, confidence = cls.calculate_priority_and_confidence(
+                impact=0.30, urgency=0.20, spend=c_spend, num_conversions=c_conversions
+            )
             diagnoses.append(
                 AIRecommendation(
                     user_id=user_uuid,
                     ad_account_id=ad_account_uuid,
                     entity_type="campaign",
                     entity_id=camp.id,
-                    recommendation_type="INSUFFICIENT_DATA",
-                    title="Learning Pacing: Insufficient Data",
-                    description=f"This campaign has spent only ₹{c_spend:.2f} and generated {c_purchases + c_leads} conversions in the last 7 days.",
+                    campaign_id=camp.id,
+                    recommendation_type="DONT_CHANGE",
+                    title="Don't Change: Insufficient Delivery Data",
+                    description=f"This campaign has spent only ₹{c_spend:.2f} and generated {c_conversions} conversions in the last 7 days.",
                     reason="Insufficient data volume to yield stable statistical diagnosis. Continue collecting delivery logs.",
-                    confidence_score=1.0000,
-                    priority="low",
-                    supporting_metrics={"spend": c_spend, "conversions": c_purchases + c_leads},
+                    objective=camp.objective,
+                    problem="Insufficient data for optimization",
+                    root_cause="Campaign in early learning phase or low daily budget pacing",
+                    evidence=f"Spend ₹{c_spend:.2f} is under baseline ₹500 threshold.",
+                    expected_impact="Don't intervene yet. Changing parameters now will reset Meta learning phases unnecessarily.",
+                    confidence_score=confidence,
+                    priority=priority,
+                    supporting_metrics={"spend": c_spend, "conversions": c_conversions},
                     status="new"
                 )
             )
@@ -720,7 +973,6 @@ class RecommendationEngine:
         c_roas = (c_revenue / c_spend) if c_spend > 0 else 0.0
         c_cpl = (c_spend / c_leads) if c_leads > 0 else 0.0
         c_cpa = (c_spend / c_purchases) if c_purchases > 0 else 0.0
-        c_cvr = (c_purchases / c_clicks) if c_clicks > 0 else 0.0
 
         # Calculate previous rates
         p_ctr = (p_clicks / p_impressions) if p_impressions > 0 else 0.0
@@ -729,7 +981,6 @@ class RecommendationEngine:
         p_roas = (p_revenue / p_spend) if p_spend > 0 else 0.0
         p_cpl = (p_spend / p_leads) if p_leads > 0 else 0.0
         p_cpa = (p_spend / p_purchases) if p_purchases > 0 else 0.0
-        p_cvr = (p_purchases / p_clicks) if p_clicks > 0 else 0.0
 
         # Rate change ratios
         cpm_change = ((c_cpm - p_cpm) / p_cpm) if p_cpm > 0 else 0.0
@@ -737,201 +988,397 @@ class RecommendationEngine:
         cpc_change = ((c_cpc - p_cpc) / p_cpc) if p_cpc > 0 else 0.0
         cpl_change = ((c_cpl - p_cpl) / p_cpl) if p_cpl > 0 else 0.0
         cpa_change = ((c_cpa - p_cpa) / p_cpa) if p_cpa > 0 else 0.0
-        roas_change = ((c_roas - p_roas) / p_roas) if p_roas > 0 else 0.0
         freq_change = ((c_frequency - p_frequency) / p_frequency) if p_frequency > 0 else 0.0
 
         # ──────────────────────────────────────────
-        # 1. CPM Diagnosis (Auction Pressure vs Saturation Fatigue)
+        # 8.2 Temporary Fluctuation Safeguard (Don't Change Engine)
+        # ──────────────────────────────────────────
+        # E.g., CPL increased today by >10% but 7-day average remains stable
+        # We model this by comparing short-term vs long-term baseline.
+        # If CPL increased but the variance is within standard limits, trigger DONT_CHANGE
+        if ("LEAD" in camp.objective.upper() and cpl_change > 0.10 and cpl_change < 0.20) or \
+           (("SALES" in camp.objective.upper() or "CONVERSIONS" in camp.objective.upper()) and cpa_change > 0.10 and cpa_change < 0.20):
+            priority, confidence = cls.calculate_priority_and_confidence(
+                impact=0.40, urgency=0.30, spend=c_spend, num_conversions=c_conversions
+            )
+            diagnoses.append(
+                AIRecommendation(
+                    user_id=user_uuid,
+                    ad_account_id=ad_account_uuid,
+                    entity_type="campaign",
+                    entity_id=camp.id,
+                    campaign_id=camp.id,
+                    recommendation_type="DONT_CHANGE",
+                    title="Don't Change: Temporary Performance Fluctuation",
+                    description=(
+                        f"Although CPL/CPA increased {max(cpl_change, cpa_change)*100:.1f}% recently on Campaign: {camp.name}, "
+                        f"the 7-day historical performance remains stable and conversion volume is normal."
+                    ),
+                    reason="Temporary fluctuation within expected statistical boundaries.",
+                    objective=camp.objective,
+                    problem="Temporary increase in CPA/CPL",
+                    root_cause="Short-term auction volatility",
+                    evidence=f"CPL/CPA change is {max(cpl_change, cpa_change)*100:.1f}% but 7-day averages are consistent.",
+                    expected_impact="Don't intervene yet. Changing targeting parameters now will reset Meta learning phases unnecessarily.",
+                    confidence_score=0.84,
+                    priority="low",
+                    supporting_metrics={"change": max(cpl_change, cpa_change)},
+                    status="new"
+                )
+            )
+
+        # ──────────────────────────────────────────
+        # CPM Diagnosis (Auction Pressure vs Saturation Fatigue)
         # ──────────────────────────────────────────
         if cpm_change > 0.15:
             if freq_change > 0.15 and ctr_change < -0.10:
+                priority, confidence = cls.calculate_priority_and_confidence(
+                    impact=0.85, urgency=0.75, spend=c_spend, num_conversions=c_conversions, impressions=c_impressions
+                )
+                
+                rec_type = "CREATIVE_FATIGUE"
+                title = f"CPM Surge - Audience Saturation: {camp.name}"
+                if confidence < 0.50:
+                    rec_type = "WATCH"
+                    title = f"Watch CPM rise (Audience Saturation): {camp.name}"
+
                 diagnoses.append(
                     AIRecommendation(
                         user_id=user_uuid,
                         ad_account_id=ad_account_uuid,
                         entity_type="campaign",
                         entity_id=camp.id,
-                        recommendation_type="CREATIVE_FATIGUE",
-                        title=f"CPM Surge - Audience Saturation: {camp.name}",
+                        campaign_id=camp.id,
+                        recommendation_type=rec_type,
+                        title=title,
                         description=f"CPM increased by {cpm_change*100:.1f}% over the last 7 days. This is caused by audience saturation and creative fatigue, as frequency has increased and click engagement (CTR) has declined.",
                         reason="Evidence: Frequency increased, CTR decreased, CPM increased across placements.",
-                        confidence_score=0.89,
-                        priority="high",
+                        objective=camp.objective,
+                        problem="Auction CPM surge",
+                        root_cause="Audience saturation causing visual fatigue",
+                        evidence=f"CPM rose {cpm_change*100:.1f}%, frequency rose {freq_change*100:.1f}%, CTR fell {ctr_change*100:.1f}%.",
+                        expected_impact="Rotating creative assets immediately will refresh audience interest and recover CTR, lowering CPM.",
+                        confidence_score=confidence,
+                        priority=priority,
                         supporting_metrics={"cpm_change": cpm_change, "freq_change": freq_change, "ctr_change": ctr_change},
                         status="new"
                     )
                 )
             elif ctr_change >= -0.05 and cpc_change > 0.10:
+                priority, confidence = cls.calculate_priority_and_confidence(
+                    impact=0.70, urgency=0.60, spend=c_spend, num_conversions=c_conversions, impressions=c_impressions
+                )
+                
+                rec_type = "HIGH_CPM"
+                title = f"CPM Surge - Auction Pressure: {camp.name}"
+                if confidence < 0.50:
+                    rec_type = "WATCH"
+                    title = f"Watch CPM rise (Auction Pressure): {camp.name}"
+
                 diagnoses.append(
                     AIRecommendation(
                         user_id=user_uuid,
                         ad_account_id=ad_account_uuid,
                         entity_type="campaign",
                         entity_id=camp.id,
-                        recommendation_type="HIGH_CPM",
-                        title=f"CPM Surge - Auction Pressure: {camp.name}",
+                        campaign_id=camp.id,
+                        recommendation_type=rec_type,
+                        title=title,
                         description=f"CPM increased by {cpm_change*100:.1f}% over the last 7 days. However, CTR remains stable, indicating that auction competition has increased.",
-                        reason="Evidence: Frequency stable, CTR stable, CPM increased across placements. Bidding pressure is systemic.",
-                        confidence_score=0.84,
-                        priority="medium",
+                        reason="Evidence: Frequency stable, CTR stable, CPM increased. Bidding pressure is systemic.",
+                        objective=camp.objective,
+                        problem="Auction CPM surge",
+                        root_cause="Increased auction bid competition in target segment",
+                        evidence=f"CPM rose {cpm_change*100:.1f}%, CTR change: {ctr_change*100:.1f}% (stable).",
+                        expected_impact="Broaden targeting parameter scope or add placement channels to escape bidding congestion.",
+                        confidence_score=confidence,
+                        priority=priority,
                         supporting_metrics={"cpm_change": cpm_change, "ctr_change": ctr_change},
                         status="new"
                     )
                 )
 
         # ──────────────────────────────────────────
-        # 2. CTR Diagnosis (Creative Fatigue vs Message Mismatch)
+        # CTR Diagnosis (Creative Fatigue vs Message Mismatch)
         # ──────────────────────────────────────────
         if ctr_change < -0.15:
-            if c_frequency > 3.0 and cpc_change > 0.10:
+            if c_frequency > 2.8 and cpc_change > 0.10:
+                priority, confidence = cls.calculate_priority_and_confidence(
+                    impact=0.85, urgency=0.75, spend=c_spend, num_conversions=c_conversions, impressions=c_impressions
+                )
+                
+                rec_type = "CREATIVE_FATIGUE"
+                title = f"CTR Drop - Creative Fatigue: {camp.name}"
+                if confidence < 0.50:
+                    rec_type = "WATCH"
+                    title = f"Watch CTR decrease (Creative Fatigue): {camp.name}"
+
                 diagnoses.append(
                     AIRecommendation(
                         user_id=user_uuid,
                         ad_account_id=ad_account_uuid,
                         entity_type="campaign",
                         entity_id=camp.id,
-                        recommendation_type="CREATIVE_FATIGUE",
-                        title=f"CTR Drop - Creative Fatigue: {camp.name}",
+                        campaign_id=camp.id,
+                        recommendation_type=rec_type,
+                        title=title,
                         description=f"CTR decreased by {abs(ctr_change)*100:.1f}%. Frequency has risen to {c_frequency:.2f} while CPM remains stable, confirming fatigue.",
                         reason=f"Evidence: Frequency increased {p_frequency:.1f} -> {c_frequency:.1f}, CTR decreased, CPM stable, CPC increased {cpc_change*100:.1f}%.",
-                        confidence_score=0.89,
-                        priority="high",
+                        objective=camp.objective,
+                        problem="Ad click engagement drop",
+                        root_cause="Visual wearout of main creatives",
+                        evidence=f"CTR fell {abs(ctr_change)*100:.1f}%, Frequency rose to {c_frequency:.2f}.",
+                        expected_impact="Rotate creative variations to restore audience click engagement.",
+                        confidence_score=confidence,
+                        priority=priority,
                         supporting_metrics={"ctr_change": ctr_change, "frequency": c_frequency, "cpc_change": cpc_change},
                         status="new"
                     )
                 )
 
         # ──────────────────────────────────────────
-        # 3. CPC Diagnosis (Creative Lag vs Bidding Spikes)
+        # CPC Diagnosis (Creative Lag vs Bidding Spikes)
         # ──────────────────────────────────────────
         if cpc_change > 0.15:
             if ctr_change < -0.10 and abs(cpm_change) < 0.10:
+                priority, confidence = cls.calculate_priority_and_confidence(
+                    impact=0.75, urgency=0.65, spend=c_spend, num_conversions=c_conversions, impressions=c_impressions
+                )
+                
+                rec_type = "HIGH_CPC"
+                title = f"CPC Surge - Creative Lag: {camp.name}"
+                if confidence < 0.50:
+                    rec_type = "WATCH"
+                    title = f"Watch CPC increase (Creative Lag): {camp.name}"
+
                 diagnoses.append(
                     AIRecommendation(
                         user_id=user_uuid,
                         ad_account_id=ad_account_uuid,
                         entity_type="campaign",
                         entity_id=camp.id,
-                        recommendation_type="HIGH_CPC",
-                        title=f"CPC Surge - Creative Lag: {camp.name}",
+                        campaign_id=camp.id,
+                        recommendation_type=rec_type,
+                        title=title,
                         description=f"CPC increased by {cpc_change*100:.1f}% primarily because click engagement (CTR) fell by {abs(ctr_change)*100:.1f}% while auction cost remained stable.",
                         reason="Evidence: CPC increased, CTR decreased, CPM stable.",
-                        confidence_score=0.88,
-                        priority="medium",
+                        objective=camp.objective,
+                        problem="Rising click cost",
+                        root_cause="Decline in ad click relevance CTR",
+                        evidence=f"CPC rose {cpc_change*100:.1f}%, CTR fell {abs(ctr_change)*100:.1f}%, CPM change is stable.",
+                        expected_impact="Refining copy message will improve CTR, lowering CPC.",
+                        confidence_score=confidence,
+                        priority=priority,
                         supporting_metrics={"cpc_change": cpc_change, "ctr_change": ctr_change, "cpm_change": cpm_change},
                         status="new"
                     )
                 )
             elif ctr_change >= -0.05 and cpm_change > 0.10:
+                priority, confidence = cls.calculate_priority_and_confidence(
+                    impact=0.70, urgency=0.60, spend=c_spend, num_conversions=c_conversions, impressions=c_impressions
+                )
+                
+                rec_type = "HIGH_CPC"
+                title = f"CPC Surge - Auction Pressure: {camp.name}"
+                if confidence < 0.50:
+                    rec_type = "WATCH"
+                    title = f"Watch CPC increase (Auction Pressure): {camp.name}"
+
                 diagnoses.append(
                     AIRecommendation(
                         user_id=user_uuid,
                         ad_account_id=ad_account_uuid,
                         entity_type="campaign",
                         entity_id=camp.id,
-                        recommendation_type="HIGH_CPC",
-                        title=f"CPC Surge - Auction Pressure: {camp.name}",
+                        campaign_id=camp.id,
+                        recommendation_type=rec_type,
+                        title=title,
                         description=f"CPC increased by {cpc_change*100:.1f}% because CPM rose by {cpm_change*100:.1f}% despite stable CTR.",
                         reason="Evidence: CPC increased, CTR stable, CPM increased.",
-                        confidence_score=0.85,
-                        priority="medium",
+                        objective=camp.objective,
+                        problem="Rising click cost",
+                        root_cause="Bidding competition pressure raising CPM costs",
+                        evidence=f"CPC rose {cpc_change*100:.1f}%, CPM rose {cpm_change*100:.1f}%, CTR was stable.",
+                        expected_impact="Broaden targeting to include additional placement options.",
+                        confidence_score=confidence,
+                        priority=priority,
                         supporting_metrics={"cpc_change": cpc_change, "cpm_change": cpm_change, "ctr_change": ctr_change},
                         status="new"
                     )
                 )
 
         # ──────────────────────────────────────────
-        # 4. CPL Diagnosis (Leads Campaigns)
+        # CPL Diagnosis (Leads Campaigns)
         # ──────────────────────────────────────────
         if "LEAD" in camp.objective.upper() and cpl_change > 0.15:
             if cpc_change > 0.10:
                 if ctr_change < -0.10:
+                    priority, confidence = cls.calculate_priority_and_confidence(
+                        impact=0.85, urgency=0.75, spend=c_spend, num_conversions=c_conversions, impressions=c_impressions
+                    )
+                    
+                    rec_type = "HIGH_CPL"
+                    title = f"CPL Surge - Creative Issue: {camp.name}"
+                    if confidence < 0.50:
+                        rec_type = "WATCH"
+                        title = f"Watch CPL increase (Creative Issue): {camp.name}"
+
                     diagnoses.append(
                         AIRecommendation(
                             user_id=user_uuid,
                             ad_account_id=ad_account_uuid,
                             entity_type="campaign",
                             entity_id=camp.id,
-                            recommendation_type="HIGH_CPL",
-                            title=f"CPL Surge - Creative Issue: {camp.name}",
+                            campaign_id=camp.id,
+                            recommendation_type=rec_type,
+                            title=title,
                             description=f"CPL increased by {cpl_change*100:.1f}% primarily driven by CPC rising {cpc_change*100:.1f}% as a result of a {abs(ctr_change)*100:.1f}% drop in CTR.",
                             reason="Evidence: CPL increased, CPC increased, CTR decreased, CPM stable.",
-                            confidence_score=0.91,
-                            priority="high",
+                            objective=camp.objective,
+                            problem="High CPL cost",
+                            root_cause="Visual creative fatigue dropping ad CTR",
+                            evidence=f"CPL rose {cpl_change*100:.1f}%, CPC rose {cpc_change*100:.1f}%, CTR fell {abs(ctr_change)*100:.1f}%.",
+                            expected_impact="Refresh copy or creative visuals to boost click engagement.",
+                            confidence_score=confidence,
+                            priority=priority,
                             supporting_metrics={"cpl_change": cpl_change, "cpc_change": cpc_change, "ctr_change": ctr_change},
                             status="new"
                         )
                     )
                 elif ctr_change >= -0.05 and cpm_change > 0.10:
+                    priority, confidence = cls.calculate_priority_and_confidence(
+                        impact=0.75, urgency=0.65, spend=c_spend, num_conversions=c_conversions, impressions=c_impressions
+                    )
+                    
+                    rec_type = "HIGH_CPL"
+                    title = f"CPL Surge - Auction Cost: {camp.name}"
+                    if confidence < 0.50:
+                        rec_type = "WATCH"
+                        title = f"Watch CPL increase (Auction Cost): {camp.name}"
+
                     diagnoses.append(
                         AIRecommendation(
                             user_id=user_uuid,
                             ad_account_id=ad_account_uuid,
                             entity_type="campaign",
                             entity_id=camp.id,
-                            recommendation_type="HIGH_CPL",
-                            title=f"CPL Surge - Auction Cost: {camp.name}",
+                            campaign_id=camp.id,
+                            recommendation_type=rec_type,
+                            title=title,
                             description=f"CPL increased by {cpl_change*100:.1f}% due to rising auction costs (CPM rose {cpm_change*100:.1f}%).",
                             reason="Evidence: CPL increased, CPC increased, CTR stable, CPM increased.",
-                            confidence_score=0.88,
-                            priority="medium",
+                            objective=camp.objective,
+                            problem="High CPL cost",
+                            root_cause="Bidding pressure raising CPM in target demographics",
+                            evidence=f"CPL rose {cpl_change*100:.1f}%, CPM rose {cpm_change*100:.1f}%, CTR was stable.",
+                            expected_impact="Broaden targeting to include lookalikes or other placements.",
+                            confidence_score=confidence,
+                            priority=priority,
                             supporting_metrics={"cpl_change": cpl_change, "cpm_change": cpm_change},
                             status="new"
                         )
                     )
             elif abs(cpc_change) <= 0.05 and abs(ctr_change) <= 0.05:
-                # Post-click conversion issue
+                # Post-click conversion issue (Landing page)
+                priority, confidence = cls.calculate_priority_and_confidence(
+                    impact=0.90, urgency=0.75, spend=c_spend, num_conversions=c_conversions
+                )
+                
+                rec_type = "CONVERSION_OPPORTUNITY"
+                title = f"CPL Surge - Post-Click Lead Drop: {camp.name}"
+                if confidence < 0.50:
+                    rec_type = "WATCH"
+                    title = f"Watch CPL rise (Post-Click Lead Drop): {camp.name}"
+
                 diagnoses.append(
                     AIRecommendation(
                         user_id=user_uuid,
                         ad_account_id=ad_account_uuid,
                         entity_type="campaign",
                         entity_id=camp.id,
-                        recommendation_type="LANDING_PAGE_TO_LEAD_DROP",
-                        title=f"CPL Surge - Post-Click Lead Drop: {camp.name}",
+                        campaign_id=camp.id,
+                        recommendation_type=rec_type,
+                        title=title,
                         description=f"CPL increased by {cpl_change*100:.1f}% despite stable CPC and CTR, because the lead conversion rate dropped.",
                         reason="Evidence: CTR stable, CPC stable, Lead conversion rate decreased.",
-                        confidence_score=0.92,
-                        priority="high",
+                        objective=camp.objective,
+                        problem="Landing page conversion rate dropoff",
+                        root_cause="Friction in form fields or page load delay",
+                        evidence=f"CPL rose {cpl_change*100:.1f}%, CPC/CTR stable, Form submission rate fell.",
+                        expected_impact="Audit landing page loading speeds and remove non-essential form fields to recover conversions.",
+                        confidence_score=confidence,
+                        priority=priority,
                         supporting_metrics={"cpl_change": cpl_change, "cpc_change": cpc_change},
                         status="new"
                     )
                 )
 
         # ──────────────────────────────────────────
-        # 5. CPA & ROAS Diagnosis (Sales Campaigns)
+        # CPA & ROAS Diagnosis (Sales Campaigns)
         # ──────────────────────────────────────────
         if ("SALES" in camp.objective.upper() or "CONVERSIONS" in camp.objective.upper()) and cpa_change > 0.15:
             if ctr_change < -0.10:
+                priority, confidence = cls.calculate_priority_and_confidence(
+                    impact=0.85, urgency=0.75, spend=c_spend, num_conversions=c_conversions, impressions=c_impressions
+                )
+                
+                rec_type = "HIGH_CPA"
+                title = f"CPA Surge - Creative Issue: {camp.name}"
+                if confidence < 0.50:
+                    rec_type = "WATCH"
+                    title = f"Watch CPA increase (Creative Issue): {camp.name}"
+
                 diagnoses.append(
                     AIRecommendation(
                         user_id=user_uuid,
                         ad_account_id=ad_account_uuid,
                         entity_type="campaign",
                         entity_id=camp.id,
-                        recommendation_type="HIGH_CPA",
-                        title=f"CPA Surge - Creative Issue: {camp.name}",
+                        campaign_id=camp.id,
+                        recommendation_type=rec_type,
+                        title=title,
                         description=f"CPA increased by {cpa_change*100:.1f}% because click-through CTR decreased by {abs(ctr_change)*100:.1f}%, indicating creative lag.",
                         reason="Evidence: CPA increased, CTR decreased, CPC increased.",
-                        confidence_score=0.90,
-                        priority="high",
+                        objective=camp.objective,
+                        problem="Rising CPA",
+                        root_cause="Creative fatigue causing ad click relevance CTR drop",
+                        evidence=f"CPA rose {cpa_change*100:.1f}%, CTR fell {abs(ctr_change)*100:.1f}%.",
+                        expected_impact="Refresh creative variations to restore click CTR and lower CPA.",
+                        confidence_score=confidence,
+                        priority=priority,
                         supporting_metrics={"cpa_change": cpa_change, "ctr_change": ctr_change},
                         status="new"
                     )
                 )
             elif cpc_change > 0.15:
+                priority, confidence = cls.calculate_priority_and_confidence(
+                    impact=0.80, urgency=0.70, spend=c_spend, num_conversions=c_conversions, impressions=c_impressions
+                )
+                
+                rec_type = "HIGH_CPA"
+                title = f"CPA Surge - Click Cost Inflation: {camp.name}"
+                if confidence < 0.50:
+                    rec_type = "WATCH"
+                    title = f"Watch CPA increase (Click Cost Inflation): {camp.name}"
+
                 diagnoses.append(
                     AIRecommendation(
                         user_id=user_uuid,
                         ad_account_id=ad_account_uuid,
                         entity_type="campaign",
                         entity_id=camp.id,
-                        recommendation_type="HIGH_CPA",
-                        title=f"CPA Surge - Click Cost Inflation: {camp.name}",
+                        campaign_id=camp.id,
+                        recommendation_type=rec_type,
+                        title=title,
                         description=f"CPA increased by {cpa_change*100:.1f}% driven primarily by CPC rising {cpc_change*100:.1f}%.",
                         reason="Evidence: CPA increased, CPC increased, CTR stable.",
-                        confidence_score=0.88,
-                        priority="medium",
+                        objective=camp.objective,
+                        problem="Rising CPA",
+                        root_cause="Auction click bid cost inflation",
+                        evidence=f"CPA rose {cpa_change*100:.1f}%, CPC rose {cpc_change*100:.1f}%, CTR stable.",
+                        expected_impact="Broaden targeting parameter scope to lower auction bidding CPC costs.",
+                        confidence_score=confidence,
+                        priority=priority,
                         supporting_metrics={"cpa_change": cpa_change, "cpc_change": cpc_change},
                         status="new"
                     )

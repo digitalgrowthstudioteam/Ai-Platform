@@ -48,6 +48,38 @@ class AIRecommendation(BaseModel):
         Text,
         nullable=False,
     )
+    objective: Mapped[Optional[str]] = mapped_column(
+        String(50),
+        nullable=True,  # Sales, Lead Gen, etc.
+    )
+    problem: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+    )
+    root_cause: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+    )
+    evidence: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+    )
+    expected_impact: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+    )
+    campaign_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        nullable=True,
+    )
+    adset_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        nullable=True,
+    )
+    ad_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        nullable=True,
+    )
+    creative_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        nullable=True,
+    )
     confidence_score: Mapped[float] = mapped_column(
         Numeric(precision=5, scale=4),
         nullable=False,
