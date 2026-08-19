@@ -220,65 +220,42 @@ export default function AdSetsPage() {
             </div>
 
             {/* Performance Goal Header */}
-            {adSetPerformance ? (
-              <div className="card border border-border bg-gradient-to-r from-slate-900 to-slate-800 shadow-xl rounded-xl p-6 text-white space-y-4">
-                <div className="flex justify-between items-start gap-4">
-                  <div className="space-y-1">
-                    <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest flex items-center gap-1">
-                      <Target size={12} /> Performance Goal Intelligence Active
-                    </span>
-                    <h2 className="text-2xl font-black">{selectedAdSet.name}</h2>
-                    <p className="text-sm text-slate-300 max-w-2xl">
-                      {adSetPerformance.performance_goal.name}: {adSetPerformance.performance_goal.description}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className={`text-[10px] px-2 py-1 rounded font-bold uppercase ${selectedAdSet.status === "ACTIVE" ? "text-green-400 bg-green-50/10 border border-green-50/20" : "text-slate-400 bg-slate-50/10 border border-slate-50/20"}`}>
+            {/* Ad Set Header */}
+            <div className="card border border-border bg-white shadow-sm rounded-lg p-5 space-y-4">
+              {perfError && (
+                <div className="bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold px-4 py-3 rounded-lg flex items-center gap-2 mb-2">
+                  <AlertCircle size={16} className="text-rose-500 shrink-0" />
+                  <span>Goal-Aware Performance Engine load failed: {perfError}. Showing basic fallback layout instead.</span>
+                </div>
+              )}
+              <div className="flex flex-wrap justify-between items-start gap-4">
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Ad Set Details</span>
+                  <h2 className="text-xl font-black text-slate-800 mt-1">{selectedAdSet.name}</h2>
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${selectedAdSet.status === "ACTIVE" ? "text-green-600 bg-green-50 animate-pulse" : "text-slate-500 bg-slate-100"}`}>
                       {selectedAdSet.status}
                     </span>
-                    <span className="text-[10px] text-blue-400 bg-blue-50/10 border border-blue-50/20 px-2 py-1 rounded font-bold uppercase">
-                      Motive: {adSetPerformance.performance_goal.motive}
+                    <span className="text-[10px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded font-bold uppercase">
+                      Goal: {selectedAdSet.optimization_goal?.replace(/_/g, " ") || "N/A"}
                     </span>
                   </div>
                 </div>
-              </div>
-            ) : (
-              <div className="card border border-border bg-white shadow-sm rounded-lg p-5 space-y-4">
-                {perfError && (
-                  <div className="bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold px-4 py-3 rounded-lg flex items-center gap-2 mb-2">
-                    <AlertCircle size={16} className="text-rose-500 shrink-0" />
-                    <span>Goal-Aware Performance Engine load failed: {perfError}. Showing basic fallback layout instead.</span>
-                  </div>
-                )}
-                <div className="flex flex-wrap justify-between items-start gap-4">
-                  <div>
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Ad Set Details</span>
-                    <h2 className="text-xl font-black text-slate-800 mt-1">{selectedAdSet.name}</h2>
-                    <div className="flex items-center gap-2 mt-2">
-                      <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${selectedAdSet.status === "ACTIVE" ? "text-green-600 bg-green-50 animate-pulse" : "text-slate-500 bg-slate-100"}`}>
-                        {selectedAdSet.status}
-                      </span>
-                      <span className="text-[10px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded font-bold uppercase">
-                        Goal: {selectedAdSet.optimization_goal.replace(/_/g, " ")}
-                      </span>
+                <div className="flex flex-wrap items-center gap-4">
+                  {[
+                    { label: "Spend", val: formatCurrency(selectedAdSet.metrics.spend) },
+                    { label: "CTR", val: formatPercent(selectedAdSet.metrics.ctr) },
+                    { label: "Conversions", val: selectedAdSet.metrics.purchases },
+                    { label: "ROAS", val: `${selectedAdSet.metrics.roas.toFixed(2)}x`, highlight: true }
+                  ].map((k, i) => (
+                    <div key={i} className="bg-slate-50 border border-slate-100 p-2.5 rounded-lg text-center min-w-[90px]">
+                      <div className="text-[8px] font-bold text-slate-400 uppercase">{k.label}</div>
+                      <div className={`text-xs font-black mt-1 ${k.highlight ? "text-green-600 font-bold" : "text-slate-800"}`}>{k.val}</div>
                     </div>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-4">
-                    {[
-                      { label: "Spend", val: formatCurrency(selectedAdSet.metrics.spend) },
-                      { label: "CTR", val: formatPercent(selectedAdSet.metrics.ctr) },
-                      { label: "Conversions", val: selectedAdSet.metrics.purchases },
-                      { label: "ROAS", val: `${selectedAdSet.metrics.roas.toFixed(2)}x`, highlight: true }
-                    ].map((k, i) => (
-                      <div key={i} className="bg-slate-50 border border-slate-100 p-2.5 rounded-lg text-center min-w-[90px]">
-                        <div className="text-[8px] font-bold text-slate-400 uppercase">{k.label}</div>
-                        <div className={`text-xs font-black mt-1 ${k.highlight ? "text-green-600 font-bold" : "text-slate-800"}`}>{k.val}</div>
-                      </div>
-                    ))}
-                  </div>
+                  ))}
                 </div>
               </div>
-            )}
+            </div>
 
             {/* Tab Toggles */}
             <div className="flex border-b border-slate-200 gap-6 mt-2">
