@@ -266,7 +266,7 @@ class RecommendationEngine:
                 )
 
         # ──────────────────────────────────────────────
-        # RULE 3: Scale Opportunity (High ROAS Campaign)
+        # RULE 3: Objective-Aware Campaign Diagnosis Engine
         # ──────────────────────────────────────────────
         camp_stmt = select(Campaign).where(Campaign.ad_account_id == ad_account_uuid).where(Campaign.status == "ACTIVE")
         camp_res = await db.execute(camp_stmt)
@@ -278,6 +278,12 @@ class RecommendationEngine:
                     func.coalesce(func.sum(CampaignDailyMetrics.spend), 0).label("spend"),
                     func.coalesce(func.sum(CampaignDailyMetrics.revenue), 0).label("revenue"),
                     func.coalesce(func.sum(CampaignDailyMetrics.purchases), 0).label("purchases"),
+                    func.coalesce(func.sum(CampaignDailyMetrics.impressions), 0).label("impressions"),
+                    func.coalesce(func.sum(CampaignDailyMetrics.clicks), 0).label("clicks"),
+                    func.coalesce(func.sum(CampaignDailyMetrics.link_clicks), 0).label("link_clicks"),
+                    func.coalesce(func.sum(CampaignDailyMetrics.leads), 0).label("leads"),
+                    func.coalesce(func.sum(CampaignDailyMetrics.reach), 0).label("reach"),
+                    func.coalesce(func.avg(CampaignDailyMetrics.frequency), 1.0).label("frequency"),
                 )
                 .where(CampaignDailyMetrics.campaign_id == camp.id)
                 .where(CampaignDailyMetrics.date >= start_date)
@@ -287,12 +293,280 @@ class RecommendationEngine:
             if not m_row:
                 continue
 
-            spend = float(m_row.spend)
-            revenue = float(m_row.revenue)
-            purchases = int(m_row.purchases)
-            roas = (revenue / spend) if spend > 0 else 0.0
+            # Core Metrics (Handling missing values gracefully)
+            spend = float(m_row.spend or 0.0)
+            revenue = float(m_row.revenue or 0.0)
+            purchases = int(m_row.purchases or 0)
+            impressions = int(m_row.impressions or 0)
+            clicks = int(m_row.clicks or 0)
+            link_clicks = int(m_row.link_clicks or 0)
+            leads = int(m_row.leads or 0)
+            reach = int(m_row.reach or 0)
+            frequency = float(m_row.frequency or 1.0)
 
-            # Scale opportunity
+            # Calculated helper metrics
+            ctr = (clicks / impressions) if impressions > 0 else 0.0
+            cpc = (spend / clicks) if clicks > 0 else 0.0
+            cpm = (spend / impressions * 1000) if impressions > 0 else 0.0
+            roas = (revenue / spend) if spend > 0 else 0.0
+            cpa = (spend / purchases) if purchases > 0 else 0.0
+            cpl = (spend / leads) if leads > 0 else 0.0
+
+            obj = camp.objective.upper()
+
+            # ──────────────────────────────────────────
+            # A. Sales Objective (Purchases / CPA / ROAS focus)
+            # ──────────────────────────────────────────
+            if "SALES" in obj or "CONVERSIONS" in obj:
+                if spend >= 50.00:
+                    if roas < 1.20:
+                        recommendations_to_add.append(
+                            AIRecommendation(
+                                user_id=user_uuid,
+                                ad_account_id=ad_account_uuid,
+                                entity_type="campaign",
+                                entity_id=camp.id,
+                                recommendation_type="LOW_ROAS",
+                                title=f"Low ROAS Conversion Leak: {camp.name}",
+                                description=f"ROAS is currently {roas:.2f}x. The campaign spent {spend:.2f} but generated only {revenue:.2f} in revenue.",
+                                reason="Low purchase intent or checkout drop-off. Audit add-to-cart and initiate checkout steps.",
+                                confidence_score=0.93,
+                                priority="high",
+                                supporting_metrics={"spend": spend, "roas": roas, "purchases": purchases},
+                                status="new"
+                            )
+                        )
+                    if cpa > 25.0 or (purchases == 0 and spend > 150.00):
+                        recommendations_to_add.append(
+                            AIRecommendation(
+                                user_id=user_uuid,
+                                ad_account_id=ad_account_uuid,
+                                entity_type="campaign",
+                                entity_id=camp.id,
+                                recommendation_type="HIGH_CPA",
+                                title=f"Elevated CPA Warning: {camp.name}",
+                                description=f"CPA is currently at {f'₹{cpa:.2f}' if purchases > 0 else 'N/A'}. Budget spent: {spend:.2f}.",
+                                reason="Cost per conversion is high due to lower conversion rate or higher CPM bidding thresholds.",
+                                confidence_score=0.91,
+                                priority="high",
+                                supporting_metrics={"spend": spend, "cpa": cpa, "purchases": purchases},
+                                status="new"
+                            )
+                        )
+                if frequency > 3.5 and spend >= 50.00:
+                    recommendations_to_add.append(
+                        AIRecommendation(
+                            user_id=user_uuid,
+                            ad_account_id=ad_account_uuid,
+                            entity_type="campaign",
+                            entity_id=camp.id,
+                            recommendation_type="CREATIVE_FATIGUE",
+                            title=f"Creative Fatigue: {camp.name}",
+                            description=f"Frequency is at {frequency:.2f}. Audience is seeing the same creative multiple times, degrading CTR.",
+                            reason="Rotate creative visual assets to refresh audience interest.",
+                            confidence_score=0.88,
+                            priority="medium",
+                            supporting_metrics={"frequency": frequency, "ctr": ctr},
+                            status="new"
+                        )
+                    )
+
+            # ──────────────────────────────────────────
+            # B. Leads Objective (Leads / CPL focus)
+            # ──────────────────────────────────────────
+            elif "LEAD" in obj:
+                if spend >= 50.00:
+                    if cpl > 15.0 or (leads == 0 and spend > 100.00):
+                        recommendations_to_add.append(
+                            AIRecommendation(
+                                user_id=user_uuid,
+                                ad_account_id=ad_account_uuid,
+                                entity_type="campaign",
+                                entity_id=camp.id,
+                                recommendation_type="HIGH_CPL",
+                                title=f"High Cost Per Lead (CPL): {camp.name}",
+                                description=f"CPL is currently at {f'₹{cpl:.2f}' if leads > 0 else 'N/A'}. Spent {spend:.2f} for {leads} leads.",
+                                reason="CPL has exceeded optimal threshold limits. Audit target form components or audience match criteria.",
+                                confidence_score=0.92,
+                                priority="high",
+                                supporting_metrics={"spend": spend, "cpl": cpl, "leads": leads},
+                                status="new"
+                            )
+                        )
+                    if clicks >= 100 and leads > 0 and (leads / clicks) < 0.02:
+                        recommendations_to_add.append(
+                            AIRecommendation(
+                                user_id=user_uuid,
+                                ad_account_id=ad_account_uuid,
+                                entity_type="campaign",
+                                entity_id=camp.id,
+                                recommendation_type="LOW_LEAD_CONVERSION",
+                                title=f"Low Lead Conversion Rate: {camp.name}",
+                                description=f"Click-to-lead conversion is currently {((leads/clicks)*100):.2f}% (leads: {leads}, clicks: {clicks}).",
+                                reason="Forms may have too many fields or landing pages lack trust/clarity.",
+                                confidence_score=0.89,
+                                priority="medium",
+                                supporting_metrics={"leads": leads, "clicks": clicks, "conversion_rate": leads/clicks},
+                                status="new"
+                            )
+                        )
+
+            # ──────────────────────────────────────────
+            # C. Traffic Objective (CTR / CPC / link click drop focus)
+            # ──────────────────────────────────────────
+            elif "TRAFFIC" in obj or "LINK_CLICKS" in obj:
+                if impressions >= 500:
+                    if ctr < 0.012:
+                        recommendations_to_add.append(
+                            AIRecommendation(
+                                user_id=user_uuid,
+                                ad_account_id=ad_account_uuid,
+                                entity_type="campaign",
+                                entity_id=camp.id,
+                                recommendation_type="LOW_CTR",
+                                title=f"Low Click-Through Rate: {camp.name}",
+                                description=f"CTR is {ctr*100:.2f}%. Out of {impressions} impressions, got only {clicks} clicks.",
+                                reason="The creative image or primary message is failing to capture attention in the feed.",
+                                confidence_score=0.90,
+                                priority="medium",
+                                supporting_metrics={"ctr": ctr, "impressions": impressions},
+                                status="new"
+                            )
+                        )
+                if clicks > 0 and cpc > 3.0:
+                    recommendations_to_add.append(
+                        AIRecommendation(
+                            user_id=user_uuid,
+                            ad_account_id=ad_account_uuid,
+                            entity_type="campaign",
+                            entity_id=camp.id,
+                            recommendation_type="HIGH_CPC",
+                            title=f"High CPC Cost Warning: {camp.name}",
+                            description=f"Cost per Click is currently at ₹{cpc:.2f}.",
+                            reason="High bid competition or poor relevance score. Exclude low-converting placements.",
+                            confidence_score=0.87,
+                            priority="medium",
+                            supporting_metrics={"cpc": cpc, "spend": spend},
+                            status="new"
+                        )
+                    )
+                if link_clicks > 0 and clicks > 0 and (link_clicks / clicks) < 0.60:
+                    recommendations_to_add.append(
+                        AIRecommendation(
+                            user_id=user_uuid,
+                            ad_account_id=ad_account_uuid,
+                            entity_type="campaign",
+                            entity_id=camp.id,
+                            recommendation_type="CLICK_TO_LPV_DROP",
+                            title=f"Click to Landing Page Dropoff: {camp.name}",
+                            description=f"Only {((link_clicks/clicks)*100):.1f}% of clicks converted to Link Clicks.",
+                            reason="High page load latency or accidental exit clicks. Check website loading speeds.",
+                            confidence_score=0.92,
+                            priority="medium",
+                            supporting_metrics={"clicks": clicks, "link_clicks": link_clicks},
+                            status="new"
+                        )
+                    )
+
+            # ──────────────────────────────────────────
+            # D. Engagement Objective (CTR / Shares / CPC focus)
+            # ──────────────────────────────────────────
+            elif "ENGAGEMENT" in obj:
+                if impressions >= 1000:
+                    if ctr < 0.008:
+                        recommendations_to_add.append(
+                            AIRecommendation(
+                                user_id=user_uuid,
+                                ad_account_id=ad_account_uuid,
+                                entity_type="campaign",
+                                entity_id=camp.id,
+                                recommendation_type="LOW_ENGAGEMENT",
+                                title=f"Low Engagement Alert: {camp.name}",
+                                description=f"CTR is currently {ctr*100:.2f}% which is below standard engagement baseline filters.",
+                                reason="Creative elements do not invoke conversational hooks or shares.",
+                                confidence_score=0.86,
+                                priority="medium",
+                                supporting_metrics={"ctr": ctr, "impressions": impressions},
+                                status="new"
+                            )
+                        )
+                if clicks > 50 and purchases == 0 and leads == 0:
+                    recommendations_to_add.append(
+                        AIRecommendation(
+                            user_id=user_uuid,
+                            ad_account_id=ad_account_uuid,
+                            entity_type="campaign",
+                            entity_id=camp.id,
+                            recommendation_type="LOW_CLICK_QUALITY",
+                            title=f"Low Click Quality: {camp.name}",
+                            description=f"Ad has generated {clicks} clicks but zero conversions.",
+                            reason="Audience target settings are too broad. Add demographic or placement restrictions.",
+                            confidence_score=0.88,
+                            priority="medium",
+                            supporting_metrics={"clicks": clicks},
+                            status="new"
+                        )
+                    )
+
+            # ──────────────────────────────────────────
+            # E. Awareness Objective (Impressions / CPM / Saturation focus)
+            # ──────────────────────────────────────────
+            elif "AWARENESS" in obj or "REACH" in obj:
+                if frequency > 3.0 and spend >= 50.00:
+                    recommendations_to_add.append(
+                        AIRecommendation(
+                            user_id=user_uuid,
+                            ad_account_id=ad_account_uuid,
+                            entity_type="campaign",
+                            entity_id=camp.id,
+                            recommendation_type="CREATIVE_FATIGUE",
+                            title=f"Awareness Fatigue: {camp.name}",
+                            description=f"Frequency has reached {frequency:.2f}. Audience saturation reduces reach efficiency.",
+                            reason="Ad frequency is elevated. Swap creatives or target lookalikes to expand reach.",
+                            confidence_score=0.89,
+                            priority="medium",
+                            supporting_metrics={"frequency": frequency},
+                            status="new"
+                        )
+                    )
+                if impressions > 5000 and reach > 0 and (impressions / reach) > 4.0:
+                    recommendations_to_add.append(
+                        AIRecommendation(
+                            user_id=user_uuid,
+                            ad_account_id=ad_account_uuid,
+                            entity_type="campaign",
+                            entity_id=camp.id,
+                            recommendation_type="AUDIENCE_SATURATION",
+                            title=f"Audience Saturation: {camp.name}",
+                            description=f"High impressions-to-reach ratio ({ (impressions/reach):.2f}x).",
+                            reason="The budget is saturating a small audience pool. Expand demographic targeting parameters.",
+                            confidence_score=0.91,
+                            priority="medium",
+                            supporting_metrics={"impressions": impressions, "reach": reach},
+                            status="new"
+                        )
+                    )
+                if impressions >= 1000 and cpm > 15.0:
+                    recommendations_to_add.append(
+                        AIRecommendation(
+                            user_id=user_uuid,
+                            ad_account_id=ad_account_uuid,
+                            entity_type="campaign",
+                            entity_id=camp.id,
+                            recommendation_type="HIGH_CPM",
+                            title=f"High CPM Warning: {camp.name}",
+                            description=f"CPM is currently ₹{cpm:.2f}.",
+                            reason="Auction bids are expensive. Check relevance scores or expand placement targeting.",
+                            confidence_score=0.85,
+                            priority="low",
+                            supporting_metrics={"cpm": cpm},
+                            status="new"
+                        )
+                    )
+
+            # ──────────────────────────────────────────
+            # F. Scale budget checks for top Campaign
+            # ──────────────────────────────────────────
             if spend >= 50.00 and roas >= 2.50:
                 recommendations_to_add.append(
                     AIRecommendation(
@@ -302,10 +576,7 @@ class RecommendationEngine:
                         entity_id=camp.id,
                         recommendation_type="SCALE_OPPORTUNITY",
                         title=f"Scale budget for top Campaign: {camp.name}",
-                        description=(
-                            f"This campaign is performing exceptionally well with a ROAS of {roas:.2f}x. "
-                            f"We recommend increasing the daily budget by 15-20% to capture additional volume."
-                        ),
+                        description=f"This campaign is performing exceptionally well with a ROAS of {roas:.2f}x. We recommend increasing the daily budget by 15-20% to capture additional volume.",
                         reason="Campaign exhibits strong conversion efficiency and room to expand.",
                         confidence_score=0.9500,
                         priority="high",
