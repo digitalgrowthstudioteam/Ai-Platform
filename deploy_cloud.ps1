@@ -9,6 +9,11 @@ Write-Host "🚀 Starting Digital Growth Studio Deployment for digitalgrowthstud
 # 1. Build Next.js Frontend
 Write-Host "📦 Building Next.js Frontend..." -ForegroundColor Cyan
 Set-Location -Path "$PSScriptRoot\frontend"
+
+# Force clear Next.js build caches
+if (Test-Path ".next") { Remove-Item -Recurse -Force ".next" }
+if (Test-Path "out") { Remove-Item -Recurse -Force "out" }
+
 npm run build
 if ($LASTEXITCODE -ne 0) {
     Write-Host "❌ Frontend build failed!" -ForegroundColor Red
