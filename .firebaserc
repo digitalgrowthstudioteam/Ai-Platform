@@ -16,7 +16,8 @@
     "partner-dgs": {
       "hosting": {
         "prod": [
-          "digitalgrowthstudio"
+          "digitalgrowthstudio",
+          "partner-dgs"
         ]
       }
     }
