@@ -74,43 +74,8 @@ export default function Topbar() {
     }
   };
 
-  const handleSyncClick = async () => {
-    if (syncStatus.status === "in_progress") {
-      await fetchSyncStatus();
-      return;
-    }
 
-    try {
-      setSyncStatus(prev => ({ ...prev, status: "in_progress" }));
-      sessionStorage.setItem("dgs_cached_sync_status", JSON.stringify({
-        lastSyncAt: syncStatus.lastSyncAt,
-        status: "in_progress",
-      }));
-      await api.triggerSync(selectedAccount?.id || undefined);
-      
-      let attempts = 0;
-      const pollTimer = setInterval(async () => {
-        attempts += 1;
-        try {
-          const res = await api.getSyncStatus();
-          if (res.last_sync_status !== "in_progress" || attempts > 30) {
-            clearInterval(pollTimer);
-            const finalStatus = {
-              lastSyncAt: res.last_sync_at || null,
-              status: res.last_sync_status || null,
-            };
-            setSyncStatus(finalStatus);
-            sessionStorage.setItem("dgs_cached_sync_status", JSON.stringify(finalStatus));
-          }
-        } catch (e) {
-          clearInterval(pollTimer);
-        }
-      }, 5000);
-    } catch (e) {
-      console.error("Failed to trigger metadata sync:", e);
-      fetchSyncStatus();
-    }
-  };
+
 
   useEffect(() => {
     const cached = sessionStorage.getItem("dgs_cached_sync_status");
@@ -203,16 +168,15 @@ export default function Topbar() {
 
       {/* Right Actions */}
       <div className="topbar-actions">
-        {/* Sync Status Badge */}
-        <button 
-          onClick={handleSyncClick}
-          className={`topbar-sync ${syncClass} flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border border-border transition`} 
+        {/* Sync Status Badge (Display Only — sync runs automatically per plan interval) */}
+        <div 
+          className={`topbar-sync ${syncClass} flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border border-border`} 
           id="sync-status"
-          title="Click to trigger or refresh metadata sync"
+          title={`Auto-syncs based on your plan interval`}
         >
           {syncIcon}
           <span>{syncLabel}</span>
-        </button>
+        </div>
 
         {/* Notifications */}
         <div className="relative">

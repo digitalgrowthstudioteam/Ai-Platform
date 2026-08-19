@@ -4,7 +4,7 @@ Digital Growth Studio — Admin Control Panel Router
 import uuid
 import structlog
 from datetime import datetime, timedelta
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -695,3 +695,116 @@ async def override_user_credits(
 
     logger.info("admin_credits_override_success", user_id=user_id, credits=req.credits)
     return {"status": "success", "message": f"Successfully updated user credits to {req.credits}."}
+
+
+# ──────────────────────────────────────────────
+# Admin: Manual Resync for Any User Account
+# ──────────────────────────────────────────────
+
+class AdminResyncRequest(BaseModel):
+    force: bool = False  # If True, bypasses interval check (but still updates last_sync_at)
+
+
+@router.post("/users/{user_id}/resync", summary="Trigger resync for a user's ad accounts (admin only)")
+async def admin_resync_user(
+    user_id: uuid.UUID,
+    req: Optional[AdminResyncRequest] = None,
+    background_tasks: BackgroundTasks = None,
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Admin-only endpoint to trigger a Meta data sync for a specific user's ad accounts.
+    
+    - By default, respects the user's plan sync interval (3hr, 6hr, 12hr, etc.)
+    - If force=True, triggers sync immediately but still updates last_sync_at
+      so the next automatic sync follows the normal schedule.
+    """
+    from app.services.entitlement_engine import EntitlementEngine
+    from app.models.meta import MetaConnection
+    from app.workers.tasks import sync_ad_account_task
+    from app.api.v1.meta import run_sync_inline
+    from datetime import timezone, timedelta
+
+    verify_admin(claims)
+
+    force = req.force if req else False
+
+    # Verify target user exists
+    stmt = select(User).where(User.id == user_id)
+    res = await db.execute(stmt)
+    user = res.scalar_one_or_none()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found."
+        )
+
+    # Fetch user's Meta connection
+    stmt_conn = select(MetaConnection).where(MetaConnection.user_id == user_id)
+    res_conn = await db.execute(stmt_conn)
+    conn = res_conn.scalar_one_or_none()
+    if not conn or conn.status != "connected":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User has no active Meta connection."
+        )
+
+    # Check sync interval unless force=True
+    if not force:
+        entitlements = await EntitlementEngine.resolve_entitlements(user, db)
+        interval_hours = entitlements.get("sync_interval_hours", 48)
+
+        if conn.last_sync_at:
+            now = datetime.now(timezone.utc)
+            last_sync = conn.last_sync_at.replace(tzinfo=timezone.utc) if conn.last_sync_at.tzinfo is None else conn.last_sync_at
+            elapsed = now - last_sync
+            remaining = timedelta(hours=interval_hours) - elapsed
+
+            if remaining.total_seconds() > 0:
+                remaining_mins = int(remaining.total_seconds() / 60)
+                return {
+                    "status": "skipped",
+                    "message": f"User's plan allows sync every {interval_hours}h. Next sync available in {remaining_mins} minutes.",
+                    "plan_id": user.plan_id,
+                    "sync_interval_hours": interval_hours,
+                    "remaining_minutes": remaining_mins,
+                }
+
+    # Prevent duplicate in_progress syncs
+    if conn.last_sync_status == "in_progress":
+        return {
+            "status": "in_progress",
+            "message": "A sync is already in progress for this user's Meta connection."
+        }
+
+    # Fetch user's active ad accounts
+    stmt_acc = select(MetaAdAccount).where(
+        MetaAdAccount.user_id == user_id,
+        MetaAdAccount.account_status == 1,
+    )
+    res_acc = await db.execute(stmt_acc)
+    accounts = res_acc.scalars().all()
+
+    if not accounts:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No active ad accounts found for this user."
+        )
+
+    synced_count = 0
+    for acc in accounts:
+        try:
+            sync_ad_account_task.delay(str(acc.id))
+        except Exception:
+            pass
+        if background_tasks:
+            background_tasks.add_task(run_sync_inline, str(acc.id))
+        synced_count += 1
+
+    logger.info("admin_resync_triggered", user_id=str(user_id), account_count=synced_count, forced=force)
+    return {
+        "status": "success",
+        "message": f"Resync triggered for {synced_count} ad account(s) belonging to {user.email}.",
+        "forced": force,
+    }
