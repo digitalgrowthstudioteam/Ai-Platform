@@ -160,6 +160,25 @@ class ApiClient {
     );
   }
 
+  async getCampaignDaily(campaignId: string, startDate: string, endDate: string) {
+    return this.request<any[]>(
+      `/campaigns/${campaignId}/daily?start_date=${startDate}&end_date=${endDate}`
+    );
+  }
+
+  async getAdSetDaily(campaignId: string, adSetId: string, startDate: string, endDate: string) {
+    return this.request<any[]>(
+      `/campaigns/${campaignId}/adsets/${adSetId}/daily?start_date=${startDate}&end_date=${endDate}`
+    );
+  }
+
+  async getAdDaily(adId: string, startDate: string, endDate: string) {
+    return this.request<any[]>(
+      `/ads/${adId}/daily?start_date=${startDate}&end_date=${endDate}`
+    );
+  }
+
+
   async getAds(adAccountId: string, startDate: string, endDate: string) {
     return this.request<any[]>(
       `/ads?ad_account_id=${adAccountId}&start_date=${startDate}&end_date=${endDate}`

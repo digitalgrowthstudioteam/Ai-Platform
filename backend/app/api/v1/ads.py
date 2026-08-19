@@ -687,3 +687,62 @@ async def list_audiences(
             )
         )
     return output
+
+
+class DailyMetricPoint(BaseModel):
+    date: date
+    spend: float
+    impressions: int
+    clicks: int
+    purchases: int
+    revenue: float
+    roas: float
+
+
+@router.get("/{ad_id}/daily", response_model=List[DailyMetricPoint], summary="Get ad daily performance metrics")
+async def get_ad_daily_metrics(
+    ad_id: uuid.UUID,
+    start_date: date = Query(..., description="Start date of filter window"),
+    end_date: date = Query(..., description="End date of filter window"),
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    user = await get_db_user_from_claims(claims, db)
+    # Verify ad access
+    stmt = (
+        select(Ad)
+        .join(AdSet, Ad.ad_set_id == AdSet.id)
+        .join(Campaign, AdSet.campaign_id == Campaign.id)
+        .where(Ad.id == ad_id)
+        .where(Campaign.ad_account_id.in_(
+            select(MetaAdAccount.id).where(MetaAdAccount.user_id == user.id)
+        ))
+    )
+    res = await db.execute(stmt)
+    ad = res.scalar_one_or_none()
+    if not ad:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ad not found.")
+
+    # Fetch daily metrics
+    stmt = (
+        select(AdDailyMetrics)
+        .where(AdDailyMetrics.ad_id == ad_id)
+        .where(AdDailyMetrics.date >= start_date)
+        .where(AdDailyMetrics.date <= end_date)
+        .order_by(AdDailyMetrics.date.asc())
+    )
+    res = await db.execute(stmt)
+    rows = res.scalars().all()
+    return [
+        DailyMetricPoint(
+            date=r.date,
+            spend=float(r.spend or 0.0),
+            impressions=int(r.impressions or 0),
+            clicks=int(r.clicks or 0),
+            purchases=int(r.purchases or 0),
+            revenue=float(r.revenue or 0.0),
+            roas=float(r.roas or 0.0),
+        )
+        for r in rows
+    ]
+
