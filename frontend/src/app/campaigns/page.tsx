@@ -64,6 +64,8 @@ export default function CampaignsPage() {
   // Drill-down selected items
   const [selectedAdSet, setSelectedAdSet] = useState<any | null>(null);
   const [selectedAd, setSelectedAd] = useState<any | null>(null);
+  const [adSetPerformance, setAdSetPerformance] = useState<any | null>(null);
+  const [loadingPerf, setLoadingPerf] = useState(false);
 
   // Date helper
   const getDates = (preset: "7d" | "30d") => {
@@ -223,9 +225,21 @@ export default function CampaignsPage() {
     }
   };
 
-  const handleSelectAdSetFromList = (as: any) => {
+  const handleSelectAdSetFromList = async (as: any) => {
     setSelectedAdSet(as);
     setSelectedAd(null);
+    setAdSetPerformance(null);
+    if (!selectedCampaign) return;
+
+    setLoadingPerf(true);
+    try {
+      const res = await api.getAdSetPerformance(selectedCampaign.id, as.id, startStr, endStr);
+      setAdSetPerformance(res);
+    } catch (err) {
+      console.error("Failed to load adset performance goal profile:", err);
+    } finally {
+      setLoadingPerf(false);
+    }
   };
 
   const handleSelectAdFromList = (ad: any) => {
@@ -692,172 +706,407 @@ export default function CampaignsPage() {
         /* ──────────────────────────────────────────────────────────── */
         /* 3. Ad Set Detail Drill-Down View */
         /* ──────────────────────────────────────────────────────────── */
-        <div className="space-y-6">
-          {/* Breadcrumb Navigation */}
-          <div className="flex justify-between items-center bg-white p-4 border border-border rounded-lg shadow-xs">
-            <div className="flex items-center gap-2 text-xs text-slate-400 font-bold">
-              <button onClick={() => { setSelectedAd(null); setSelectedAdSet(null); setSelectedCampaign(null); }} className="hover:text-slate-600 transition">Campaigns</button>
-              <span>/</span>
-              <button onClick={() => { setSelectedAd(null); setSelectedAdSet(null); }} className="hover:text-slate-600 transition">{selectedCampaign.name}</button>
-              <span>/</span>
-              <span className="text-slate-800">{selectedAdSet.name}</span>
-            </div>
-            <button
-              onClick={() => setSelectedAdSet(null)}
-              className="flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-slate-800 transition cursor-pointer"
-            >
-              <ArrowLeft size={14} /> Back to Campaign
-            </button>
+        loadingPerf ? (
+          <div className="flex h-96 items-center justify-center bg-white border border-border rounded-lg shadow-sm">
+            <Loader2 className="animate-spin text-primary" size={32} />
+            <span className="ml-2 text-sm text-subtle font-medium">Resolving Goal-Aware Performance Engine...</span>
           </div>
+        ) : adSetPerformance ? (
+          <div className="space-y-6">
+            {/* Breadcrumb Navigation */}
+            <div className="flex justify-between items-center bg-white p-4 border border-border rounded-lg shadow-xs">
+              <div className="flex items-center gap-2 text-xs text-slate-400 font-bold">
+                <button onClick={() => { setSelectedAd(null); setSelectedAdSet(null); setSelectedCampaign(null); }} className="hover:text-slate-600 transition">Campaigns</button>
+                <span>/</span>
+                <button onClick={() => { setSelectedAd(null); setSelectedAdSet(null); }} className="hover:text-slate-600 transition">{selectedCampaign.name}</button>
+                <span>/</span>
+                <span className="text-slate-800">{selectedAdSet.name}</span>
+              </div>
+              <button
+                onClick={() => setSelectedAdSet(null)}
+                className="flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-slate-800 transition cursor-pointer"
+              >
+                <ArrowLeft size={14} /> Back to Campaign
+              </button>
+            </div>
 
-          {/* Ad Set KPI Grid */}
-          <div className="card border border-border bg-white shadow-sm rounded-lg p-5 space-y-4">
-            <div className="flex flex-wrap justify-between items-start gap-4">
-              <div>
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Ad Set Details</span>
-                <h2 className="text-xl font-black text-slate-800 mt-1">{selectedAdSet.name}</h2>
-                <div className="flex items-center gap-2 mt-2">
-                  <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${selectedAdSet.status === "ACTIVE" ? "text-green-600 bg-green-50 animate-pulse" : "text-slate-500 bg-slate-100"}`}>
+            {/* Performance Goal Header */}
+            <div className="card border border-border bg-gradient-to-r from-slate-900 to-slate-800 shadow-xl rounded-xl p-6 text-white space-y-4">
+              <div className="flex justify-between items-start gap-4">
+                <div className="space-y-1">
+                  <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest flex items-center gap-1">
+                    <Target size={12} /> Performance Goal Intelligence Active
+                  </span>
+                  <h2 className="text-2xl font-black">{selectedAdSet.name}</h2>
+                  <p className="text-sm text-slate-300 max-w-2xl">{adSetPerformance.performance_goal.name}: {adSetPerformance.performance_goal.description}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`text-[10px] px-2 py-1 rounded font-bold uppercase ${selectedAdSet.status === "ACTIVE" ? "text-green-400 bg-green-500/10 border border-green-500/20" : "text-slate-400 bg-slate-500/10 border border-slate-500/20"}`}>
                     {selectedAdSet.status}
                   </span>
-                  <span className="text-[10px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded font-bold uppercase">
-                    Goal: {selectedAdSet.optimization_goal.replace(/_/g, " ")}
+                  <span className="text-[10px] text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2 py-1 rounded font-bold uppercase">
+                    Motive: {adSetPerformance.performance_goal.motive}
                   </span>
                 </div>
               </div>
+            </div>
 
-              {/* KPI cards */}
-              <div className="flex flex-wrap items-center gap-4">
-                {[
-                  { label: "Spend", val: formatCurrency(selectedAdSet.metrics.spend) },
-                  { label: "CTR", val: formatPercent(selectedAdSet.metrics.ctr) },
-                  { label: "Conversions", val: selectedAdSet.metrics.purchases },
-                  { label: "ROAS", val: `${selectedAdSet.metrics.roas.toFixed(2)}x`, highlight: true }
-                ].map((k, i) => (
-                  <div key={i} className="bg-slate-50 border border-slate-100 p-2.5 rounded-lg text-center min-w-[90px]">
-                    <div className="text-[8px] font-bold text-slate-400 uppercase">{k.label}</div>
-                    <div className={`text-xs font-black mt-1 ${k.highlight ? "text-green-600 font-bold" : "text-slate-800"}`}>{k.val}</div>
+            {/* Health Score & Primary KPIs Row */}
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+              {/* Health Score Panel */}
+              <div className="lg:col-span-1 card border border-border bg-white shadow-sm rounded-xl p-5 flex flex-col justify-between items-center text-center space-y-4">
+                <div>
+                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Goal Health Score</span>
+                  <p className="text-[10px] text-slate-400 mt-0.5">Calculated weighting index</p>
+                </div>
+
+                <div className="relative flex items-center justify-center">
+                  <div className={`w-28 h-28 rounded-full border-8 flex flex-col items-center justify-center ${
+                    adSetPerformance.health_score.status === "good" ? "border-emerald-500/15 text-emerald-600" :
+                    adSetPerformance.health_score.status === "warning" ? "border-amber-500/15 text-amber-600" : "border-rose-500/15 text-rose-600"
+                  }`}>
+                    <span className="text-3xl font-black">{adSetPerformance.health_score.score}</span>
+                    <span className="text-[8px] font-bold uppercase tracking-wider">{adSetPerformance.health_score.status}</span>
+                  </div>
+                </div>
+
+                <div className="w-full text-xs text-left space-y-1.5 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                  <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider block">Diagnostic Factors:</span>
+                  {adSetPerformance.health_score.reasons.length > 0 ? (
+                    adSetPerformance.health_score.reasons.map((r: string, idx: number) => (
+                      <div key={idx} className="flex items-center gap-1 text-[10px] font-semibold text-slate-600">
+                        <span className="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0" />
+                        {r}
+                      </div>
+                    ))
+                  ) : (
+                    <span className="text-[10px] text-slate-500 italic">No significant deviations detected.</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Primary KPIs Cards */}
+              <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-6">
+                {adSetPerformance.primary_metrics.map((k: any, idx: number) => (
+                  <div key={idx} className="card border border-border bg-white shadow-sm rounded-xl p-5 flex flex-col justify-between space-y-4">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">{k.name}</span>
+                        <span className="text-[8px] font-semibold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded mt-1 inline-block uppercase">Primary KPI</span>
+                      </div>
+                      {k.change_percent !== null && (
+                        <div className={`flex items-center gap-0.5 text-[10px] font-bold ${
+                          k.status === "good" ? "text-emerald-600" :
+                          k.status === "critical" ? "text-rose-600" : "text-slate-500"
+                        }`}>
+                          {k.trend === "improving" ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                          {k.change_percent > 0 ? "+" : ""}{k.change_percent.toFixed(1)}%
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <div className="text-2xl font-black text-slate-800">
+                        {k.metric.includes("spend") || k.metric.includes("cost_") || k.metric === "cpc" || k.metric === "cpa" || k.metric === "cpm"
+                          ? formatCurrency(k.value)
+                          : k.metric.includes("rate") || k.metric.includes("ctr")
+                          ? formatPercent(k.value / 100)
+                          : formatNumber(k.value)}
+                      </div>
+                      <span className="text-[8px] text-slate-400 block mt-1">Formula: {k.formula}</span>
+                    </div>
                   </div>
                 ))}
               </div>
             </div>
-          </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Left columns: Targeting details */}
-            <div className="lg:col-span-1 space-y-6">
-              {/* Audience Targeting */}
-              <div className="card border border-border bg-white shadow-sm rounded-lg p-5 space-y-4">
-                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <Users size={14} className="text-primary" /> Audience Targeting Parameters
-                </h3>
-                <div className="space-y-3 text-xs">
-                  <div className="border-b border-slate-50 pb-2">
-                    <span className="text-[10px] text-slate-400 font-bold uppercase block">Target Age Window</span>
-                    <div className="font-semibold text-slate-700 mt-0.5">25 – 44 Years (Primary skew: 25-34)</div>
+            {/* Supporting, Diagnostic & Business Impact Grids */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Supporting & Diagnostic Metrics */}
+              <div className="lg:col-span-2 space-y-6">
+                <div className="card border border-border bg-white shadow-sm rounded-xl p-5 space-y-4">
+                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Goal Delivery & Diagnostics</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {adSetPerformance.secondary_metrics.concat(adSetPerformance.diagnostic_metrics).slice(0, 8).map((m: any, idx: number) => (
+                      <div key={idx} className="bg-slate-50 border border-slate-100 p-3 rounded-lg">
+                        <div className="text-[8px] font-bold text-slate-400 uppercase truncate">{m.name}</div>
+                        <div className="text-sm font-black text-slate-800 mt-1">
+                          {m.metric.includes("spend") || m.metric.includes("cost_") || m.metric === "cpc" || m.metric === "cpa" || m.metric === "cpm"
+                            ? formatCurrency(m.value)
+                            : m.metric.includes("rate") || m.metric.includes("ctr")
+                            ? formatPercent(m.value / 100)
+                            : formatNumber(m.value)}
+                        </div>
+                        {m.change_percent !== null && (
+                          <div className={`text-[8px] font-bold mt-0.5 ${m.status === "good" ? "text-emerald-600" : m.status === "critical" ? "text-rose-600" : "text-slate-500"}`}>
+                            {m.change_percent > 0 ? "+" : ""}{m.change_percent.toFixed(1)}% vs prev
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
-                  <div className="border-b border-slate-50 pb-2">
-                    <span className="text-[10px] text-slate-400 font-bold uppercase block">Gender Distribution</span>
-                    <div className="font-semibold text-slate-700 mt-0.5">All Genders (Female skew: 65% contribution)</div>
-                  </div>
-                  <div className="border-b border-slate-50 pb-2">
-                    <span className="text-[10px] text-slate-400 font-bold uppercase block">Geography & Location</span>
-                    <div className="font-semibold text-slate-700 mt-0.5">India (Top States: MH, DL, KA)</div>
-                  </div>
+                </div>
+
+                {/* Funnel chart */}
+                <div className="card border border-border bg-white shadow-sm rounded-xl p-5 space-y-4">
                   <div>
-                    <span className="text-[10px] text-slate-400 font-bold uppercase block">Audience Targeting Type</span>
-                    <div className="font-semibold text-slate-700 mt-0.5">Lookalike 2% (Purchasers - Last 30 Days)</div>
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Motive Funnel Analysis</h3>
+                    <p className="text-[10px] text-slate-400 mt-0.5">Conversion flow optimization layout</p>
+                  </div>
+                  <div className="space-y-3">
+                    {adSetPerformance.funnel.map((stage: any, idx: number) => {
+                      const maxVal = adSetPerformance.funnel[0]?.value || 1;
+                      const percentage = Math.round((stage.value / maxVal) * 100);
+                      return (
+                        <div key={idx} className="space-y-1">
+                          <div className="flex justify-between text-xs font-semibold text-slate-600">
+                            <span>{stage.stage}</span>
+                            <span>{formatNumber(stage.value)} ({percentage}%)</span>
+                          </div>
+                          <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+                            <div className="bg-blue-600 h-full rounded-full transition-all duration-500" style={{ width: `${percentage}%` }} />
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
 
-              {/* Placement Specifications */}
-              <div className="card border border-border bg-white shadow-sm rounded-lg p-5 space-y-4">
-                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <Target size={14} className="text-primary" /> Publisher Placement Splits
-                </h3>
-                <div className="space-y-3 text-xs">
-                  <div className="border-b border-slate-50 pb-2">
-                    <span className="text-[10px] text-slate-400 font-bold uppercase block">Platform Contribution</span>
-                    <div className="font-semibold text-slate-700 mt-0.5">Instagram (60%), Facebook (35%), Messenger (5%)</div>
-                  </div>
-                  <div className="border-b border-slate-50 pb-2">
-                    <span className="text-[10px] text-slate-400 font-bold uppercase block">Positioning Formats</span>
-                    <div className="font-semibold text-slate-700 mt-0.5">Mobile Feed (45%), Stories (30%), Reels (25%)</div>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-400 font-bold uppercase block">Device Delivery</span>
-                    <div className="font-semibold text-slate-700 mt-0.5">Mobile Devices (98%), Desktop Web (2%)</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Right column: Ads & AI Diagnoses */}
-            <div className="lg:col-span-2 space-y-6">
-              {/* AI Diagnosis block */}
-              <div className="card border border-border bg-white shadow-sm rounded-lg p-5 space-y-3">
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                  <Sparkles size={14} className="text-yellow-500 animate-pulse" />
-                  AI Diagnosis & Evidence
-                </h4>
-                <div className="bg-slate-50 rounded-lg p-4 space-y-2">
-                  <div className="text-xs font-bold text-slate-800">
-                    {selectedAdSet.metrics.roas >= 1.5 
-                      ? "This Ad Set is currently the strongest component of the campaign."
-                      : "This Ad Set shows signs of conversion latency and elevated CPA."}
-                  </div>
-                  
-                  <div className="text-[11px] text-slate-500 font-bold uppercase mt-2">Evaluation Evidence:</div>
-                  <ul className="list-disc list-inside text-xs text-slate-600 space-y-1 pl-1">
-                    <li>Lowest CPL: ₹{(selectedAdSet.metrics.spend / Math.max(1, selectedAdSet.metrics.purchases)).toFixed(2)} cost per result.</li>
-                    <li>Strong conversion rate: {(selectedAdSet.metrics.purchases > 0 ? (selectedAdSet.metrics.purchases / selectedAdSet.metrics.clicks * 100).toFixed(2) : "0.00")}% click-to-purchase CVR.</li>
-                    <li>Stable CTR: {formatPercent(selectedAdSet.metrics.ctr)} delivery engagement.</li>
-                    <li>Sufficient conversion pool data for learning optimization.</li>
-                  </ul>
-                </div>
-              </div>
-
-              {/* Ads Table */}
-              <div className="card border border-border bg-white shadow-sm rounded-lg p-5 space-y-3">
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Active Ads in this Ad Set ({ads.filter(ad => ad.adset_name === selectedAdSet.name).length})</h4>
-                <div className="overflow-x-auto">
-                  <table className="min-w-full text-xs text-left divide-y divide-border">
-                    <thead className="bg-slate-50/50">
-                      <tr className="text-[10px] font-bold text-slate-400 uppercase border-b border-border">
-                        <th className="p-2">Ad Name</th>
-                        <th className="p-2 text-right">Spend</th>
-                        <th className="p-2 text-right">CTR</th>
-                        <th className="p-2 text-right">ROAS</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {ads.filter(ad => ad.adset_name === selectedAdSet.name).map((ad, idx) => (
-                        <tr 
-                          key={idx} 
-                          onClick={() => handleSelectAdFromList(ad)}
-                          className="hover:bg-slate-50 transition cursor-pointer"
-                        >
-                          <td className="p-2 font-bold text-slate-700 flex items-center gap-2">
-                            {ad.creative?.image_url ? (
-                              <img src={ad.creative.image_url} alt="" className="w-8 h-8 object-cover rounded border border-border shrink-0" />
-                            ) : (
-                              <div className="w-8 h-8 bg-slate-100 rounded border border-border flex items-center justify-center shrink-0 text-slate-400"><ImageIcon size={12} /></div>
-                            )}
-                            <span className="truncate max-w-[200px]">{ad.name}</span>
-                          </td>
-                          <td className="p-2 text-right font-semibold">{formatCurrency(ad.metrics.spend)}</td>
-                          <td className="p-2 text-right">{formatPercent(ad.metrics.ctr)}</td>
-                          <td className="p-2 text-right text-green-600 font-bold">{ad.metrics.roas.toFixed(2)}x</td>
-                        </tr>
+              {/* Downstream Business Impact & Target Audience */}
+              <div className="lg:col-span-1 space-y-6">
+                {/* Business impact */}
+                <div className="card border border-border bg-white shadow-sm rounded-xl p-5 space-y-4">
+                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <Zap size={14} className="text-emerald-500" /> Downstream Business Impact
+                  </h3>
+                  {adSetPerformance.business_metrics.length > 0 ? (
+                    <div className="space-y-3">
+                      {adSetPerformance.business_metrics.map((m: any, idx: number) => (
+                        <div key={idx} className="flex justify-between items-center bg-slate-50 p-3 rounded-lg border border-slate-100">
+                          <div>
+                            <span className="font-bold text-slate-700 block text-xs">{m.name}</span>
+                            <span className="text-[8px] text-slate-400 block mt-0.5">From downstream CRM integration</span>
+                          </div>
+                          <span className="font-black text-slate-800 text-sm">
+                            {m.metric.includes("revenue") ? formatCurrency(m.value) : m.metric === "roas" ? `${m.value.toFixed(2)}x` : formatNumber(m.value)}
+                          </span>
+                        </div>
                       ))}
-                    </tbody>
-                  </table>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center p-6 border border-dashed border-slate-200 rounded-lg text-center space-y-1">
+                      <Info size={16} className="text-slate-400" />
+                      <span className="text-xs font-bold text-slate-500">No CRM Integration Linked</span>
+                      <p className="text-[10px] text-slate-400 leading-normal max-w-[200px]">Link Hubspot or Zoho CRM in account settings to pull down sales outcomes.</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Ads listing */}
+                <div className="card border border-border bg-white shadow-sm rounded-xl p-5 space-y-3">
+                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Active Ads ({ads.filter(ad => ad.adset_name === selectedAdSet.name).length})</h4>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-xs text-left divide-y divide-border">
+                      <thead className="bg-slate-50/50">
+                        <tr className="text-[10px] font-bold text-slate-400 uppercase border-b border-border">
+                          <th className="p-2">Ad Name</th>
+                          <th className="p-2 text-right">Spend</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {ads.filter(ad => ad.adset_name === selectedAdSet.name).map((ad, idx) => (
+                          <tr 
+                            key={idx} 
+                            onClick={() => handleSelectAdFromList(ad)}
+                            className="hover:bg-slate-50 transition cursor-pointer"
+                          >
+                            <td className="p-2 font-bold text-slate-700 flex items-center gap-2">
+                              {ad.creative?.image_url ? (
+                                <img src={ad.creative.image_url} alt="" className="w-8 h-8 object-cover rounded border border-border shrink-0" />
+                              ) : (
+                                <div className="w-8 h-8 bg-slate-100 rounded border border-border flex items-center justify-center shrink-0 text-slate-400"><ImageIcon size={12} /></div>
+                              )}
+                              <span className="truncate max-w-[120px]">{ad.name}</span>
+                            </td>
+                            <td className="p-2 text-right font-semibold">{formatCurrency(ad.metrics.spend)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        ) : (
+          <div className="space-y-6">
+            {/* Breadcrumb Navigation */}
+            <div className="flex justify-between items-center bg-white p-4 border border-border rounded-lg shadow-xs">
+              <div className="flex items-center gap-2 text-xs text-slate-400 font-bold">
+                <button onClick={() => { setSelectedAd(null); setSelectedAdSet(null); setSelectedCampaign(null); }} className="hover:text-slate-600 transition">Campaigns</button>
+                <span>/</span>
+                <button onClick={() => { setSelectedAd(null); setSelectedAdSet(null); }} className="hover:text-slate-600 transition">{selectedCampaign.name}</button>
+                <span>/</span>
+                <span className="text-slate-800">{selectedAdSet.name}</span>
+              </div>
+              <button
+                onClick={() => setSelectedAdSet(null)}
+                className="flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-slate-800 transition cursor-pointer"
+              >
+                <ArrowLeft size={14} /> Back to Campaign
+              </button>
+            </div>
+
+            {/* Ad Set KPI Grid */}
+            <div className="card border border-border bg-white shadow-sm rounded-lg p-5 space-y-4">
+              <div className="flex flex-wrap justify-between items-start gap-4">
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Ad Set Details</span>
+                  <h2 className="text-xl font-black text-slate-800 mt-1">{selectedAdSet.name}</h2>
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${selectedAdSet.status === "ACTIVE" ? "text-green-600 bg-green-50 animate-pulse" : "text-slate-500 bg-slate-100"}`}>
+                      {selectedAdSet.status}
+                    </span>
+                    <span className="text-[10px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded font-bold uppercase">
+                      Goal: {selectedAdSet.optimization_goal.replace(/_/g, " ")}
+                    </span>
+                  </div>
+                </div>
+
+                {/* KPI cards */}
+                <div className="flex flex-wrap items-center gap-4">
+                  {[
+                    { label: "Spend", val: formatCurrency(selectedAdSet.metrics.spend) },
+                    { label: "CTR", val: formatPercent(selectedAdSet.metrics.ctr) },
+                    { label: "Conversions", val: selectedAdSet.metrics.purchases },
+                    { label: "ROAS", val: `${selectedAdSet.metrics.roas.toFixed(2)}x`, highlight: true }
+                  ].map((k, i) => (
+                    <div key={i} className="bg-slate-50 border border-slate-100 p-2.5 rounded-lg text-center min-w-[90px]">
+                      <div className="text-[8px] font-bold text-slate-400 uppercase">{k.label}</div>
+                      <div className={`text-xs font-black mt-1 ${k.highlight ? "text-green-600 font-bold" : "text-slate-800"}`}>{k.val}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Left columns: Targeting details */}
+              <div className="lg:col-span-1 space-y-6">
+                {/* Audience Targeting */}
+                <div className="card border border-border bg-white shadow-sm rounded-lg p-5 space-y-4">
+                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <Users size={14} className="text-primary" /> Audience Targeting Parameters
+                  </h3>
+                  <div className="space-y-3 text-xs">
+                    <div className="border-b border-slate-50 pb-2">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase block">Target Age Window</span>
+                      <div className="font-semibold text-slate-700 mt-0.5">25 – 44 Years (Primary skew: 25-34)</div>
+                    </div>
+                    <div className="border-b border-slate-50 pb-2">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase block">Gender Distribution</span>
+                      <div className="font-semibold text-slate-700 mt-0.5">All Genders (Female skew: 65% contribution)</div>
+                    </div>
+                    <div className="border-b border-slate-50 pb-2">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase block">Geography & Location</span>
+                      <div className="font-semibold text-slate-700 mt-0.5">India (Top States: MH, DL, KA)</div>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-400 font-bold uppercase block">Audience Targeting Type</span>
+                      <div className="font-semibold text-slate-700 mt-0.5">Lookalike 2% (Purchasers - Last 30 Days)</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Placement Specifications */}
+                <div className="card border border-border bg-white shadow-sm rounded-lg p-5 space-y-4">
+                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <Target size={14} className="text-primary" /> Publisher Placement Splits
+                  </h3>
+                  <div className="space-y-3 text-xs">
+                    <div className="border-b border-slate-50 pb-2">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase block">Platform Contribution</span>
+                      <div className="font-semibold text-slate-700 mt-0.5">Instagram (60%), Facebook (35%), Messenger (5%)</div>
+                    </div>
+                    <div className="border-b border-slate-50 pb-2">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase block">Positioning Formats</span>
+                      <div className="font-semibold text-slate-700 mt-0.5">Mobile Feed (45%), Stories (30%), Reels (25%)</div>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-400 font-bold uppercase block">Device Delivery</span>
+                      <div className="font-semibold text-slate-700 mt-0.5">Mobile Devices (98%), Desktop Web (2%)</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right column: Ads & AI Diagnoses */}
+              <div className="lg:col-span-2 space-y-6">
+                {/* AI Diagnosis block */}
+                <div className="card border border-border bg-white shadow-sm rounded-lg p-5 space-y-3">
+                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                    <Sparkles size={14} className="text-yellow-500 animate-pulse" />
+                    AI Diagnosis & Evidence
+                  </h4>
+                  <div className="bg-slate-50 rounded-lg p-4 space-y-2">
+                    <div className="text-xs font-bold text-slate-800">
+                      {selectedAdSet.metrics.roas >= 1.5 
+                        ? "This Ad Set is currently the strongest component of the campaign."
+                        : "This Ad Set shows signs of conversion latency and elevated CPA."}
+                    </div>
+                    
+                    <div className="text-[11px] text-slate-500 font-bold uppercase mt-2">Evaluation Evidence:</div>
+                    <ul className="list-disc list-inside text-xs text-slate-600 space-y-1 pl-1">
+                      <li>Lowest CPL: ₹{(selectedAdSet.metrics.spend / Math.max(1, selectedAdSet.metrics.purchases)).toFixed(2)} cost per result.</li>
+                      <li>Strong conversion rate: {(selectedAdSet.metrics.purchases > 0 ? (selectedAdSet.metrics.purchases / selectedAdSet.metrics.clicks * 100).toFixed(2) : "0.00")}% click-to-purchase CVR.</li>
+                      <li>Stable CTR: {formatPercent(selectedAdSet.metrics.ctr)} delivery engagement.</li>
+                      <li>Sufficient conversion pool data for learning optimization.</li>
+                    </ul>
+                  </div>
+                </div>
+
+                {/* Ads Table */}
+                <div className="card border border-border bg-white shadow-sm rounded-lg p-5 space-y-3">
+                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Active Ads in this Ad Set ({ads.filter(ad => ad.adset_name === selectedAdSet.name).length})</h4>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-xs text-left divide-y divide-border">
+                      <thead className="bg-slate-50/50">
+                        <tr className="text-[10px] font-bold text-slate-400 uppercase border-b border-border">
+                          <th className="p-2">Ad Name</th>
+                          <th className="p-2 text-right">Spend</th>
+                          <th className="p-2 text-right">CTR</th>
+                          <th className="p-2 text-right">ROAS</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {ads.filter(ad => ad.adset_name === selectedAdSet.name).map((ad, idx) => (
+                          <tr 
+                            key={idx} 
+                            onClick={() => handleSelectAdFromList(ad)}
+                            className="hover:bg-slate-50 transition cursor-pointer"
+                          >
+                            <td className="p-2 font-bold text-slate-700 flex items-center gap-2">
+                              {ad.creative?.image_url ? (
+                                <img src={ad.creative.image_url} alt="" className="w-8 h-8 object-cover rounded border border-border shrink-0" />
+                              ) : (
+                                <div className="w-8 h-8 bg-slate-100 rounded border border-border flex items-center justify-center shrink-0 text-slate-400"><ImageIcon size={12} /></div>
+                              )}
+                              <span className="truncate max-w-[200px]">{ad.name}</span>
+                            </td>
+                            <td className="p-2 text-right font-semibold">{formatCurrency(ad.metrics.spend)}</td>
+                            <td className="p-2 text-right">{formatPercent(ad.metrics.ctr)}</td>
+                            <td className="p-2 text-right text-green-600 font-bold">{ad.metrics.roas.toFixed(2)}x</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
       ) : (
         /* ──────────────────────────────────────────────────────────── */
         /* 4. Campaign Detail Tabbed View (Overview / Tabs Cockpit) */

@@ -7,6 +7,9 @@ from sqlalchemy.pool import StaticPool
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy import delete
 
+import os
+os.environ["ENCRYPTION_KEY"] = "8n7H_bQpZl7lqVwYpZl7lqVwYpZl7lqVwYpZl7lqVwY="
+
 from app.database import Base, get_db
 from app.main import app as fastapi_app
 # Import all models to register on Base.metadata

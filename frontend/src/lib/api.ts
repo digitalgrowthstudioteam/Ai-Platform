@@ -154,6 +154,12 @@ class ApiClient {
     );
   }
 
+  async getAdSetPerformance(campaignId: string, adSetId: string, startDate: string, endDate: string) {
+    return this.request<any>(
+      `/campaigns/${campaignId}/adsets/${adSetId}/performance?start_date=${startDate}&end_date=${endDate}`
+    );
+  }
+
   async getAds(adAccountId: string, startDate: string, endDate: string) {
     return this.request<any[]>(
       `/ads?ad_account_id=${adAccountId}&start_date=${startDate}&end_date=${endDate}`
@@ -232,6 +238,16 @@ class ApiClient {
     return this.request<any>(`/recommendations/experiments/${experimentId}/complete`, {
       method: "POST",
       body: payload,
+    });
+  }
+  async getFeatures(adAccountId: string, date?: string) {
+    const dateParam = date ? `&feature_date=${date}` : "";
+    return this.request<any[]>(`/recommendations/features?ad_account_id=${adAccountId}${dateParam}`);
+  }
+
+  async extractFeatures(adAccountId: string) {
+    return this.request<{ status: string; message: string }>(`/recommendations/features/extract?ad_account_id=${adAccountId}`, {
+      method: "POST",
     });
   }
 
