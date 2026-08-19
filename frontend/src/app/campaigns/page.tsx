@@ -66,6 +66,7 @@ export default function CampaignsPage() {
   const [selectedAd, setSelectedAd] = useState<any | null>(null);
   const [adSetPerformance, setAdSetPerformance] = useState<any | null>(null);
   const [loadingPerf, setLoadingPerf] = useState(false);
+  const [perfError, setPerfError] = useState<string | null>(null);
 
   // Date helper
   const getDates = (preset: "7d" | "30d") => {
@@ -229,14 +230,16 @@ export default function CampaignsPage() {
     setSelectedAdSet(as);
     setSelectedAd(null);
     setAdSetPerformance(null);
+    setPerfError(null);
     if (!selectedCampaign) return;
 
     setLoadingPerf(true);
     try {
       const res = await api.getAdSetPerformance(selectedCampaign.id, as.id, startStr, endStr);
       setAdSetPerformance(res);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to load adset performance goal profile:", err);
+      setPerfError(err.message || String(err));
     } finally {
       setLoadingPerf(false);
     }
@@ -960,6 +963,12 @@ export default function CampaignsPage() {
 
             {/* Ad Set KPI Grid */}
             <div className="card border border-border bg-white shadow-sm rounded-lg p-5 space-y-4">
+              {perfError && (
+                <div className="bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold px-4 py-3 rounded-lg flex items-center gap-2 mb-2">
+                  <AlertCircle size={16} className="text-rose-500 shrink-0" />
+                  <span>Goal-Aware Performance Engine load failed: {perfError}. Showing basic fallback layout instead.</span>
+                </div>
+              )}
               <div className="flex flex-wrap justify-between items-start gap-4">
                 <div>
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Ad Set Details</span>
@@ -1126,7 +1135,7 @@ export default function CampaignsPage() {
                     Objective: {selectedCampaign.objective.replace(/_/g, " ")}
                   </span>
                   <span className="text-[10px] text-slate-500 bg-slate-50 border border-border px-2 py-0.5 rounded font-bold">
-                    Interval: {selectedAccount?.industry || "General Industry"}
+                    Vertical: {selectedAccount?.industry || "General Industry"}
                   </span>
                   <span className="text-[10px] text-green-600 bg-green-50 border border-green-150 px-2 py-0.5 rounded font-bold flex items-center gap-1">
                     <Check size={10} /> Synced
