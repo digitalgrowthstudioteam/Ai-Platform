@@ -40,6 +40,7 @@ class CampaignMetrics(BaseModel):
     cpm: float
     roas: float
     conversations: Optional[int] = 0
+    calls: Optional[int] = 0
 
 
 class CampaignItemResponse(BaseModel):
@@ -51,6 +52,8 @@ class CampaignItemResponse(BaseModel):
     daily_budget: Optional[float]
     lifetime_budget: Optional[float]
     metrics: CampaignMetrics
+    performance_goal: Optional[str] = None
+    optimization_event: Optional[str] = None
 
 
 # ──────────────────────────────────────────────
@@ -121,7 +124,7 @@ async def list_campaigns(
     res = await db.execute(stmt)
     rows = res.all()
 
-    # Query and sum conversations from actions JSON daily logs
+    # Query and sum conversations and calls from actions JSON daily logs
     daily_stmt = (
         select(CampaignDailyMetrics.campaign_id, CampaignDailyMetrics.actions)
         .join(Campaign, CampaignDailyMetrics.campaign_id == Campaign.id)
@@ -133,10 +136,32 @@ async def list_campaigns(
     daily_rows = daily_res.all()
     
     conversations_map = {}
+    calls_map = {}
     for r in daily_rows:
         c_id = r.campaign_id
         actions = r.actions or {}
         conversations_map[c_id] = conversations_map.get(c_id, 0) + int(actions.get("conversations", 0))
+        calls_map[c_id] = calls_map.get(c_id, 0) + int(actions.get("calls", 0))
+
+    # Resolve performance_goal and optimization_event per campaign based on active/primary adsets
+    campaign_ids = [row.Campaign.id for row in rows]
+    adsets_goals = {}
+    if campaign_ids:
+        adsets_stmt = select(
+            AdSet.campaign_id,
+            AdSet.performance_goal,
+            AdSet.optimization_event,
+            AdSet.status
+        ).where(AdSet.campaign_id.in_(campaign_ids))
+        adsets_res = await db.execute(adsets_stmt)
+        adsets_rows = adsets_res.all()
+        for r in adsets_rows:
+            c_id = r.campaign_id
+            if c_id not in adsets_goals or r.status == "ACTIVE":
+                adsets_goals[c_id] = {
+                    "performance_goal": r.performance_goal,
+                    "optimization_event": r.optimization_event
+                }
 
     campaigns = []
     for row in rows:
@@ -153,6 +178,9 @@ async def list_campaigns(
         cpm = (spend / impressions * 1000) if impressions > 0 else 0.0
         roas = (revenue / spend) if spend > 0 else 0.0
         conversations = conversations_map.get(camp.id, 0)
+        calls = calls_map.get(camp.id, 0)
+
+        goals = adsets_goals.get(camp.id, {})
 
         campaigns.append(
             CampaignItemResponse(
@@ -163,6 +191,8 @@ async def list_campaigns(
                 status=camp.status,
                 daily_budget=float(camp.daily_budget) if camp.daily_budget else None,
                 lifetime_budget=float(camp.lifetime_budget) if camp.lifetime_budget else None,
+                performance_goal=goals.get("performance_goal"),
+                optimization_event=goals.get("optimization_event"),
                 metrics=CampaignMetrics(
                     spend=spend,
                     impressions=impressions,
@@ -175,6 +205,7 @@ async def list_campaigns(
                     cpm=cpm,
                     roas=roas,
                     conversations=conversations,
+                    calls=calls,
                 ),
             )
         )

@@ -384,13 +384,75 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
   // Objective based dynamic metrics resolver
   const getObjectiveMetrics = (c: any) => {
     const obj = (c.objective || "OUTCOME_SALES").toUpperCase();
+    const perfGoal = (c.performance_goal || "").toUpperCase();
+    const optEvent = (c.optimization_event || "").toUpperCase();
+
     const spend = c.metrics.spend || 0;
     const impressions = c.metrics.impressions || 0;
     const clicks = c.metrics.clicks || 0;
     const purchases = c.metrics.purchases || 0;
     const leads = c.metrics.leads || 0;
+    const conversations = c.metrics.conversations || 0;
+    const calls = c.metrics.calls || 0;
     const roas = c.metrics.roas || 0;
 
+    // 1. Check by optimization event or performance goal profile first
+    if (optEvent === "CONVERSATION" || perfGoal.includes("CONVERSATION") || perfGoal.includes("MESSAGING_CONVERSATION")) {
+      return {
+        resultLabel: "Conversations",
+        resultValue: formatNumber(conversations),
+        costPerResult: conversations > 0 ? formatCurrency(spend / conversations) : "—",
+        ctrLabel: formatPercent(c.metrics.ctr),
+        roasLabel: "—",
+        isRoasRelevant: false
+      };
+    }
+
+    if (optEvent === "LEAD" || perfGoal.includes("LEAD")) {
+      return {
+        resultLabel: "Leads",
+        resultValue: formatNumber(leads),
+        costPerResult: leads > 0 ? formatCurrency(spend / leads) : "—",
+        ctrLabel: formatPercent(c.metrics.ctr),
+        roasLabel: "—",
+        isRoasRelevant: false
+      };
+    }
+
+    if (optEvent === "CALL" || perfGoal.includes("CALL")) {
+      return {
+        resultLabel: "Calls",
+        resultValue: formatNumber(calls),
+        costPerResult: calls > 0 ? formatCurrency(spend / calls) : "—",
+        ctrLabel: formatPercent(c.metrics.ctr),
+        roasLabel: "—",
+        isRoasRelevant: false
+      };
+    }
+
+    if (optEvent === "PURCHASE" || perfGoal.includes("PURCHASE")) {
+      return {
+        resultLabel: "Purchases",
+        resultValue: formatNumber(purchases),
+        costPerResult: purchases > 0 ? formatCurrency(spend / purchases) : "—",
+        ctrLabel: formatPercent(c.metrics.ctr),
+        roasLabel: roas > 0 ? `${roas.toFixed(2)}x` : "—",
+        isRoasRelevant: true
+      };
+    }
+
+    if (optEvent === "LINK_CLICKS" || perfGoal.includes("LINK_CLICKS")) {
+      return {
+        resultLabel: "Clicks",
+        resultValue: formatNumber(clicks),
+        costPerResult: clicks > 0 ? formatCurrency(spend / clicks) : "—",
+        ctrLabel: formatPercent(c.metrics.ctr),
+        roasLabel: "—",
+        isRoasRelevant: false
+      };
+    }
+
+    // 2. Fallbacks based on campaign objectives
     if (obj.includes("TRAFFIC") || obj.includes("LINK_CLICKS")) {
       return {
         resultLabel: "Clicks",
@@ -420,7 +482,7 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
       };
     } else if (obj.includes("ENGAGEMENT")) {
       return {
-        resultLabel: "Engagements",
+        resultLabel: "Clicks",
         resultValue: formatNumber(clicks),
         costPerResult: clicks > 0 ? formatCurrency(spend / clicks) : "—",
         ctrLabel: formatPercent(c.metrics.ctr),
