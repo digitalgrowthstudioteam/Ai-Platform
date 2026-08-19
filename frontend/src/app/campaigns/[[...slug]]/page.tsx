@@ -1905,3 +1905,9 @@ export default function CampaignsPage() {
     </div>
   );
 }
+
+export function generateStaticParams() {
+  return [
+    { slug: [] }
+  ];
+}
