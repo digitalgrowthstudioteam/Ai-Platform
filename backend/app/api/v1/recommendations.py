@@ -21,6 +21,8 @@ from app.services.recommendation_engine import RecommendationEngine
 from app.services.brief_service import AIBriefService
 from app.services.ml_feature_extractor import MLFeatureExtractor
 from app.models.ml_features import MLFeatureRecord, OptimizationAction
+from app.models.campaign import Campaign, AdSet, Ad
+from app.models.creative import Creative
 from datetime import date
 
 logger = structlog.get_logger()
@@ -46,6 +48,10 @@ class AIRecommendationResponse(BaseModel):
     priority: str
     supporting_metrics: Optional[dict] = None
     status: str
+    entity_name: Optional[str] = None
+    campaign_id: Optional[uuid.UUID] = None
+    adset_id: Optional[uuid.UUID] = None
+    ad_id: Optional[uuid.UUID] = None
 
 
 class RecommendationActionResponse(BaseModel):
@@ -94,23 +100,63 @@ async def list_recommendations(
     
     res = await db.execute(stmt)
     recs = res.scalars().all()
-    
-    return [
-        AIRecommendationResponse(
-            id=r.id,
-            entity_type=r.entity_type,
-            entity_id=r.entity_id,
-            recommendation_type=r.recommendation_type,
-            title=r.title,
-            description=r.description,
-            reason=r.reason,
-            confidence_score=float(r.confidence_score),
-            priority=r.priority,
-            supporting_metrics=r.supporting_metrics,
-            status=r.status,
+
+    # Resolve target entity names to display references in the UI
+    campaign_ids = [r.entity_id for r in recs if r.entity_type == "campaign"] + [r.campaign_id for r in recs if r.campaign_id]
+    adset_ids = [r.entity_id for r in recs if r.entity_type == "adset"] + [r.adset_id for r in recs if r.adset_id]
+    ad_ids = [r.entity_id for r in recs if r.entity_type == "ad"] + [r.ad_id for r in recs if r.ad_id]
+    creative_ids = [r.entity_id for r in recs if r.entity_type == "creative"] + [r.creative_id for r in recs if r.creative_id]
+
+    campaign_names = {}
+    adset_names = {}
+    ad_names = {}
+    creative_names = {}
+
+    if campaign_ids:
+        c_res = await db.execute(select(Campaign.id, Campaign.name).where(Campaign.id.in_(campaign_ids)))
+        campaign_names = {row.id: row.name for row in c_res.all()}
+    if adset_ids:
+        as_res = await db.execute(select(AdSet.id, AdSet.name).where(AdSet.id.in_(adset_ids)))
+        adset_names = {row.id: row.name for row in as_res.all()}
+    if ad_ids:
+        ad_res = await db.execute(select(Ad.id, Ad.name).where(Ad.id.in_(ad_ids)))
+        ad_names = {row.id: row.name for row in ad_res.all()}
+    if creative_ids:
+        cr_res = await db.execute(select(Creative.id, Creative.headline, Creative.meta_creative_id).where(Creative.id.in_(creative_ids)))
+        creative_names = {row.id: (row.headline or f"Creative {row.meta_creative_id}") for row in cr_res.all()}
+
+    out_recs = []
+    for r in recs:
+        entity_name = None
+        if r.entity_type == "campaign":
+            entity_name = campaign_names.get(r.entity_id)
+        elif r.entity_type == "adset":
+            entity_name = adset_names.get(r.entity_id)
+        elif r.entity_type == "ad":
+            entity_name = ad_names.get(r.entity_id)
+        elif r.entity_type == "creative":
+            entity_name = creative_names.get(r.entity_id)
+
+        out_recs.append(
+            AIRecommendationResponse(
+                id=r.id,
+                entity_type=r.entity_type,
+                entity_id=r.entity_id,
+                recommendation_type=r.recommendation_type,
+                title=r.title,
+                description=r.description,
+                reason=r.reason,
+                confidence_score=float(r.confidence_score),
+                priority=r.priority,
+                supporting_metrics=r.supporting_metrics,
+                status=r.status,
+                entity_name=entity_name,
+                campaign_id=r.campaign_id,
+                adset_id=r.adset_id,
+                ad_id=r.ad_id,
+            )
         )
-        for r in recs
-    ]
+    return out_recs
 
 
 @router.post("/{recommendation_id}/apply", response_model=RecommendationActionResponse, summary="Apply a recommendation")

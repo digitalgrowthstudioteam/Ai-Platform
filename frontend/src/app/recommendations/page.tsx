@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useAdAccount } from "@/context/AdAccountContext";
 import { api } from "@/lib/api";
 import {
@@ -25,7 +26,30 @@ import {
 } from "lucide-react";
 
 export default function RecommendationsPage() {
+  const router = useRouter();
   const { selectedAccount, loadingAccounts } = useAdAccount();
+  
+  const getEntityUrl = (r: any) => {
+    if (!r.campaign_id) return null;
+    
+    if (r.entity_type === "campaign") {
+      return `/campaigns?c=${r.entity_id}`;
+    }
+    
+    if (r.entity_type === "adset" || r.adset_id) {
+      const adSetId = r.adset_id || r.entity_id;
+      return `/campaigns?c=${r.campaign_id}&as=${adSetId}`;
+    }
+    
+    if (r.entity_type === "ad" || r.ad_id) {
+      const adId = r.ad_id || r.entity_id;
+      const adSetId = r.adset_id || "all";
+      return `/campaigns?c=${r.campaign_id}&as=${adSetId}&ad=${adId}`;
+    }
+    
+    return `/campaigns?c=${r.campaign_id}`;
+  };
+
   const [recs, setRecs] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [viewMode, setViewMode] = useState<"card" | "list">("card");
@@ -316,6 +340,25 @@ export default function RecommendationsPage() {
                       </p>
                     </div>
 
+                    {r.entity_name && (
+                      <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500 bg-slate-50 border border-slate-100 rounded-md p-2.5">
+                        <span className="text-slate-700">Target Reference:</span>
+                        {getEntityUrl(r) ? (
+                          <button
+                            onClick={() => router.push(getEntityUrl(r)!)}
+                            className="hover:underline text-blue-600 bg-blue-50 px-2 py-0.5 rounded transition font-black cursor-pointer text-left"
+                            title="Click to view details"
+                          >
+                            {r.entity_type.toUpperCase()}: {r.entity_name}
+                          </button>
+                        ) : (
+                          <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-black">
+                            {r.entity_type.toUpperCase()}: {r.entity_name}
+                          </span>
+                        )}
+                      </div>
+                    )}
+
                     <div className="bg-slate-50 border border-slate-100 rounded-md p-3 text-xs font-semibold text-slate-500">
                       <span className="text-slate-700 font-bold block mb-1">Observation Reason:</span>
                       {r.reason}
@@ -366,6 +409,24 @@ export default function RecommendationsPage() {
                         <td className="p-4 max-w-lg">
                           <div className="font-bold text-sm text-slate-800">{r.title}</div>
                           <div className="text-xs text-slate-500 mt-1">{r.description}</div>
+                          {r.entity_name && (
+                            <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 mt-2">
+                              <span className="text-slate-600">Target:</span>
+                              {getEntityUrl(r) ? (
+                                <button
+                                  onClick={() => router.push(getEntityUrl(r)!)}
+                                  className="hover:underline text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded transition font-black cursor-pointer text-left"
+                                  title="Click to view details"
+                                >
+                                  {r.entity_type.toUpperCase()}: {r.entity_name}
+                                </button>
+                              ) : (
+                                <span className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded font-black">
+                                  {r.entity_type.toUpperCase()}: {r.entity_name}
+                                </span>
+                              )}
+                            </div>
+                          )}
                           <div className="text-[11px] text-slate-400 italic mt-2 bg-slate-50 p-2 rounded border border-slate-100">
                             <span className="font-semibold text-slate-500 not-italic">Reason: </span>
                             {r.reason}
