@@ -7,6 +7,7 @@ import structlog
 import math
 from datetime import date, datetime, timedelta
 from sqlalchemy import select, delete, func
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Tuple, Dict, Any
 
@@ -128,6 +129,38 @@ class RecommendationEngine:
         start_date = today - timedelta(days=14)
         recommendations_to_add = []
 
+        # Resolve active campaigns in the account to determine primary objective (Conversations, Leads, etc.)
+        active_stmt = select(Campaign).where(Campaign.ad_account_id == ad_account_uuid).where(Campaign.status == "ACTIVE").options(selectinload(Campaign.ad_sets))
+        active_res = await db.execute(active_stmt)
+        active_campaigns = active_res.scalars().all()
+        
+        is_messaging_acc = False
+        is_leads_acc = False
+        
+        if active_campaigns:
+            conv_count = 0
+            lead_count = 0
+            for c in active_campaigns:
+                if "ENGAGEMENT" in (c.objective or "").upper():
+                    conv_count += 1
+                elif "LEADS" in (c.objective or "").upper():
+                    lead_count += 1
+                else:
+                    for as_item in c.ad_sets:
+                        perf_goal = (as_item.performance_goal or "").upper()
+                        opt_event = (as_item.optimization_event or "").upper()
+                        if "CONVERSATION" in perf_goal or "MESSAGING" in perf_goal or "CONVERSATION" in opt_event:
+                            conv_count += 1
+                            break
+                        elif "LEAD" in perf_goal or "LEAD" in opt_event:
+                            lead_count += 1
+                            break
+            
+            if conv_count > len(active_campaigns) / 2:
+                is_messaging_acc = True
+            elif lead_count > len(active_campaigns) / 2:
+                is_leads_acc = True
+
         # ──────────────────────────────────────────────
         # CORE ANALYSIS: Fetch and process breakdowns
         # ──────────────────────────────────────────────
@@ -163,18 +196,27 @@ class RecommendationEngine:
 
         # Handle Mock/Demo Breakdown generation if mock pipeline
         if is_mock:
+            action_type_mock = "purchase"
+            if is_messaging_acc:
+                action_type_mock = "onsite_conversion.messaging_conversation_started_7d"
+            elif is_leads_acc:
+                action_type_mock = "lead"
+
             platform_breakdowns = [
-                {"publisher_platform": "facebook", "spend": 4500.00, "impressions": 50000, "clicks": 800, "actions": [{"action_type": "purchase", "value": 8}], "action_values": [{"action_type": "purchase", "value": 6400.00}]},
-                {"publisher_platform": "instagram", "spend": 3200.00, "impressions": 40000, "clicks": 950, "actions": [{"action_type": "purchase", "value": 15}], "action_values": [{"action_type": "purchase", "value": 12000.00}]},
+                {"publisher_platform": "facebook", "spend": 4500.00, "impressions": 50000, "clicks": 800, "actions": [{"action_type": action_type_mock, "value": 8}], "action_values": [] if (is_messaging_acc or is_leads_acc) else [{"action_type": "purchase", "value": 6400.00}]},
+                {"publisher_platform": "instagram", "spend": 3200.00, "impressions": 40000, "clicks": 950, "actions": [{"action_type": action_type_mock, "value": 15}], "action_values": [] if (is_messaging_acc or is_leads_acc) else [{"action_type": "purchase", "value": 12000.00}]},
                 {"publisher_platform": "audience_network", "spend": 950.00, "impressions": 12000, "clicks": 110, "actions": [], "action_values": []},
             ]
             demographic_breakdowns = [
-                {"age": "18-24", "gender": "female", "spend": 1200.00, "impressions": 15000, "clicks": 180, "actions": [{"action_type": "purchase", "value": 1}], "action_values": [{"action_type": "purchase", "value": 800.00}]},
-                {"age": "18-24", "gender": "male", "spend": 1100.00, "impressions": 14000, "clicks": 150, "actions": [{"action_type": "purchase", "value": 0}], "action_values": []},
-                {"age": "25-34", "gender": "female", "spend": 3500.00, "impressions": 40000, "clicks": 720, "actions": [{"action_type": "purchase", "value": 14}], "action_values": [{"action_type": "purchase", "value": 11200.00}]},
-                {"age": "25-34", "gender": "male", "spend": 2800.00, "impressions": 30000, "clicks": 600, "actions": [{"action_type": "purchase", "value": 10}], "action_values": [{"action_type": "purchase", "value": 8000.00}]},
+                {"age": "18-24", "gender": "female", "spend": 1200.00, "impressions": 15000, "clicks": 180, "actions": [{"action_type": action_type_mock, "value": 1}], "action_values": [] if (is_messaging_acc or is_leads_acc) else [{"action_type": "purchase", "value": 800.00}]},
+                {"age": "18-24", "gender": "male", "spend": 1100.00, "impressions": 14000, "clicks": 150, "actions": [{"action_type": action_type_mock, "value": 0}], "action_values": []},
+                {"age": "25-34", "gender": "female", "spend": 3500.00, "impressions": 40000, "clicks": 720, "actions": [{"action_type": action_type_mock, "value": 14}], "action_values": [] if (is_messaging_acc or is_leads_acc) else [{"action_type": "purchase", "value": 11200.00}]},
+                {"age": "25-34", "gender": "male", "spend": 2800.00, "impressions": 30000, "clicks": 600, "actions": [{"action_type": action_type_mock, "value": 10}], "action_values": [] if (is_messaging_acc or is_leads_acc) else [{"action_type": "purchase", "value": 8000.00}]},
             ]
 
+        # ──────────────────────────────────────────────
+        # RULE: Platform/Placement Optimization (8.9)
+        # ──────────────────────────────────────────────
         # ──────────────────────────────────────────────
         # RULE: Platform/Placement Optimization (8.9)
         # ──────────────────────────────────────────────
@@ -183,23 +225,49 @@ class RecommendationEngine:
             platform_name = platform.get("publisher_platform")
             spend = float(platform.get("spend", 0))
             
-            purchases = 0
+            results = 0
             revenue = 0.0
-            for act in platform.get("actions", []):
-                if act.get("action_type") == "purchase":
-                    purchases = int(act.get("value", 0))
-            for val in platform.get("action_values", []):
-                if val.get("action_type") == "purchase":
-                    revenue = float(val.get("value", 0.0))
+            roas = 0.0
+            
+            action_type_key = "purchase"
+            if is_messaging_acc:
+                action_type_key = "onsite_conversion.messaging_conversation_started_7d"
+            elif is_leads_acc:
+                action_type_key = "lead"
 
-            roas = (revenue / spend) if spend > 0 else 0.0
+            for act in platform.get("actions", []):
+                act_type = act.get("action_type", "")
+                if act_type == action_type_key or (is_messaging_acc and "conversation" in act_type) or (is_leads_acc and "lead" in act_type):
+                    results += int(act.get("value", 0))
+
+            if not (is_messaging_acc or is_leads_acc):
+                for val in platform.get("action_values", []):
+                    if val.get("action_type") == "purchase":
+                        revenue = float(val.get("value", 0.0))
+                roas = (revenue / spend) if spend > 0 else 0.0
+
             spend_share = (spend / total_platform_spend) if total_platform_spend > 0 else 0.0
 
-            # 1. Placement Opportunity (8.9 Reels prioritization / Placement)
-            if platform_name == "instagram" and roas >= 2.0 and spend_share < 0.50:
+            # 1. Placement Opportunity
+            is_opp = False
+            cost_per_res = 0.0
+            if is_messaging_acc:
+                cost_per_res = spend / results if results > 0 else spend
+                is_opp = results >= 5 and cost_per_res <= 35.00
+            elif is_leads_acc:
+                cost_per_res = spend / results if results > 0 else spend
+                is_opp = results >= 2 and cost_per_res <= 130.00
+            else:
+                is_opp = roas >= 2.0
+
+            if platform_name == "instagram" and is_opp and spend_share < 0.50:
                 priority, confidence = cls.calculate_priority_and_confidence(
-                    impact=0.70, urgency=0.50, spend=spend, num_conversions=purchases
+                    impact=0.70, urgency=0.50, spend=spend, num_conversions=results
                 )
+                
+                desc_detail = f"generates strong conversion efficiency with a ROAS of {roas:.2f}x" if not (is_messaging_acc or is_leads_acc) else f"generates strong efficiency with a Cost Per Result of ₹{cost_per_res:.2f}"
+                evidence_str = f"Reels ROAS is {roas:.2f}x" if not (is_messaging_acc or is_leads_acc) else f"Reels Cost is ₹{cost_per_res:.2f}"
+
                 recommendations_to_add.append(
                     AIRecommendation(
                         user_id=user_uuid,
@@ -208,57 +276,70 @@ class RecommendationEngine:
                         entity_id=ad_account_uuid,
                         recommendation_type="PLACEMENT_OPPORTUNITY",
                         title=f"Placement Opportunity: Prioritize Reels/Instagram Delivery",
-                        description=f"Instagram delivery generates strong conversion efficiency with a ROAS of {roas:.2f}x, while consuming only {spend_share*100:.0f}% of total budget.",
+                        description=f"Instagram delivery {desc_detail}, while consuming only {spend_share*100:.0f}% of total budget.",
                         reason="Reels placement exhibits lower cost per conversion than other placements.",
-                        objective="Sales",
+                        objective="Conversations" if is_messaging_acc else ("Leads" if is_leads_acc else "Sales"),
                         problem=None,
                         root_cause=None,
-                        evidence=f"Reels ROAS is {roas:.2f}x vs account average. Spend share is {spend_share*100:.1f}%.",
-                        expected_impact="Prioritizing Instagram Reels delivery in your next creative cycle will scale conversions and reduce average CPL.",
+                        evidence=f"{evidence_str} vs account average. Spend share is {spend_share*100:.1f}%.",
+                        expected_impact="Prioritizing Instagram Reels delivery in your next creative cycle will scale conversions and reduce average CPA.",
                         confidence_score=confidence,
                         priority=priority,
-                        supporting_metrics={"spend": spend, "roas": roas, "purchases": purchases, "placement": platform_name},
+                        supporting_metrics={"spend": spend, "roas": roas, "purchases": results, "placement": platform_name},
                         status="new",
                     )
                 )
             
-            # 2. Exclude Placement if low ROAS
-            elif spend >= 100.00 and roas < 0.8:
-                priority, confidence = cls.calculate_priority_and_confidence(
-                    impact=0.65, urgency=0.60, spend=spend, num_conversions=purchases
-                )
-                
-                # Check confidence threshold for FIX vs WATCH
-                rec_type = "PLACEMENT_OPTIMIZATION"
-                title = f"Exclude underperforming placement: {platform_name.upper()}"
-                if confidence < 0.50:
-                    rec_type = "WATCH"
-                    title = f"Watch placement delivery: {platform_name.upper()}"
+            # 2. Exclude Placement if low performance
+            else:
+                is_low = False
+                if is_messaging_acc:
+                    cost_per_res = spend / results if results > 0 else spend
+                    is_low = spend >= 100.00 and (results == 0 or cost_per_res > 55.00)
+                elif is_leads_acc:
+                    cost_per_res = spend / results if results > 0 else spend
+                    is_low = spend >= 150.00 and (results == 0 or cost_per_res > 220.00)
+                else:
+                    is_low = spend >= 100.00 and roas < 0.8
 
-                recommendations_to_add.append(
-                    AIRecommendation(
-                        user_id=user_uuid,
-                        ad_account_id=ad_account_uuid,
-                        entity_type="ad_account",
-                        entity_id=ad_account_uuid,
-                        recommendation_type=rec_type,
-                        title=title,
-                        description=(
-                            f"The {platform_name.upper()} placement is delivering conversions inefficiently. "
-                            f"It consumed ₹{spend:.2f} but generated only {purchases} conversions with a ROAS of {roas:.2f}x."
-                        ),
-                        reason=f"Excluding the underperforming {platform_name} placement redirects budget to higher-converting placements like Instagram Reels.",
-                        objective="Sales",
-                        problem="Inefficient placement spend",
-                        root_cause="Over-delivery on low-conversion placement",
-                        evidence=f"Spend: ₹{spend:.2f}, ROAS: {roas:.2f}x, conversions: {purchases}",
-                        expected_impact="Excluding this placement saves wasted spend and improves campaign ROAS.",
-                        confidence_score=confidence,
-                        priority=priority,
-                        supporting_metrics={"spend": spend, "roas": roas, "purchases": purchases, "placement": platform_name},
-                        status="new",
+                if is_low:
+                    priority, confidence = cls.calculate_priority_and_confidence(
+                        impact=0.65, urgency=0.60, spend=spend, num_conversions=results
                     )
-                )
+                    
+                    rec_type = "PLACEMENT_OPTIMIZATION"
+                    title = f"Exclude underperforming placement: {platform_name.upper()}"
+                    if confidence < 0.50:
+                        rec_type = "WATCH"
+                        title = f"Watch placement delivery: {platform_name.upper()}"
+
+                    desc_detail = f"generated only {results} conversions with a ROAS of {roas:.2f}x" if not (is_messaging_acc or is_leads_acc) else f"generated only {results} results with a high Cost Per Result of ₹{cost_per_res:.2f}"
+                    evidence_str = f"ROAS: {roas:.2f}x, conversions: {results}" if not (is_messaging_acc or is_leads_acc) else f"conversions: {results}, Cost: ₹{cost_per_res:.2f}"
+
+                    recommendations_to_add.append(
+                        AIRecommendation(
+                            user_id=user_uuid,
+                            ad_account_id=ad_account_uuid,
+                            entity_type="ad_account",
+                            entity_id=ad_account_uuid,
+                            recommendation_type=rec_type,
+                            title=title,
+                            description=(
+                                f"The {platform_name.upper()} placement is delivering conversions inefficiently. "
+                                f"It consumed ₹{spend:.2f} but {desc_detail}."
+                            ),
+                            reason=f"Excluding the underperforming {platform_name} placement redirects budget to higher-converting placements like Instagram Reels.",
+                            objective="Conversations" if is_messaging_acc else ("Leads" if is_leads_acc else "Sales"),
+                            problem="Inefficient placement spend",
+                            root_cause="Over-delivery on low-conversion placement",
+                            evidence=f"Spend: ₹{spend:.2f}, {evidence_str}",
+                            expected_impact="Excluding this placement saves wasted spend and improves campaign conversion efficiency.",
+                            confidence_score=confidence,
+                            priority=priority,
+                            supporting_metrics={"spend": spend, "roas": roas, "purchases": results, "placement": platform_name},
+                            status="new",
+                        )
+                    )
 
         # ──────────────────────────────────────────────
         # RULE: Age & Gender Target Tuning (8.10 Audience)
@@ -268,22 +349,47 @@ class RecommendationEngine:
             gender = demo.get("gender")
             spend = float(demo.get("spend", 0))
             
-            purchases = 0
+            results = 0
             revenue = 0.0
-            for act in demo.get("actions", []):
-                if act.get("action_type") == "purchase":
-                    purchases = int(act.get("value", 0))
-            for val in demo.get("action_values", []):
-                if val.get("action_type") == "purchase":
-                    revenue = float(val.get("value", 0.0))
+            roas = 0.0
+            
+            action_type_key = "purchase"
+            if is_messaging_acc:
+                action_type_key = "onsite_conversion.messaging_conversation_started_7d"
+            elif is_leads_acc:
+                action_type_key = "lead"
 
-            roas = (revenue / spend) if spend > 0 else 0.0
+            for act in demo.get("actions", []):
+                act_type = act.get("action_type", "")
+                if act_type == action_type_key or (is_messaging_acc and "conversation" in act_type) or (is_leads_acc and "lead" in act_type):
+                    results += int(act.get("value", 0))
+
+            if not (is_messaging_acc or is_leads_acc):
+                for val in demo.get("action_values", []):
+                    if val.get("action_type") == "purchase":
+                        revenue = float(val.get("value", 0.0))
+                roas = (revenue / spend) if spend > 0 else 0.0
 
             # Audience Opportunity
-            if spend >= 1000.00 and roas >= 2.8:
+            is_opp = False
+            cost_per_res = 0.0
+            if is_messaging_acc:
+                cost_per_res = spend / results if results > 0 else spend
+                is_opp = spend >= 1000.00 and results >= 20 and cost_per_res <= 25.00
+            elif is_leads_acc:
+                cost_per_res = spend / results if results > 0 else spend
+                is_opp = spend >= 1000.00 and results >= 8 and cost_per_res <= 100.00
+            else:
+                is_opp = spend >= 1000.00 and roas >= 2.8
+
+            if is_opp:
                 priority, confidence = cls.calculate_priority_and_confidence(
-                    impact=0.75, urgency=0.50, spend=spend, num_conversions=purchases
+                    impact=0.75, urgency=0.50, spend=spend, num_conversions=results
                 )
+                
+                desc_detail = f"generates strong conversions with a ROAS of {roas:.2f}x" if not (is_messaging_acc or is_leads_acc) else f"generates strong efficiency with a Cost Per Result of ₹{cost_per_res:.2f}"
+                evidence_str = f"ROAS of {roas:.2f}x" if not (is_messaging_acc or is_leads_acc) else f"Cost of ₹{cost_per_res:.2f}"
+
                 recommendations_to_add.append(
                     AIRecommendation(
                         user_id=user_uuid,
@@ -292,56 +398,69 @@ class RecommendationEngine:
                         entity_id=ad_account_uuid,
                         recommendation_type="AUDIENCE_OPPORTUNITY",
                         title=f"Audience Opportunity: Scale target demographic {gender.upper()} {age_group}",
-                        description=f"Demographic segment {gender.upper()} ({age_group}) generates strong conversions with a ROAS of {roas:.2f}x.",
+                        description=f"Demographic segment {gender.upper()} ({age_group}) {desc_detail}.",
                         reason="Target audience segment has high conversion rates.",
-                        objective="Sales",
+                        objective="Conversations" if is_messaging_acc else ("Leads" if is_leads_acc else "Sales"),
                         problem=None,
                         root_cause=None,
-                        evidence=f"Segment spent ₹{spend:.2f} with a ROAS of {roas:.2f}x.",
+                        evidence=f"Segment spent ₹{spend:.2f} with a {evidence_str}.",
                         expected_impact="Consider testing additional creative variations tailored specifically to this segment.",
                         confidence_score=confidence,
                         priority=priority,
-                        supporting_metrics={"spend": spend, "roas": roas, "purchases": purchases, "demographics": f"{gender}_{age_group}"},
+                        supporting_metrics={"spend": spend, "roas": roas, "purchases": results, "demographics": f"{gender}_{age_group}"},
                         status="new",
                     )
                 )
 
             # Exclude low performing audience segment
-            elif spend >= 100.00 and roas < 0.5:
-                priority, confidence = cls.calculate_priority_and_confidence(
-                    impact=0.60, urgency=0.55, spend=spend, num_conversions=purchases
-                )
-                
-                rec_type = "DEMOGRAPHIC_TUNING"
-                title = f"Narrow target audience: Exclude {gender.upper()} {age_group}"
-                if confidence < 0.50:
-                    rec_type = "WATCH"
-                    title = f"Watch demographic segment: {gender.upper()} {age_group}"
+            else:
+                is_low = False
+                if is_messaging_acc:
+                    cost_per_res = spend / results if results > 0 else spend
+                    is_low = spend >= 100.00 and (results == 0 or cost_per_res > 55.00)
+                elif is_leads_acc:
+                    cost_per_res = spend / results if results > 0 else spend
+                    is_low = spend >= 150.00 and (results == 0 or cost_per_res > 220.00)
+                else:
+                    is_low = spend >= 100.00 and roas < 0.5
 
-                recommendations_to_add.append(
-                    AIRecommendation(
-                        user_id=user_uuid,
-                        ad_account_id=ad_account_uuid,
-                        entity_type="ad_account",
-                        entity_id=ad_account_uuid,
-                        recommendation_type=rec_type,
-                        title=title,
-                        description=(
-                            f"Audience segment {gender.upper()} ({age_group}) is consuming budget with low purchase intent. "
-                            f"It has consumed ₹{spend:.2f} with a ROAS of {roas:.2f}x."
-                        ),
-                        reason=f"Refining targeting to exclude {gender} aged {age_group} will improve campaign efficiency.",
-                        objective="Sales",
-                        problem="Targeting leakage",
-                        root_cause="Over-targeting low intent demographic",
-                        evidence=f"Spend: ₹{spend:.2f}, ROAS: {roas:.2f}x",
-                        expected_impact="Excluding this demographic redirects budget to higher intent groups.",
-                        confidence_score=confidence,
-                        priority=priority,
-                        supporting_metrics={"spend": spend, "roas": roas, "purchases": purchases, "demographics": f"{gender}_{age_group}"},
-                        status="new",
+                if is_low:
+                    priority, confidence = cls.calculate_priority_and_confidence(
+                        impact=0.60, urgency=0.55, spend=spend, num_conversions=results
                     )
-                )
+                    
+                    rec_type = "DEMOGRAPHIC_TUNING"
+                    title = f"Narrow target audience: Exclude {gender.upper()} {age_group}"
+                    if confidence < 0.50:
+                        rec_type = "WATCH"
+                        title = f"Watch demographic segment: {gender.upper()} {age_group}"
+
+                    desc_detail = f"with low purchase intent. It has consumed ₹{spend:.2f} with a ROAS of {roas:.2f}x" if not (is_messaging_acc or is_leads_acc) else f"with high Cost Per Result. It has consumed ₹{spend:.2f} with a Cost Per Result of ₹{cost_per_res:.2f}"
+                    evidence_str = f"ROAS: {roas:.2f}x" if not (is_messaging_acc or is_leads_acc) else f"Cost: ₹{cost_per_res:.2f}"
+
+                    recommendations_to_add.append(
+                        AIRecommendation(
+                            user_id=user_uuid,
+                            ad_account_id=ad_account_uuid,
+                            entity_type="ad_account",
+                            entity_id=ad_account_uuid,
+                            recommendation_type=rec_type,
+                            title=title,
+                            description=(
+                                f"Audience segment {gender.upper()} ({age_group}) is consuming budget {desc_detail}."
+                            ),
+                            reason=f"Refining targeting to exclude {gender} aged {age_group} will improve campaign efficiency.",
+                            objective="Conversations" if is_messaging_acc else ("Leads" if is_leads_acc else "Sales"),
+                            problem="Targeting leakage",
+                            root_cause="Over-targeting low intent demographic",
+                            evidence=f"Spend: ₹{spend:.2f}, {evidence_str}",
+                            expected_impact="Excluding this demographic redirects budget to higher intent groups.",
+                            confidence_score=confidence,
+                            priority=priority,
+                            supporting_metrics={"spend": spend, "roas": roas, "purchases": results, "demographics": f"{gender}_{age_group}"},
+                            status="new",
+                        )
+                    )
 
         # ──────────────────────────────────────────────
         # RULE: Underperforming Ads & Money at Risk (8.3)
@@ -352,6 +471,7 @@ class RecommendationEngine:
             .join(Campaign, AdSet.campaign_id == Campaign.id)
             .where(Campaign.ad_account_id == ad_account_uuid)
             .where(Ad.status == "ACTIVE")
+            .options(selectinload(Ad.ad_set).selectinload(AdSet.campaign))
         )
         res = await db.execute(ad_stmt)
         active_ads = res.scalars().all()
@@ -361,56 +481,148 @@ class RecommendationEngine:
 
         for ad in active_ads:
             m_stmt = (
-                select(
-                    func.coalesce(func.sum(AdDailyMetrics.spend), 0).label("spend"),
-                    func.coalesce(func.sum(AdDailyMetrics.revenue), 0).label("revenue"),
-                    func.coalesce(func.sum(AdDailyMetrics.purchases), 0).label("purchases"),
-                    func.coalesce(func.sum(AdDailyMetrics.impressions), 0).label("impressions"),
-                    func.coalesce(func.sum(AdDailyMetrics.clicks), 0).label("clicks"),
-                )
+                select(AdDailyMetrics)
                 .where(AdDailyMetrics.ad_id == ad.id)
                 .where(AdDailyMetrics.date >= start_date)
             )
             m_res = await db.execute(m_stmt)
-            m_row = m_res.fetchone()
-            if not m_row or float(m_row.spend or 0.0) == 0.0:
+            metrics_rows = m_res.scalars().all()
+            if not metrics_rows:
                 continue
 
-            spend = float(m_row.spend)
-            revenue = float(m_row.revenue)
-            purchases = int(m_row.purchases)
-            impressions = int(m_row.impressions)
-            clicks = int(m_row.clicks)
+            spend = sum(float(r.spend or 0.0) for r in metrics_rows)
+            if spend == 0.0:
+                continue
 
-            roas = (revenue / spend) if spend > 0 else 0.0
+            impressions = sum(int(r.impressions or 0) for r in metrics_rows)
+            clicks = sum(int(r.clicks or 0) for r in metrics_rows)
+            purchases = sum(int(r.purchases or 0) for r in metrics_rows)
+            revenue = sum(float(r.revenue or 0.0) for r in metrics_rows)
+            
+            conversations = sum(int((r.actions or {}).get("conversations", 0)) for r in metrics_rows)
+            leads = sum(int(r.leads or (r.actions or {}).get("leads", 0)) for r in metrics_rows)
+            calls = sum(int((r.actions or {}).get("calls", 0)) for r in metrics_rows)
+
+            campaign = ad.ad_set.campaign
+            obj = (campaign.objective or "").upper()
+            perf_goal = (ad.ad_set.performance_goal or campaign.performance_goal or "").upper()
+            opt_event = (ad.ad_set.optimization_event or campaign.optimization_event or "").upper()
+
+            is_conv = opt_event == "CONVERSATION" or "CONVERSATION" in perf_goal or "MESSAGING" in perf_goal or "ENGAGEMENT" in obj
+            is_lead = opt_event == "LEAD" or "LEAD" in perf_goal or "LEADS" in obj
+            is_call = opt_event == "CALL" or "CALL" in perf_goal
+
+            is_underperforming = False
+            pct_worse = 0.0
+            description = ""
+            reason = ""
+            evidence = ""
+            rec_title_pause = ""
+            rec_title_watch = ""
+            rec_obj = "Sales"
+            num_conversions = purchases
+
             ctr = (clicks / impressions) if impressions > 0 else 0.0
 
-            # Compute campaign average benchmark ROAS
-            # For simplicity, compare against average target ROAS = 1.6
-            pct_worse = 0.0
-            if roas < 1.20:
-                pct_worse = ((1.6 - roas) / 1.6) * 100
+            if is_conv:
+                num_conversions = conversations
+                rec_obj = "Conversations"
+                cost = (spend / conversations) if conversations > 0 else spend
+                if conversations == 0 and spend >= 50.00:
+                    is_underperforming = True
+                    pct_worse = 100.0
+                elif conversations > 0 and cost > 45.00:
+                    is_underperforming = True
+                    pct_worse = min(100.0, ((cost - 30.0) / 30.0) * 100)
+                
+                description = (
+                    f"This active ad has generated a high cost-per-conversation of ₹{cost:.2f} over the last 14 days, "
+                    f"spending ₹{spend:.2f} and returning only {conversations} conversations."
+                )
+                reason = "Cost-per-conversation is significantly higher than account benchmark targets."
+                evidence = f"Spend: ₹{spend:.2f}, Conversations: {conversations}, Cost: ₹{cost:.2f}/conv"
+                rec_title_pause = f"Pause high CPA Ad: {ad.name}"
+                rec_title_watch = f"Watch cost per conversation on Ad: {ad.name}"
+
+            elif is_lead:
+                num_conversions = leads
+                rec_obj = "Leads"
+                cost = (spend / leads) if leads > 0 else spend
+                if leads == 0 and spend >= 100.00:
+                    is_underperforming = True
+                    pct_worse = 100.0
+                elif leads > 0 and cost > 180.00:
+                    is_underperforming = True
+                    pct_worse = min(100.0, ((cost - 120.0) / 120.0) * 100)
+                
+                description = (
+                    f"This active ad has generated a high cost-per-lead of ₹{cost:.2f} over the last 14 days, "
+                    f"spending ₹{spend:.2f} and returning only {leads} leads."
+                )
+                reason = "Cost-per-lead is higher than target benchmarks."
+                evidence = f"Spend: ₹{spend:.2f}, Leads: {leads}, Cost: ₹{cost:.2f}/lead"
+                rec_title_pause = f"Pause high CPA Ad: {ad.name}"
+                rec_title_watch = f"Watch cost per lead on Ad: {ad.name}"
+
+            elif is_call:
+                num_conversions = calls
+                rec_obj = "Calls"
+                cost = (spend / calls) if calls > 0 else spend
+                if calls == 0 and spend >= 120.00:
+                    is_underperforming = True
+                    pct_worse = 100.0
+                elif calls > 0 and cost > 220.00:
+                    is_underperforming = True
+                    pct_worse = min(100.0, ((cost - 150.0) / 150.0) * 100)
+                
+                description = (
+                    f"This active ad has generated a high cost-per-call of ₹{cost:.2f} over the last 14 days, "
+                    f"spending ₹{spend:.2f} and returning only {calls} phone calls."
+                )
+                reason = "Cost-per-call is higher than benchmark targets."
+                evidence = f"Spend: ₹{spend:.2f}, Calls: {calls}, Cost: ₹{cost:.2f}/call"
+                rec_title_pause = f"Pause high CPA Ad: {ad.name}"
+                rec_title_watch = f"Watch cost per call on Ad: {ad.name}"
+
+            else:
+                # Sales / ROAS based
+                roas = (revenue / spend) if spend > 0 else 0.0
+                if roas < 1.20:
+                    is_underperforming = True
+                    pct_worse = min(100.0, ((1.6 - roas) / 1.6) * 100)
+                
+                description = (
+                    f"This active ad has generated a low ROAS of {roas:.2f}x over the last 14 days, "
+                    f"spending ₹{spend:.2f} and returning only ₹{revenue:.2f} in purchases revenue."
+                )
+                reason = "Cost-per-acquisition is too high compared to return values."
+                evidence = f"Spend: ₹{spend:.2f}, ROAS: {roas:.2f}x, CTR: {ctr*100:.2f}%"
+                rec_title_pause = f"Pause low ROAS Ad: {ad.name}"
+                rec_title_watch = f"Watch performance on Ad: {ad.name}"
+
+            if is_underperforming:
                 underperforming_ads_list.append({
                     "name": ad.name,
                     "id": str(ad.id),
                     "spend": spend,
-                    "roas": roas,
-                    "purchases": purchases,
+                    "purchases": num_conversions,
                     "pct_worse": pct_worse
                 })
                 total_risk_spend += spend
 
             # Emitting Underperforming Ad Recommendation
-            if spend >= 50.00 and roas < 1.20:
+            if spend >= 50.00 and is_underperforming:
                 priority, confidence = cls.calculate_priority_and_confidence(
-                    impact=0.80, urgency=0.75, spend=spend, num_conversions=purchases, impressions=impressions
+                    impact=0.80, urgency=0.75, spend=spend, num_conversions=num_conversions, impressions=impressions
                 )
 
                 rec_type = "UNDERPERFORMING_AD"
-                title = f"Pause low ROAS Ad: {ad.name}"
+                title = rec_title_pause
                 if confidence < 0.50:
                     rec_type = "WATCH"
-                    title = f"Watch performance on Ad: {ad.name}"
+                    title = rec_title_watch
+
+                resolved_campaign_id = ad.ad_set.campaign_id if ad.ad_set else None
 
                 recommendations_to_add.append(
                     AIRecommendation(
@@ -418,24 +630,21 @@ class RecommendationEngine:
                         ad_account_id=ad_account_uuid,
                         entity_type="ad",
                         entity_id=ad.id,
-                        campaign_id=ad.campaign_id if hasattr(ad, "campaign_id") else None,
+                        campaign_id=resolved_campaign_id,
                         adset_id=ad.ad_set_id,
                         ad_id=ad.id,
                         recommendation_type=rec_type,
                         title=title,
-                        description=(
-                            f"This active ad has generated a low ROAS of {roas:.2f}x over the last 14 days, "
-                            f"spending ₹{spend:.2f} and returning only ₹{revenue:.2f} in purchases revenue."
-                        ),
-                        reason="Cost-per-acquisition is too high compared to return values.",
-                        objective="Sales",
+                        description=description,
+                        reason=reason,
+                        objective=rec_obj,
                         problem="Inefficient creative performance",
-                        root_cause="High CPL or low purchase conversion rate on creative variant",
-                        evidence=f"Spend: ₹{spend:.2f}, ROAS: {roas:.2f}x, CTR: {ctr*100:.2f}%",
+                        root_cause="High CPA or low conversion rate on creative variant",
+                        evidence=evidence,
                         expected_impact="Pausing this ad allows Meta's delivery algorithm to prioritize higher performing assets in the ad set.",
                         confidence_score=confidence,
                         priority=priority,
-                        supporting_metrics={"spend": spend, "roas": roas, "purchases": purchases, "pct_worse": pct_worse},
+                        supporting_metrics={"spend": spend, "pct_worse": pct_worse},
                         status="new",
                     )
                 )
@@ -443,7 +652,7 @@ class RecommendationEngine:
             # Low CTR Check
             if impressions >= 500 and ctr < 0.015:
                 priority, confidence = cls.calculate_priority_and_confidence(
-                    impact=0.65, urgency=0.60, spend=spend, num_conversions=purchases, impressions=impressions
+                    impact=0.65, urgency=0.60, spend=spend, num_conversions=num_conversions, impressions=impressions
                 )
                 
                 rec_type = "UNDERPERFORMING_CREATIVE"
@@ -452,13 +661,15 @@ class RecommendationEngine:
                     rec_type = "WATCH"
                     title = f"Watch click engagement: {ad.name}"
 
+                resolved_campaign_id = ad.ad_set.campaign_id if ad.ad_set else None
+
                 recommendations_to_add.append(
                     AIRecommendation(
                         user_id=user_uuid,
                         ad_account_id=ad_account_uuid,
                         entity_type="ad",
                         entity_id=ad.id,
-                        campaign_id=ad.campaign_id if hasattr(ad, "campaign_id") else None,
+                        campaign_id=resolved_campaign_id,
                         adset_id=ad.ad_set_id,
                         ad_id=ad.id,
                         recommendation_type=rec_type,
@@ -513,7 +724,6 @@ class RecommendationEngine:
         # ──────────────────────────────────────────────
         # RULE: Budget Efficiency Engine (8.4 & 8.5)
         # ──────────────────────────────────────────────
-        from sqlalchemy.orm import selectinload
         camp_stmt = select(Campaign).where(Campaign.ad_account_id == ad_account_uuid).where(Campaign.status == "ACTIVE").options(selectinload(Campaign.ad_sets))
         camp_res = await db.execute(camp_stmt)
         active_camps = camp_res.scalars().all()
