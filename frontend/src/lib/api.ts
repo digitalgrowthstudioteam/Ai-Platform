@@ -221,6 +221,13 @@ class ApiClient {
     );
   }
 
+  async triggerSync(adAccountId?: string) {
+    return this.request<{ status: string; message: string }>("/meta/sync/trigger", {
+      method: "POST",
+      body: JSON.stringify({ ad_account_id: adAccountId }),
+    });
+  }
+
   // Phase 8: AI Recommendations endpoints
   async getRecommendations(adAccountId: string) {
     return this.request<any[]>(`/recommendations?ad_account_id=${adAccountId}`);
