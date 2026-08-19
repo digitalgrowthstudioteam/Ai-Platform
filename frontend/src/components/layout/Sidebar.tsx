@@ -47,31 +47,24 @@ const navigation: NavSection[] = [
     ],
   },
   {
-    label: "ANALYTICS",
+    label: "CAMPAIGNS",
     items: [
-      { label: "Campaigns", href: "/campaigns", icon: Megaphone },
-      { label: "Ad Sets", href: "/ad-sets", icon: Layers },
-      { label: "Ads", href: "/ads", icon: FileText },
-      { label: "Creatives", href: "/creatives", icon: Image },
-      { label: "Audiences", href: "/audiences", icon: Users },
-      { label: "Placements", href: "/placements", icon: MapPin },
-      { label: "Demographics", href: "/demographics", icon: BarChart3 },
+      { label: "All Campaigns", href: "/campaigns", icon: Megaphone },
     ],
   },
   {
-    label: "AI & INSIGHTS",
+    label: "AI INTELLIGENCE",
     items: [
-      { label: "AI Recommendations", href: "/recommendations", icon: Lightbulb },
-      { label: "Performance Insights", href: "/insights", icon: TrendingUp },
-      { label: "Creative Analyzer", href: "/creative-analyzer", icon: Palette },
-      { label: "Copy Analyzer", href: "/copy-analyzer", icon: Type },
+      { label: "Recommendations", href: "/recommendations", icon: Lightbulb },
+      { label: "Account Intelligence", href: "/insights", icon: TrendingUp },
+      { label: "Creative Intelligence", href: "/creative-analyzer", icon: Palette },
     ],
   },
   {
-    label: "AUTOMATION",
+    label: "Automation",
     items: [
       { label: "Rules", href: "/rules", icon: Zap, badge: "Coming Soon", disabled: true },
-      { label: "Auto Optimize", href: "/auto-optimize", icon: Bot, badge: "Soon", disabled: true },
+      { label: "AI Active", href: "/auto-optimize", icon: Bot, badge: "Coming Soon", disabled: true },
     ],
   },
   {
@@ -79,7 +72,6 @@ const navigation: NavSection[] = [
     items: [
       { label: "Ad Accounts", href: "/settings/ad-accounts", icon: Megaphone },
       { label: "Billing & Plans", href: "/settings/billing", icon: CreditCard },
-      { label: "Team Members", href: "/settings/team", icon: UserPlus },
       { label: "Account Settings", href: "/settings/account", icon: Settings },
     ],
   },
