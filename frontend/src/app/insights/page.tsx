@@ -176,7 +176,7 @@ export default function InsightsPage() {
             </div>
 
             <div className="space-y-2 text-xs">
-              {riskEntities.map((ent, idx) => (
+              {riskEntities.map((ent: any, idx: number) => (
                 <div key={idx} className="flex justify-between items-center border-b border-slate-50 pb-2">
                   <span className="font-semibold text-slate-700 truncate max-w-[180px]">{ent.name}</span>
                   <div className="text-right shrink-0">
