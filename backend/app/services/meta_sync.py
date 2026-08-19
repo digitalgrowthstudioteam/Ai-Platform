@@ -504,21 +504,21 @@ class MetaSyncService:
 
             # 4. Ingest Historical Insights (last 30 days)
             # Level: Campaign
-            ins_url = f"https://graph.facebook.com/{api_ver}/{account_id}/insights?time_increment=1&level=campaign&date_preset=last_30d&fields=campaign_id,date_start,spend,impressions,clicks,actions,action_values&limit=500"
+            ins_url = f"https://graph.facebook.com/{api_ver}/{account_id}/insights?time_increment=1&level=campaign&date_preset=last_30d&fields=campaign_id,date_start,spend,impressions,reach,frequency,clicks,actions,action_values&limit=500"
             r = await client.get(ins_url, headers=headers)
             r.raise_for_status()
             c_insights = r.json().get("data", [])
             await self._save_insights(db, c_insights, campaign_map, "campaign")
 
             # Level: AdSet
-            ins_url = f"https://graph.facebook.com/{api_ver}/{account_id}/insights?time_increment=1&level=adset&date_preset=last_30d&fields=adset_id,date_start,spend,impressions,clicks,actions,action_values&limit=500"
+            ins_url = f"https://graph.facebook.com/{api_ver}/{account_id}/insights?time_increment=1&level=adset&date_preset=last_30d&fields=adset_id,date_start,spend,impressions,reach,frequency,clicks,actions,action_values&limit=500"
             r = await client.get(ins_url, headers=headers)
             r.raise_for_status()
             a_insights = r.json().get("data", [])
             await self._save_insights(db, a_insights, adset_map, "adset")
 
             # Level: Ad
-            ins_url = f"https://graph.facebook.com/{api_ver}/{account_id}/insights?time_increment=1&level=ad&date_preset=last_30d&fields=ad_id,date_start,spend,impressions,clicks,actions,action_values&limit=500"
+            ins_url = f"https://graph.facebook.com/{api_ver}/{account_id}/insights?time_increment=1&level=ad&date_preset=last_30d&fields=ad_id,date_start,spend,impressions,reach,frequency,clicks,actions,action_values&limit=500"
             r = await client.get(ins_url, headers=headers)
             r.raise_for_status()
             ad_insights = r.json().get("data", [])
@@ -555,6 +555,7 @@ class MetaSyncService:
             leads = parsed["leads"]
             revenue = parsed["revenue"]
             link_clicks = parsed["link_clicks"] or clicks
+            clicks = max(clicks, link_clicks)
 
             # Call MetricEngine to calculate derived fields
             raw_metrics = {
@@ -824,7 +825,7 @@ class MetaSyncService:
                 out["purchases"] += val
             elif atype in ("lead", "offsite_conversion.fb_pixel_lead", "leadgen_grouped"):
                 out["leads"] += val
-            elif atype in ("onsite_conversion.messaging_first_reply", "onsite_conversion.messaging_conversation_started_7d", "onsite_conversion.messaging_welcome_message_viewed"):
+            elif atype == "onsite_conversion.messaging_conversation_started_7d":
                 out["conversations"] += val
             elif atype == "onsite_conversion.messaging_purchase":
                 out["messaging_purchases"] += val
