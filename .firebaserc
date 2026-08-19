@@ -12,6 +12,13 @@
           "digital-growth-studio"
         ]
       }
+    },
+    "partner-dgs": {
+      "hosting": {
+        "prod": [
+          "digitalgrowthstudio"
+        ]
+      }
     }
   },
   "etags": {}
