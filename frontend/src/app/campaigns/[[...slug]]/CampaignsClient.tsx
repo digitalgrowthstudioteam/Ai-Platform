@@ -497,40 +497,83 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
   };
 
   // Generate mock chart data based on totals
-  const generateTrendChartData = (entity: any, isAd = false) => {
-    const days = datePreset === "7d" ? 7 : 30;
-    const data = [];
-    const obj = (selectedCampaign?.objective || "OUTCOME_SALES").toUpperCase();
-    const isClicks = obj.includes("TRAFFIC") || obj.includes("LINK_CLICKS");
-    const isImpressions = obj.includes("AWARENESS") || obj.includes("REACH");
+  // Daily metrics states for real trend lines
+  const [dailyData, setDailyData] = useState<any[]>([]);
+  const [loadingDaily, setLoadingDaily] = useState<boolean>(false);
 
-    const totalSpend = entity.metrics.spend || 0;
-    const totalResult = isClicks 
-      ? (entity.metrics.clicks || 0) 
-      : isImpressions 
-      ? (entity.metrics.impressions || 0) 
-      : (entity.metrics.purchases || 0);
+  useEffect(() => {
+    const fetchDailyMetrics = async () => {
+      const { startStr, endStr } = getDates(datePreset, customStartDate, customEndDate);
+      if (selectedAd) {
+        try {
+          setLoadingDaily(true);
+          const res = await api.getAdDaily(selectedAd.id, startStr, endStr);
+          setDailyData(res);
+        } catch (e) {
+          console.error("Failed to fetch ad daily metrics:", e);
+          setDailyData([]);
+        } finally {
+          setLoadingDaily(false);
+        }
+      } else if (selectedCampaign) {
+        try {
+          setLoadingDaily(true);
+          const res = await api.getCampaignDaily(selectedCampaign.id, startStr, endStr);
+          setDailyData(res);
+        } catch (e) {
+          console.error("Failed to fetch campaign daily metrics:", e);
+          setDailyData([]);
+        } finally {
+          setLoadingDaily(false);
+        }
+      } else {
+        setDailyData([]);
+      }
+    };
 
-    const baseSpend = totalSpend / days;
-    const baseResult = totalResult / days;
+    fetchDailyMetrics();
+  }, [selectedCampaign?.id, selectedAd?.id, datePreset, customStartDate, customEndDate]);
 
-    const today = new Date();
-    for (let i = days - 1; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(today.getDate() - i);
+  const chartData = useMemo(() => {
+    if (dailyData && dailyData.length > 0) {
+      const obj = (selectedCampaign?.objective || "OUTCOME_SALES").toUpperCase();
+      const isClicks = obj.includes("TRAFFIC") || obj.includes("LINK_CLICKS");
+      const isImpressions = obj.includes("AWARENESS") || obj.includes("REACH");
+
+      return dailyData.map(item => ({
+        date: (() => {
+          try {
+            const d = new Date(item.date);
+            return d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+          } catch (e) {
+            return item.date;
+          }
+        })(),
+        spend: item.spend,
+        result: isClicks ? item.clicks : isImpressions ? item.impressions : item.purchases
+      }));
+    }
+
+    // Fallback if no real daily metrics exist in the DB for the range
+    const { startDateObj, endDateObj } = getDates(datePreset, customStartDate, customEndDate);
+    const timeDiff = endDateObj.getTime() - startDateObj.getTime();
+    const days = Math.max(1, Math.ceil(timeDiff / (1000 * 3600 * 24)) + 1);
+    const fallback = [];
+    
+    // Create UTC baseline to avoid timezone drift issues
+    const baseDate = new Date(startDateObj);
+    for (let i = 0; i < days; i++) {
+      const d = new Date(baseDate);
+      d.setDate(baseDate.getDate() + i);
       const dateStr = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-
-      const spendVariance = 0.75 + Math.random() * 0.5;
-      const resultVariance = 0.7 + Math.random() * 0.6;
-
-      data.push({
+      fallback.push({
         date: dateStr,
-        spend: parseFloat((baseSpend * spendVariance).toFixed(2)),
-        result: Math.round(baseResult * resultVariance)
+        spend: 0,
+        result: 0
       });
     }
-    return data;
-  };
+    return fallback;
+  }, [dailyData, selectedCampaign, datePreset, customStartDate, customEndDate]);
 
   // Find top and bottom performing ads in the campaign
   const getStrongestAndWeakestAds = () => {
@@ -963,7 +1006,7 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
                 </div>
                 <div className="h-44 w-full">
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={generateTrendChartData(selectedAd, true)}>
+                    <LineChart data={chartData}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                       <XAxis dataKey="date" tickLine={false} axisLine={false} style={{ fontSize: 9, fill: "#94a3b8" }} />
                       <YAxis yAxisId="left" tickLine={false} axisLine={false} style={{ fontSize: 9, fill: "#94a3b8" }} />
@@ -1891,7 +1934,7 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
 
                     <div className="h-44 w-full">
                       <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={generateTrendChartData(selectedCampaign)}>
+                        <LineChart data={chartData}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                           <XAxis dataKey="date" tickLine={false} axisLine={false} style={{ fontSize: 9, fill: "#94a3b8" }} />
                           <YAxis yAxisId="left" tickLine={false} axisLine={false} style={{ fontSize: 9, fill: "#94a3b8" }} />

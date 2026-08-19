@@ -422,3 +422,109 @@ async def get_adset_performance(
         "trend_summary": "improving" if score >= 75 else ("degrading" if score < 50 else "stable")
     }
 
+
+class DailyMetricPoint(BaseModel):
+    date: date
+    spend: float
+    impressions: int
+    clicks: int
+    purchases: int
+    revenue: float
+    roas: float
+
+
+@router.get("/{campaign_id}/daily", response_model=List[DailyMetricPoint], summary="Get campaign daily performance metrics")
+async def get_campaign_daily_metrics(
+    campaign_id: uuid.UUID,
+    start_date: date = Query(..., description="Start date of filter window"),
+    end_date: date = Query(..., description="End date of filter window"),
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    user = await get_db_user_from_claims(claims, db)
+    # Verify campaign access
+    stmt = (
+        select(Campaign)
+        .where(Campaign.id == campaign_id)
+        .where(Campaign.ad_account_id.in_(
+            select(MetaAdAccount.id).where(MetaAdAccount.user_id == user.id)
+        ))
+    )
+    res = await db.execute(stmt)
+    campaign = res.scalar_one_or_none()
+    if not campaign:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found.")
+
+    # Fetch daily metrics
+    stmt = (
+        select(CampaignDailyMetrics)
+        .where(CampaignDailyMetrics.campaign_id == campaign_id)
+        .where(CampaignDailyMetrics.date >= start_date)
+        .where(CampaignDailyMetrics.date <= end_date)
+        .order_by(CampaignDailyMetrics.date.asc())
+    )
+    res = await db.execute(stmt)
+    rows = res.scalars().all()
+    return [
+        DailyMetricPoint(
+            date=r.date,
+            spend=float(r.spend or 0.0),
+            impressions=int(r.impressions or 0),
+            clicks=int(r.clicks or 0),
+            purchases=int(r.purchases or 0),
+            revenue=float(r.revenue or 0.0),
+            roas=float(r.roas or 0.0),
+        )
+        for r in rows
+    ]
+
+
+@router.get("/{campaign_id}/adsets/{adset_id}/daily", response_model=List[DailyMetricPoint], summary="Get adset daily performance metrics")
+async def get_adset_daily_metrics(
+    campaign_id: uuid.UUID,
+    adset_id: uuid.UUID,
+    start_date: date = Query(..., description="Start date of filter window"),
+    end_date: date = Query(..., description="End date of filter window"),
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    user = await get_db_user_from_claims(claims, db)
+    # Verify adset access
+    stmt = (
+        select(AdSet)
+        .join(Campaign, AdSet.campaign_id == Campaign.id)
+        .where(AdSet.id == adset_id)
+        .where(Campaign.id == campaign_id)
+        .where(Campaign.ad_account_id.in_(
+            select(MetaAdAccount.id).where(MetaAdAccount.user_id == user.id)
+        ))
+    )
+    res = await db.execute(stmt)
+    adset = res.scalar_one_or_none()
+    if not adset:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="AdSet not found.")
+
+    # Fetch daily metrics
+    stmt = (
+        select(AdSetDailyMetrics)
+        .where(AdSetDailyMetrics.ad_set_id == adset_id)
+        .where(AdSetDailyMetrics.date >= start_date)
+        .where(AdSetDailyMetrics.date <= end_date)
+        .order_by(AdSetDailyMetrics.date.asc())
+    )
+    res = await db.execute(stmt)
+    rows = res.scalars().all()
+    return [
+        DailyMetricPoint(
+            date=r.date,
+            spend=float(r.spend or 0.0),
+            impressions=int(r.impressions or 0),
+            clicks=int(r.clicks or 0),
+            purchases=int(r.purchases or 0),
+            revenue=float(r.revenue or 0.0),
+            roas=float(r.roas or 0.0),
+        )
+        for r in rows
+    ]
+
+
