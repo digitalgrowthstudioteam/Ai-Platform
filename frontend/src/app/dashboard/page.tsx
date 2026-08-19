@@ -22,6 +22,14 @@ import {
   CheckCircle2,
   Loader2,
   Zap,
+  Users,
+  MousePointer,
+  Activity,
+  Video,
+  Heart,
+  FileText,
+  RefreshCw,
+  Brain,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -55,7 +63,19 @@ export default function OverviewPage() {
     return new Date().toISOString().split("T")[0];
   });
 
-  const [activeChartTab, setActiveChartTab] = useState<"spend" | "purchases" | "roas">("purchases");
+  const [activeChartTab, setActiveChartTab] = useState<string>("purchases");
+  const [goalFilter, setGoalFilter] = useState<"all" | "leads" | "sales" | "engagement">("all");
+
+  // Reset active chart tab on goal filter changes
+  useEffect(() => {
+    if (goalFilter === "leads") {
+      setActiveChartTab("leads");
+    } else if (goalFilter === "engagement") {
+      setActiveChartTab("impressions");
+    } else {
+      setActiveChartTab("purchases");
+    }
+  }, [goalFilter]);
 
   // Loaded data states
   const [metrics, setMetrics] = useState<any>(null);
@@ -330,27 +350,44 @@ export default function OverviewPage() {
   const dateRangeLabel = `${formatDateHeader(startStr)} – ${formatDateHeader(endStr)}, 2026`;
 
   // Render metric card helper
-  const renderKpiCard = (title: string, value: number, trend: number, isCurrency: boolean, icon: any, color: string) => {
+  const renderKpiCard = (title: string, value: number, trend: number, formatType: "currency" | "percent" | "multiplier" | "number", icon: any, color: string) => {
     const Icon = icon;
     const isUp = trend >= 0;
     
-    // Format KPI Value
     let formattedVal = "";
-    if (isCurrency) formattedVal = formatCurrency(value);
-    else if (title.includes("ROAS")) formattedVal = `${value.toFixed(2)}x`;
-    else formattedVal = formatNumber(value);
+    if (formatType === "currency") {
+      formattedVal = formatCurrency(value);
+    } else if (formatType === "percent") {
+      formattedVal = `${(value * 100).toFixed(2)}%`;
+    } else if (formatType === "multiplier") {
+      formattedVal = title.includes("Frequency") ? value.toFixed(2) : `${value.toFixed(2)}x`;
+    } else {
+      formattedVal = formatNumber(value);
+    }
+
+    const bgColors: Record<string, string> = {
+      blue: "bg-blue-50 text-blue-600 border-blue-100",
+      green: "bg-emerald-50 text-emerald-600 border-emerald-100",
+      purple: "bg-indigo-50 text-indigo-650 border-indigo-100",
+      orange: "bg-amber-50 text-amber-600 border-amber-100",
+      red: "bg-rose-50 text-rose-650 border-rose-100",
+    };
 
     return (
-      <div className="kpi-card shadow-sm border border-border bg-white rounded-lg p-5">
-        <div className={`kpi-icon ${color} p-3 rounded-lg flex items-center justify-center shrink-0`}>
-          <Icon size={20} />
+      <div className="bg-white border border-slate-150 rounded-xl p-5 hover:shadow-md transition duration-200 flex flex-col justify-between">
+        <div className="flex justify-between items-start">
+          <div className="flex flex-col">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{title}</span>
+            <span className="text-2xl font-extrabold text-slate-900 mt-1 block">{formattedVal}</span>
+          </div>
+          <div className={`p-2.5 rounded-xl border ${bgColors[color] || bgColors.blue} flex items-center justify-center shrink-0`}>
+            <Icon size={18} />
+          </div>
         </div>
-        <div className="kpi-content mt-3">
-          <span className="kpi-label text-xs text-subtle font-bold uppercase tracking-wider">{title}</span>
-          <span className="kpi-value text-2xl font-bold text-slate-800 mt-1 block">{formattedVal}</span>
-          <span className={`kpi-trend text-xs font-semibold flex items-center gap-0.5 mt-2 ${isUp ? "text-green-600" : "text-red-500"}`}>
+        <div className="mt-4 pt-3 border-t border-slate-100">
+          <span className={`text-[11px] font-semibold flex items-center gap-0.5 ${isUp ? "text-emerald-600" : "text-rose-500"}`}>
             {isUp ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
-            {Math.abs(trend).toFixed(1)}% vs prev period
+            <span className="font-bold">{Math.abs(trend).toFixed(1)}%</span> vs prev period
           </span>
         </div>
       </div>
@@ -388,15 +425,60 @@ export default function OverviewPage() {
   return (
     <div className="animate-fade-in space-y-6">
       {/* Page Header */}
-      <div className="page-header flex justify-between items-center">
+      <div className="page-header flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-100 pb-5">
         <div>
-          <h1 className="page-title text-2xl font-bold text-slate-800">Overview</h1>
-          <p className="page-subtitle text-sm text-subtle mt-1">
-            Real-time insights for {selectedAccount?.name || "active Meta pipeline"}
+          <h1 className="page-title text-2xl font-black text-slate-900 tracking-tight">Dashboard</h1>
+          <p className="page-subtitle text-xs text-slate-500 mt-1 font-semibold">
+            Real-time performance analytics for <span className="text-primary font-bold">{selectedAccount?.name || "active Meta pipeline"}</span>
           </p>
         </div>
         
-        <div className="flex flex-wrap items-center gap-3">
+        {/* Goal Filter & Date Picker Controls */}
+        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+          {/* Goal Filter Selector */}
+          <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-bold">
+            <button
+              onClick={() => setGoalFilter("all")}
+              className={`px-3.5 py-1.5 rounded-lg transition-all ${
+                goalFilter === "all"
+                  ? "bg-white text-slate-950 shadow-sm"
+                  : "text-slate-500 hover:text-slate-900"
+              }`}
+            >
+              Whole Account
+            </button>
+            <button
+              onClick={() => setGoalFilter("sales")}
+              className={`px-3.5 py-1.5 rounded-lg transition-all ${
+                goalFilter === "sales"
+                  ? "bg-white text-slate-950 shadow-sm"
+                  : "text-slate-500 hover:text-slate-900"
+              }`}
+            >
+              Sales
+            </button>
+            <button
+              onClick={() => setGoalFilter("leads")}
+              className={`px-3.5 py-1.5 rounded-lg transition-all ${
+                goalFilter === "leads"
+                  ? "bg-white text-slate-950 shadow-sm"
+                  : "text-slate-500 hover:text-slate-900"
+              }`}
+            >
+              Leads & Messaging
+            </button>
+            <button
+              onClick={() => setGoalFilter("engagement")}
+              className={`px-3.5 py-1.5 rounded-lg transition-all ${
+                goalFilter === "engagement"
+                  ? "bg-white text-slate-950 shadow-sm"
+                  : "text-slate-500 hover:text-slate-900"
+              }`}
+            >
+              Engagement
+            </button>
+          </div>
+
           {/* Custom Date Range Select Inputs */}
           {datePreset === "custom" && (
             <div className="flex items-center gap-2">
@@ -566,13 +648,150 @@ export default function OverviewPage() {
           </div>
 
           {/* KPI Cards Grid */}
-          <div className="kpi-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
-            {renderKpiCard("Spend", metrics.spend.value, metrics.spend.trend, true, DollarSign, "blue")}
-            {renderKpiCard("Purchases", metrics.purchases.value, metrics.purchases.trend, false, ShoppingCart, "green")}
-            {renderKpiCard("Cost per Purchase", metrics.cpa.value, metrics.cpa.trend, true, Target, "purple")}
-            {renderKpiCard("ROAS", metrics.roas.value, metrics.roas.trend, false, TrendingUp, "green")}
-            {renderKpiCard("Impressions", metrics.impressions.value, metrics.impressions.trend, false, Eye, "orange")}
-          </div>
+          {goalFilter === "all" && (
+            <div className="space-y-6">
+              <div>
+                <div className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                  <Target size={14} className="text-slate-400" />
+                  <span>Primary Performance KPIs</span>
+                </div>
+                <div className="kpi-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
+                  {renderKpiCard("Spend", metrics.spend.value, metrics.spend.trend, "currency", DollarSign, "blue")}
+                  {renderKpiCard("Purchases", metrics.purchases.value, metrics.purchases.trend, "number", ShoppingCart, "green")}
+                  {renderKpiCard("Cost per Purchase (CPA)", metrics.cpa.value, metrics.cpa.trend, "currency", Target, "purple")}
+                  {renderKpiCard("ROAS", metrics.roas.value, metrics.roas.trend, "multiplier", TrendingUp, "green")}
+                  {renderKpiCard("Impressions", metrics.impressions.value, metrics.impressions.trend, "number", Eye, "orange")}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Traffic & Clicks Card */}
+                <div className="bg-slate-50/50 p-5 rounded-xl border border-slate-200">
+                  <span className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4 block">Traffic & Delivery CTR</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {renderKpiCard("CTR", metrics.ctr.value, metrics.ctr.trend, "percent", MousePointer, "blue")}
+                    {renderKpiCard("CPM", metrics.cpm.value, metrics.cpm.trend, "currency", Eye, "orange")}
+                    {renderKpiCard("CPC", metrics.cpc.value, metrics.cpc.trend, "currency", Target, "purple")}
+                    {renderKpiCard("Link Clicks", metrics.link_clicks.value, metrics.link_clicks.trend, "number", MousePointer, "blue")}
+                    {renderKpiCard("Outbound Clicks", metrics.clicks.value, metrics.clicks.trend, "number", ArrowUpRight, "blue")}
+                  </div>
+                </div>
+
+                {/* Funnels & Lead Gen Card */}
+                <div className="bg-slate-50/50 p-5 rounded-xl border border-slate-200">
+                  <span className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4 block">Conversions & Leads</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {renderKpiCard("Leads", metrics.leads.value, metrics.leads.trend, "number", FileText, "green")}
+                    {renderKpiCard("CPL", metrics.cpl.value, metrics.cpl.trend, "currency", Target, "purple")}
+                    {renderKpiCard("Add to Cart", metrics.add_to_cart.value, metrics.add_to_cart.trend, "number", ShoppingCart, "blue")}
+                    {renderKpiCard("Initiate Checkout", metrics.initiate_checkout.value, metrics.initiate_checkout.trend, "number", Target, "purple")}
+                    {renderKpiCard("AOV", metrics.aov.value, metrics.aov.trend, "currency", RefreshCw, "green")}
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <div className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                  <Activity size={14} className="text-slate-400" />
+                  <span>Creative Watch & Engagement</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
+                  {renderKpiCard("Engagement Rate", metrics.engagement_rate.value, metrics.engagement_rate.trend, "percent", Activity, "blue")}
+                  {renderKpiCard("Hook Rate", metrics.hook_rate.value, metrics.hook_rate.trend, "percent", Sparkles, "orange")}
+                  {renderKpiCard("Video Views", metrics.video_views.value, metrics.video_views.trend, "number", Video, "blue")}
+                  {renderKpiCard("ThruPlays", metrics.thruplays.value, metrics.thruplays.trend, "number", Video, "purple")}
+                  {renderKpiCard("Post Engagement", metrics.post_engagement.value, metrics.post_engagement.trend, "number", Heart, "red")}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {goalFilter === "leads" && (
+            <div className="space-y-6">
+              <div>
+                <div className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                  <FileText size={14} className="text-slate-400" />
+                  <span>Messaging & Lead Gen Performance KPIs</span>
+                </div>
+                <div className="kpi-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
+                  {renderKpiCard("Spend", metrics.spend.value, metrics.spend.trend, "currency", DollarSign, "blue")}
+                  {renderKpiCard("Leads", metrics.leads.value, metrics.leads.trend, "number", FileText, "green")}
+                  {renderKpiCard("Cost per Lead (CPL)", metrics.cpl.value, metrics.cpl.trend, "currency", Target, "purple")}
+                  {renderKpiCard("Link Clicks", metrics.link_clicks.value, metrics.link_clicks.trend, "number", MousePointer, "blue")}
+                  {renderKpiCard("Impressions", metrics.impressions.value, metrics.impressions.trend, "number", Eye, "orange")}
+                </div>
+              </div>
+              
+              <div className="bg-slate-50/50 p-5 rounded-xl border border-slate-200">
+                <span className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4 block">Secondary Lead Indicators</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
+                  {renderKpiCard("CTR", metrics.ctr.value, metrics.ctr.trend, "percent", MousePointer, "blue")}
+                  {renderKpiCard("CPC", metrics.cpc.value, metrics.cpc.trend, "currency", Target, "purple")}
+                  {renderKpiCard("CPM", metrics.cpm.value, metrics.cpm.trend, "currency", Eye, "orange")}
+                  {renderKpiCard("Reach", metrics.reach.value, metrics.reach.trend, "number", Users, "blue")}
+                  {renderKpiCard("Frequency", metrics.frequency.value, metrics.frequency.trend, "multiplier", Activity, "orange")}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {goalFilter === "sales" && (
+            <div className="space-y-6">
+              <div>
+                <div className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                  <ShoppingCart size={14} className="text-slate-400" />
+                  <span>Sales & E-Commerce Performance KPIs</span>
+                </div>
+                <div className="kpi-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
+                  {renderKpiCard("Spend", metrics.spend.value, metrics.spend.trend, "currency", DollarSign, "blue")}
+                  {renderKpiCard("Purchases", metrics.purchases.value, metrics.purchases.trend, "number", ShoppingCart, "green")}
+                  {renderKpiCard("Cost per Purchase (CPA)", metrics.cpa.value, metrics.cpa.trend, "currency", Target, "purple")}
+                  {renderKpiCard("ROAS", metrics.roas.value, metrics.roas.trend, "multiplier", TrendingUp, "green")}
+                  {renderKpiCard("Revenue", metrics.revenue.value, metrics.revenue.trend, "currency", DollarSign, "green")}
+                </div>
+              </div>
+
+              <div className="bg-slate-50/50 p-5 rounded-xl border border-slate-200">
+                <span className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4 block">Checkout Funnel & Efficiency</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
+                  {renderKpiCard("Average Order Value", metrics.aov.value, metrics.aov.trend, "currency", RefreshCw, "green")}
+                  {renderKpiCard("Add to Cart", metrics.add_to_cart.value, metrics.add_to_cart.trend, "number", ShoppingCart, "blue")}
+                  {renderKpiCard("Initiate Checkout", metrics.initiate_checkout.value, metrics.initiate_checkout.trend, "number", Target, "purple")}
+                  {renderKpiCard("Cost per Cart Add", metrics.cost_per_add_to_cart.value, metrics.cost_per_add_to_cart.trend, "currency", Target, "blue")}
+                  {renderKpiCard("Cost per Checkout Init", metrics.cost_per_initiate_checkout.value, metrics.cost_per_initiate_checkout.trend, "currency", Target, "purple")}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {goalFilter === "engagement" && (
+            <div className="space-y-6">
+              <div>
+                <div className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                  <Activity size={14} className="text-slate-400" />
+                  <span>Branding & Engagement Performance KPIs</span>
+                </div>
+                <div className="kpi-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
+                  {renderKpiCard("Spend", metrics.spend.value, metrics.spend.trend, "currency", DollarSign, "blue")}
+                  {renderKpiCard("Engagement Rate", metrics.engagement_rate.value, metrics.engagement_rate.trend, "percent", Activity, "blue")}
+                  {renderKpiCard("Hook Rate", metrics.hook_rate.value, metrics.hook_rate.trend, "percent", Sparkles, "orange")}
+                  {renderKpiCard("Impressions", metrics.impressions.value, metrics.impressions.trend, "number", Eye, "orange")}
+                  {renderKpiCard("Reach", metrics.reach.value, metrics.reach.trend, "number", Users, "blue")}
+                </div>
+              </div>
+
+              <div className="bg-slate-50/50 p-5 rounded-xl border border-slate-200">
+                <span className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4 block">Interactive Social Ratios</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
+                  {renderKpiCard("Post Engagement", metrics.post_engagement.value, metrics.post_engagement.trend, "number", Heart, "red")}
+                  {renderKpiCard("Video Views", metrics.video_views.value, metrics.video_views.trend, "number", Video, "blue")}
+                  {renderKpiCard("ThruPlays", metrics.thruplays.value, metrics.thruplays.trend, "number", Video, "purple")}
+                  {renderKpiCard("CPM", metrics.cpm.value, metrics.cpm.trend, "currency", Eye, "orange")}
+                  {renderKpiCard("Frequency", metrics.frequency.value, metrics.frequency.trend, "multiplier", Activity, "orange")}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* AI Recommendations + Performance Chart */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -588,7 +807,7 @@ export default function OverviewPage() {
                 {mockRecommendations.map((rec, idx) => {
                   const Icon = rec.icon;
                   return (
-                    <div key={idx} className="recommendation-item flex items-start justify-between gap-4 p-4 border border-border rounded-lg hover:bg-slate-50 transition cursor-pointer">
+                     <div key={idx} className="recommendation-item flex items-start justify-between gap-4 p-4 border border-border rounded-lg hover:bg-slate-50 transition cursor-pointer">
                       <div className="flex items-start gap-3">
                         <div className={`recommendation-icon ${rec.iconClass} p-2 rounded-full shrink-0 flex items-center justify-center`}>
                           <Icon size={18} />
@@ -612,24 +831,94 @@ export default function OverviewPage() {
               <div className="card-header border-b border-border p-6 flex justify-between items-center bg-slate-50/50">
                 <h3 className="card-title font-bold text-slate-800 text-sm">Performance Overview</h3>
                 <div className="tab-group flex border border-border rounded-md overflow-hidden bg-white">
-                  <button 
-                    onClick={() => setActiveChartTab("spend")}
-                    className={`tab-item px-3 py-1.5 text-xs font-semibold transition ${activeChartTab === "spend" ? "bg-slate-100 text-slate-800" : "text-subtle hover:bg-slate-50"}`}
-                  >
-                    Spend
-                  </button>
-                  <button 
-                    onClick={() => setActiveChartTab("purchases")}
-                    className={`tab-item px-3 py-1.5 text-xs font-semibold transition ${activeChartTab === "purchases" ? "bg-slate-100 text-slate-800" : "text-subtle hover:bg-slate-50"}`}
-                  >
-                    Purchases
-                  </button>
-                  <button 
-                    onClick={() => setActiveChartTab("roas")}
-                    className={`tab-item px-3 py-1.5 text-xs font-semibold transition ${activeChartTab === "roas" ? "bg-slate-100 text-slate-800" : "text-subtle hover:bg-slate-50"}`}
-                  >
-                    ROAS
-                  </button>
+                  {goalFilter === "all" && (
+                    <>
+                      <button 
+                        onClick={() => setActiveChartTab("spend")}
+                        className={`tab-item px-3 py-1.5 text-xs font-semibold transition ${activeChartTab === "spend" ? "bg-slate-100 text-slate-800" : "text-subtle hover:bg-slate-50"}`}
+                      >
+                        Spend
+                      </button>
+                      <button 
+                        onClick={() => setActiveChartTab("purchases")}
+                        className={`tab-item px-3 py-1.5 text-xs font-semibold transition ${activeChartTab === "purchases" ? "bg-slate-100 text-slate-800" : "text-subtle hover:bg-slate-50"}`}
+                      >
+                        Purchases
+                      </button>
+                      <button 
+                        onClick={() => setActiveChartTab("roas")}
+                        className={`tab-item px-3 py-1.5 text-xs font-semibold transition ${activeChartTab === "roas" ? "bg-slate-100 text-slate-800" : "text-subtle hover:bg-slate-50"}`}
+                      >
+                        ROAS
+                      </button>
+                    </>
+                  )}
+                  {goalFilter === "sales" && (
+                    <>
+                      <button 
+                        onClick={() => setActiveChartTab("spend")}
+                        className={`tab-item px-3 py-1.5 text-xs font-semibold transition ${activeChartTab === "spend" ? "bg-slate-100 text-slate-800" : "text-subtle hover:bg-slate-50"}`}
+                      >
+                        Spend
+                      </button>
+                      <button 
+                        onClick={() => setActiveChartTab("purchases")}
+                        className={`tab-item px-3 py-1.5 text-xs font-semibold transition ${activeChartTab === "purchases" ? "bg-slate-100 text-slate-800" : "text-subtle hover:bg-slate-50"}`}
+                      >
+                        Purchases
+                      </button>
+                      <button 
+                        onClick={() => setActiveChartTab("roas")}
+                        className={`tab-item px-3 py-1.5 text-xs font-semibold transition ${activeChartTab === "roas" ? "bg-slate-100 text-slate-800" : "text-subtle hover:bg-slate-50"}`}
+                      >
+                        ROAS
+                      </button>
+                    </>
+                  )}
+                  {goalFilter === "leads" && (
+                    <>
+                      <button 
+                        onClick={() => setActiveChartTab("spend")}
+                        className={`tab-item px-3 py-1.5 text-xs font-semibold transition ${activeChartTab === "spend" ? "bg-slate-100 text-slate-800" : "text-subtle hover:bg-slate-50"}`}
+                      >
+                        Spend
+                      </button>
+                      <button 
+                        onClick={() => setActiveChartTab("leads")}
+                        className={`tab-item px-3 py-1.5 text-xs font-semibold transition ${activeChartTab === "leads" ? "bg-slate-100 text-slate-800" : "text-subtle hover:bg-slate-50"}`}
+                      >
+                        Leads
+                      </button>
+                      <button 
+                        onClick={() => setActiveChartTab("cpl")}
+                        className={`tab-item px-3 py-1.5 text-xs font-semibold transition ${activeChartTab === "cpl" ? "bg-slate-100 text-slate-800" : "text-subtle hover:bg-slate-50"}`}
+                      >
+                        CPL
+                      </button>
+                    </>
+                  )}
+                  {goalFilter === "engagement" && (
+                    <>
+                      <button 
+                        onClick={() => setActiveChartTab("spend")}
+                        className={`tab-item px-3 py-1.5 text-xs font-semibold transition ${activeChartTab === "spend" ? "bg-slate-100 text-slate-800" : "text-subtle hover:bg-slate-50"}`}
+                      >
+                        Spend
+                      </button>
+                      <button 
+                        onClick={() => setActiveChartTab("impressions")}
+                        className={`tab-item px-3 py-1.5 text-xs font-semibold transition ${activeChartTab === "impressions" ? "bg-slate-100 text-slate-800" : "text-subtle hover:bg-slate-50"}`}
+                      >
+                        Impressions
+                      </button>
+                      <button 
+                        onClick={() => setActiveChartTab("engagement_rate")}
+                        className={`tab-item px-3 py-1.5 text-xs font-semibold transition ${activeChartTab === "engagement_rate" ? "bg-slate-100 text-slate-800" : "text-subtle hover:bg-slate-50"}`}
+                      >
+                        Engagement %
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
               <div className="card-body p-6">
@@ -699,7 +988,12 @@ export default function OverviewPage() {
                       {campaigns.map((c, idx) => (
                         <tr key={idx} className="hover:bg-slate-50">
                           <td className="py-3">
-                            <div className="font-bold text-slate-800 truncate max-w-[120px]">{c.name}</div>
+                            <Link
+                              href={`/campaigns/${c.id}`}
+                              className="font-bold text-primary hover:underline truncate max-w-[120px] block"
+                            >
+                              {c.name}
+                            </Link>
                             <span className="text-[10px] text-green-600 bg-green-50 px-1 py-0.5 rounded font-bold uppercase mt-1 inline-block">
                               {c.status}
                             </span>
@@ -740,7 +1034,12 @@ export default function OverviewPage() {
                       {ads.map((ad, idx) => (
                         <tr key={idx} className="hover:bg-slate-50">
                           <td className="py-3">
-                            <div className="font-bold text-slate-800 truncate max-w-[120px]">{ad.name}</div>
+                            <Link
+                              href={`/ads?ad_id=${ad.id}`}
+                              className="font-bold text-primary hover:underline truncate max-w-[120px] block"
+                            >
+                              {ad.name}
+                            </Link>
                             <div className="text-[10px] text-slate-400 font-medium truncate max-w-[120px] mt-0.5">
                               {ad.campaign_name}
                             </div>

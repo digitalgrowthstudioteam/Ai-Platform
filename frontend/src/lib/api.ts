@@ -115,6 +115,8 @@ class ApiClient {
       account_status: number;
       is_connected: boolean;
       industry?: string | null;
+      ai_intelligence_status?: string | null;
+      historical_intelligence_status?: string | null;
     }>>("/meta/accounts");
   }
 
@@ -404,6 +406,36 @@ class ApiClient {
   async cancelAddon(addonId: string) {
     return this.request<{ status: string; message: string }>(`/billing/addon/cancel?addon_id=${addonId}`, {
       method: "POST",
+    });
+  }
+
+  async getAIIntelligenceStatus() {
+    return this.request<{
+      all_accounts_active: boolean;
+      individual_slots_total: number;
+      individual_slots_used: number;
+      individual_slots_available: number;
+      accounts: Array<{
+        id: string;
+        meta_account_id: string;
+        account_name: string;
+        ai_intelligence_status: string;
+        historical_intelligence_status: string;
+      }>;
+    }>("/billing/ai-intelligence/status");
+  }
+
+  async assignAIIntelligence(adAccountId: string) {
+    return this.request<{ status: string; message: string }>("/billing/ai-intelligence/assign", {
+      method: "POST",
+      body: { ad_account_id: adAccountId },
+    });
+  }
+
+  async unassignAIIntelligence(adAccountId: string) {
+    return this.request<{ status: string; message: string }>("/billing/ai-intelligence/unassign", {
+      method: "POST",
+      body: { ad_account_id: adAccountId },
     });
   }
 

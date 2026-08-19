@@ -819,7 +819,11 @@ class MetaSyncService:
             "ad_recall_lift": 0,
             "add_to_cart": 0,
             "initiate_checkout": 0,
-            "link_clicks": 0
+            "link_clicks": 0,
+            "comments": 0,
+            "shares": 0,
+            "saves": 0,
+            "reactions": 0
         }
 
         # Parse action counts
@@ -845,8 +849,14 @@ class MetaSyncService:
                 out["video_play_2"] += val
             elif atype == "post_engagement":
                 out["post_engagement"] += val
-            elif atype in ("like", "page_like"):
-                out["page_likes"] += val
+            elif atype in ("like", "page_like", "reaction"):
+                out["reactions"] += val
+            elif atype == "comment":
+                out["comments"] += val
+            elif atype == "share":
+                out["shares"] += val
+            elif atype in ("onsite_conversion.post_save", "save"):
+                out["saves"] += val
             elif atype == "instagram_profile_visit":
                 out["profile_visits"] += val
             elif atype == "reminder_set":

@@ -42,6 +42,8 @@ class MetaAdAccountResponse(BaseModel):
     account_status: int
     is_connected: bool
     industry: Optional[str] = None
+    ai_intelligence_status: Optional[str] = "none"
+    historical_intelligence_status: Optional[str] = "none"
 
 
 class SelectAdAccountsRequest(BaseModel):
@@ -302,7 +304,8 @@ async def get_ad_accounts(
     # Retrieve already synced ad accounts for this user
     stmt = select(MetaAdAccount).where(MetaAdAccount.user_id == user.id)
     result = await db.execute(stmt)
-    synced_accounts_map = {acc.meta_account_id: acc.industry for acc in result.scalars().all()}
+    synced_accounts = result.scalars().all()
+    synced_accounts_map = {acc.meta_account_id: acc for acc in synced_accounts}
 
     try:
         # Mock connection bypass (EAAGm0PX is user's mock token prefix for tests)
@@ -313,18 +316,24 @@ async def get_ad_accounts(
                 {"id": "act_202020202", "name": "Brand Growth Sandbox", "currency": "USD", "timezone": "America/New_York", "account_status": 1},
                 {"id": "act_303030303", "name": "Underperforming Ecom Store", "currency": "INR", "timezone": "Asia/Kolkata", "account_status": 2},
             ]
-            return [
-                MetaAdAccountResponse(
-                    id=acc["id"],
-                    name=acc["name"],
-                    currency=acc["currency"],
-                    timezone=acc["timezone"],
-                    account_status=acc["account_status"],
-                    is_connected=acc["id"] in synced_accounts_map,
-                    industry=synced_accounts_map.get(acc["id"]),
+            
+            out_list = []
+            for acc in mock_accounts:
+                db_acc = synced_accounts_map.get(acc["id"])
+                out_list.append(
+                    MetaAdAccountResponse(
+                        id=acc["id"],
+                        name=acc["name"],
+                        currency=acc["currency"],
+                        timezone=acc["timezone"],
+                        account_status=acc["account_status"],
+                        is_connected=db_acc is not None,
+                        industry=db_acc.industry if db_acc else None,
+                        ai_intelligence_status=db_acc.ai_intelligence_status if db_acc else "none",
+                        historical_intelligence_status=db_acc.historical_intelligence_status if db_acc else "none",
+                    )
                 )
-                for acc in mock_accounts
-            ]
+            return out_list
 
         async with httpx.AsyncClient() as client:
             # Call Meta Marketing API: /me/adaccounts
@@ -337,18 +346,23 @@ async def get_ad_accounts(
             r.raise_for_status()
             data = r.json().get("data", [])
 
-            return [
-                MetaAdAccountResponse(
-                    id=acc["id"],
-                    name=acc.get("name", f"Account {acc['id']}"),
-                    currency=acc.get("currency", "INR"),
-                    timezone=acc.get("timezone", "Asia/Kolkata"),
-                    account_status=acc.get("account_status", 1),
-                    is_connected=acc["id"] in synced_accounts_map,
-                    industry=synced_accounts_map.get(acc["id"]),
+            out_list = []
+            for acc in data:
+                db_acc = synced_accounts_map.get(acc["id"])
+                out_list.append(
+                    MetaAdAccountResponse(
+                        id=acc["id"],
+                        name=acc.get("name", f"Account {acc['id']}"),
+                        currency=acc.get("currency", "INR"),
+                        timezone=acc.get("timezone", "Asia/Kolkata"),
+                        account_status=acc.get("account_status", 1),
+                        is_connected=db_acc is not None,
+                        industry=db_acc.industry if db_acc else None,
+                        ai_intelligence_status=db_acc.ai_intelligence_status if db_acc else "none",
+                        historical_intelligence_status=db_acc.historical_intelligence_status if db_acc else "none",
+                    )
                 )
-                for acc in data
-            ]
+            return out_list
 
     except Exception as e:
         raise HTTPException(

@@ -26,6 +26,7 @@ import {
   HelpCircle,
   ChevronUp,
   ShieldAlert,
+  Brain,
 } from "lucide-react";
 
 interface NavItem {
@@ -45,7 +46,7 @@ const navigation: NavSection[] = [
   {
     label: "",
     items: [
-      { label: "Overview", href: "/dashboard", icon: LayoutDashboard },
+      { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     ],
   },
   {
@@ -73,6 +74,7 @@ const navigation: NavSection[] = [
     label: "SETTINGS",
     items: [
       { label: "Ad Accounts", href: "/settings/ad-accounts", icon: Megaphone },
+      { label: "AI Intelligence Hub", href: "/settings/ai-intelligence", icon: Brain },
       { label: "Billing & Plans", href: "/settings/billing", icon: CreditCard },
       { label: "Account Settings", href: "/settings/account", icon: Settings },
     ],
