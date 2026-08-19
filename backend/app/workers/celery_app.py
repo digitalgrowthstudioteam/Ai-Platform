@@ -24,11 +24,11 @@ celery_app.conf.update(
     task_track_started=True,
     broker_connection_retry_on_startup=True,
     
-    # Celery Beat scheduling: run daily
+    # Celery Beat scheduling: run periodic checks
     beat_schedule={
-        "trigger-daily-syncs": {
+        "trigger-periodic-syncs": {
             "task": "app.workers.tasks.trigger_all_active_syncs",
-            "schedule": 86400.0, # Every 24 hours
+            "schedule": 900.0, # Every 15 minutes
         }
     }
 )

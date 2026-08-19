@@ -3,6 +3,7 @@ Digital Growth Studio — AI Ads Optimizer
 FastAPI Application Entry Point
 """
 import structlog
+import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -44,9 +45,27 @@ async def lifespan(app: FastAPI):
     )
     from app.core.firebase import initialize_firebase
     initialize_firebase(settings.FIREBASE_PRIVATE_KEY_PATH)
+
+    # Initialize background check task to run sync checks periodically (fallback if celery beat is offline)
+    async def periodic_check_loop():
+        # Pause briefly on startup to let server bind and resolve db connections
+        await asyncio.sleep(30)
+        from app.workers.tasks import trigger_all_active_syncs_async
+        while True:
+            try:
+                logger.info("background_sync_interval_check_triggered")
+                await trigger_all_active_syncs_async()
+            except Exception as loop_err:
+                logger.error("background_sync_interval_check_failed", error=str(loop_err))
+            # Wait 15 minutes between check cycles
+            await asyncio.sleep(900)
+
+    sync_check_task = asyncio.create_task(periodic_check_loop())
+
     yield
     # Shutdown
     logger.info("application_shutting_down")
+    sync_check_task.cancel()
     await close_db()
 
 
