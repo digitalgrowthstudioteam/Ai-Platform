@@ -298,10 +298,6 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
       const camp = campaigns.find(c => c.id === campaignId || c.meta_campaign_id === campaignId);
       if (camp) {
         setSelectedCampaign(camp);
-        
-        if (adSets.length === 0 && !loadingDetails) {
-          loadCampaignDetails(camp.name);
-        }
 
         if (!adSetId) {
           setSelectedAdSet(null);
@@ -323,10 +319,6 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
             const as = adSets.find(item => item.id === adSetId || item.meta_adset_id === adSetId);
             if (as) {
               setSelectedAdSet(as);
-              
-              if (!adSetPerformance && !loadingPerf) {
-                loadAdSetPerformance(camp.id, as.id);
-              }
 
               if (!adId) {
                 setSelectedAd(null);
@@ -347,8 +339,22 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
     }
   }, [slug, campaigns, adSets, ads]);
 
+  // Load campaign details (adsets and ads) when campaign selection or date filters change
+  useEffect(() => {
+    if (selectedCampaign && selectedAccount) {
+      loadCampaignDetails(selectedCampaign.name);
+    }
+  }, [selectedCampaign?.id, datePreset, customStartDate, customEndDate, selectedAccount?.id]);
+
+  // Load adset performance details when adset selection or date filters change
+  useEffect(() => {
+    if (selectedCampaign && selectedAdSet) {
+      loadAdSetPerformance(selectedCampaign.id, selectedAdSet.id);
+    }
+  }, [selectedAdSet?.id, selectedCampaign?.id, datePreset, customStartDate, customEndDate]);
+
   // Date Range string
-  const { startStr, endStr } = getDates(datePreset);
+  const { startStr, endStr } = getDates(datePreset, customStartDate, customEndDate);
   const formatDateHeader = (dStr: string) => {
     const d = new Date(dStr);
     return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
