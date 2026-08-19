@@ -42,6 +42,7 @@ class AdMetrics(BaseModel):
     cpc: float
     cpm: float
     roas: float
+    conversations: Optional[int] = 0
 
 
 class CreativeDetails(BaseModel):
@@ -77,6 +78,7 @@ class AdSetMetrics(BaseModel):
     cpc: float
     cpm: float
     roas: float
+    conversations: Optional[int] = 0
 
 
 class AdSetItemResponse(BaseModel):
@@ -182,6 +184,25 @@ async def list_ads(
     res = await db.execute(stmt)
     rows = res.all()
 
+    # Query and sum conversations from actions JSON daily logs for Ads
+    daily_stmt = (
+        select(AdDailyMetrics.ad_id, AdDailyMetrics.actions)
+        .join(Ad, AdDailyMetrics.ad_id == Ad.id)
+        .join(AdSet, Ad.ad_set_id == AdSet.id)
+        .join(Campaign, AdSet.campaign_id == Campaign.id)
+        .where(Campaign.ad_account_id == ad_acc.id)
+        .where(AdDailyMetrics.date >= start_date)
+        .where(AdDailyMetrics.date <= end_date)
+    )
+    daily_res = await db.execute(daily_stmt)
+    daily_rows = daily_res.all()
+    
+    conversations_map = {}
+    for r in daily_rows:
+        a_id = r.ad_id
+        actions = r.actions or {}
+        conversations_map[a_id] = conversations_map.get(a_id, 0) + int(actions.get("conversations", 0))
+
     ads = []
     for row in rows:
         ad = row.Ad
@@ -196,6 +217,7 @@ async def list_ads(
         cpc = (spend / clicks) if clicks > 0 else 0.0
         cpm = (spend / impressions * 1000) if impressions > 0 else 0.0
         roas = (revenue / spend) if spend > 0 else 0.0
+        conversations = conversations_map.get(ad.id, 0)
 
         creative_details = None
         if cr:
@@ -229,6 +251,7 @@ async def list_ads(
                     cpc=cpc,
                     cpm=cpm,
                     roas=roas,
+                    conversations=conversations,
                 ),
                 creative=creative_details,
             )
@@ -302,6 +325,24 @@ async def list_adsets(
     res = await db.execute(stmt)
     rows = res.all()
 
+    # Query and sum conversations from actions JSON daily logs for AdSets
+    daily_stmt = (
+        select(AdSetDailyMetrics.ad_set_id, AdSetDailyMetrics.actions)
+        .join(AdSet, AdSetDailyMetrics.ad_set_id == AdSet.id)
+        .join(Campaign, AdSet.campaign_id == Campaign.id)
+        .where(Campaign.ad_account_id == ad_acc.id)
+        .where(AdSetDailyMetrics.date >= start_date)
+        .where(AdSetDailyMetrics.date <= end_date)
+    )
+    daily_res = await db.execute(daily_stmt)
+    daily_rows = daily_res.all()
+    
+    conversations_map = {}
+    for r in daily_rows:
+        as_id = r.ad_set_id
+        actions = r.actions or {}
+        conversations_map[as_id] = conversations_map.get(as_id, 0) + int(actions.get("conversations", 0))
+
     adsets = []
     for row in rows:
         adset = row.AdSet
@@ -315,6 +356,7 @@ async def list_adsets(
         cpc = (spend / clicks) if clicks > 0 else 0.0
         cpm = (spend / impressions * 1000) if impressions > 0 else 0.0
         roas = (revenue / spend) if spend > 0 else 0.0
+        conversations = conversations_map.get(adset.id, 0)
 
         adsets.append(
             AdSetItemResponse(
@@ -341,6 +383,7 @@ async def list_adsets(
                     cpc=cpc,
                     cpm=cpm,
                     roas=roas,
+                    conversations=conversations,
                 ),
             )
         )
