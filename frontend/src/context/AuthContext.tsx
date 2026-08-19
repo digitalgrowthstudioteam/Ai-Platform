@@ -29,6 +29,12 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [isAuthCached, setIsAuthCached] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("dgs_has_session") === "true";
+    }
+    return false;
+  });
   const [loading, setLoading] = useState(() => {
     if (typeof window !== "undefined") {
       const hasSession = localStorage.getItem("dgs_has_session") === "true";
@@ -43,8 +49,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(currentUser);
       if (currentUser) {
         localStorage.setItem("dgs_has_session", "true");
+        setIsAuthCached(true);
       } else {
         localStorage.removeItem("dgs_has_session");
+        setIsAuthCached(false);
       }
       setLoading(false);
     });
@@ -57,6 +65,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await signInWithEmailAndPassword(auth, email, pass);
       localStorage.setItem("dgs_has_session", "true");
+      setIsAuthCached(true);
       trackLogin("email");
     } finally {
       setLoading(false);
@@ -69,6 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Phase 1: Firebase Auth Registration
       const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
       localStorage.setItem("dgs_has_session", "true");
+      setIsAuthCached(true);
       
       // We can update profile name or handle sync with database in Phase 2
       // For now, we update Firebase displayName
@@ -88,6 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await signInWithPopup(auth, provider);
       localStorage.setItem("dgs_has_session", "true");
+      setIsAuthCached(true);
       trackLogin("google");
     } finally {
       setLoading(false);
@@ -99,6 +110,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await signOut(auth);
       localStorage.removeItem("dgs_has_session");
+      setIsAuthCached(false);
     } finally {
       setLoading(false);
     }
@@ -111,7 +123,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value = {
     user,
     loading,
-    isAuthenticated: !!user,
+    isAuthenticated: !!user || isAuthCached,
     loginWithEmail,
     signUpWithEmail,
     loginWithGoogle,
