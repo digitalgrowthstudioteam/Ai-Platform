@@ -33,6 +33,7 @@ class CampaignMetrics(BaseModel):
     impressions: int
     clicks: int
     purchases: int
+    leads: int
     revenue: float
     ctr: float
     cpc: float
@@ -92,6 +93,7 @@ async def list_campaigns(
             func.coalesce(func.sum(CampaignDailyMetrics.impressions), 0).label("impressions"),
             func.coalesce(func.sum(CampaignDailyMetrics.clicks), 0).label("clicks"),
             func.coalesce(func.sum(CampaignDailyMetrics.purchases), 0).label("purchases"),
+            func.coalesce(func.sum(CampaignDailyMetrics.leads), 0).label("leads"),
             func.coalesce(func.sum(CampaignDailyMetrics.revenue), 0).label("revenue"),
         )
         .where(CampaignDailyMetrics.date >= start_date)
@@ -107,6 +109,7 @@ async def list_campaigns(
             func.coalesce(metrics_subq.c.impressions, 0).label("impressions"),
             func.coalesce(metrics_subq.c.clicks, 0).label("clicks"),
             func.coalesce(metrics_subq.c.purchases, 0).label("purchases"),
+            func.coalesce(metrics_subq.c.leads, 0).label("leads"),
             func.coalesce(metrics_subq.c.revenue, 0).label("revenue"),
         )
         .outerjoin(metrics_subq, Campaign.id == metrics_subq.c.campaign_id)
@@ -124,6 +127,7 @@ async def list_campaigns(
         impressions = int(row.impressions)
         clicks = int(row.clicks)
         purchases = int(row.purchases)
+        leads = int(row.leads)
         revenue = float(row.revenue)
 
         ctr = (clicks / impressions) if impressions > 0 else 0.0
@@ -145,6 +149,7 @@ async def list_campaigns(
                     impressions=impressions,
                     clicks=clicks,
                     purchases=purchases,
+                    leads=leads,
                     revenue=revenue,
                     ctr=ctr,
                     cpc=cpc,

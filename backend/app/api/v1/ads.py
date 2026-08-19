@@ -82,9 +82,11 @@ class AdSetMetrics(BaseModel):
 class AdSetItemResponse(BaseModel):
     id: uuid.UUID
     meta_adset_id: str
+    campaign_id: uuid.UUID
     name: str
     status: str
     campaign_name: str
+    campaign_objective: Optional[str] = None
     optimization_goal: str
     billing_event: str
     motive: Optional[str] = None
@@ -284,6 +286,7 @@ async def list_adsets(
         select(
             AdSet,
             Campaign.name.label("campaign_name"),
+            Campaign.objective.label("campaign_objective"),
             func.coalesce(metrics_subq.c.spend, 0).label("spend"),
             func.coalesce(metrics_subq.c.impressions, 0).label("impressions"),
             func.coalesce(metrics_subq.c.clicks, 0).label("clicks"),
@@ -317,9 +320,11 @@ async def list_adsets(
             AdSetItemResponse(
                 id=adset.id,
                 meta_adset_id=adset.meta_adset_id,
+                campaign_id=adset.campaign_id,
                 name=adset.name,
                 status=adset.status,
                 campaign_name=row.campaign_name,
+                campaign_objective=row.campaign_objective,
                 optimization_goal=adset.optimization_goal,
                 billing_event=adset.billing_event,
                 motive=adset.motive,
