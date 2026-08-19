@@ -42,6 +42,26 @@ import {
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/utils";
 
 export default function CampaignsPage() {
+  // Programmatic client-side Cache & Service Worker Buster
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      if (window.navigator && navigator.serviceWorker) {
+        navigator.serviceWorker.getRegistrations().then(registrations => {
+          for (const reg of registrations) {
+            reg.unregister();
+          }
+        });
+      }
+      if (window.caches) {
+        caches.keys().then(keys => {
+          for (const key of keys) {
+            caches.delete(key);
+          }
+        });
+      }
+    }
+  }, []);
+
   const { selectedAccount, loadingAccounts } = useAdAccount();
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [recs, setRecs] = useState<any[]>([]);
