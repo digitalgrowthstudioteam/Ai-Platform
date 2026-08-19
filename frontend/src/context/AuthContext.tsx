@@ -29,12 +29,23 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => {
+    if (typeof window !== "undefined") {
+      const hasSession = localStorage.getItem("dgs_has_session") === "true";
+      if (hasSession) return false; // Bypass blocking session check if cache exists
+    }
+    return true;
+  });
 
   useEffect(() => {
     // Listen to Firebase Auth state change
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
+      if (currentUser) {
+        localStorage.setItem("dgs_has_session", "true");
+      } else {
+        localStorage.removeItem("dgs_has_session");
+      }
       setLoading(false);
     });
 
@@ -45,6 +56,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, pass);
+      localStorage.setItem("dgs_has_session", "true");
       trackLogin("email");
     } finally {
       setLoading(false);
@@ -56,6 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       // Phase 1: Firebase Auth Registration
       const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
+      localStorage.setItem("dgs_has_session", "true");
       
       // We can update profile name or handle sync with database in Phase 2
       // For now, we update Firebase displayName
@@ -74,6 +87,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth, provider);
+      localStorage.setItem("dgs_has_session", "true");
       trackLogin("google");
     } finally {
       setLoading(false);
@@ -84,6 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(true);
     try {
       await signOut(auth);
+      localStorage.removeItem("dgs_has_session");
     } finally {
       setLoading(false);
     }
