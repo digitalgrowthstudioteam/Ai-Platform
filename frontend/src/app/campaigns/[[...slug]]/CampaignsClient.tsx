@@ -625,22 +625,44 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
 
   const chartData = useMemo(() => {
     if (dailyData && dailyData.length > 0) {
-      const obj = (selectedCampaign?.objective || "OUTCOME_SALES").toUpperCase();
-      const isClicks = obj.includes("TRAFFIC") || obj.includes("LINK_CLICKS");
-      const isImpressions = obj.includes("AWARENESS") || obj.includes("REACH");
+      const obj = (selectedCampaign?.objective || "").toUpperCase();
+      const perfGoal = (selectedCampaign?.performance_goal || "").toUpperCase();
+      const optEvent = (selectedCampaign?.optimization_event || "").toUpperCase();
 
-      return dailyData.map(item => ({
-        date: (() => {
-          try {
-            const d = new Date(item.date);
-            return d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
-          } catch (e) {
-            return item.date;
-          }
-        })(),
-        spend: item.spend,
-        result: isClicks ? item.clicks : isImpressions ? item.impressions : item.purchases
-      }));
+      return dailyData.map(item => {
+        let result = item.purchases || 0;
+
+        if (optEvent === "CONVERSATION" || perfGoal.includes("CONVERSATION") || perfGoal.includes("MESSAGING_CONVERSATION")) {
+          result = item.conversations || 0;
+        } else if (optEvent === "LEAD" || perfGoal.includes("LEAD")) {
+          result = item.leads || 0;
+        } else if (optEvent === "CALL" || perfGoal.includes("CALL")) {
+          result = item.calls || 0;
+        } else if (optEvent === "PURCHASE" || perfGoal.includes("PURCHASE")) {
+          result = item.purchases || 0;
+        } else if (optEvent === "LINK_CLICKS" || perfGoal.includes("LINK_CLICKS") || obj.includes("TRAFFIC")) {
+          result = item.clicks || 0;
+        } else if (obj.includes("AWARENESS") || obj.includes("REACH")) {
+          result = item.impressions || 0;
+        } else if (obj.includes("LEADS")) {
+          result = item.leads || 0;
+        } else if (obj.includes("ENGAGEMENT")) {
+          result = item.conversations || item.clicks || 0;
+        }
+
+        return {
+          date: (() => {
+            try {
+              const d = new Date(item.date);
+              return d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+            } catch (e) {
+              return item.date;
+            }
+          })(),
+          spend: item.spend,
+          result: result
+        };
+      });
     }
 
     // Fallback if no real daily metrics exist in the DB for the range

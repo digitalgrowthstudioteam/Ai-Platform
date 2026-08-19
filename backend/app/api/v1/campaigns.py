@@ -482,6 +482,9 @@ class DailyMetricPoint(BaseModel):
     purchases: int
     revenue: float
     roas: float
+    conversations: int = 0
+    leads: int = 0
+    calls: int = 0
 
 
 @router.get("/{campaign_id}/daily", response_model=List[DailyMetricPoint], summary="Get campaign daily performance metrics")
@@ -525,6 +528,9 @@ async def get_campaign_daily_metrics(
             purchases=int(r.purchases or 0),
             revenue=float(r.revenue or 0.0),
             roas=float(r.roas or 0.0),
+            conversations=int((r.actions or {}).get("conversations", 0)),
+            leads=int(r.leads or (r.actions or {}).get("leads", 0)),
+            calls=int((r.actions or {}).get("calls", 0)),
         )
         for r in rows
     ]
@@ -574,6 +580,9 @@ async def get_adset_daily_metrics(
             purchases=int(r.purchases or 0),
             revenue=float(r.revenue or 0.0),
             roas=float(r.roas or 0.0),
+            conversations=int((r.actions or {}).get("conversations", 0)),
+            leads=int(r.leads or (r.actions or {}).get("leads", 0)),
+            calls=int((r.actions or {}).get("calls", 0)),
         )
         for r in rows
     ]
