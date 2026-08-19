@@ -166,8 +166,14 @@ async def meta_callback(
     if not code or not state:
         return RedirectResponse(url=f"{frontend_redirect_url}?error=missing_oauth_params")
 
+    import uuid
+    try:
+        user_uuid = uuid.UUID(state)
+    except ValueError:
+        return RedirectResponse(url=f"{frontend_redirect_url}?error=invalid_user_session")
+
     # Fetch corresponding user from state (contains user.id UUID)
-    stmt = select(User).where(User.id == state)
+    stmt = select(User).where(User.id == user_uuid)
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
     
@@ -570,6 +576,12 @@ async def disconnect_meta(
     """
     user = await get_db_user_from_claims(claims, db)
     
+    # Explicitly clear related MetaAdAccounts to guarantee cleanup on SQLite
+    from app.models.meta import MetaAdAccount
+    delete_acc_stmt = delete(MetaAdAccount).where(MetaAdAccount.user_id == user.id)
+    await db.execute(delete_acc_stmt)
+    
+    # Delete connection record
     delete_stmt = delete(MetaConnection).where(MetaConnection.user_id == user.id)
     await db.execute(delete_stmt)
     await db.commit()

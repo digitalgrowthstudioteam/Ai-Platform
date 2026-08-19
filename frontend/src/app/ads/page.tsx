@@ -203,7 +203,7 @@ export default function AdsPage() {
     const d = new Date(dStr);
     return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   };
-  const dateRangeLabel = `${formatDateHeader(startStr)} – ${formatDateHeader(endStr)}`;`;
+  const dateRangeLabel = `${formatDateHeader(startStr)} – ${formatDateHeader(endStr)}`;
 
   const filteredAndSortedAds = ads
     .filter(a => statusFilter === "ALL" || a.status === statusFilter)

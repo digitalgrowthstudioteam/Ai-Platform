@@ -239,14 +239,16 @@ class EntitlementEngine:
         )
         
         # Resolve dynamic historical days limits
-        if is_trial_active:
+        if has_lifetime_history:
+            historical_days = 99999
+        elif is_trial_active:
             historical_days = 7
         elif plan_id in ["starter", "growth"]:
             historical_days = 90
         elif plan_id in ["pro", "agency"]:
             historical_days = 99999
         else:
-            historical_days = 99999 if has_lifetime_history else base_config["historical_days"]
+            historical_days = base_config["historical_days"]
 
         # 5. AI Deep Analysis entitlement
         has_ai_deep = any(a.addon_id == "ai_deep_analysis" for a in addons) or (plan_id.lower() in ["growth", "pro", "agency"])
