@@ -23,7 +23,14 @@ if ($LASTEXITCODE -ne 0) {
 # 2. Deploy Frontend to Firebase Hosting
 Write-Host "🔥 Deploying Frontend to Firebase Hosting..." -ForegroundColor Cyan
 Set-Location -Path "$PSScriptRoot"
+# Temporarily clear credentials to deploy using user authorization (flasshgames2026@gmail.com)
+$oldCreds = $env:GOOGLE_APPLICATION_CREDENTIALS
+$env:GOOGLE_APPLICATION_CREDENTIALS = ""
+
 npx --yes firebase-tools deploy --only hosting --non-interactive
+
+# Restore credentials
+$env:GOOGLE_APPLICATION_CREDENTIALS = $oldCreds
 if ($LASTEXITCODE -ne 0) {
     Write-Host "❌ Firebase Hosting deploy failed!" -ForegroundColor Red
     exit 1
