@@ -201,6 +201,29 @@ export default function AdminPage() {
     }
   };
 
+  const handleAddonToggle = async (targetUserId: string, addonId: string, enabled: boolean) => {
+    try {
+      setActionLoading(`addon_${addonId}`);
+      const newQty = enabled ? 1 : 0;
+      await api.updateUserAddons(targetUserId, addonId, newQty);
+      setNotification({
+        type: "success",
+        message: `Addon ${addonId.replace(/_/g, " ")} status updated successfully.`,
+      });
+      // Refresh user details in real-time
+      if (selectedUserId === targetUserId) {
+        const details = await api.getAdminUserDetails(targetUserId);
+        setUserDetails(details);
+      }
+    } catch (err) {
+      console.error("Failed to update addon:", err);
+      setNotification({ type: "error", message: "Failed to toggle user addon." });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+
   const handleReplySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!replyTicketId || !replyText) return;
@@ -692,23 +715,41 @@ export default function AdminPage() {
                             )}
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0">
-                            <button
-                              disabled={quantity === 0 || actionLoading === `addon_${addon.id}`}
-                              onClick={() => handleAddonQtyChange(userDetails.user.id, addon.id, quantity, false)}
-                              className="w-5 h-5 bg-white border border-slate-200 rounded flex items-center justify-center font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-50 cursor-pointer text-xs"
-                            >
-                              -
-                            </button>
-                            <span className="font-extrabold text-xs text-slate-900 bg-white min-w-6 text-center px-1.5 py-0.5 rounded border border-slate-200">
-                              {quantity}
-                            </span>
-                            <button
-                              disabled={actionLoading === `addon_${addon.id}`}
-                              onClick={() => handleAddonQtyChange(userDetails.user.id, addon.id, quantity, true)}
-                              className="w-5 h-5 bg-white border border-slate-200 rounded flex items-center justify-center font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-50 cursor-pointer text-xs"
-                            >
-                              +
-                            </button>
+                            {addon.id !== "additional_account" && addon.id !== "additional_team_member" ? (
+                              <button
+                                disabled={actionLoading === `addon_${addon.id}`}
+                                onClick={() => handleAddonToggle(userDetails.user.id, addon.id, quantity === 0)}
+                                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                                  quantity > 0 ? "bg-blue-600" : "bg-slate-200"
+                                } ${actionLoading === `addon_${addon.id}` ? "opacity-50 cursor-not-allowed" : ""}`}
+                              >
+                                <span
+                                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                                    quantity > 0 ? "translate-x-4" : "translate-x-0"
+                                  }`}
+                                />
+                              </button>
+                            ) : (
+                              <>
+                                <button
+                                  disabled={quantity === 0 || actionLoading === `addon_${addon.id}`}
+                                  onClick={() => handleAddonQtyChange(userDetails.user.id, addon.id, quantity, false)}
+                                  className="w-5 h-5 bg-white border border-slate-200 rounded flex items-center justify-center font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-50 cursor-pointer text-xs"
+                                >
+                                  -
+                                </button>
+                                <span className="font-extrabold text-xs text-slate-900 bg-white min-w-6 text-center px-1.5 py-0.5 rounded border border-slate-200">
+                                  {quantity}
+                                </span>
+                                <button
+                                  disabled={actionLoading === `addon_${addon.id}`}
+                                  onClick={() => handleAddonQtyChange(userDetails.user.id, addon.id, quantity, true)}
+                                  className="w-5 h-5 bg-white border border-slate-200 rounded flex items-center justify-center font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-50 cursor-pointer text-xs"
+                                >
+                                  +
+                                </button>
+                              </>
+                            )}
                           </div>
                         </div>
                       );
