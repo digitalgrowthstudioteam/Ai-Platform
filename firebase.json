@@ -10,8 +10,8 @@
     "trailingSlash": false,
     "rewrites": [
       {
-        "source": "**",
-        "destination": "/index.html"
+        "source": "/campaigns/**",
+        "destination": "/campaigns.html"
       }
     ],
     "headers": [
