@@ -835,7 +835,7 @@ class MetaSyncService:
                 out["purchases"] += val
             elif atype in ("lead", "offsite_conversion.fb_pixel_lead", "leadgen_grouped"):
                 out["leads"] += val
-            elif atype == "onsite_conversion.messaging_conversation_started_7d":
+            elif atype.startswith("onsite_conversion.messaging_conversation_started"):
                 out["conversations"] += val
             elif atype == "onsite_conversion.messaging_purchase":
                 out["messaging_purchases"] += val

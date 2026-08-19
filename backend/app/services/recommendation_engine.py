@@ -1227,11 +1227,24 @@ class RecommendationEngine:
             perf_goal = camp.ad_sets[0].performance_goal or "conversions"
         else:
             # Fallback to objective parsing
-            obj = camp.objective.upper()
+            obj = (camp.objective or "").upper()
             if "LEAD" in obj:
                 perf_goal = "leads"
             elif "SALES" in obj or "CONVERSIONS" in obj:
                 perf_goal = "purchases"
+            elif "MESSAGING" in obj or "CONVERSATION" in obj or "ENGAGEMENT" in obj:
+                perf_goal = "conversations"
+
+        # Determine if it's messaging/conversation goal
+        perf_goal_upper = perf_goal.upper()
+        is_messaging_goal = (
+            "CONVERSATION" in perf_goal_upper or 
+            "MESSAGING" in perf_goal_upper or 
+            "ENGAGEMENT" in perf_goal_upper or
+            "REPLY" in perf_goal_upper or
+            "CONVERSATION" in (camp.objective or "").upper() or
+            "MESSAGING" in (camp.objective or "").upper()
+        )
 
         # ──────────────────────────────────────────
         # 8.1 Don't Change Engine: Insufficient Data / Learning Period Check
@@ -1551,6 +1564,41 @@ class RecommendationEngine:
                         confidence_score=confidence,
                         priority=priority,
                         supporting_metrics={"cost_per_thruplay_change": cpt_change},
+                        status="new"
+                    )
+                )
+        elif is_messaging_goal or perf_goal == "conversations":
+            cpc_conv_change = pct_change(c_derived.get("cost_per_conversation"), p_derived.get("cost_per_conversation"))
+            conv_change = pct_change(curr.get("conversations"), prev.get("conversations"))
+            
+            # Diagnostic Rule 5: Messaging Performance Drop (Conversations fell by >= 15% AND Cost per Conversation rose by >= 15% AND CTR fell by >= 10%)
+            if conv_change <= -0.15 and cpc_conv_change >= 0.15 and ctr_change <= -0.10:
+                priority, confidence = cls.calculate_priority_and_confidence(
+                    impact=0.90, urgency=0.85, spend=c_spend, num_conversions=curr.get("conversations", 0)
+                )
+                diagnoses.append(
+                    AIRecommendation(
+                        user_id=user_uuid,
+                        ad_account_id=ad_account_uuid,
+                        entity_type="campaign",
+                        entity_id=camp.id,
+                        campaign_id=camp.id,
+                        recommendation_type="MESSAGING_PERFORMANCE_DECLINE",
+                        title=f"Messaging Performance Declining: {camp.name}",
+                        description=f"Conversations fell by {abs(conv_change)*100:.1f}%, cost per conversation increased by {cpc_conv_change*100:.1f}%, and CTR decreased by {abs(ctr_change)*100:.1f}%.",
+                        reason="Evidence: Conversations dropped, Cost/Conversation rose, and CTR decreased due to high creative/audience fatigue.",
+                        objective=camp.objective,
+                        problem="Messaging performance drop",
+                        root_cause="Audience fatigue or sub-relevance click drop-offs",
+                        evidence=f"Conversations: {prev.get('conversations')} → {curr.get('conversations')} ({conv_change*100:.1f}%), Cost/Conv: ₹{p_derived.get('cost_per_conversation') or 0.0:.2f} → ₹{c_derived.get('cost_per_conversation') or 0.0:.2f} (+{cpc_conv_change*100:.1f}%), CTR: {p_derived.get('ctr')*100:.2f}% → {c_derived.get('ctr')*100:.2f}% ({ctr_change*100:.1f}%)",
+                        expected_impact="Refresh visual hooks or expand target demographics to capture fresh intent.",
+                        confidence_score=confidence,
+                        priority=priority,
+                        supporting_metrics={
+                            "conversations_change": conv_change,
+                            "cost_per_conversation_change": cpc_conv_change,
+                            "ctr_change": ctr_change
+                        },
                         status="new"
                     )
                 )
