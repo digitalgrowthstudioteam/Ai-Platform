@@ -35,13 +35,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     return false;
   });
-  const [loading, setLoading] = useState(() => {
-    if (typeof window !== "undefined") {
-      const hasSession = localStorage.getItem("dgs_has_session") === "true";
-      if (hasSession) return false; // Bypass blocking session check if cache exists
-    }
-    return true;
-  });
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let nullTimeoutId: NodeJS.Timeout | null = null;
@@ -69,7 +63,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           localStorage.removeItem("dgs_has_session");
           setIsAuthCached(false);
           setLoading(false);
-        }, 3000);
+        }, 800);
       } else {
         // No cached session — clear immediately
         setUser(null);
