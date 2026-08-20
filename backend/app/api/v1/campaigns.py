@@ -160,7 +160,8 @@ async def list_campaigns(
         )
         .outerjoin(metrics_subq, Campaign.id == metrics_subq.c.campaign_id)
         .outerjoin(prev_metrics_subq, Campaign.id == prev_metrics_subq.c.campaign_id)
-        .where(Campaign.ad_account_id == ad_acc.id)
+        .join(MetaAdAccount, Campaign.ad_account_id == MetaAdAccount.id)
+        .where(MetaAdAccount.meta_account_id == ad_acc.meta_account_id)
         .order_by(Campaign.name.asc())
     )
     
@@ -171,7 +172,8 @@ async def list_campaigns(
     daily_stmt = (
         select(CampaignDailyMetrics.campaign_id, CampaignDailyMetrics.actions)
         .join(Campaign, CampaignDailyMetrics.campaign_id == Campaign.id)
-        .where(Campaign.ad_account_id == ad_acc.id)
+        .join(MetaAdAccount, Campaign.ad_account_id == MetaAdAccount.id)
+        .where(MetaAdAccount.meta_account_id == ad_acc.meta_account_id)
         .where(CampaignDailyMetrics.date >= start_date)
         .where(CampaignDailyMetrics.date <= end_date)
     )
@@ -581,13 +583,13 @@ async def get_campaign_daily_metrics(
     db: AsyncSession = Depends(get_db),
 ):
     user = await get_db_user_from_claims(claims, db)
-    # Verify campaign access
+    # Verify campaign access via shared meta_account_id
+    user_meta_account_ids = select(MetaAdAccount.meta_account_id).where(MetaAdAccount.user_id == user.id)
     stmt = (
         select(Campaign)
+        .join(MetaAdAccount, Campaign.ad_account_id == MetaAdAccount.id)
         .where(Campaign.id == campaign_id)
-        .where(Campaign.ad_account_id.in_(
-            select(MetaAdAccount.id).where(MetaAdAccount.user_id == user.id)
-        ))
+        .where(MetaAdAccount.meta_account_id.in_(user_meta_account_ids))
     )
     res = await db.execute(stmt)
     campaign = res.scalar_one_or_none()

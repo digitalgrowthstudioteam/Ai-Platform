@@ -93,7 +93,6 @@ class MetaAdAccount(BaseModel):
     )
     meta_account_id: Mapped[str] = mapped_column(
         String(128),
-        unique=True,
         index=True,
         nullable=False,
     )

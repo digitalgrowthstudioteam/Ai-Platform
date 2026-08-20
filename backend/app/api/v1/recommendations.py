@@ -787,7 +787,8 @@ async def get_decision_center(
     # Fetch recommendations
     rec_stmt = (
         select(AIRecommendation)
-        .where(AIRecommendation.ad_account_id == ad_acc.id)
+        .join(MetaAdAccount, AIRecommendation.ad_account_id == MetaAdAccount.id)
+        .where(MetaAdAccount.meta_account_id == ad_acc.meta_account_id)
         .where(AIRecommendation.status.in_(["new", "viewed"]))
         .order_by(AIRecommendation.priority.asc(), AIRecommendation.created_at.desc())
     )
@@ -796,7 +797,11 @@ async def get_decision_center(
 
     # Fetch all campaigns in this ad account
     from app.models.campaign import Campaign, AdSet, Ad
-    camp_stmt = select(Campaign).where(Campaign.ad_account_id == ad_acc.id)
+    camp_stmt = (
+        select(Campaign)
+        .join(MetaAdAccount, Campaign.ad_account_id == MetaAdAccount.id)
+        .where(MetaAdAccount.meta_account_id == ad_acc.meta_account_id)
+    )
     camp_res = await db.execute(camp_stmt)
     real_campaigns = camp_res.scalars().all()
 

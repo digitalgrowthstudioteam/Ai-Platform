@@ -88,17 +88,17 @@ async def test_meta_sync_service_mock_pipeline(db: AsyncSession):
     res = await db.execute(stmt)
     campaigns = res.scalars().all()
     assert len(campaigns) == 2
-    assert {c.meta_campaign_id for c in campaigns} == {"camp_111", "camp_222"}
+    assert {c.meta_campaign_id for c in campaigns} == {"camp_111_act_101010101", "camp_222_act_101010101"}
 
     # Verify AdSets
-    stmt = select(AdSet).where(AdSet.meta_adset_id == "adset_111")
+    stmt = select(AdSet).where(AdSet.meta_adset_id == "adset_111_act_101010101")
     res = await db.execute(stmt)
     adset = res.scalar_one_or_none()
     assert adset is not None
     assert adset.name == "Broad Audience (India)"
 
     # Verify Ads
-    stmt = select(Ad).where(Ad.meta_ad_id == "ad_111_1")
+    stmt = select(Ad).where(Ad.meta_ad_id == "ad_111_1_act_101010101")
     res = await db.execute(stmt)
     ad = res.scalar_one_or_none()
     assert ad is not None
@@ -109,7 +109,7 @@ async def test_meta_sync_service_mock_pipeline(db: AsyncSession):
     res = await db.execute(stmt)
     creative = res.scalar_one_or_none()
     assert creative is not None
-    assert creative.meta_creative_id == "creative_ad_111_1"
+    assert creative.meta_creative_id == "creative_ad_111_1_act_101010101"
     assert creative.creative_type == "video"
 
     # Verify 30 Days of Historical Metrics populated
