@@ -121,7 +121,8 @@ export default function WeeklyBriefPage() {
   const endDateStr = new Date(brief.end_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   const weekRangeStr = `${startDateStr} – ${endDateStr}`;
 
-  const totalAccountSpend = drilldown.reduce((acc, c) => acc + c.adsets.reduce((sum: number, a: any) => sum + (a.comparisons?.lifetime?.spend_current || 0), 0), 0);
+  const drilldownSpend = drilldown.reduce((acc, c) => acc + c.adsets.reduce((sum: number, a: any) => sum + (a.comparisons?.lifetime?.spend_current || 0), 0), 0);
+  const totalAccountSpend = drilldownSpend > 0 ? drilldownSpend : brief.spend;
 
   const getBestPerformingCampaign = () => {
     if (!drilldown || drilldown.length === 0) return null;
@@ -196,7 +197,11 @@ export default function WeeklyBriefPage() {
           <div className="text-xs space-y-1 flex-1">
             <span className="text-slate-500 font-bold">Delivery Summary:</span>
             <p className="text-slate-800 text-sm font-semibold">
-              You spent <span className="font-extrabold text-slate-900">₹{formatNumber(brief.spend)}</span> this week and generated <span className="font-extrabold text-slate-900">{brief.results} conversions</span>. Performance improved <span className="font-extrabold text-green-600">16%</span> compared with the previous period.
+              You spent <span className="font-extrabold text-slate-900">₹{formatNumber(brief.spend)}</span> this week and generated <span className="font-extrabold text-slate-900">{brief.results} conversions</span>.{brief.primary_kpi_change !== undefined && brief.primary_kpi_change !== 0 ? (
+                <> Performance {brief.primary_kpi_change < 0 ? "improved" : "declined"} <span className={`font-extrabold ${brief.primary_kpi_change < 0 ? "text-green-600" : "text-red-600"}`}>{Math.abs(brief.primary_kpi_change * 100).toFixed(0)}%</span> compared with the previous period.</>
+              ) : (
+                <> Performance remained stable compared with the previous period.</>
+              )}
             </p>
           </div>
           <div className="shrink-0 flex items-center gap-3 border-t md:border-t-0 md:border-l border-slate-100 pt-3 md:pt-0 md:pl-4">
