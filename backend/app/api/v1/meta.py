@@ -368,6 +368,25 @@ async def get_ad_accounts(
         import structlog
         logger = structlog.get_logger()
         logger.warning("failed_fetching_live_adaccounts_fallback_to_mock", error=str(e))
+        
+        if synced_accounts:
+            out_list = []
+            for acc in synced_accounts:
+                out_list.append(
+                    MetaAdAccountResponse(
+                        id=acc.meta_account_id,
+                        name=acc.account_name,
+                        currency=acc.currency,
+                        timezone=acc.timezone,
+                        account_status=acc.account_status,
+                        is_connected=True,
+                        industry=acc.industry,
+                        ai_intelligence_status=acc.ai_intelligence_status,
+                        historical_intelligence_status=acc.historical_intelligence_status,
+                    )
+                )
+            return out_list
+
         mock_accounts = [
             {"id": "act_101010101", "name": "DGS Primary Ad Account", "currency": "INR", "timezone": "Asia/Kolkata", "account_status": 1},
             {"id": "act_202020202", "name": "Brand Growth Sandbox", "currency": "USD", "timezone": "America/New_York", "account_status": 1},
@@ -467,12 +486,30 @@ async def select_ad_accounts(
         import structlog
         logger = structlog.get_logger()
         logger.warning("failed_fetching_live_adaccounts_select_fallback_to_mock", error=str(e))
-        mock_accounts = [
-            {"id": "act_101010101", "name": "DGS Primary Ad Account", "currency": "INR", "timezone": "Asia/Kolkata", "account_status": 1},
-            {"id": "act_202020202", "name": "Brand Growth Sandbox", "currency": "USD", "timezone": "America/New_York", "account_status": 1},
-            {"id": "act_303030303", "name": "Underperforming Ecom Store", "currency": "INR", "timezone": "Asia/Kolkata", "account_status": 2},
-        ]
-        available_accounts = {acc["id"]: acc for acc in mock_accounts}
+        
+        # Check if they have synced accounts in DB
+        stmt_synced = select(MetaAdAccount).where(MetaAdAccount.user_id == user.id)
+        res_synced = await db.execute(stmt_synced)
+        synced_accounts = res_synced.scalars().all()
+        
+        if synced_accounts:
+            available_accounts = {
+                acc.meta_account_id: {
+                    "id": acc.meta_account_id,
+                    "name": acc.account_name,
+                    "currency": acc.currency,
+                    "timezone": acc.timezone,
+                    "account_status": acc.account_status
+                }
+                for acc in synced_accounts
+            }
+        else:
+            mock_accounts = [
+                {"id": "act_101010101", "name": "DGS Primary Ad Account", "currency": "INR", "timezone": "Asia/Kolkata", "account_status": 1},
+                {"id": "act_202020202", "name": "Brand Growth Sandbox", "currency": "USD", "timezone": "America/New_York", "account_status": 1},
+                {"id": "act_303030303", "name": "Underperforming Ecom Store", "currency": "INR", "timezone": "Asia/Kolkata", "account_status": 2},
+            ]
+            available_accounts = {acc["id"]: acc for acc in mock_accounts}
 
     # 2. Check for active paid subscription
     stmt_sub = select(Subscription).where(Subscription.user_id == user.id).where(Subscription.status == "active")
