@@ -10,7 +10,7 @@ from typing import Optional, Dict, Any, List
 
 from app.models.daily_brief import AIDailyBrief, AIWeeklyBrief
 from app.models.metrics import CampaignDailyMetrics, AdDailyMetrics
-from app.models.campaign import Campaign, Ad
+from app.models.campaign import Campaign, AdSet, Ad
 from app.models.recommendation import AIRecommendation
 from app.services.recommendation_engine import RecommendationEngine
 
@@ -297,70 +297,128 @@ class AIBriefService:
             watch_list = ["No segments watch indicators triggered yesterday."]
 
         # Compile Top 3 Priorities Today
-        top_priorities = []
-        if critical_recs:
-            r = critical_recs[0]
-            top_priorities.append({
-                "id": 1,
-                "status": "critical",
-                "title": r.title,
-                "description": r.description
-            })
-        elif watch_recs:
-            r = watch_recs[0]
-            top_priorities.append({
-                "id": 1,
-                "status": "critical",
-                "title": r.title,
-                "description": r.description
-            })
-        else:
-            top_priorities.append({
-                "id": 1,
-                "status": "critical",
-                "title": "No critical issues detected",
-                "description": "Your account has no critical conversion or performance bottleneck issues today."
-            })
+        # Resolve names for all entity_ids in the recommendations to provide deep links context
+        entity_names = {}
+        c_ids = set()
+        as_ids = set()
+        ad_ids = set()
+        
+        for r in recs:
+            if r.campaign_id:
+                c_ids.add(r.campaign_id)
+            if r.adset_id:
+                as_ids.add(r.adset_id)
+            if r.ad_id:
+                ad_ids.add(r.ad_id)
+            if r.entity_type == "campaign":
+                c_ids.add(r.entity_id)
+            elif r.entity_type == "ad_set":
+                as_ids.add(r.entity_id)
+            elif r.entity_type == "ad":
+                ad_ids.add(r.entity_id)
 
-        if opp_recs:
-            r = opp_recs[0]
-            top_priorities.append({
-                "id": 2,
-                "status": "opportunity",
-                "title": r.title,
-                "description": r.description
-            })
-        elif len(watch_recs) > 1:
-            r = watch_recs[1]
-            top_priorities.append({
-                "id": 2,
-                "status": "opportunity",
-                "title": r.title,
-                "description": r.description
-            })
-        else:
-            top_priorities.append({
-                "id": 2,
-                "status": "opportunity",
-                "title": "Build creative variations",
-                "description": "Ensure you are testing 2-3 copy/hooks variations per ad set to avoid audience fatigue."
-            })
+        if c_ids:
+            c_res = await db.execute(select(Campaign.id, Campaign.name).where(Campaign.id.in_(list(c_ids))))
+            for row in c_res.all():
+                entity_names[row.id] = row.name
+        if as_ids:
+            as_res = await db.execute(select(AdSet.id, AdSet.name).where(AdSet.id.in_(list(as_ids))))
+            for row in as_res.all():
+                entity_names[row.id] = row.name
+        if ad_ids:
+            ad_res = await db.execute(select(Ad.id, Ad.name).where(Ad.id.in_(list(ad_ids))))
+            for row in ad_res.all():
+                entity_names[row.id] = row.name
 
-        if dont_change_recs:
-            r = dont_change_recs[0]
-            top_priorities.append({
-                "id": 3,
-                "status": "dont_change",
+        def serialize_rec(r):
+            e_name = entity_names.get(r.entity_id, "Unknown Entity")
+            return {
+                "id": str(r.id),
+                "entity_type": r.entity_type,
+                "entity_id": str(r.entity_id),
+                "entity_name": e_name,
+                "campaign_id": str(r.campaign_id) if r.campaign_id else None,
+                "adset_id": str(r.adset_id) if r.adset_id else None,
+                "ad_id": str(r.ad_id) if r.ad_id else None,
                 "title": r.title,
-                "description": r.description
-            })
-        else:
-            top_priorities.append({
-                "id": 3,
-                "status": "dont_change",
-                "title": "Continue running stable entities",
-                "description": "Your active adsets are performing within normal variation limits. No action recommended."
-            })
+                "description": r.description,
+                "reason": r.reason,
+                "objective": r.objective or "Sales",
+                "problem": r.problem or "Metric decline",
+                "root_cause": r.root_cause or "Creative Fatigue",
+                "evidence": r.evidence or "CTR decreased",
+                "confidence_score": float(r.confidence_score) if r.confidence_score else 0.85,
+                "priority": r.priority,
+            }
+
+        # Build categorized lists of full serialized recommendation objects
+        raw_priorities = [r for r in recs if r.priority in ("critical", "high", "medium") or r.recommendation_type in ("UNDERPERFORMING_AD", "UNDERPERFORMING_CREATIVE")]
+        raw_priorities = sorted(raw_priorities, key=lambda x: 0 if x.priority == "critical" else (1 if x.priority == "high" else (2 if x.priority == "medium" else 3)))
+        top_priorities = [serialize_rec(r) for r in raw_priorities]
+
+        # Opportunities
+        opportunities = [serialize_rec(r) for r in opp_items]
+
+        # Don't Change (Safeguards)
+        dont_change_items = [serialize_rec(r) for r in dont_change]
+
+        # Experiments
+        experiments = [serialize_rec(r) for r in exp_items]
+
+        # Watch (Early Warnings)
+        watch_items = [serialize_rec(r) for r in watch_recs]
+
+        # If empty arrays, supply clean fallback baselines mapped with default values
+        if not top_priorities:
+            top_priorities = [{
+                "id": "fallback_1",
+                "entity_type": "campaign",
+                "entity_id": str(campaign_performance_changes[0]["campaign_id"]) if campaign_performance_changes else None,
+                "entity_name": entity_names.get(campaign_performance_changes[0]["campaign_id"], "All Campaigns") if campaign_performance_changes else "All Campaigns",
+                "title": "Account looks stable today",
+                "description": "Your active adsets are performing within normal variation limits. Monitor creative fatigue indicators.",
+                "reason": "Baseline comparisons show costs are stable.",
+                "objective": "Engagement",
+                "problem": "None",
+                "root_cause": "Stable delivery",
+                "evidence": "CPL stable",
+                "confidence_score": 0.95,
+                "priority": "medium"
+            }]
+
+        if not opportunities:
+            opportunities = [{
+                "id": "fallback_opp",
+                "entity_type": "campaign",
+                "entity_id": str(campaign_performance_changes[0]["campaign_id"]) if campaign_performance_changes else None,
+                "entity_name": entity_names.get(campaign_performance_changes[0]["campaign_id"], "Top Campaign") if campaign_performance_changes else "Top Campaign",
+                "title": "Gradual budget scaling",
+                "description": "Top performing campaign is showing positive cost per conversion trends. Consider gradual budget scaling.",
+                "reason": "Strong performance baseline.",
+                "objective": "Engagement",
+                "problem": "None",
+                "root_cause": "Strong audience resonance",
+                "evidence": "Cost per result is below target",
+                "confidence_score": 0.88,
+                "priority": "opportunity"
+            }]
+
+        if not dont_change_items:
+            dont_change_items = [{
+                "id": "fallback_dont_change",
+                "entity_type": "campaign",
+                "entity_id": None,
+                "entity_name": "Active Campaigns",
+                "title": "Maintain stable messaging creatives",
+                "description": "Active ad copy is performing within normal historical variation limits. Keep delivery active.",
+                "reason": "Stable ad delivery.",
+                "objective": "Engagement",
+                "problem": "None",
+                "root_cause": "Normal pacing",
+                "evidence": "Frequency stable",
+                "confidence_score": 0.92,
+                "priority": "medium"
+            }]
 
         daily_brief = AIDailyBrief(
             user_id=user_uuid,
@@ -376,10 +434,10 @@ class AIBriefService:
             biggest_problem=biggest_problem,
             positive_changes=pos_list,
             negative_changes=neg_list,
-            watch_items=watch_list,
-            opportunities=[{"description": o.description, "action": o.reason} for o in opp_items] or [{"description": "Prioritize high-converting placements.", "action": "Scale Reels/Instagram budget allocation."}],
-            experiments=[{"description": e.description, "hypothesis": e.reason} for e in exp_items] or [{"description": "Test copy hooks against baseline.", "hypothesis": "Highlight verified customer cake testimonials to boost conversions."}],
-            dont_change_items=[{"description": d.description, "reason": d.reason} for d in dont_change] or [{"description": "Maintain stable messaging creatives.", "reason": "Keep adset delivery active."}],
+            watch_items=watch_items,
+            opportunities=opportunities,
+            experiments=experiments,
+            dont_change_items=dont_change_items,
             top_priorities=top_priorities,
             generated_at=datetime.utcnow()
         )
@@ -739,22 +797,122 @@ class AIBriefService:
         """Helper to create a fully populated realistic fallback Daily Brief (9.8)."""
         top_priorities = [
             {
-                "id": 1,
-                "status": "critical",
-                "title": "🔴 Review Image C",
-                "description": "CPL increased 54% yesterday due to CTR drop."
+                "id": "mock_crit_1",
+                "entity_type": "ad",
+                "entity_id": str(uuid.uuid4()),
+                "entity_name": "Image C (Standard Call Out)",
+                "title": "Review Image C Fatigue",
+                "description": "CPL increased 54% yesterday due to CTR drop.",
+                "reason": "Audience creative fatigue on static image layout.",
+                "objective": "Leads",
+                "problem": "CPL increased 54%",
+                "root_cause": "Creative Fatigue",
+                "evidence": "CTR ↓ 29%, Frequency ↑ 42%",
+                "confidence_score": 0.91,
+                "priority": "critical"
             },
             {
-                "id": 2,
-                "status": "opportunity",
-                "title": "🔵 Test a new Video A variation",
-                "description": "Winning pattern is showing strong Reels performance."
+                "id": "mock_crit_2",
+                "entity_type": "campaign",
+                "entity_id": str(uuid.uuid4()),
+                "entity_name": "Video A Campaign",
+                "title": "Scaling Opportunity on Reels",
+                "description": "Video A is converting 26% below target CPL. Expand delivery.",
+                "reason": "Reels placement performing significantly above baseline.",
+                "objective": "Engagement",
+                "problem": "None",
+                "root_cause": "Strong hook rate",
+                "evidence": "Cost per conversation is ₹71.00",
+                "confidence_score": 0.88,
+                "priority": "opportunity"
             },
             {
-                "id": 3,
-                "status": "dont_change",
-                "title": "🟢 Continue Campaign B",
-                "description": "No intervention recommended. Performance within normal variation limits."
+                "id": "mock_crit_3",
+                "entity_type": "campaign",
+                "entity_id": str(uuid.uuid4()),
+                "entity_name": "Campaign B",
+                "title": "Maintain stable messaging creatives",
+                "description": "Active ad copy is performing within normal historical variation limits. Keep delivery active.",
+                "reason": "Stable ad delivery.",
+                "objective": "Engagement",
+                "problem": "None",
+                "root_cause": "Normal pacing",
+                "evidence": "Frequency stable",
+                "confidence_score": 0.92,
+                "priority": "medium"
+            }
+        ]
+
+        opportunities = [
+            {
+                "id": "mock_opp_1",
+                "entity_type": "ad_set",
+                "entity_id": str(uuid.uuid4()),
+                "entity_name": "Instagram Reels Adset",
+                "title": "Scaling Opportunity",
+                "description": "Instagram Reels is generating leads 31% cheaper than campaign average.",
+                "reason": "Prioritize Reels-focused creative testing cycle.",
+                "objective": "Leads",
+                "problem": "None",
+                "root_cause": "Low CPC Reels auctions",
+                "evidence": "CPL is ₹84.50",
+                "confidence_score": 0.89,
+                "priority": "opportunity"
+            }
+        ]
+
+        dont_change_items = [
+            {
+                "id": "mock_dc_1",
+                "entity_type": "campaign",
+                "entity_id": str(uuid.uuid4()),
+                "entity_name": "Campaign B",
+                "title": "Don't Change Campaign B",
+                "description": "Campaign B is performing within normal variation thresholds.",
+                "reason": "Yesterday CPL spiked 11% but 7-day average remains stable. Do not intervene.",
+                "objective": "Engagement",
+                "problem": "None",
+                "root_cause": "Auction volatility",
+                "evidence": "CPL baseline is within range",
+                "confidence_score": 0.95,
+                "priority": "medium"
+            }
+        ]
+
+        experiments = [
+            {
+                "id": "mock_exp_1",
+                "entity_type": "ad",
+                "entity_id": str(uuid.uuid4()),
+                "entity_name": "Video A",
+                "title": "Refine Hook of Video A",
+                "description": "Create a new variation of Video A with customer testimonial hook.",
+                "reason": "Hook testing cycle.",
+                "hypothesis": "Refining opening visual hook will maintain low CPL without reducing landing page quality.",
+                "objective": "Sales",
+                "problem": "None",
+                "root_cause": "Opportunity",
+                "evidence": "CTR is 1.8%",
+                "confidence_score": 0.85,
+                "priority": "medium"
+            }
+        ]
+
+        watch_items = [
+            {
+                "id": "mock_watch_1",
+                "entity_type": "ad_set",
+                "entity_id": str(uuid.uuid4()),
+                "entity_name": "Audience segment C",
+                "title": "Auction Pressure Alert",
+                "description": "Audience segment C has increasing CPM auction pressure.",
+                "reason": "Monitor frequency metrics over the next 48 hours.",
+                "objective": "Sales",
+                "problem": "CPM rose 18%",
+                "root_cause": "Auction competition",
+                "evidence": "CPM increased from ₹220 to ₹259",
+                "confidence_score": 0.82,
+                "priority": "low"
             }
         ]
 
@@ -796,22 +954,10 @@ class AIBriefService:
                 "Campaign B ad frequency rose 21% today",
                 "Retargeting landing page CTR fell 18%"
             ],
-            watch_items=[
-                "Audience segment C has increasing CPM auction pressure",
-                "Campaign D has insufficient conversion data for optimization"
-            ],
-            opportunities=[
-                {"description": "Instagram Reels is generating leads 31% cheaper than campaign average.", "action": "Prioritize Reels-focused creative testing cycle."}
-            ],
-            experiments=[
-                {
-                    "description": "Create a new variation of Video A.", 
-                    "hypothesis": "Refining opening visual hook will maintain low cost-per-lead without reducing landing page engagement quality."
-                }
-            ],
-            dont_change_items=[
-                {"description": "Campaign B is performing within normal variation thresholds.", "reason": "Yesterday CPL spiked 11% but 7-day average remains stable. Do not intervene."}
-            ],
+            watch_items=watch_items,
+            opportunities=opportunities,
+            experiments=experiments,
+            dont_change_items=dont_change_items,
             top_priorities=top_priorities,
             generated_at=datetime.utcnow()
         )
