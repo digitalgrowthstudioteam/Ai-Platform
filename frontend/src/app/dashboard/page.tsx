@@ -86,6 +86,8 @@ export default function OverviewPage() {
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [ads, setAds] = useState<any[]>([]);
   const [recommendations, setRecommendations] = useState<any[]>([]);
+  const [dailyBrief, setDailyBrief] = useState<any>(null);
+  const [weeklyBrief, setWeeklyBrief] = useState<any>(null);
   const [loadingData, setLoadingData] = useState(false);
 
   // Fetch subscription on mount
@@ -236,13 +238,15 @@ export default function OverviewPage() {
     const cached = sessionStorage.getItem(cacheKey);
     if (cached) {
       try {
-        const { metrics: cachedMetrics, chartData: cachedChart, health: cachedHealth, campaigns: cachedCampaigns, ads: cachedAds, recommendations: cachedRecs } = JSON.parse(cached);
+        const { metrics: cachedMetrics, chartData: cachedChart, health: cachedHealth, campaigns: cachedCampaigns, ads: cachedAds, recommendations: cachedRecs, dailyBrief: cachedDaily, weeklyBrief: cachedWeekly } = JSON.parse(cached);
         if (cachedMetrics) setMetrics(cachedMetrics);
         if (cachedChart) setChartData(cachedChart);
         if (cachedHealth) setHealth(cachedHealth);
         if (cachedCampaigns) setCampaigns(cachedCampaigns);
         if (cachedAds) setAds(cachedAds);
         if (cachedRecs) setRecommendations(cachedRecs);
+        if (cachedDaily) setDailyBrief(cachedDaily);
+        if (cachedWeekly) setWeeklyBrief(cachedWeekly);
       } catch (e) {}
     }
 
@@ -295,15 +299,33 @@ export default function OverviewPage() {
         return [];
       });
 
+      const dailyBriefPromise = api.getDailyBrief(selectedAccount.id).then((res) => {
+        setDailyBrief(res);
+        return res;
+      }).catch((e) => {
+        console.warn("Failed to load dashboard daily brief:", e);
+        return null;
+      });
+
+      const weeklyBriefPromise = api.getWeeklyBrief(selectedAccount.id).then((res) => {
+        setWeeklyBrief(res);
+        return res;
+      }).catch((e) => {
+        console.warn("Failed to load dashboard weekly brief:", e);
+        return null;
+      });
+
       // Update cache in the background when all finish
-      Promise.all([healthPromise, campaignsPromise, adsPromise, recsPromise]).then(([healthRes, campaignsRes, adsRes, recsRes]) => {
+      Promise.all([healthPromise, campaignsPromise, adsPromise, recsPromise, dailyBriefPromise, weeklyBriefPromise]).then(([healthRes, campaignsRes, adsRes, recsRes, dailyRes, weeklyRes]) => {
         const cacheData = {
           metrics: overviewRes,
           chartData: chartRes,
           health: healthRes,
           campaigns: campaignsRes,
           ads: adsRes,
-          recommendations: recsRes
+          recommendations: recsRes,
+          dailyBrief: dailyRes,
+          weeklyBrief: weeklyRes,
         };
         sessionStorage.setItem(cacheKey, JSON.stringify(cacheData));
       });
@@ -830,8 +852,16 @@ export default function OverviewPage() {
                   <Sparkles size={16} />
                   <span className="text-xs font-black uppercase tracking-wider">Today's AI Brief</span>
                 </div>
-                <h4 className="text-sm font-bold text-slate-800 mt-2">Yesterday CPL decreased 12%</h4>
-                <p className="text-xs text-subtle font-medium mt-1">3 priorities need your attention today.</p>
+                <h4 className="text-sm font-bold text-slate-800 mt-2">
+                  {dailyBrief && dailyBrief.primary_kpi_change !== undefined
+                    ? `Yesterday ${dailyBrief.primary_kpi} ${dailyBrief.primary_kpi_change >= 0 ? "increased" : "decreased"} ${Math.abs(dailyBrief.primary_kpi_change * 100).toFixed(0)}%`
+                    : "Yesterday's performance overview"}
+                </h4>
+                <p className="text-xs text-subtle font-medium mt-1">
+                  {dailyBrief 
+                    ? `${dailyBrief.top_priorities?.length || 3} priorities need your attention today.`
+                    : "Generating today's AI priorities..."}
+                </p>
               </div>
               <Link href="/briefs/daily" className="text-xs font-bold text-primary hover:underline flex items-center gap-1 mt-2">
                 View Daily Brief <ChevronRight size={14} />
@@ -844,8 +874,12 @@ export default function OverviewPage() {
                   <Zap size={16} />
                   <span className="text-xs font-black uppercase tracking-wider">Weekly AI Brief</span>
                 </div>
-                <h4 className="text-sm font-bold text-slate-800 mt-2">Winning Pattern: Short video + Reels</h4>
-                <p className="text-xs text-subtle font-medium mt-1">Acquisitions are 34% cheaper using short video Reels.</p>
+                <h4 className="text-sm font-bold text-slate-800 mt-2 truncate max-w-full">
+                  {weeklyBrief?.winning_pattern?.pattern || "Weekly performance summary"}
+                </h4>
+                <p className="text-xs text-subtle font-medium mt-1 line-clamp-2">
+                  {weeklyBrief?.winning_pattern?.description || "Review weekly brief insights."}
+                </p>
               </div>
               <Link href="/briefs/weekly" className="text-xs font-bold text-primary hover:underline flex items-center gap-1 mt-2">
                 View Weekly Brief <ChevronRight size={14} />
