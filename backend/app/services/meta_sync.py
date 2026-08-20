@@ -112,10 +112,11 @@ class MetaSyncService:
         """
         Generates structured sandbox datasets for local/mock validation.
         """
+        suffix = f"_{ad_acc.meta_account_id}"
         # Create campaigns
         mock_campaigns = [
-            {"id": "camp_111", "name": "DG - Prospecting Conversions", "objective": "OUTCOMES", "status": "ACTIVE", "daily_budget": 1500.00},
-            {"id": "camp_222", "name": "DG - Retargeting Customers", "objective": "OUTCOMES", "status": "ACTIVE", "daily_budget": 800.00},
+            {"id": f"camp_111{suffix}", "name": "DG - Prospecting Conversions", "objective": "OUTCOMES", "status": "ACTIVE", "daily_budget": 1500.00},
+            {"id": f"camp_222{suffix}", "name": "DG - Retargeting Customers", "objective": "OUTCOMES", "status": "ACTIVE", "daily_budget": 800.00},
         ]
         campaign_map = {}
         for mc in mock_campaigns:
@@ -141,9 +142,9 @@ class MetaSyncService:
 
         # Create ad sets
         mock_adsets = [
-            {"id": "adset_111", "campaign_id": "camp_111", "name": "Broad Audience (India)", "status": "ACTIVE", "optimization_goal": "OFFSITE_CONVERSIONS", "billing_event": "IMPRESSIONS", "daily_budget": 1000.00, "motive": "website", "performance_goal": "purchases", "optimization_event": "purchase", "performance_goal_profile_id": "purchases"},
-            {"id": "adset_112", "campaign_id": "camp_111", "name": "Lookalike (1%) Purchase", "status": "ACTIVE", "optimization_goal": "OFFSITE_CONVERSIONS", "billing_event": "IMPRESSIONS", "daily_budget": 500.00, "motive": "website", "performance_goal": "purchases", "optimization_event": "purchase", "performance_goal_profile_id": "purchases"},
-            {"id": "adset_221", "campaign_id": "camp_222", "name": "Website Visitors 30d", "status": "ACTIVE", "optimization_goal": "OFFSITE_CONVERSIONS", "billing_event": "IMPRESSIONS", "daily_budget": 800.00, "motive": "website", "performance_goal": "leads", "optimization_event": "lead", "performance_goal_profile_id": "leads"},
+            {"id": f"adset_111{suffix}", "campaign_id": f"camp_111{suffix}", "name": "Broad Audience (India)", "status": "ACTIVE", "optimization_goal": "OFFSITE_CONVERSIONS", "billing_event": "IMPRESSIONS", "daily_budget": 1000.00, "motive": "website", "performance_goal": "purchases", "optimization_event": "purchase", "performance_goal_profile_id": "purchases"},
+            {"id": f"adset_112{suffix}", "campaign_id": f"camp_111{suffix}", "name": "Lookalike (1%) Purchase", "status": "ACTIVE", "optimization_goal": "OFFSITE_CONVERSIONS", "billing_event": "IMPRESSIONS", "daily_budget": 500.00, "motive": "website", "performance_goal": "purchases", "optimization_event": "purchase", "performance_goal_profile_id": "purchases"},
+            {"id": f"adset_221{suffix}", "campaign_id": f"camp_222{suffix}", "name": "Website Visitors 30d", "status": "ACTIVE", "optimization_goal": "OFFSITE_CONVERSIONS", "billing_event": "IMPRESSIONS", "daily_budget": 800.00, "motive": "website", "performance_goal": "leads", "optimization_event": "lead", "performance_goal_profile_id": "leads"},
         ]
         adset_map = {}
         for ma in mock_adsets:
@@ -177,10 +178,10 @@ class MetaSyncService:
 
         # Create ads and creatives
         mock_ads = [
-            {"id": "ad_111_1", "adset_id": "adset_111", "name": "Summer Sale - Video 1", "status": "ACTIVE", "headline": "50% Off Summer Wear", "body": "Beat the heat with our special sales!", "image_url": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e"},
-            {"id": "ad_111_2", "adset_id": "adset_111", "name": "Summer Sale - Image 1", "status": "ACTIVE", "headline": "Shop Summer Looks", "body": "Best collections this summer.", "image_url": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e"},
-            {"id": "ad_112_1", "adset_id": "adset_112", "name": "Summer Sale - Carousel 1", "status": "ACTIVE", "headline": "Trending Outfits", "body": "Discover the latest styles.", "image_url": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e"},
-            {"id": "ad_221_1", "adset_id": "adset_221", "name": "Summer Sale - Retarget Video", "status": "ACTIVE", "headline": "Did you forget something?", "body": "Complete your purchase today.", "image_url": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e"},
+            {"id": f"ad_111_1{suffix}", "adset_id": f"adset_111{suffix}", "name": "Summer Sale - Video 1", "status": "ACTIVE", "headline": "50% Off Summer Wear", "body": "Beat the heat with our special sales!", "image_url": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e"},
+            {"id": f"ad_111_2{suffix}", "adset_id": f"adset_111{suffix}", "name": "Summer Sale - Image 1", "status": "ACTIVE", "headline": "Shop Summer Looks", "body": "Best collections this summer.", "image_url": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e"},
+            {"id": f"ad_112_1{suffix}", "adset_id": f"adset_112{suffix}", "name": "Summer Sale - Carousel 1", "status": "ACTIVE", "headline": "Trending Outfits", "body": "Discover the latest styles.", "image_url": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e"},
+            {"id": f"ad_221_1{suffix}", "adset_id": f"adset_221{suffix}", "name": "Summer Sale - Retarget Video", "status": "ACTIVE", "headline": "Did you forget something?", "body": "Complete your purchase today.", "image_url": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e"},
         ]
         
         ad_map = {}
@@ -232,7 +233,7 @@ class MetaSyncService:
             
             # Campaigns metrics
             for mc_id, db_id in campaign_map.items():
-                base_spend = 1200.00 if mc_id == "camp_111" else 600.00
+                base_spend = 1200.00 if mc_id.startswith("camp_111") else 600.00
                 spend = base_spend - (i * 10)
                 impressions = int(spend * 15)
                 clicks = int(impressions * 0.02)
@@ -309,7 +310,7 @@ class MetaSyncService:
 
             # Adsets metrics
             for ma_id, db_id in adset_map.items():
-                base_spend = 500.00 if ma_id == "adset_111" else 300.00
+                base_spend = 500.00 if ma_id.startswith("adset_111") else 300.00
                 spend = base_spend - (i * 5)
                 impressions = int(spend * 12)
                 clicks = int(impressions * 0.018)
