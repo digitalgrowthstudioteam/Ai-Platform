@@ -144,6 +144,82 @@ export default function CreativeAnalyzerPage() {
 
   const filteredPerformance = getFilteredPerformanceData(creativePerformance);
 
+  const getCorrelations = () => {
+    let winFormat = "Single Image Ads";
+    let loseFormat = "Carousel Ads";
+    let winCost = Infinity;
+    let loseCost = -Infinity;
+    let winRoas = -Infinity;
+    let loseRoas = Infinity;
+
+    Object.entries(formatMetrics).forEach(([key, val]: [string, any]) => {
+      const label = key === "IMAGE" ? "Single Image Ads" : (key === "VIDEO" ? "Single Video Ads" : "Carousel Ads");
+      const cost = val.conversations > 0 ? val.spend / val.conversations : val.spend;
+      const roas = val.spend > 0 ? val.revenue / val.spend : 0;
+      
+      if (isMessaging) {
+        if (val.count > 0 && cost < winCost) {
+          winCost = cost;
+          winFormat = label;
+        }
+        if (val.count > 0 && cost > loseCost) {
+          loseCost = cost;
+          loseFormat = label;
+        }
+      } else {
+        if (val.count > 0 && roas > winRoas) {
+          winRoas = roas;
+          winFormat = label;
+        }
+        if (val.count > 0 && roas < loseRoas) {
+          loseRoas = roas;
+          loseFormat = label;
+        }
+      }
+    });
+
+    return {
+      winFormat,
+      loseFormat,
+      winCost: winCost === Infinity ? 0 : winCost,
+      loseCost: loseCost === -Infinity ? 0 : loseCost,
+      winRoas: winRoas === -Infinity ? 0 : winRoas,
+      loseRoas: loseRoas === Infinity ? 0 : loseRoas
+    };
+  };
+
+  const correlations = getCorrelations();
+
+  const getHookCorrelations = () => {
+    let winHook = "N/A";
+    let loseHook = "N/A";
+    let winHeadline = "N/A";
+    let loseHeadline = "N/A";
+    let winPlacement = "N/A";
+    let losePlacement = "N/A";
+
+    if (filteredPerformance.length > 0) {
+      const sorted = [...filteredPerformance].sort((a, b) => b.score - a.score);
+      const winner = sorted[0];
+      const loser = sorted[sorted.length - 1];
+
+      if (winner) {
+        winHook = winner.dna.hook !== "N/A" ? winner.dna.hook : "Benefit-focused Hook";
+        winHeadline = winner.dna.copy.hook !== "N/A" ? winner.dna.copy.hook : "Outcome-focused Headline";
+        winPlacement = winner.dna.format === "Short-form video" ? "Instagram Reels" : "Facebook Feed";
+      }
+      if (loser) {
+        loseHook = loser.dna.hook !== "N/A" ? loser.dna.hook : "Product-focused Hook";
+        loseHeadline = loser.dna.copy.hook !== "N/A" ? loser.dna.copy.hook : "Checklist Headline";
+        losePlacement = loser.dna.format === "Carousel" ? "Facebook Audience Network" : "Instagram Stories";
+      }
+    }
+
+    return { winHook, loseHook, winHeadline, loseHeadline, winPlacement, losePlacement };
+  };
+
+  const hookCorrelations = getHookCorrelations();
+
   // Premium Augmented Mock Data with detailed DNA properties
   const getAugmentedMockData = () => {
     return [
@@ -362,9 +438,9 @@ export default function CreativeAnalyzerPage() {
 
         // Group format metrics
         const formatGroups: Record<string, any> = {
-          IMAGE: { spend: 0, impressions: 0, clicks: 0, purchases: 0, revenue: 0, count: 0 },
-          VIDEO: { spend: 0, impressions: 0, clicks: 0, purchases: 0, revenue: 0, count: 0 },
-          CAROUSEL: { spend: 0, impressions: 0, clicks: 0, purchases: 0, revenue: 0, count: 0 }
+          IMAGE: { spend: 0, impressions: 0, clicks: 0, purchases: 0, revenue: 0, conversations: 0, count: 0 },
+          VIDEO: { spend: 0, impressions: 0, clicks: 0, purchases: 0, revenue: 0, conversations: 0, count: 0 },
+          CAROUSEL: { spend: 0, impressions: 0, clicks: 0, purchases: 0, revenue: 0, conversations: 0, count: 0 }
         };
         mocks.forEach(m => {
           const type = m.creative.creative_type;
@@ -374,17 +450,34 @@ export default function CreativeAnalyzerPage() {
             formatGroups[type].clicks += m.spend / m.cpc;
             formatGroups[type].purchases += m.purchases;
             formatGroups[type].revenue += m.revenue;
+            formatGroups[type].conversations += (m as any).conversations || 0;
             formatGroups[type].count += 1;
           }
         });
         setFormatMetrics(formatGroups);
       } else {
-        // Blend live data with mock DNA for rich visualization
+        // Compute overall account metrics for average benchmarks
+        let totalSpend = 0;
+        let totalImpressions = 0;
+        let totalClicks = 0;
+        let totalConversions = 0;
+        
+        ads.forEach((ad: any) => {
+          totalSpend += ad.metrics.spend;
+          totalImpressions += ad.metrics.impressions;
+          totalClicks += ad.metrics.clicks;
+          const conv = ad.metrics.purchases + ad.metrics.leads + (ad.metrics.conversations || 0);
+          totalConversions += conv;
+        });
+
+        const avgCtr = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 1.15;
+        const avgCpl = totalConversions > 0 ? totalSpend / totalConversions : 110;
+
         const creativeGroups: Record<string, any> = {};
         const formatGroups: Record<string, any> = {
-          IMAGE: { spend: 0, impressions: 0, clicks: 0, purchases: 0, revenue: 0, count: 0 },
-          VIDEO: { spend: 0, impressions: 0, clicks: 0, purchases: 0, revenue: 0, count: 0 },
-          CAROUSEL: { spend: 0, impressions: 0, clicks: 0, purchases: 0, revenue: 0, count: 0 }
+          IMAGE: { spend: 0, impressions: 0, clicks: 0, purchases: 0, revenue: 0, conversations: 0, count: 0 },
+          VIDEO: { spend: 0, impressions: 0, clicks: 0, purchases: 0, revenue: 0, conversations: 0, count: 0 },
+          CAROUSEL: { spend: 0, impressions: 0, clicks: 0, purchases: 0, revenue: 0, conversations: 0, count: 0 }
         };
 
         ads.forEach((ad: any, index: number) => {
@@ -395,20 +488,27 @@ export default function CreativeAnalyzerPage() {
           const cType = (cr.creative_type || "IMAGE").toUpperCase();
           const adFeature = features.find(f => f.ad_id === ad.id || f.creative_type === cType);
 
+          const formatLabel = cType === "IMAGE" ? "Single Image" : (cType === "VIDEO" ? "Short-form video" : (cType === "CAROUSEL" ? "Carousel" : cType));
+          const aspectLabel = cType === "VIDEO" ? "9:16 (Vertical)" : "1:1 (Square)";
+          const durationLabel = adFeature?.creative_length ? `${adFeature.creative_length}s` : "N/A";
+          const hookLabel = adFeature?.hook_type ? `${adFeature.hook_type.charAt(0).toUpperCase() + adFeature.hook_type.slice(1)}-focused` : "N/A";
+          
+          const visualsList = adFeature?.creative_type === "VIDEO" 
+            ? ["UGC style", "Reels optimized"] 
+            : (adFeature?.creative_type === "CAROUSEL" ? ["Swipe cards"] : ["Static image layout"]);
+
           if (!creativeGroups[cId]) {
-            // Apply mock template DNA blended with DB features
-            const mockDnaTemplate = mocks[index % mocks.length];
             const resolvedDna = {
-              format: adFeature?.creative_type || mockDnaTemplate.dna.format,
-              aspect: mockDnaTemplate.dna.aspect,
-              duration: adFeature?.creative_length ? `${adFeature.creative_length}s` : mockDnaTemplate.dna.duration,
-              hook: adFeature?.hook_type ? `${adFeature.hook_type.charAt(0).toUpperCase() + adFeature.hook_type.slice(1)}-focused` : mockDnaTemplate.dna.hook,
-              visuals: mockDnaTemplate.dna.visuals,
+              format: formatLabel,
+              aspect: aspectLabel,
+              duration: durationLabel,
+              hook: hookLabel,
+              visuals: visualsList,
               copy: {
-                hook: adFeature?.hook_type ? `${adFeature.hook_type.charAt(0).toUpperCase() + adFeature.hook_type.slice(1)} Hook` : mockDnaTemplate.dna.copy.hook,
-                benefit: adFeature?.has_social_proof ? "Social Proof element present" : (adFeature?.has_price ? "Price detail highlighted" : mockDnaTemplate.dna.copy.benefit),
-                offer: adFeature?.has_offer ? "Offer details configured" : "None",
-                cta: adFeature?.cta_type || mockDnaTemplate.dna.copy.cta
+                hook: adFeature?.hook_type ? `${adFeature.hook_type.charAt(0).toUpperCase() + adFeature.hook_type.slice(1)} Hook` : "N/A",
+                benefit: adFeature?.has_social_proof ? "Social Proof element present" : (adFeature?.has_price ? "Price detail highlighted" : "N/A"),
+                offer: adFeature?.has_offer ? "Offer details configured" : "N/A",
+                cta: cr.call_to_action || "Learn More"
               }
             };
 
@@ -420,10 +520,11 @@ export default function CreativeAnalyzerPage() {
               clicks: 0,
               purchases: 0,
               revenue: 0,
-              frequency: mockDnaTemplate.frequency,
-              score: mockDnaTemplate.score,
-              lifecycle: mockDnaTemplate.lifecycle,
-              fatigue: mockDnaTemplate.fatigue,
+              conversations: 0,
+              frequency: 1.2,
+              score: 75,
+              lifecycle: "Learning",
+              fatigue: "Fresh",
               dna: resolvedDna
             };
           }
@@ -431,14 +532,16 @@ export default function CreativeAnalyzerPage() {
           creativeGroups[cId].impressions += ad.metrics.impressions;
           creativeGroups[cId].clicks += ad.metrics.clicks;
           creativeGroups[cId].purchases += ad.metrics.purchases;
-          creativeGroups[cId].revenue += ad.metrics.spend * ad.metrics.roas;
+          creativeGroups[cId].revenue += ad.metrics.revenue || (ad.metrics.spend * ad.metrics.roas);
+          creativeGroups[cId].conversations += (ad.metrics.conversations || 0);
 
           const fmt = formatGroups[cType] ? cType : "IMAGE";
           formatGroups[fmt].spend += ad.metrics.spend;
           formatGroups[fmt].impressions += ad.metrics.impressions;
           formatGroups[fmt].clicks += ad.metrics.clicks;
           formatGroups[fmt].purchases += ad.metrics.purchases;
-          formatGroups[fmt].revenue += ad.metrics.spend * ad.metrics.roas;
+          formatGroups[fmt].revenue += ad.metrics.revenue || (ad.metrics.spend * ad.metrics.roas);
+          formatGroups[fmt].conversations += (ad.metrics.conversations || 0);
           formatGroups[fmt].count += 1;
         });
 
@@ -446,16 +549,50 @@ export default function CreativeAnalyzerPage() {
           const ctr = g.impressions > 0 ? (g.clicks / g.impressions) * 100 : 0;
           const cpc = g.clicks > 0 ? g.spend / g.clicks : 0;
           const roas = g.spend > 0 ? g.revenue / g.spend : 0;
-          const cpl = g.purchases > 0 ? g.spend / (g.purchases * 2) : 0;
-          const cpa = g.purchases > 0 ? g.spend / g.purchases : 0;
+          
+          const convTotal = g.purchases + g.conversations;
+          const costPerResult = convTotal > 0 ? g.spend / convTotal : g.spend;
+          
+          // Calculate realistic ad frequency dynamically
+          const frequency = g.spend > 0 ? Math.min(3.8, Math.max(1.1, 1.1 + (g.impressions / 350000))) : 1.0;
+
+          // Compute realistic Performance Score from averages
+          let score = 75;
+          if (avgCtr > 0) {
+            score += Math.round((ctr - avgCtr) / avgCtr * 20);
+          }
+          if (avgCpl > 0 && costPerResult > 0) {
+            score += Math.round((avgCpl - costPerResult) / avgCpl * 15);
+          }
+          score = Math.min(98, Math.max(45, score));
+
+          let lifecycle = "Stable";
+          if (g.spend < 100) {
+            lifecycle = "Learning";
+          } else if (score >= 88) {
+            lifecycle = "Winner";
+          } else if (frequency > 2.8) {
+            lifecycle = "Fatigue Risk";
+          }
+
+          let fatigue = "Fresh";
+          if (frequency > 3.0) {
+            fatigue = "Fatigued";
+          } else if (frequency > 2.4) {
+            fatigue = "Showing fatigue";
+          }
 
           return {
             ...g,
             ctr,
             cpc,
-            cpl: cpl || 150,
-            cpa: cpa || 450,
-            roas
+            cpl: costPerResult || 150,
+            cpa: g.purchases > 0 ? g.spend / g.purchases : 450,
+            roas,
+            score,
+            lifecycle,
+            fatigue,
+            frequency
           };
         });
 
@@ -912,25 +1049,25 @@ export default function CreativeAnalyzerPage() {
               <div className="space-y-3 text-xs font-semibold text-slate-700">
                 <div className="flex justify-between border-b border-green-100 pb-2">
                   <span>Winning Format:</span>
-                  <span className="text-green-700 font-bold bg-green-100 px-2 py-0.5 rounded">Short-form Video (15-22s)</span>
+                  <span className="text-green-700 font-bold bg-green-100 px-2 py-0.5 rounded">{correlations.winFormat}</span>
                 </div>
                 <div className="flex justify-between border-b border-green-100 pb-2">
                   <span>Winning Hook Type:</span>
-                  <span className="text-green-700 font-bold bg-green-100 px-2 py-0.5 rounded">Problem-focused Hook</span>
+                  <span className="text-green-700 font-bold bg-green-100 px-2 py-0.5 rounded">{hookCorrelations.winHook}</span>
                 </div>
                 <div className="flex justify-between border-b border-green-100 pb-2">
                   <span>Winning Headline:</span>
-                  <span className="text-green-700 font-bold bg-green-100 px-2 py-0.5 rounded">Outcome-focused Headline</span>
+                  <span className="text-green-700 font-bold bg-green-100 px-2 py-0.5 rounded">{hookCorrelations.winHeadline}</span>
                 </div>
                 <div className="flex justify-between pb-2">
                   <span>Optimal Delivery Placement:</span>
-                  <span className="text-green-700 font-bold bg-green-100 px-2 py-0.5 rounded">Instagram Reels</span>
+                  <span className="text-green-700 font-bold bg-green-100 px-2 py-0.5 rounded">{hookCorrelations.winPlacement}</span>
                 </div>
                 <div className="bg-white p-3 rounded-lg border border-green-100 text-[11px] leading-relaxed text-slate-600 font-medium">
                   <span className="font-bold text-slate-800">Winning Pattern: </span>
                   {isMessaging 
-                    ? "Short-form video + problem-focused hook + outcome headline is currently your strongest creative pattern. This combination correlates with the lowest cost per conversation and captures 72% of total chat initiations."
-                    : "Short-form video + problem-focused hook + outcome headline is currently your strongest creative pattern. This combination correlates with an average 3.65x ROAS and captures 72% of total conversions."
+                    ? `Your top performing format is ${correlations.winFormat} with ${hookCorrelations.winHook} and ${hookCorrelations.winHeadline}. This setup correlates with the lowest cost per conversation (CPL) for ${selectedAccount.name}.`
+                    : `Your top performing format is ${correlations.winFormat} with ${hookCorrelations.winHook} and ${hookCorrelations.winHeadline}. This setup correlates with the highest ROAS for ${selectedAccount.name}.`
                   }
                 </div>
               </div>
@@ -945,25 +1082,25 @@ export default function CreativeAnalyzerPage() {
               <div className="space-y-3 text-xs font-semibold text-slate-700">
                 <div className="flex justify-between border-b border-red-100 pb-2">
                   <span>Losing Format:</span>
-                  <span className="text-red-700 font-bold bg-red-100 px-2 py-0.5 rounded">Static Image Ads</span>
+                  <span className="text-red-700 font-bold bg-red-100 px-2 py-0.5 rounded">{correlations.loseFormat}</span>
                 </div>
                 <div className="flex justify-between border-b border-red-100 pb-2">
                   <span>Losing Hook Type:</span>
-                  <span className="text-red-700 font-bold bg-red-100 px-2 py-0.5 rounded">Product-focused Hook</span>
+                  <span className="text-red-700 font-bold bg-red-100 px-2 py-0.5 rounded">{hookCorrelations.loseHook}</span>
                 </div>
                 <div className="flex justify-between border-b border-red-100 pb-2">
                   <span>Losing Headline:</span>
-                  <span className="text-red-700 font-bold bg-red-100 px-2 py-0.5 rounded">Static Checklist Headline</span>
+                  <span className="text-red-700 font-bold bg-red-100 px-2 py-0.5 rounded">{hookCorrelations.loseHeadline}</span>
                 </div>
                 <div className="flex justify-between pb-2">
                   <span>Weak Placement:</span>
-                  <span className="text-red-700 font-bold bg-red-100 px-2 py-0.5 rounded">Facebook Audience Network</span>
+                  <span className="text-red-700 font-bold bg-red-100 px-2 py-0.5 rounded">{hookCorrelations.losePlacement}</span>
                 </div>
                 <div className="bg-white p-3 rounded-lg border border-red-100 text-[11px] leading-relaxed text-slate-600 font-medium">
                   <span className="font-bold text-slate-800">Losing Pattern: </span>
                   {isMessaging 
-                    ? "Static image layouts combined with technical checklist headlines correlate with higher Cost Per Conversation (₹180+) and suffer from accelerated frequency wearout."
-                    : "Static image layouts combined with technical checklist headlines correlate with higher CPA (₹1,800+) and suffer from accelerated frequency wearout."
+                    ? `Conversely, ${correlations.loseFormat} combined with ${hookCorrelations.loseHook} correlate with higher Cost Per Conversation (₹${(correlations.loseCost || 180).toFixed(0)}+) and suffer from frequency wearout.`
+                    : `Conversely, ${correlations.loseFormat} combined with ${hookCorrelations.loseHook} correlate with lower conversion efficiency and suffer from frequency wearout.`
                   }
                 </div>
               </div>
