@@ -30,11 +30,8 @@ if ($env:GOOGLE_APPLICATION_CREDENTIALS) {
     Remove-Item -Path "Env:GOOGLE_APPLICATION_CREDENTIALS"
 }
 
-Write-Host "Deploying to Staging (digital-growth-studio)..." -ForegroundColor Cyan
-npx --yes firebase-tools deploy --only hosting:staging --project digital-growth-studio --non-interactive
-
-Write-Host "Deploying to Production (partner-dgs)..." -ForegroundColor Cyan
-npx --yes firebase-tools deploy --only hosting:prod --project partner-dgs --non-interactive
+Write-Host "Deploying to digital-growth-studio..." -ForegroundColor Cyan
+npx --yes firebase-tools deploy --only hosting --project digital-growth-studio --non-interactive
 
 # Restore credentials
 if ($oldCreds) {

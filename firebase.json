@@ -1,60 +1,29 @@
 {
-  "hosting": [
-    {
-      "target": "staging",
-      "public": "frontend/out",
-      "ignore": [
-        "firebase.json",
-        "**/.*",
-        "**/node_modules/**"
-      ],
-      "cleanUrls": true,
-      "trailingSlash": false,
-      "rewrites": [
-        {
-          "source": "/campaigns/**",
-          "destination": "/campaigns.html"
-        }
-      ],
-      "headers": [
-        {
-          "source": "/**",
-          "headers": [
-            {
-              "key": "Cache-Control",
-              "value": "no-cache, no-store, must-revalidate"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "target": "prod",
-      "public": "frontend/out",
-      "ignore": [
-        "firebase.json",
-        "**/.*",
-        "**/node_modules/**"
-      ],
-      "cleanUrls": true,
-      "trailingSlash": false,
-      "rewrites": [
-        {
-          "source": "/campaigns/**",
-          "destination": "/campaigns.html"
-        }
-      ],
-      "headers": [
-        {
-          "source": "/**",
-          "headers": [
-            {
-              "key": "Cache-Control",
-              "value": "no-cache, no-store, must-revalidate"
-            }
-          ]
-        }
-      ]
-    }
-  ]
+  "hosting": {
+    "public": "frontend/out",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "cleanUrls": true,
+    "trailingSlash": false,
+    "rewrites": [
+      {
+        "source": "/campaigns/**",
+        "destination": "/campaigns.html"
+      }
+    ],
+    "headers": [
+      {
+        "source": "/**",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      }
+    ]
+  }
 }
