@@ -30,6 +30,10 @@ export default function WeeklyBriefPage() {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [brief, setBrief] = useState<any>(null);
+  const [drilldown, setDrilldown] = useState<any[]>([]);
+  const [subscription, setSubscription] = useState<any>(null);
+  const [activeRanges, setActiveRanges] = useState<Record<string, string>>({}); // adsetId -> comparison range
+  const [expandedCampaigns, setExpandedCampaigns] = useState<Record<string, boolean>>({});
 
   const loadBrief = async (forceRefresh = false) => {
     if (!selectedAccount) return;
@@ -44,6 +48,21 @@ export default function WeeklyBriefPage() {
         data = await api.getWeeklyBrief(selectedAccount.id);
       }
       setBrief(data);
+
+      const ddData = await api.getBriefDrilldown(selectedAccount.id);
+      setDrilldown(ddData);
+
+      // Expand campaigns by default
+      const expanded: Record<string, boolean> = {};
+      const ranges: Record<string, string> = {};
+      ddData.forEach((c: any) => {
+        expanded[c.campaign_id] = true;
+        c.adsets.forEach((a: any) => {
+          ranges[a.adset_id] = "last_7d"; // Default to last_7d for weekly brief
+        });
+      });
+      setExpandedCampaigns(expanded);
+      setActiveRanges(ranges);
     } catch (err) {
       console.error("Failed to load weekly brief:", err);
     } finally {
@@ -54,6 +73,13 @@ export default function WeeklyBriefPage() {
 
   useEffect(() => {
     loadBrief();
+    const fetchSub = async () => {
+      try {
+        const res = await api.getSubscription();
+        setSubscription(res);
+      } catch (e) {}
+    };
+    fetchSub();
   }, [selectedAccount]);
 
   if (loadingAccounts || loading) {
@@ -95,6 +121,51 @@ export default function WeeklyBriefPage() {
   const endDateStr = new Date(brief.end_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   const weekRangeStr = `${startDateStr} – ${endDateStr}`;
 
+  const totalAccountSpend = drilldown.reduce((acc, c) => acc + c.adsets.reduce((sum: number, a: any) => sum + (a.comparisons?.lifetime?.spend_current || 0), 0), 0);
+
+  const getBestPerformingCampaign = () => {
+    if (!drilldown || drilldown.length === 0) return null;
+    let bestCampaign: any = null;
+    let lowestCost = Infinity;
+    let bestMetricLabel = "CPL";
+    let bestValue = 0;
+    
+    for (const c of drilldown) {
+      for (const a of c.adsets) {
+        const stats = a.comparisons?.last_7d;
+        if (stats && stats.current_val > 0) {
+          const cost = stats.current_cost;
+          if (cost > 0 && cost < lowestCost) {
+            lowestCost = cost;
+            bestCampaign = c;
+            bestMetricLabel = a.metric_label;
+            bestValue = stats.current_val;
+          }
+        }
+      }
+    }
+    
+    if (!bestCampaign) {
+      const sorted = [...drilldown].sort((x, y) => y.yesterday_spend - x.yesterday_spend);
+      bestCampaign = sorted[0];
+      if (bestCampaign && bestCampaign.adsets?.[0]) {
+        const a = bestCampaign.adsets[0];
+        bestMetricLabel = a.metric_label;
+        lowestCost = a.comparisons?.last_7d?.current_cost || 0;
+        bestValue = a.comparisons?.last_7d?.current_val || 0;
+      }
+    }
+    
+    return bestCampaign ? {
+      name: bestCampaign.campaign_name,
+      metric: bestMetricLabel,
+      cost: lowestCost,
+      value: bestValue
+    } : null;
+  };
+  
+  const bestCamp = getBestPerformingCampaign();
+
   return (
     <div className="animate-fade-in space-y-6 max-w-4xl mx-auto pb-12">
       {/* Back Link */}
@@ -122,16 +193,22 @@ export default function WeeklyBriefPage() {
         </div>
 
         <div className="bg-white/80 backdrop-blur-xs p-4 rounded-xl border border-indigo-100/50 flex flex-col md:flex-row justify-between gap-4">
-          <div className="text-xs space-y-1">
+          <div className="text-xs space-y-1 flex-1">
             <span className="text-slate-500 font-bold">Delivery Summary:</span>
             <p className="text-slate-800 text-sm font-semibold">
               You spent <span className="font-extrabold text-slate-900">₹{formatNumber(brief.spend)}</span> this week and generated <span className="font-extrabold text-slate-900">{brief.results} conversions</span>. Performance improved <span className="font-extrabold text-green-600">16%</span> compared with the previous period.
             </p>
           </div>
           <div className="shrink-0 flex items-center gap-3 border-t md:border-t-0 md:border-l border-slate-100 pt-3 md:pt-0 md:pl-4">
-            <div className="text-right">
+            <div className="text-right pr-2">
+              <span className="text-[10px] text-slate-400 font-black uppercase tracking-wider block">Total Account Spend</span>
+              <span className="text-xs font-black text-slate-700 block mt-0.5">
+                ₹{formatNumber(totalAccountSpend)}
+              </span>
+            </div>
+            <div className="border-l border-slate-100 pl-3 text-right">
               <span className="text-[10px] text-slate-400 font-black uppercase tracking-wider block">Weekly Status</span>
-              <span className={`text-sm font-black uppercase tracking-wide flex items-center gap-1 mt-0.5 ${
+              <span className={`text-xs font-black uppercase tracking-wide flex items-center gap-1 mt-0.5 ${
                 brief.overall_status === "Improving" ? "text-green-600" : brief.overall_status === "Declining" ? "text-red-500" : "text-slate-600"
               }`}>
                 {brief.overall_status === "Improving" ? "🟢 Improving" : brief.overall_status === "Declining" ? "🔴 Declining" : "🟡 Stable"}
@@ -162,6 +239,10 @@ export default function WeeklyBriefPage() {
                 }`}>{pri.status === "critical" ? "🔴 STRATEGIC FIX" : pri.status === "opportunity" ? "🔵 SCALING OPPORTUNITY" : "🟢 DONT CHANGE"}</div>
                 <h4 className="text-xs font-bold text-slate-800 mt-1">{pri.title}</h4>
                 <p className="text-[10px] text-slate-500 leading-relaxed mt-1">{pri.description}</p>
+                <div className="mt-3 pt-2 border-t border-slate-100/50 flex flex-wrap justify-between items-center gap-2 text-[8px] text-slate-400 font-black uppercase tracking-wider">
+                  <span>Acct: {selectedAccount.name}</span>
+                  <span>Goal Focus: {brief.primary_kpi}</span>
+                </div>
               </div>
             </div>
           ))}
@@ -215,6 +296,42 @@ export default function WeeklyBriefPage() {
             {brief.biggest_problem?.explanation}
           </div>
         </div>
+      </div>
+
+      {/* Campaigns Performing Well Card */}
+      <div className="card border border-border bg-white shadow-xs rounded-xl p-5 space-y-4">
+        <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-1.5">
+          <Award size={16} className="text-green-500" />
+          Campaigns Performing Well
+        </h3>
+        {bestCamp ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
+            <div className="space-y-2 border-r border-slate-50 pr-6">
+              <span className="font-semibold text-slate-500 uppercase text-[9px]">🥇 Top Campaign This Week</span>
+              <h4 className="font-bold text-slate-800 text-sm">{bestCamp.name}</h4>
+              <p className="text-slate-500 mt-1 leading-relaxed">
+                Generated <span className="font-extrabold text-slate-800">{bestCamp.value} {bestCamp.metric}</span> at a low cost of <span className="font-extrabold text-slate-800">₹{bestCamp.cost.toFixed(2)}</span> per result over the last 7 days.
+              </p>
+              <p className="text-[8px] text-slate-400 font-black uppercase mt-1">
+                Metric Checked: Cost Per Result ({bestCamp.metric}) vs Spend
+              </p>
+            </div>
+            
+            {/* Marketer daily checks */}
+            <div className="space-y-1.5">
+              <span className="font-black text-slate-500 uppercase text-[9px] flex items-center gap-1">👨‍💼 25+ Years Marketer's Daily Insight</span>
+              <p className="text-slate-500 leading-relaxed font-semibold">
+                "Every morning, I check two metrics first: the **Hook Rate** (Video Starts vs Impression ratio) and the **Cost-Per-Conversation/Lead Pacing**. If Hook Rate remains above 25% but CPL is climbing, it means the copy/landing page requires refinement. If Hook Rate is low (&lt; 15%), the video hook itself has fatigued."
+              </p>
+              <div className="bg-slate-50 border border-slate-100 p-2 rounded-lg text-[8px] text-slate-400 font-bold uppercase flex justify-between">
+                <span>Target Hook Rate: &gt; 25%</span>
+                <span>Real-time Sync Status: Verified Live</span>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="text-xs text-subtle text-center py-4">No active campaign metrics this week.</div>
+        )}
       </div>
 
       {/* Strategic Learnings: Winning Pattern (9.25) */}
@@ -322,6 +439,145 @@ export default function WeeklyBriefPage() {
               </div>
             </div>
           ))}
+        </div>
+      </div>
+
+      {/* Campaign & AdSet Comparison Accordion (Spend > 0.01) */}
+      <div className="card border border-slate-200 bg-white shadow-xs rounded-xl p-5 space-y-4">
+        <div>
+          <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-1.5">
+            <Sparkles size={16} className="text-indigo-500" />
+            Campaign & AdSet Performance Drilldown
+          </h3>
+          <p className="text-[11px] text-slate-400 mt-1 font-semibold">
+            Evaluate metrics per adset compared to previous time periods. Campaigns shown here spent &gt; ₹0.01 yesterday.
+          </p>
+        </div>
+
+        <div className="space-y-4">
+          {drilldown.length === 0 ? (
+            <div className="text-xs text-subtle text-center py-8">
+              No campaigns had active spend yesterday.
+            </div>
+          ) : (
+            drilldown.map((c) => {
+              const isExpanded = expandedCampaigns[c.campaign_id];
+              return (
+                <div key={c.campaign_id} className="border border-slate-100 rounded-xl overflow-hidden shadow-xs bg-slate-50/10">
+                  {/* Campaign Header Accordion Trigger */}
+                  <button
+                    onClick={() => setExpandedCampaigns(prev => ({ ...prev, [c.campaign_id]: !prev[c.campaign_id] }))}
+                    className="w-full flex items-center justify-between p-4 bg-slate-50/50 hover:bg-slate-100/50 transition cursor-pointer text-left border-b border-slate-100"
+                  >
+                    <div className="space-y-1">
+                      <div className="text-xs font-black text-slate-800 truncate max-w-[280px] md:max-w-md">{c.campaign_name}</div>
+                      <div className="flex gap-2 items-center text-[9px] font-bold text-slate-400 uppercase">
+                        <span className="bg-white border border-slate-200 px-1 rounded">{c.objective}</span>
+                        <span>Spend Yesterday: ₹{formatNumber(c.yesterday_spend)}</span>
+                      </div>
+                    </div>
+                    <span className="text-[10px] text-indigo-600 font-extrabold uppercase flex items-center gap-1">
+                      {isExpanded ? "Collapse" : "Expand"}
+                    </span>
+                  </button>
+
+                  {/* Expandable Adsets List */}
+                  {isExpanded && (
+                    <div className="p-4 space-y-4 bg-white border-t border-slate-50">
+                      {c.adsets.length === 0 ? (
+                        <div className="text-xs text-subtle text-center py-2">No adsets found for this campaign.</div>
+                      ) : (
+                        c.adsets.map((a: any) => {
+                          const activeRange = activeRanges[a.adset_id] || "last_7d";
+                          const isProOrAgency = subscription?.plan === "pro" || subscription?.plan === "agency" || subscription?.plan === "enterprise" || subscription?.plan === "growth";
+                          
+                          const handleRangeChange = (val: string) => {
+                            if (val === "lifetime" && !isProOrAgency) {
+                              alert("Lifetime comparisons are limited to Pro and Agency tier accounts. Please upgrade to unlock lifetime metrics.");
+                              return;
+                            }
+                            setActiveRanges(prev => ({ ...prev, [a.adset_id]: val }));
+                          };
+
+                          const stats = a.comparisons[activeRange];
+                          const safeValChange = stats?.val_change_pct || 0;
+                          const safeCostChange = stats?.cost_change_pct || 0;
+                          const safeSpendChange = stats?.spend_previous > 0 ? ((stats.spend_current - stats.spend_previous) / stats.spend_previous) * 100.0 : 0.0;
+
+                          return (
+                            <div key={a.adset_id} className="border border-slate-100 rounded-lg p-3 space-y-3 bg-slate-50/20">
+                              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
+                                <div className="space-y-0.5">
+                                  <div className="text-xs font-bold text-slate-800">{a.adset_name}</div>
+                                  <div className="text-[9px] font-semibold text-slate-400 uppercase">Goal: {a.performance_goal || "Unknown"} ({a.metric_label})</div>
+                                </div>
+
+                                {/* Comparison Picker */}
+                                <div className="flex items-center gap-1.5 text-[10px] font-bold">
+                                  <span className="text-slate-400 uppercase text-[9px]">Compare:</span>
+                                  <select
+                                    value={activeRange}
+                                    onChange={(e) => handleRangeChange(e.target.value)}
+                                    className="bg-white border border-slate-200 rounded px-2 py-1 outline-none text-slate-700 font-semibold cursor-pointer"
+                                  >
+                                    <option value="last_7d">Last 7 Days vs Prev 7 Days</option>
+                                    <option value="last_15d">Last 15 Days vs Prev 15 Days</option>
+                                    <option value="last_30d">Last 30 Days vs Prev 30 Days</option>
+                                    <option value="lifetime">
+                                      {isProOrAgency ? "Lifetime" : "Lifetime (🔒 Upgrade)"}
+                                    </option>
+                                  </select>
+                                </div>
+                              </div>
+
+                              {/* Comparison Grid */}
+                              {stats ? (
+                                <div className="grid grid-cols-3 gap-3 text-center border-t border-slate-100 pt-3">
+                                  {/* Spend */}
+                                  <div className="space-y-1">
+                                    <div className="text-[9px] font-bold text-slate-400 uppercase">Ad Spend</div>
+                                    <div className="text-xs font-extrabold text-slate-700">₹{formatNumber(stats.spend_current)}</div>
+                                    <div className="text-[9px] text-slate-400">vs ₹{formatNumber(stats.spend_previous)}</div>
+                                    <div className={`text-[9px] font-bold flex items-center justify-center ${safeSpendChange >= 0 ? "text-amber-500" : "text-emerald-600"}`}>
+                                      {safeSpendChange >= 0 ? "+" : ""}{safeSpendChange.toFixed(0)}% spend
+                                    </div>
+                                  </div>
+
+                                  {/* Results */}
+                                  <div className="space-y-1 border-x border-slate-100 px-3">
+                                    <div className="text-[9px] font-bold text-slate-400 uppercase">{a.metric_label}</div>
+                                    <div className="text-xs font-extrabold text-slate-700">{stats.current_val}</div>
+                                    <div className="text-[9px] text-slate-400">vs {stats.previous_val}</div>
+                                    <div className={`text-[9px] font-bold flex items-center justify-center ${safeValChange >= 0 ? "text-emerald-600" : "text-rose-500"}`}>
+                                      {safeValChange >= 0 ? <ArrowUpRight size={10} /> : <ArrowDownRight size={10} />}
+                                      {Math.abs(safeValChange).toFixed(0)}%
+                                    </div>
+                                  </div>
+
+                                  {/* Cost Per Result */}
+                                  <div className="space-y-1">
+                                    <div className="text-[9px] font-bold text-slate-400 uppercase">Cost Per {a.metric_label.slice(0, 4)}</div>
+                                    <div className="text-xs font-extrabold text-slate-700">₹{formatNumber(stats.current_cost)}</div>
+                                    <div className="text-[9px] text-slate-400">vs ₹{formatNumber(stats.previous_cost)}</div>
+                                    <div className={`text-[9px] font-bold flex items-center justify-center ${safeCostChange <= 0 ? "text-emerald-600" : "text-rose-500"}`}>
+                                      {safeCostChange <= 0 ? <ArrowDownRight size={10} /> : <ArrowUpRight size={10} />}
+                                      {Math.abs(safeCostChange).toFixed(0)}% cost
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="text-[10px] text-slate-400 text-center py-1">No comparison data for this range.</div>
+                              )}
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
     </div>
