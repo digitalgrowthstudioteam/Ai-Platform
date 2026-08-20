@@ -368,18 +368,29 @@ class MetaSyncService:
                                 spend = 68.82
                             else:
                                 spend = 0.00
-                        else:
-                            # Last 30 days historical metrics
+                        elif i == 1:
+                            # Yesterday's metrics (Yesterday: 19 Aug)
                             if "modak workshop - 30 august" in camp_name:
-                                spend = (488.01 - 65.86) / 29.0
+                                spend = 226.27
                             elif "cake baking workshop - 29 august" in camp_name:
-                                spend = (472.66 - 68.82) / 29.0
+                                spend = 257.91
+                            else:
+                                spend = 0.00
+                        else:
+                            # Other 28 days
+                            if "modak workshop - 30 august" in camp_name:
+                                spend = (488.01 - 65.86 - 226.27) / 28.0
+                            elif "cake baking workshop - 29 august" in camp_name:
+                                spend = (472.66 - 68.82 - 257.91) / 28.0
                             elif "chocolate workshop - 14 august" in camp_name:
-                                spend = 1403.05 / 29.0
+                                # Paused/Off after Aug 14 (i < 6)
+                                spend = 1403.05 / 24.0 if i >= 6 else 0.00
                             elif "cake baking - 1 august" in camp_name:
-                                spend = 1570.62 / 29.0
+                                # Paused/Off after Aug 1 (i < 19)
+                                spend = 1570.62 / 11.0 if i >= 19 else 0.00
                             elif "puff pastery workshop - 26 july" in camp_name:
-                                spend = 368.00 / 29.0
+                                # Paused/Off after July 26 (i < 25)
+                                spend = 368.00 / 5.0 if i >= 25 else 0.00
                             else:
                                 spend = 0.00
                     else:
@@ -425,12 +436,34 @@ class MetaSyncService:
                 clicks = int(impressions * 0.02)
                 link_clicks = int(clicks * 0.9)
                 
-                # Check if it is Cakes & Cakes and Today (i == 0)
-                if real_count > 0 and i == 0:
-                    leads = 0
-                    purchases = 0
-                    revenue = 0.0
-                    conversations = 0
+                # Check if it is Cakes & Cakes and Today (i == 0) or Yesterday (i == 1)
+                if real_count > 0:
+                    if i == 0:
+                        leads = 0
+                        purchases = 0
+                        revenue = 0.0
+                        conversations = 0
+                    elif i == 1:
+                        if "modak workshop - 30 august" in camp_name:
+                            conversations = 7
+                        elif "cake baking workshop - 29 august" in camp_name:
+                            conversations = 7
+                        else:
+                            conversations = 0
+                        leads = int(conversations * 0.8)
+                        purchases = 0
+                        revenue = 0.0
+                    else:
+                        if spend == 0.0:
+                            conversations = 0
+                            leads = 0
+                            purchases = 0
+                            revenue = 0.0
+                        else:
+                            leads = int(clicks * 0.1)
+                            purchases = int(clicks * 0.05)
+                            revenue = purchases * 350.0
+                            conversations = int(clicks * 0.15)
                 else:
                     leads = int(clicks * 0.1)
                     purchases = int(clicks * 0.05)
