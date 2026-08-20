@@ -126,11 +126,37 @@ export default function AdAccountsPage() {
     }
   };
 
-  // Trigger toggle on (deactivation is blocked / locked)
-  const handleToggleOn = (accountId: string) => {
-    setError(null);
-    setPendingAccountId(accountId);
-    setShowConfirmModal(true);
+  // Handle toggling of ad accounts (activate/deactivate)
+  const handleToggle = async (accountId: string, isCurrentlyChecked: boolean) => {
+    if (isCurrentlyChecked) {
+      if (!confirm("Are you sure you want to deactivate this ad account pipeline? This will stop syncing campaign metrics for this account.")) {
+        return;
+      }
+      try {
+        setSaving(true);
+        setError(null);
+        setSuccess(null);
+        
+        const newSelected = selectedAccounts.filter(id => id !== accountId);
+        await api.selectMetaAccounts(newSelected, industries);
+        setSuccess("Ad account pipeline deactivated successfully.");
+        await checkStatus();
+        await refreshAccounts();
+      } catch (err: any) {
+        console.error("Failed to deactivate ad account:", err);
+        setError(err.message || "Failed to deactivate ad account");
+      } finally {
+        setSaving(false);
+      }
+    } else {
+      if (!industries[accountId]) {
+        setError("Please select an industry vertical before activating.");
+        return;
+      }
+      setError(null);
+      setPendingAccountId(accountId);
+      setShowConfirmModal(true);
+    }
   };
 
   // Save changes to selected ad accounts list
@@ -288,7 +314,7 @@ export default function AdAccountsPage() {
           <div className="card border border-border bg-white shadow-sm">
             <div className="card-header border-b border-border p-6">
               <h3 className="text-base font-bold text-foreground">Select Active Ad Accounts</h3>
-              <p className="text-xs text-subtle">Toggle to activate ad account pipelines (active pipelines are locked and cannot be switched)</p>
+              <p className="text-xs text-subtle font-medium text-slate-500">Toggle to activate or deactivate Meta Ad Account integration pipelines.</p>
             </div>
             
             <div className="divide-y divide-border">
@@ -319,7 +345,7 @@ export default function AdAccountsPage() {
                           {isChecked && (
                             <span className="text-[10px] bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200 font-bold uppercase tracking-wider flex items-center gap-1.5">
                               <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block animate-ping" />
-                              Active Pipeline (Locked)
+                              Active Pipeline
                             </span>
                           )}
                         </div>
@@ -367,11 +393,11 @@ export default function AdAccountsPage() {
                         </span>
                         <button
                           type="button"
-                          disabled={isChecked || !isActive || saving}
-                          onClick={() => isActive && !isChecked && handleToggleOn(acc.id)}
+                          disabled={!isActive || saving}
+                          onClick={() => isActive && handleToggle(acc.id, isChecked)}
                           className={`relative inline-flex h-6.5 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
                             isChecked 
-                              ? 'bg-blue-600 cursor-not-allowed opacity-90' 
+                              ? 'bg-blue-600 hover:bg-blue-700' 
                               : !isActive 
                                 ? 'bg-slate-200 cursor-not-allowed opacity-50' 
                                 : 'bg-slate-200 hover:bg-slate-300'
