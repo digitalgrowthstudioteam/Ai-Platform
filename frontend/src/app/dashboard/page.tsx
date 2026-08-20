@@ -547,6 +547,21 @@ export default function OverviewPage() {
     const safeTrend = trend !== null && trend !== undefined && !isNaN(trend) ? trend : 0;
     const info = METRIC_INFOS[metricKey];
 
+    const getTooltipAlignClass = (key: string): string => {
+      const leftAligned = ["spend", "ctr", "cpc", "clicks", "leads", "add_to_cart", "conversations", "aov", "engagement_rate"];
+      const rightAligned = ["impressions", "cpm", "link_clicks", "cpl", "initiate_checkout", "cost_per_conversation", "post_engagement"];
+      
+      if (leftAligned.includes(key)) {
+        return "left-0 translate-x-0 origin-bottom-left";
+      }
+      if (rightAligned.includes(key)) {
+        return "right-0 left-auto translate-x-0 origin-bottom-right";
+      }
+      return "left-1/2 -translate-x-1/2 origin-bottom";
+    };
+
+    const tooltipAlignClass = getTooltipAlignClass(metricKey);
+
     return (
       <div className="bg-white border border-slate-150 rounded-xl p-5 hover:shadow-md transition duration-200 flex flex-col justify-between">
         <div className="flex justify-between items-start">
@@ -556,7 +571,7 @@ export default function OverviewPage() {
               {info && (
                 <span className="group relative cursor-pointer inline-flex items-center">
                   <Info size={12} className="text-slate-350 hover:text-slate-500 transition" />
-                  <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-52 p-2.5 bg-slate-900 text-white text-[10px] font-semibold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-150 shadow-lg z-50 normal-case leading-normal">
+                  <span className={`absolute bottom-full mb-2 w-52 p-2.5 bg-slate-900 text-white text-[10px] font-semibold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-150 shadow-lg z-50 normal-case leading-normal ${tooltipAlignClass}`}>
                     <span className="block font-bold text-indigo-300 mb-0.5">{title}</span>
                     <span className="block font-medium text-slate-200">{info.desc}</span>
                     <span className="block border-t border-slate-700/60 mt-1.5 pt-1 font-bold text-slate-400">Formula: <code className="text-slate-300 font-mono">{info.formula}</code></span>
