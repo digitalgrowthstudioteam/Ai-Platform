@@ -78,13 +78,14 @@ export default function OverviewPage() {
       setActiveChartTab("purchases");
     }
   }, [goalFilter]);
-
+  
   // Loaded data states
   const [metrics, setMetrics] = useState<any>(null);
   const [chartData, setChartData] = useState<any[]>([]);
   const [health, setHealth] = useState<any>(null);
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [ads, setAds] = useState<any[]>([]);
+  const [recommendations, setRecommendations] = useState<any[]>([]);
   const [loadingData, setLoadingData] = useState(false);
 
   // Fetch subscription on mount
@@ -235,12 +236,13 @@ export default function OverviewPage() {
     const cached = sessionStorage.getItem(cacheKey);
     if (cached) {
       try {
-        const { metrics: cachedMetrics, chartData: cachedChart, health: cachedHealth, campaigns: cachedCampaigns, ads: cachedAds } = JSON.parse(cached);
+        const { metrics: cachedMetrics, chartData: cachedChart, health: cachedHealth, campaigns: cachedCampaigns, ads: cachedAds, recommendations: cachedRecs } = JSON.parse(cached);
         if (cachedMetrics) setMetrics(cachedMetrics);
         if (cachedChart) setChartData(cachedChart);
         if (cachedHealth) setHealth(cachedHealth);
         if (cachedCampaigns) setCampaigns(cachedCampaigns);
         if (cachedAds) setAds(cachedAds);
+        if (cachedRecs) setRecommendations(cachedRecs);
       } catch (e) {}
     }
 
@@ -284,14 +286,24 @@ export default function OverviewPage() {
         return [];
       });
 
+      const recsPromise = api.getRecommendations(selectedAccount.id).then((res) => {
+        const topRecs = res.slice(0, 3);
+        setRecommendations(topRecs);
+        return topRecs;
+      }).catch((e) => {
+        console.warn("Failed to load dashboard recommendations:", e);
+        return [];
+      });
+
       // Update cache in the background when all finish
-      Promise.all([healthPromise, campaignsPromise, adsPromise]).then(([healthRes, campaignsRes, adsRes]) => {
+      Promise.all([healthPromise, campaignsPromise, adsPromise, recsPromise]).then(([healthRes, campaignsRes, adsRes, recsRes]) => {
         const cacheData = {
           metrics: overviewRes,
           chartData: chartRes,
           health: healthRes,
           campaigns: campaignsRes,
-          ads: adsRes
+          ads: adsRes,
+          recommendations: recsRes
         };
         sessionStorage.setItem(cacheKey, JSON.stringify(cacheData));
       });
@@ -601,33 +613,20 @@ export default function OverviewPage() {
     );
   };
 
-  // AI recommendations list
-  const mockRecommendations = [
-    {
-      title: "Pause underperforming Ad: Summer Sale - Image 1",
-      desc: "ROAS is currently below target threshold (0.9x)",
-      priority: "High Priority",
-      priorityClass: "high",
-      iconClass: "critical",
-      icon: AlertTriangle,
-    },
-    {
-      title: "Increase budget for Campaign: DG - Prospecting Conversions",
-      desc: "ROAS is high (2.18x) and CPA is 32% lower than target",
-      priority: "High Impact",
-      priorityClass: "high",
-      iconClass: "success",
-      icon: Lightbulb,
-    },
-    {
-      title: "Test Video creative format in Lookalike AdSet",
-      desc: "Video variations generally perform 45% better than statics",
-      priority: "Experiment",
-      priorityClass: "medium",
-      iconClass: "info",
-      icon: Sparkles,
-    },
-  ];
+  // Helper to determine the goal type of a campaign
+  const getCampaignGoalType = (campaign: any) => {
+    const obj = (campaign.objective || "").toLowerCase();
+    if (obj.includes("sales") || obj.includes("conversions")) return "sales";
+    if (obj.includes("leads")) return "leads";
+    if (obj.includes("engagement") || obj.includes("messaging")) return "engagement";
+    
+    // Fallback to name keywords
+    const name = (campaign.name || "").toLowerCase();
+    if (name.includes("sales") || name.includes("conversions")) return "sales";
+    if (name.includes("lead")) return "leads";
+    if (name.includes("engagement") || name.includes("messaging") || name.includes("workshop")) return "engagement";
+    return "sales"; // default fallback
+  };
 
   return (
     <div className="animate-fade-in space-y-6">
@@ -1032,7 +1031,7 @@ export default function OverviewPage() {
               )}
 
               {/* Video Retention Funnel */}
-              {metrics.video_retention && metrics.video_retention.video_starts > 0 && (
+              {metrics.video_retention && metrics.video_retention.video_starts > 0 && (metrics.video_retention.thruplay_rate > 0 || metrics.video_retention.video_25_rate > 0) && (
                 <div className="bg-slate-50/50 p-5 rounded-xl border border-slate-200">
                   <span className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4 block">Video Watch Retention Funnel</span>
                   <div className="space-y-2">
@@ -1121,25 +1120,53 @@ export default function OverviewPage() {
                 </a>
               </div>
               <div className="card-body p-6 space-y-4">
-                {mockRecommendations.map((rec, idx) => {
-                  const Icon = rec.icon;
-                  return (
-                     <div key={idx} className="recommendation-item flex items-start justify-between gap-4 p-4 border border-border rounded-lg hover:bg-slate-50 transition cursor-pointer">
-                      <div className="flex items-start gap-3">
-                        <div className={`recommendation-icon ${rec.iconClass} p-2 rounded-full shrink-0 flex items-center justify-center`}>
-                          <Icon size={18} />
+                {recommendations.length === 0 ? (
+                  <div className="p-8 text-center text-xs text-subtle font-medium">
+                    No active AI recommendations generated yet. Sync your account data to compile recommendations.
+                  </div>
+                ) : (
+                  recommendations.map((rec, idx) => {
+                    const prio = (rec.priority || "").toLowerCase();
+                    let Icon = Lightbulb;
+                    let iconClass = "bg-blue-50 text-blue-600";
+                    let badgeClass = "bg-blue-50 text-blue-700";
+                    
+                    if (prio === "critical") {
+                      Icon = AlertTriangle;
+                      iconClass = "bg-red-50 text-red-600";
+                      badgeClass = "bg-red-50 text-red-700 border-red-100";
+                    } else if (prio === "high") {
+                      Icon = AlertTriangle;
+                      iconClass = "bg-amber-50 text-amber-600";
+                      badgeClass = "bg-amber-50 text-amber-700 border-amber-100";
+                    } else if (prio === "medium") {
+                      Icon = Lightbulb;
+                      iconClass = "bg-yellow-50 text-yellow-600";
+                      badgeClass = "bg-yellow-50 text-yellow-800 border-yellow-100";
+                    } else if (prio === "low" || prio === "opportunity") {
+                      Icon = Sparkles;
+                      iconClass = "bg-green-50 text-green-600";
+                      badgeClass = "bg-green-50 text-green-700 border-green-100";
+                    }
+                    
+                    return (
+                      <div key={rec.id || idx} className="recommendation-item flex items-start justify-between gap-4 p-4 border border-border rounded-lg hover:bg-slate-50 transition cursor-pointer">
+                        <div className="flex items-start gap-3">
+                          <div className={`recommendation-icon ${iconClass} p-2 rounded-full shrink-0 flex items-center justify-center`}>
+                            <Icon size={18} />
+                          </div>
+                          <div>
+                            <div className="recommendation-title font-bold text-sm text-slate-800">{rec.title}</div>
+                            <div className="recommendation-desc text-xs text-subtle font-medium mt-0.5">{rec.description}</div>
+                          </div>
                         </div>
-                        <div>
-                          <div className="recommendation-title font-bold text-sm text-slate-800">{rec.title}</div>
-                          <div className="recommendation-desc text-xs text-subtle font-medium mt-0.5">{rec.desc}</div>
-                        </div>
+                        <span className={`recommendation-badge ${badgeClass} px-2 py-0.5 rounded text-[10px] font-bold shrink-0 uppercase tracking-wide border`}>
+                          {rec.priority}
+                        </span>
                       </div>
-                      <span className={`recommendation-badge ${rec.priorityClass} px-2 py-0.5 rounded text-[10px] font-bold shrink-0 uppercase tracking-wide`}>
-                        {rec.priority}
-                      </span>
-                    </div>
-                  );
-                })}
+                    );
+                  })
+                )}
               </div>
             </div>
 
@@ -1297,31 +1324,42 @@ export default function OverviewPage() {
                       <tr className="text-subtle font-bold uppercase tracking-wider border-b border-border">
                         <th className="py-2.5">Campaign</th>
                         <th className="py-2.5 text-right">Spend</th>
-                        <th className="py-2.5 text-right">Conversions</th>
-                        <th className="py-2.5 text-right">ROAS</th>
+                        <th className="py-2.5 text-right">
+                          {goalFilter === "leads" ? "Leads" : goalFilter === "engagement" ? "Conversations" : goalFilter === "sales" ? "Conversions" : "Results"}
+                        </th>
+                        <th className="py-2.5 text-right">
+                          {goalFilter === "leads" ? "CPL" : goalFilter === "engagement" ? "Cost/Conv" : "ROAS/Efficiency"}
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border font-medium text-slate-700">
-                      {campaigns.map((c, idx) => (
-                        <tr key={idx} className="hover:bg-slate-50">
-                          <td className="py-3">
-                            <Link
-                              href={`/campaigns/${c.id}`}
-                              className="font-bold text-primary hover:underline truncate max-w-[120px] block"
-                            >
-                              {c.name}
-                            </Link>
-                            <span className="text-[10px] text-green-600 bg-green-50 px-1 py-0.5 rounded font-bold uppercase mt-1 inline-block">
-                              {c.status}
-                            </span>
-                          </td>
-                          <td className="py-3 text-right">{formatCurrency(c.metrics.spend)}</td>
-                          <td className="py-3 text-right">{c.metrics.purchases}</td>
-                          <td className="py-3 text-right text-green-600 font-bold">
-                            {(c.metrics.roas !== null && c.metrics.roas !== undefined) ? `${c.metrics.roas.toFixed(2)}x` : "—"}
-                          </td>
-                        </tr>
-                      ))}
+                      {campaigns.map((c, idx) => {
+                        const campaignGoal = getCampaignGoalType(c);
+                        return (
+                          <tr key={idx} className="hover:bg-slate-50">
+                            <td className="py-3">
+                              <Link
+                                href={`/campaigns/${c.id}`}
+                                className="font-bold text-primary hover:underline truncate max-w-[120px] block"
+                              >
+                                {c.name}
+                              </Link>
+                              <span className="text-[10px] text-green-600 bg-green-50 px-1 py-0.5 rounded font-bold uppercase mt-1 inline-block">
+                                {c.status}
+                              </span>
+                            </td>
+                            <td className="py-3 text-right">{formatCurrency(c.metrics.spend)}</td>
+                            <td className="py-3 text-right">
+                              {campaignGoal === "leads" ? c.metrics.leads : campaignGoal === "engagement" ? (c.metrics.conversations || 0) : c.metrics.purchases}
+                            </td>
+                            <td className="py-3 text-right text-green-600 font-bold">
+                              {campaignGoal === "leads" ? (c.metrics.leads > 0 ? formatCurrency(c.metrics.spend / c.metrics.leads) : "—") :
+                               campaignGoal === "engagement" ? (c.metrics.conversations > 0 ? formatCurrency(c.metrics.spend / c.metrics.conversations) : "—") :
+                               (c.metrics.roas !== null && c.metrics.roas !== undefined) ? `${c.metrics.roas.toFixed(2)}x` : "—"}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 )}
@@ -1346,34 +1384,45 @@ export default function OverviewPage() {
                         <th className="py-2.5">Ad Name</th>
                         <th className="py-2.5 text-right">CTR</th>
                         <th className="py-2.5 text-right">CPC</th>
-                        <th className="py-2.5 text-right">ROAS</th>
+                        <th className="py-2.5 text-right">
+                          {goalFilter === "leads" ? "CPL" : goalFilter === "engagement" ? "Cost/Conv" : "ROAS/Efficiency"}
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border font-medium text-slate-700">
-                      {ads.map((ad, idx) => (
-                        <tr key={idx} className="hover:bg-slate-50">
-                          <td className="py-3">
-                            <Link
-                              href={`/ads?ad_id=${ad.id}`}
-                              className="font-bold text-primary hover:underline truncate max-w-[120px] block"
-                            >
-                              {ad.name}
-                            </Link>
-                            <div className="text-[10px] text-slate-400 font-medium truncate max-w-[120px] mt-0.5">
-                              {ad.campaign_name}
-                            </div>
-                          </td>
-                          <td className="py-3 text-right">
-                            {(ad.metrics.ctr !== null && ad.metrics.ctr !== undefined) ? formatPercent(ad.metrics.ctr) : "—"}
-                          </td>
-                          <td className="py-3 text-right">
-                            {(ad.metrics.cpc !== null && ad.metrics.cpc !== undefined) ? formatCurrency(ad.metrics.cpc) : "—"}
-                          </td>
-                          <td className="py-3 text-right text-green-600 font-bold">
-                            {(ad.metrics.roas !== null && ad.metrics.roas !== undefined) ? `${ad.metrics.roas.toFixed(2)}x` : "—"}
-                          </td>
-                        </tr>
-                      ))}
+                      {ads.map((ad, idx) => {
+                        const campaignName = (ad.campaign_name || "").toLowerCase();
+                        let adGoal = "sales";
+                        if (campaignName.includes("leads")) adGoal = "leads";
+                        else if (campaignName.includes("engagement") || campaignName.includes("messaging") || campaignName.includes("workshop")) adGoal = "engagement";
+                        
+                        return (
+                          <tr key={idx} className="hover:bg-slate-50">
+                            <td className="py-3">
+                              <Link
+                                href={`/ads?ad_id=${ad.id}`}
+                                className="font-bold text-primary hover:underline truncate max-w-[120px] block"
+                              >
+                                {ad.name}
+                              </Link>
+                              <div className="text-[10px] text-slate-400 font-medium truncate max-w-[120px] mt-0.5">
+                                {ad.campaign_name}
+                              </div>
+                            </td>
+                            <td className="py-3 text-right">
+                              {(ad.metrics.ctr !== null && ad.metrics.ctr !== undefined) ? formatPercent(ad.metrics.ctr) : "—"}
+                            </td>
+                            <td className="py-3 text-right">
+                              {(ad.metrics.cpc !== null && ad.metrics.cpc !== undefined) ? formatCurrency(ad.metrics.cpc) : "—"}
+                            </td>
+                            <td className="py-3 text-right text-green-600 font-bold">
+                              {adGoal === "leads" ? (ad.metrics.leads > 0 ? formatCurrency(ad.metrics.spend / ad.metrics.leads) : "—") :
+                               adGoal === "engagement" ? (ad.metrics.conversations > 0 ? formatCurrency(ad.metrics.spend / ad.metrics.conversations) : "—") :
+                               (ad.metrics.roas !== null && ad.metrics.roas !== undefined) ? `${ad.metrics.roas.toFixed(2)}x` : "—"}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 )}
