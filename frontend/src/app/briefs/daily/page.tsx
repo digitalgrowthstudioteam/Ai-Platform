@@ -48,7 +48,7 @@ export default function DailyBriefPage() {
       }
       setBrief(data);
 
-      const ddData = await api.getBriefDrilldown(selectedAccount.id);
+      const ddData = await api.getBriefDrilldown(selectedAccount.id, data.report_date);
       setDrilldown(ddData);
 
       // Expand campaigns by default
@@ -197,11 +197,70 @@ export default function DailyBriefPage() {
         </div>
 
         <div className="bg-white/80 backdrop-blur-xs p-4 rounded-xl border border-blue-100/50 flex flex-col md:flex-row justify-between gap-4">
-          <div className="text-xs space-y-1 flex-1">
+          <div className="text-xs space-y-1.5 flex-1">
             <span className="text-slate-500 font-bold">Delivery Summary:</span>
             <p className="text-slate-800 text-sm font-semibold">
-              You spent <span className="font-extrabold text-slate-900">₹{formatNumber(brief.spend)}</span> yesterday and generated <span className="font-extrabold text-slate-900">{conversions} conversions</span> at an average {brief.primary_kpi} of <span className="font-extrabold text-slate-900">₹{formatNumber(brief.primary_kpi_value)}</span>.
+              You spent <span className="font-extrabold text-slate-900">₹{formatNumber(brief.spend)}</span> yesterday and generated <span className="font-extrabold text-slate-900">{conversions} conversions</span>.
             </p>
+            
+            {/* Objective Breakdown */}
+            <div className="mt-2 pt-2 border-t border-slate-100/50 space-y-1 text-[11px] font-semibold text-slate-500">
+              <span className="font-bold text-[9px] uppercase tracking-wider block text-slate-400">Campaign Objective Breakdown:</span>
+              <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1">
+                {(() => {
+                  let engSpend = 0;
+                  let engResults = 0;
+                  let leadSpend = 0;
+                  let leadResults = 0;
+                  let salesSpend = 0;
+                  let salesResults = 0;
+                  
+                  drilldown.forEach((c: any) => {
+                    const obj = (c.objective || "").toUpperCase();
+                    let spend = c.yesterday_spend || 0;
+                    let val = 0;
+                    
+                    c.adsets?.forEach((a: any) => {
+                      val += a.comparisons?.last_day?.current_val || 0;
+                    });
+                    
+                    if (obj.includes("ENGAGEMENT") || obj.includes("MESSAGING") || obj.includes("CONV")) {
+                      engSpend += spend;
+                      engResults += val;
+                    } else if (obj.includes("LEAD")) {
+                      leadSpend += spend;
+                      leadResults += val;
+                    } else {
+                      salesSpend += spend;
+                      salesResults += val;
+                    }
+                  });
+                  
+                  return (
+                    <>
+                      <div className="flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                        <span>Engagement Ads:</span>
+                        <strong className="text-slate-700">{engResults} conversations</strong>
+                        <span className="text-slate-400">(Spend: ₹{formatNumber(engSpend)})</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                        <span>Leads Ads:</span>
+                        <strong className="text-slate-700">{leadResults} leads</strong>
+                        <span className="text-slate-400">(Spend: ₹{formatNumber(leadSpend)})</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                        <span>Sales Ads:</span>
+                        <strong className="text-slate-700">{salesResults} purchases</strong>
+                        <span className="text-slate-400">(Spend: ₹{formatNumber(salesSpend)})</span>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
           </div>
           <div className="shrink-0 flex items-center gap-3 border-t md:border-t-0 md:border-l border-slate-100 pt-3 md:pt-0 md:pl-4">
             <div className="text-right pr-2">
