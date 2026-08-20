@@ -112,20 +112,22 @@ async def test_meta_sync_service_mock_pipeline(db: AsyncSession):
     assert creative.meta_creative_id == "creative_ad_111_1_act_101010101"
     assert creative.creative_type == "video"
 
-    # Verify 30 Days of Historical Metrics populated
+    # Verify Days of Historical Metrics populated dynamically matching INITIAL_SYNC_DAYS
+    from app.config import get_settings
+    initial_sync_days = get_settings().INITIAL_SYNC_DAYS
     stmt = select(CampaignDailyMetrics).where(CampaignDailyMetrics.campaign_id == campaigns[0].id)
     res = await db.execute(stmt)
     metrics = res.scalars().all()
-    assert len(metrics) == 30
+    assert len(metrics) == initial_sync_days
 
     # 6. Verify Idempotency: re-running the sync upserts instead of throwing duplicate key errors
     await service.sync_ad_account(db, str(ad_acc.id))
     
-    # Confirm count is still 30 (not 60)
+    # Confirm count is still initial_sync_days (not doubled)
     stmt = select(CampaignDailyMetrics).where(CampaignDailyMetrics.campaign_id == campaigns[0].id)
     res = await db.execute(stmt)
     metrics_recheck = res.scalars().all()
-    assert len(metrics_recheck) == 30
+    assert len(metrics_recheck) == initial_sync_days
 
     # Cleanup DB records
     await db.delete(ad_acc)
