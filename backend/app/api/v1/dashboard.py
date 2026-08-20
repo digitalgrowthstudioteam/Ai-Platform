@@ -173,11 +173,17 @@ class HealthScoreResponse(BaseModel):
 async def query_aggregated_metrics(
     db: AsyncSession, ad_account_uuid: uuid.UUID, start: date, end: date
 ) -> dict:
-    """Runs database aggregations for a specified date range."""
+    """Runs database aggregations for all connections of this Meta ad account."""
+    # Resolve meta_account_id from uuid
+    stmt_meta = select(MetaAdAccount.meta_account_id).where(MetaAdAccount.id == ad_account_uuid)
+    res_meta = await db.execute(stmt_meta)
+    meta_account_id = res_meta.scalar()
+
     stmt = (
         select(CampaignDailyMetrics)
         .join(Campaign, CampaignDailyMetrics.campaign_id == Campaign.id)
-        .where(Campaign.ad_account_id == ad_account_uuid)
+        .join(MetaAdAccount, Campaign.ad_account_id == MetaAdAccount.id)
+        .where(MetaAdAccount.meta_account_id == meta_account_id)
         .where(CampaignDailyMetrics.date >= start)
         .where(CampaignDailyMetrics.date <= end)
     )
@@ -402,7 +408,12 @@ async def get_overview_analytics(
     prev_rates = calculate_rates(prev_data_sums)
 
     # 5. Calculate Budget Intelligence details (Phase 1)
-    stmt_camp = select(Campaign).where(Campaign.ad_account_id == ad_acc.id).where(Campaign.status == "ACTIVE")
+    stmt_camp = (
+        select(Campaign)
+        .join(MetaAdAccount, Campaign.ad_account_id == MetaAdAccount.id)
+        .where(MetaAdAccount.meta_account_id == ad_acc.meta_account_id)
+        .where(Campaign.status == "ACTIVE")
+    )
     res_camp = await db.execute(stmt_camp)
     active_camps = res_camp.scalars().all()
     
@@ -552,7 +563,8 @@ async def get_chart_analytics(
     stmt = (
         select(CampaignDailyMetrics)
         .join(Campaign, CampaignDailyMetrics.campaign_id == Campaign.id)
-        .where(Campaign.ad_account_id == ad_acc.id)
+        .join(MetaAdAccount, Campaign.ad_account_id == MetaAdAccount.id)
+        .where(MetaAdAccount.meta_account_id == ad_acc.meta_account_id)
         .where(CampaignDailyMetrics.date >= start_date)
         .where(CampaignDailyMetrics.date <= end_date)
         .order_by(CampaignDailyMetrics.date.asc())
@@ -664,7 +676,12 @@ async def get_account_health_score(
     rates = calculate_rates(data)
 
     # Fetch campaigns once to identify objective(s) and budget limits
-    stmt_camp = select(Campaign).where(Campaign.ad_account_id == ad_acc.id).where(Campaign.status == "ACTIVE")
+    stmt_camp = (
+        select(Campaign)
+        .join(MetaAdAccount, Campaign.ad_account_id == MetaAdAccount.id)
+        .where(MetaAdAccount.meta_account_id == ad_acc.meta_account_id)
+        .where(Campaign.status == "ACTIVE")
+    )
     res_camp = await db.execute(stmt_camp)
     active_camps = res_camp.scalars().all()
 
