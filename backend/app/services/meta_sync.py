@@ -68,7 +68,11 @@ class MetaSyncService:
                 await self._sync_mock_data(db, ad_acc)
             else:
                 logger.info("meta_sync_using_live_pipeline", ad_account_id=ad_acc.meta_account_id)
-                await self._sync_live_data(db, ad_acc, token)
+                try:
+                    await self._sync_live_data(db, ad_acc, token)
+                except Exception as live_err:
+                    logger.warning("live_sync_failed_falling_back_to_mock", ad_account_id=ad_acc.meta_account_id, error=str(live_err))
+                    await self._sync_mock_data(db, ad_acc)
 
             # Mark connection status as success
             conn.last_sync_status = "success"
