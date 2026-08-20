@@ -49,7 +49,7 @@ export default function WeeklyBriefPage() {
       }
       setBrief(data);
 
-      const ddData = await api.getBriefDrilldown(selectedAccount.id);
+      const ddData = await api.getBriefDrilldown(selectedAccount.id, data.end_date);
       setDrilldown(ddData);
 
       // Expand campaigns by default
@@ -360,32 +360,38 @@ export default function WeeklyBriefPage() {
           <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">⚠️ Creative Fatigue Alerts</h3>
         </div>
         <div className="space-y-3">
-          {brief.creative_fatigue_items?.map((item: any, idx: number) => (
-            <div key={idx} className="bg-slate-50 border border-slate-100 p-3 rounded-lg flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
-              <div className="text-xs font-semibold text-slate-700">
-                <span className="font-extrabold text-slate-900 block">{item.ad_name}</span>
-                <span className="text-[10px] text-slate-400 block mt-0.5">Confidence: {item.confidence}%</span>
-              </div>
-              <div className="flex gap-6 text-xs text-right">
-                <div>
-                  <span className="text-[9px] text-slate-400 uppercase font-bold block">Ad Frequency</span>
-                  <span className="font-bold text-slate-800">{item.frequency.toFixed(1)}x</span>
-                </div>
-                <div>
-                  <span className="text-[9px] text-slate-400 uppercase font-bold block">CTR Trend</span>
-                  <span className="font-bold text-red-500">{item.ctr_trend_pct}%</span>
-                </div>
-                <div>
-                  <span className="text-[9px] text-slate-400 uppercase font-bold block">CPL Trend</span>
-                  <span className="font-bold text-red-500">+{item.cpl_trend_pct}%</span>
-                </div>
-              </div>
+          {(!brief.creative_fatigue_items || brief.creative_fatigue_items.length === 0) ? (
+            <div className="text-xs text-slate-400 py-6 text-center font-semibold">
+              No creative fatigue alerts triggered this week.
             </div>
-          ))}
+          ) : (
+            brief.creative_fatigue_items.map((item: any, idx: number) => (
+              <div key={idx} className="bg-slate-50 border border-slate-100 p-3 rounded-lg flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+                <div className="text-xs font-semibold text-slate-700">
+                  <span className="font-extrabold text-slate-900 block">{item.ad_name}</span>
+                  <span className="text-[10px] text-slate-400 block mt-0.5">Confidence: {item.confidence}%</span>
+                </div>
+                <div className="flex gap-6 text-xs text-right">
+                  <div>
+                    <span className="text-[9px] text-slate-400 uppercase font-bold block">Ad Frequency</span>
+                    <span className="font-bold text-slate-800">{item.frequency.toFixed(1)}x</span>
+                  </div>
+                  <div>
+                    <span className="text-[9px] text-slate-400 uppercase font-bold block">CTR Trend</span>
+                    <span className="font-bold text-red-500">{item.ctr_trend_pct}%</span>
+                  </div>
+                  <div>
+                    <span className="text-[9px] text-slate-400 uppercase font-bold block">CPL Trend</span>
+                    <span className="font-bold text-red-500">+{item.cpl_trend_pct}%</span>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
 
-      {/* Weekly Opportunity & Don't Change Summary (9.27 & 9.28) */}
+      {/* Weekly Opportunity & Don't Change Summary (9.28 & 9.29) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Weekly Opportunity */}
         <div className="card border border-border bg-white shadow-xs rounded-xl p-5 space-y-3">
@@ -394,14 +400,20 @@ export default function WeeklyBriefPage() {
             🟠 Strategic Opportunities
           </h3>
           <div className="space-y-3 text-xs">
-            {brief.opportunities?.map((opp: any, idx: number) => (
-              <div key={idx} className="bg-slate-50/50 p-3 border border-slate-100 rounded-lg space-y-1">
-                <div className="font-bold text-slate-800">{opp.description}</div>
-                <div className="text-[10px] text-slate-500 italic mt-1 font-medium bg-slate-50 p-1 px-2 rounded">
-                  Suggested Action: {opp.action}
-                </div>
+            {(!brief.opportunities || brief.opportunities.length === 0) ? (
+              <div className="text-slate-400 py-6 text-center font-semibold">
+                No strategic scaling opportunities calculated for this week.
               </div>
-            ))}
+            ) : (
+              brief.opportunities.map((opp: any, idx: number) => (
+                <div key={idx} className="bg-slate-50/50 p-3 border border-slate-100 rounded-lg space-y-1">
+                  <div className="font-bold text-slate-800">{opp.description}</div>
+                  <div className="text-[10px] text-slate-500 italic mt-1 font-medium bg-slate-50 p-1 px-2 rounded">
+                    Suggested Action: {opp.action}
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
 
@@ -412,33 +424,45 @@ export default function WeeklyBriefPage() {
             🟢 Don't Change (Safeguards)
           </h3>
           <div className="space-y-3 text-xs">
-            {brief.dont_change_items?.map((item: any, idx: number) => (
-              <div key={idx} className="bg-slate-50/50 p-3 border border-slate-100 rounded-lg space-y-1">
-                <div className="font-bold text-slate-800">{item.description}</div>
-                <div className="text-[10px] text-slate-500 italic mt-1 font-medium bg-slate-50 p-1 px-2 rounded">
-                  Reasoning: {item.reason}
-                </div>
+            {(!brief.dont_change_items || brief.dont_change_items.length === 0) ? (
+              <div className="text-slate-400 py-6 text-center font-semibold">
+                No safeguarding parameters flagged. Keep running active campaigns.
               </div>
-            ))}
+            ) : (
+              brief.dont_change_items.map((item: any, idx: number) => (
+                <div key={idx} className="bg-slate-50/50 p-3 border border-slate-100 rounded-lg space-y-1">
+                  <div className="font-bold text-slate-800">{item.description}</div>
+                  <div className="text-[10px] text-slate-500 italic mt-1 font-medium bg-slate-50 p-1 px-2 rounded">
+                    Reasoning: {item.reason}
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>
 
-      {/* Recommended Experiments (9.29) */}
+      {/* Recommended Experiments (9.30) */}
       <div className="card border border-blue-100 bg-blue-50/5 rounded-xl p-5 space-y-4">
         <h3 className="text-sm font-black text-blue-700 uppercase tracking-widest flex items-center gap-1.5">
           <Fingerprint size={16} />
           🔵 Next Week's Recommended Experiments
         </h3>
         <div className="space-y-3 text-xs">
-          {brief.experiments?.map((exp: any, idx: number) => (
-            <div key={idx} className="bg-white p-3 rounded-lg border border-blue-100/50 space-y-2">
-              <div className="font-bold text-slate-800">{exp.description}</div>
-              <div className="text-[10px] text-slate-500 italic bg-slate-50 p-1 px-2 rounded">
-                Hypothesis: {exp.hypothesis}
-              </div>
+          {(!brief.experiments || brief.experiments.length === 0) ? (
+            <div className="text-blue-400/80 py-6 text-center font-semibold">
+              No A/B split-tests recommended. Configure a test in the Experiments Board.
             </div>
-          ))}
+          ) : (
+            brief.experiments.map((exp: any, idx: number) => (
+              <div key={idx} className="bg-white p-3 rounded-lg border border-blue-100/50 space-y-2">
+                <div className="font-bold text-slate-800">{exp.description}</div>
+                <div className="text-[10px] text-slate-500 italic bg-slate-50 p-1 px-2 rounded">
+                  Hypothesis: {exp.hypothesis}
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
 
