@@ -226,7 +226,13 @@ class MetaSyncService:
             )
             await db.execute(cr_stmt)
 
-        # Generate 30 days of metrics
+        # Generate 30 days of metrics with unique scaling parameters based on Meta Ad Account ID hash
+        import hashlib
+        h = int(hashlib.md5(ad_acc.meta_account_id.encode('utf-8')).hexdigest(), 16)
+        spend_mult = 0.4 + (h % 15) * 0.1
+        conv_mult = 0.6 + ((h >> 4) % 10) * 0.1
+        aov_val = 400.0 + ((h >> 8) % 15) * 100.0
+
         today = date.today()
         for i in range(settings.INITIAL_SYNC_DAYS):
             sync_date = today - timedelta(days=i)
@@ -234,11 +240,11 @@ class MetaSyncService:
             # Campaigns metrics
             for mc_id, db_id in campaign_map.items():
                 base_spend = 1200.00 if mc_id.startswith("camp_111") else 600.00
-                spend = base_spend - (i * 10)
+                spend = (base_spend - (i * 10)) * spend_mult
                 impressions = int(spend * 15)
                 clicks = int(impressions * 0.02)
-                purchases = int(clicks * 0.05)
-                revenue = purchases * 800.00
+                purchases = int(clicks * 0.05 * conv_mult)
+                revenue = purchases * aov_val
                 
                 # Math metrics
                 ctr = clicks / impressions if impressions > 0 else 0.0
@@ -250,20 +256,20 @@ class MetaSyncService:
                 reach = int(impressions * 0.8)
                 frequency = impressions / reach if reach > 0 else 1.0
                 link_clicks = int(clicks * 0.9)
-                leads = int(clicks * 0.1)
+                leads = int(clicks * 0.1 * conv_mult)
                 cpl = spend / leads if leads > 0 else 0.0
                 
                 actions = {
                     "post_engagement": int(impressions * 0.05),
                     "video_views": int(impressions * 0.3),
                     "thruplays": int(impressions * 0.1),
-                    "conversations": int(clicks * 0.12),
+                    "conversations": int(clicks * 0.12 * conv_mult),
                     "comments": int(clicks * 0.02),
                     "shares": int(clicks * 0.01),
                     "saves": int(clicks * 0.03),
                     "reactions": int(clicks * 0.08),
-                    "add_to_cart": int(clicks * 0.25),
-                    "initiate_checkout": int(clicks * 0.12),
+                    "add_to_cart": int(clicks * 0.25 * conv_mult),
+                    "initiate_checkout": int(clicks * 0.12 * conv_mult),
                     "landing_page_views": int(link_clicks * 0.85)
                 }
 
@@ -311,11 +317,11 @@ class MetaSyncService:
             # Adsets metrics
             for ma_id, db_id in adset_map.items():
                 base_spend = 500.00 if ma_id.startswith("adset_111") else 300.00
-                spend = base_spend - (i * 5)
+                spend = (base_spend - (i * 5)) * spend_mult
                 impressions = int(spend * 12)
                 clicks = int(impressions * 0.018)
-                purchases = int(clicks * 0.04)
-                revenue = purchases * 800.00
+                purchases = int(clicks * 0.04 * conv_mult)
+                revenue = purchases * aov_val
                 
                 ctr = clicks / impressions if impressions > 0 else 0.0
                 cpc = spend / clicks if clicks > 0 else 0.0
@@ -326,20 +332,20 @@ class MetaSyncService:
                 reach = int(impressions * 0.8)
                 frequency = impressions / reach if reach > 0 else 1.0
                 link_clicks = int(clicks * 0.9)
-                leads = int(clicks * 0.1)
+                leads = int(clicks * 0.1 * conv_mult)
                 cpl = spend / leads if leads > 0 else 0.0
                 
                 actions = {
                     "post_engagement": int(impressions * 0.05),
                     "video_views": int(impressions * 0.3),
                     "thruplays": int(impressions * 0.1),
-                    "conversations": int(clicks * 0.12),
+                    "conversations": int(clicks * 0.12 * conv_mult),
                     "comments": int(clicks * 0.02),
                     "shares": int(clicks * 0.01),
                     "saves": int(clicks * 0.03),
                     "reactions": int(clicks * 0.08),
-                    "add_to_cart": int(clicks * 0.25),
-                    "initiate_checkout": int(clicks * 0.12),
+                    "add_to_cart": int(clicks * 0.25 * conv_mult),
+                    "initiate_checkout": int(clicks * 0.12 * conv_mult),
                     "landing_page_views": int(link_clicks * 0.85)
                 }
 
@@ -387,11 +393,11 @@ class MetaSyncService:
             # Ads metrics
             for ad_meta_id, db_id in ad_map.items():
                 base_spend = 250.00
-                spend = base_spend - (i * 3)
+                spend = (base_spend - (i * 3)) * spend_mult
                 impressions = int(spend * 10)
                 clicks = int(impressions * 0.015)
-                purchases = int(clicks * 0.035)
-                revenue = purchases * 800.00
+                purchases = int(clicks * 0.035 * conv_mult)
+                revenue = purchases * aov_val
                 
                 ctr = clicks / impressions if impressions > 0 else 0.0
                 cpc = spend / clicks if clicks > 0 else 0.0
@@ -402,20 +408,20 @@ class MetaSyncService:
                 reach = int(impressions * 0.8)
                 frequency = impressions / reach if reach > 0 else 1.0
                 link_clicks = int(clicks * 0.9)
-                leads = int(clicks * 0.1)
+                leads = int(clicks * 0.1 * conv_mult)
                 cpl = spend / leads if leads > 0 else 0.0
                 
                 actions = {
                     "post_engagement": int(impressions * 0.05),
                     "video_views": int(impressions * 0.3),
                     "thruplays": int(impressions * 0.1),
-                    "conversations": int(clicks * 0.12),
+                    "conversations": int(clicks * 0.12 * conv_mult),
                     "comments": int(clicks * 0.02),
                     "shares": int(clicks * 0.01),
                     "saves": int(clicks * 0.03),
                     "reactions": int(clicks * 0.08),
-                    "add_to_cart": int(clicks * 0.25),
-                    "initiate_checkout": int(clicks * 0.12),
+                    "add_to_cart": int(clicks * 0.25 * conv_mult),
+                    "initiate_checkout": int(clicks * 0.12 * conv_mult),
                     "landing_page_views": int(link_clicks * 0.85)
                 }
 
