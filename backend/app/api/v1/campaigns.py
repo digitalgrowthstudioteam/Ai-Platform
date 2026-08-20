@@ -681,3 +681,209 @@ async def get_adset_daily_metrics(
     ]
 
 
+@router.get("/brief-drilldown", summary="Get campaign and adset level performance drilldown for Daily Brief comparison")
+async def get_brief_drilldown(
+    ad_account_id: str = Query(..., description="Active Ad account ID string"),
+    report_date: Optional[str] = Query(None, description="Report date (YYYY-MM-DD), default is yesterday"),
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    user = await get_db_user_from_claims(claims, db)
+
+    # 1. Resolve Active Ad Account
+    stmt = select(MetaAdAccount).where(MetaAdAccount.user_id == user.id)
+    try:
+        acc_uuid = uuid.UUID(ad_account_id)
+        stmt = stmt.where(MetaAdAccount.id == acc_uuid)
+    except ValueError:
+        stmt = stmt.where(MetaAdAccount.meta_account_id == ad_account_id)
+
+    res = await db.execute(stmt)
+    ad_acc = res.scalar_one_or_none()
+    if not ad_acc:
+        raise HTTPException(status_code=404, detail="Ad account not found.")
+
+    # 2. Parse target date
+    if report_date:
+        try:
+            target_date = datetime.strptime(report_date, "%Y-%m-%d").date()
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
+    else:
+        target_date = date.today() - timedelta(days=1)
+
+    # 3. Find campaigns with spend > 0.01 yesterday (target_date)
+    c_stmt = (
+        select(Campaign)
+        .join(CampaignDailyMetrics, Campaign.id == CampaignDailyMetrics.campaign_id)
+        .where(Campaign.ad_account_id == ad_acc.id)
+        .where(CampaignDailyMetrics.date == target_date)
+        .where(CampaignDailyMetrics.spend >= 0.01)
+        .group_by(Campaign.id)
+    )
+    c_res = await db.execute(c_stmt)
+    active_campaigns = c_res.scalars().all()
+
+    if not active_campaigns:
+        return []
+
+    active_campaign_ids = [c.id for c in active_campaigns]
+
+    # 4. Fetch all child AdSets
+    adsets_stmt = select(AdSet).where(AdSet.campaign_id.in_(active_campaign_ids))
+    adsets_res = await db.execute(adsets_stmt)
+    adsets = adsets_res.scalars().all()
+
+    if not adsets:
+        return []
+
+    adset_ids = [a.id for a in adsets]
+
+    # 5. Fetch all AdSetDailyMetrics
+    metrics_stmt = (
+        select(AdSetDailyMetrics)
+        .where(AdSetDailyMetrics.ad_set_id.in_(adset_ids))
+        .where(AdSetDailyMetrics.date <= target_date)
+    )
+    metrics_res = await db.execute(metrics_stmt)
+    all_metrics = metrics_res.scalars().all()
+
+    # Group metrics by adset
+    adset_metrics_map = {}
+    for r in all_metrics:
+        adset_metrics_map.setdefault(r.ad_set_id, []).append(r)
+
+    # Yesterday spend per campaign map
+    yesterday_c_spend_stmt = (
+        select(CampaignDailyMetrics.campaign_id, CampaignDailyMetrics.spend)
+        .where(CampaignDailyMetrics.campaign_id.in_(active_campaign_ids))
+        .where(CampaignDailyMetrics.date == target_date)
+    )
+    yesterday_c_spend_res = await db.execute(yesterday_c_spend_stmt)
+    yesterday_c_spend = {r.campaign_id: float(r.spend or 0.0) for r in yesterday_c_spend_res.all()}
+
+    # Group adsets by campaign
+    campaign_adsets_map = {}
+    for a in adsets:
+        campaign_adsets_map.setdefault(a.campaign_id, []).append(a)
+
+    results = []
+    for c in active_campaigns:
+        c_adsets = campaign_adsets_map.get(c.id, [])
+        adset_list = []
+        
+        for a in c_adsets:
+            rows = adset_metrics_map.get(a.id, [])
+            
+            # Map performance goal to primary metric
+            perf_goal = (a.performance_goal or "").upper()
+            metric_key = "link_clicks"
+            metric_label = "Link Clicks"
+            
+            if "CONVERSATIONS" in perf_goal or "MESSAGING" in perf_goal:
+                metric_key = "conversations"
+                metric_label = "Conversations"
+            elif "LEAD" in perf_goal:
+                metric_key = "leads"
+                metric_label = "Leads"
+            elif "PURCHASE" in perf_goal:
+                metric_key = "purchases"
+                metric_label = "Purchases"
+            else:
+                # Fallback to campaign objective if performance goal is not specified
+                obj = (c.objective or "").upper()
+                if "LEAD" in obj:
+                    metric_key = "leads"
+                    metric_label = "Leads"
+                elif "CONV" in obj or "ENGAGEMENT" in obj or "MESSAGING" in obj:
+                    metric_key = "conversations"
+                    metric_label = "Conversations"
+                elif "SALE" in obj:
+                    metric_key = "purchases"
+                    metric_label = "Purchases"
+
+            def get_window_stats(days_back: int, prev_shift: int):
+                # current window
+                c_start = target_date - timedelta(days=days_back - 1)
+                c_end = target_date
+                # previous window
+                p_start = c_start - timedelta(days=prev_shift)
+                p_end = c_end - timedelta(days=prev_shift)
+                
+                c_rows = [r for r in rows if c_start <= r.date <= c_end]
+                p_rows = [r for r in rows if p_start <= r.date <= p_end]
+                
+                c_spend = sum(float(r.spend or 0.0) for r in c_rows)
+                p_spend = sum(float(r.spend or 0.0) for r in p_rows)
+                
+                def get_metric_val(r):
+                    if metric_key in ("conversations", "calls", "post_engagement"):
+                        return int((r.actions or {}).get(metric_key, 0))
+                    return int(getattr(r, metric_key, 0))
+                
+                c_val = sum(get_metric_val(r) for r in c_rows)
+                p_val = sum(get_metric_val(r) for r in p_rows)
+                
+                c_cost = c_spend / c_val if c_val > 0 else 0.0
+                p_cost = p_spend / p_val if p_val > 0 else 0.0
+                
+                val_change = ((c_val - p_val) / p_val) * 100.0 if p_val > 0 else 0.0
+                cost_change = ((c_cost - p_cost) / p_cost) * 100.0 if p_cost > 0 else 0.0
+                
+                return {
+                    "current_val": c_val,
+                    "previous_val": p_val,
+                    "val_change_pct": val_change,
+                    "current_cost": c_cost,
+                    "previous_cost": p_cost,
+                    "cost_change_pct": cost_change,
+                    "spend_current": c_spend,
+                    "spend_previous": p_spend,
+                }
+
+            def get_lifetime_stats():
+                c_spend = sum(float(r.spend or 0.0) for r in rows)
+                def get_metric_val(r):
+                    if metric_key in ("conversations", "calls", "post_engagement"):
+                        return int((r.actions or {}).get(metric_key, 0))
+                    return int(getattr(r, metric_key, 0))
+                c_val = sum(get_metric_val(r) for r in rows)
+                c_cost = c_spend / c_val if c_val > 0 else 0.0
+                
+                return {
+                    "current_val": c_val,
+                    "previous_val": 0,
+                    "val_change_pct": 0.0,
+                    "current_cost": c_cost,
+                    "previous_cost": 0.0,
+                    "cost_change_pct": 0.0,
+                    "spend_current": c_spend,
+                    "spend_previous": 0.0,
+                }
+
+            adset_list.append({
+                "adset_id": a.id,
+                "adset_name": a.name,
+                "performance_goal": a.performance_goal,
+                "metric_label": metric_label,
+                "comparisons": {
+                    "last_day": get_window_stats(1, 1),
+                    "last_3d": get_window_stats(3, 3),
+                    "last_7d": get_window_stats(7, 7),
+                    "last_15d": get_window_stats(15, 15),
+                    "last_30d": get_window_stats(30, 30),
+                    "lifetime": get_lifetime_stats()
+                }
+            })
+            
+        results.append({
+            "campaign_id": c.id,
+            "campaign_name": c.name,
+            "objective": c.objective,
+            "yesterday_spend": yesterday_c_spend.get(c.id, 0.0),
+            "adsets": adset_list
+        })
+        
+    return results
+
+
