@@ -41,6 +41,16 @@ class CampaignMetrics(BaseModel):
     roas: float
     conversations: Optional[int] = 0
     calls: Optional[int] = 0
+    
+    spend_trend: Optional[float] = 0.0
+    impressions_trend: Optional[float] = 0.0
+    clicks_trend: Optional[float] = 0.0
+    purchases_trend: Optional[float] = 0.0
+    leads_trend: Optional[float] = 0.0
+    revenue_trend: Optional[float] = 0.0
+    ctr_trend: Optional[float] = 0.0
+    cpc_trend: Optional[float] = 0.0
+    roas_trend: Optional[float] = 0.0
 
 
 class CampaignItemResponse(BaseModel):
@@ -72,9 +82,14 @@ async def list_campaigns(
     Returns lists of campaigns and their aggregated performance metrics within the date range window.
     """
     user = await get_db_user_from_claims(claims, db)
+    from app.services.entitlement_engine import EntitlementEngine
+
+    # Enforce plan historical days date capping
+    start_date = await EntitlementEngine.enforce_historical_days(start_date, user, db)
 
     # 1. Resolve Active Ad Account
-    stmt = select(MetaAdAccount).where(MetaAdAccount.user_id == user.id)
+    accessible_ids = await EntitlementEngine.get_accessible_user_ids(user, db)
+    stmt = select(MetaAdAccount).where(MetaAdAccount.user_id.in_(accessible_ids))
     try:
         acc_uuid = uuid.UUID(ad_account_id)
         stmt = stmt.where(MetaAdAccount.id == acc_uuid)
@@ -88,6 +103,11 @@ async def list_campaigns(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Active ad account not found."
         )
+
+    # Calculate previous period parameters
+    period_len = (end_date - start_date).days + 1
+    prev_end = start_date - timedelta(days=1)
+    prev_start = start_date - timedelta(days=period_len)
 
     # 2. Query campaigns and join daily metrics subquery grouped by campaign_id
     metrics_subq = (
@@ -106,6 +126,22 @@ async def list_campaigns(
         .subquery()
     )
 
+    prev_metrics_subq = (
+        select(
+            CampaignDailyMetrics.campaign_id,
+            func.coalesce(func.sum(CampaignDailyMetrics.spend), 0).label("spend"),
+            func.coalesce(func.sum(CampaignDailyMetrics.impressions), 0).label("impressions"),
+            func.coalesce(func.sum(CampaignDailyMetrics.clicks), 0).label("clicks"),
+            func.coalesce(func.sum(CampaignDailyMetrics.purchases), 0).label("purchases"),
+            func.coalesce(func.sum(CampaignDailyMetrics.leads), 0).label("leads"),
+            func.coalesce(func.sum(CampaignDailyMetrics.revenue), 0).label("revenue"),
+        )
+        .where(CampaignDailyMetrics.date >= prev_start)
+        .where(CampaignDailyMetrics.date <= prev_end)
+        .group_by(CampaignDailyMetrics.campaign_id)
+        .subquery()
+    )
+
     stmt = (
         select(
             Campaign,
@@ -115,8 +151,15 @@ async def list_campaigns(
             func.coalesce(metrics_subq.c.purchases, 0).label("purchases"),
             func.coalesce(metrics_subq.c.leads, 0).label("leads"),
             func.coalesce(metrics_subq.c.revenue, 0).label("revenue"),
+            func.coalesce(prev_metrics_subq.c.spend, 0).label("prev_spend"),
+            func.coalesce(prev_metrics_subq.c.impressions, 0).label("prev_impressions"),
+            func.coalesce(prev_metrics_subq.c.clicks, 0).label("prev_clicks"),
+            func.coalesce(prev_metrics_subq.c.purchases, 0).label("prev_purchases"),
+            func.coalesce(prev_metrics_subq.c.leads, 0).label("prev_leads"),
+            func.coalesce(prev_metrics_subq.c.revenue, 0).label("prev_revenue"),
         )
         .outerjoin(metrics_subq, Campaign.id == metrics_subq.c.campaign_id)
+        .outerjoin(prev_metrics_subq, Campaign.id == prev_metrics_subq.c.campaign_id)
         .where(Campaign.ad_account_id == ad_acc.id)
         .order_by(Campaign.name.asc())
     )
@@ -173,10 +216,37 @@ async def list_campaigns(
         leads = int(row.leads)
         revenue = float(row.revenue)
 
+        prev_spend = float(row.prev_spend)
+        prev_impressions = int(row.prev_impressions)
+        prev_clicks = int(row.prev_clicks)
+        prev_purchases = int(row.prev_purchases)
+        prev_leads = int(row.prev_leads)
+        prev_revenue = float(row.prev_revenue)
+
         ctr = (clicks / impressions) if impressions > 0 else 0.0
         cpc = (spend / clicks) if clicks > 0 else 0.0
         cpm = (spend / impressions * 1000) if impressions > 0 else 0.0
         roas = (revenue / spend) if spend > 0 else 0.0
+
+        prev_ctr = (prev_clicks / prev_impressions) if prev_impressions > 0 else 0.0
+        prev_cpc = (prev_spend / prev_clicks) if prev_clicks > 0 else 0.0
+        prev_roas = (prev_revenue / prev_spend) if prev_spend > 0 else 0.0
+
+        def calc_t(c_val: float, p_val: float) -> float:
+            if p_val <= 0:
+                return 0.0
+            return ((c_val - p_val) / p_val) * 100.0
+
+        spend_trend = calc_t(spend, prev_spend)
+        impressions_trend = calc_t(impressions, prev_impressions)
+        clicks_trend = calc_t(clicks, prev_clicks)
+        purchases_trend = calc_t(purchases, prev_purchases)
+        leads_trend = calc_t(leads, prev_leads)
+        revenue_trend = calc_t(revenue, prev_revenue)
+        ctr_trend = calc_t(ctr, prev_ctr)
+        cpc_trend = calc_t(cpc, prev_cpc)
+        roas_trend = calc_t(roas, prev_roas)
+
         conversations = conversations_map.get(camp.id, 0)
         calls = calls_map.get(camp.id, 0)
 
@@ -206,6 +276,16 @@ async def list_campaigns(
                     roas=roas,
                     conversations=conversations,
                     calls=calls,
+                    
+                    spend_trend=spend_trend,
+                    impressions_trend=impressions_trend,
+                    clicks_trend=clicks_trend,
+                    purchases_trend=purchases_trend,
+                    leads_trend=leads_trend,
+                    revenue_trend=revenue_trend,
+                    ctr_trend=ctr_trend,
+                    cpc_trend=cpc_trend,
+                    roas_trend=roas_trend,
                 ),
             )
         )
@@ -230,15 +310,20 @@ async def get_adset_performance(
     AdSet's specific Meta Performance Goal.
     """
     user = await get_db_user_from_claims(claims, db)
+    from app.services.entitlement_engine import EntitlementEngine
+
+    # Enforce plan historical days date capping
+    start_date = await EntitlementEngine.enforce_historical_days(start_date, user, db)
     
     # 1. Fetch AdSet
+    accessible_ids = await EntitlementEngine.get_accessible_user_ids(user, db)
     stmt = (
         select(AdSet)
         .join(Campaign, AdSet.campaign_id == Campaign.id)
         .where(AdSet.id == adset_id)
         .where(Campaign.id == campaign_id)
         .where(Campaign.ad_account_id.in_(
-            select(MetaAdAccount.id).where(MetaAdAccount.user_id == user.id)
+            select(MetaAdAccount.id).where(MetaAdAccount.user_id.in_(accessible_ids))
         ))
     )
     res = await db.execute(stmt)

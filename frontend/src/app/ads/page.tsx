@@ -14,6 +14,16 @@ export default function AdsPage() {
   const [recs, setRecs] = useState<any[]>([]);
   const [selectedAd, setSelectedAd] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const renderTrend = (value: number | undefined) => {
+    if (value === undefined || value === 0) return null;
+    const isUp = value > 0;
+    return (
+      <span className={`inline-flex items-center gap-0.5 text-[9px] font-bold ml-1 ${isUp ? "text-emerald-600" : "text-rose-600"}`}>
+        {isUp ? "▲" : "▼"}{Math.abs(value).toFixed(1)}%
+      </span>
+    );
+  };
   
   // State for subscription and upgrade limits
   const [subscription, setSubscription] = useState<any>(null);
@@ -54,7 +64,7 @@ export default function AdsPage() {
       if (subscription.status === "trialing") {
         limit = 7;
       } else if (subscription.plan === "starter") {
-        limit = 90;
+        limit = 30;
       } else if (subscription.plan === "growth") {
         limit = 90;
       } else if (subscription.plan === "pro" || subscription.plan === "agency") {
@@ -517,14 +527,33 @@ export default function AdsPage() {
                             </div>
                           </div>
                         </td>
-                        <td className="p-4 text-right font-semibold">{formatCurrency(ad.metrics.spend)}</td>
-                        <td className="p-4 text-right">{formatNumber(ad.metrics.impressions)}</td>
-                        <td className="p-4 text-right">{formatNumber(ad.metrics.clicks)}</td>
-                        <td className="p-4 text-right">{formatNumber(ad.metrics.purchases)}</td>
-                        <td className="p-4 text-right">{formatPercent(ad.metrics.ctr)}</td>
-                        <td className="p-4 text-right">{formatCurrency(ad.metrics.cpc)}</td>
+                        <td className="p-4 text-right font-semibold">
+                          {formatCurrency(ad.metrics.spend)}
+                          {renderTrend(ad.metrics.spend_trend)}
+                        </td>
+                        <td className="p-4 text-right">
+                          {formatNumber(ad.metrics.impressions)}
+                          {renderTrend(ad.metrics.impressions_trend)}
+                        </td>
+                        <td className="p-4 text-right">
+                          {formatNumber(ad.metrics.clicks)}
+                          {renderTrend(ad.metrics.clicks_trend)}
+                        </td>
+                        <td className="p-4 text-right">
+                          {formatNumber(ad.metrics.purchases)}
+                          {renderTrend(ad.metrics.purchases_trend)}
+                        </td>
+                        <td className="p-4 text-right">
+                          {formatPercent(ad.metrics.ctr)}
+                          {renderTrend(ad.metrics.ctr_trend)}
+                        </td>
+                        <td className="p-4 text-right">
+                          {formatCurrency(ad.metrics.cpc)}
+                          {renderTrend(ad.metrics.cpc_trend)}
+                        </td>
                         <td className="p-4 text-right text-green-600 font-bold text-sm">
                           {ad.metrics.roas.toFixed(2)}x
+                          {renderTrend(ad.metrics.roas_trend)}
                         </td>
                       </tr>
                     );

@@ -105,7 +105,7 @@ export default function OverviewPage() {
       if (subscription.status === "trialing") {
         limit = 7;
       } else if (subscription.plan === "starter") {
-        limit = 90;
+        limit = 30;
       } else if (subscription.plan === "growth") {
         limit = 90;
       } else if (subscription.plan === "pro" || subscription.plan === "agency") {

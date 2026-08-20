@@ -366,9 +366,14 @@ async def get_overview_analytics(
     Includes percentage trends calculated against the previous period of identical length.
     """
     user = await get_db_user_from_claims(claims, db)
+    from app.services.entitlement_engine import EntitlementEngine
+
+    # Enforce plan historical days date capping
+    start_date = await EntitlementEngine.enforce_historical_days(start_date, user, db)
 
     # 1. Resolve Active Ad Account
-    stmt = select(MetaAdAccount).where(MetaAdAccount.user_id == user.id)
+    accessible_ids = await EntitlementEngine.get_accessible_user_ids(user, db)
+    stmt = select(MetaAdAccount).where(MetaAdAccount.user_id.in_(accessible_ids))
     try:
         acc_uuid = uuid.UUID(ad_account_id)
         stmt = stmt.where(MetaAdAccount.id == acc_uuid)
@@ -521,9 +526,14 @@ async def get_chart_analytics(
     Returns daily statistics points within the date range window for rendering line charts.
     """
     user = await get_db_user_from_claims(claims, db)
+    from app.services.entitlement_engine import EntitlementEngine
+
+    # Enforce plan historical days date capping
+    start_date = await EntitlementEngine.enforce_historical_days(start_date, user, db)
 
     # Resolve Active Ad Account
-    stmt = select(MetaAdAccount).where(MetaAdAccount.user_id == user.id)
+    accessible_ids = await EntitlementEngine.get_accessible_user_ids(user, db)
+    stmt = select(MetaAdAccount).where(MetaAdAccount.user_id.in_(accessible_ids))
     try:
         acc_uuid = uuid.UUID(ad_account_id)
         stmt = stmt.where(MetaAdAccount.id == acc_uuid)
@@ -628,9 +638,11 @@ async def get_account_health_score(
     Evaluates account health dynamically based on daily metrics ratios (CPL, ROAS, click-through rates).
     """
     user = await get_db_user_from_claims(claims, db)
+    from app.services.entitlement_engine import EntitlementEngine
 
     # Resolve Active Ad Account
-    stmt = select(MetaAdAccount).where(MetaAdAccount.user_id == user.id)
+    accessible_ids = await EntitlementEngine.get_accessible_user_ids(user, db)
+    stmt = select(MetaAdAccount).where(MetaAdAccount.user_id.in_(accessible_ids))
     try:
         acc_uuid = uuid.UUID(ad_account_id)
         stmt = stmt.where(MetaAdAccount.id == acc_uuid)
