@@ -23,6 +23,7 @@ from app.services.ml_feature_extractor import MLFeatureExtractor
 from app.models.ml_features import MLFeatureRecord, OptimizationAction
 from app.models.campaign import Campaign, AdSet, Ad
 from app.models.creative import Creative
+from app.models.metrics import CampaignDailyMetrics
 from datetime import date
 
 logger = structlog.get_logger()
@@ -52,11 +53,32 @@ class AIRecommendationResponse(BaseModel):
     campaign_id: Optional[uuid.UUID] = None
     adset_id: Optional[uuid.UUID] = None
     ad_id: Optional[uuid.UUID] = None
+    
+    # Phase 3 Fields
+    goal: Optional[str] = None
+    outcome: Optional[str] = None
+    problem: Optional[str] = None
+    root_cause: Optional[str] = None
+    evidence: Optional[str] = None
+    suggested_action: Optional[str] = None
+    expected_impact: Optional[str] = None
+    data_period: Optional[str] = None
+    comparison_period: Optional[str] = None
 
 
 class RecommendationActionResponse(BaseModel):
     status: str
     message: str
+
+
+class DecisionCenterSummary(BaseModel):
+    total_count: int
+    critical_count: int
+    high_count: int
+    medium_count: int
+    low_count: int
+    opportunity_count: int
+    ai_summary: str
 
 
 # ──────────────────────────────────────────────
@@ -66,6 +88,10 @@ class RecommendationActionResponse(BaseModel):
 @router.get("", response_model=List[AIRecommendationResponse], summary="List AI recommendations")
 async def list_recommendations(
     ad_account_id: str = Query(..., description="Active Ad account ID string (UUID or meta_account_id)"),
+    goal: Optional[str] = Query(None, description="Filter by goal/objective category"),
+    priority: Optional[str] = Query(None, description="Filter by priority level"),
+    status: Optional[str] = Query(None, description="Filter by status (comma-separated or single)"),
+    entity: Optional[str] = Query(None, description="Filter by entity type (campaign, adset, ad, creative, etc.)"),
     claims: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -90,16 +116,55 @@ async def list_recommendations(
             detail="Active ad account not found."
         )
 
-    # Fetch active recommendations (new, viewed)
-    stmt = (
-        select(AIRecommendation)
-        .where(AIRecommendation.ad_account_id == ad_acc.id)
-        .where(AIRecommendation.status.in_(["new", "viewed"]))
-        .order_by(AIRecommendation.priority.asc(), AIRecommendation.created_at.desc())
-    )
+    # Fetch recommendations from DB (with filters)
+    stmt = select(AIRecommendation).where(AIRecommendation.ad_account_id == ad_acc.id)
     
+    if status:
+        status_list = [s.strip().lower() for s in status.split(",") if s.strip()]
+        if "all" not in status_list:
+            stmt = stmt.where(AIRecommendation.status.in_(status_list))
+    else:
+        # Default: new and viewed
+        stmt = stmt.where(AIRecommendation.status.in_(["new", "viewed"]))
+
+    if priority:
+        stmt = stmt.where(AIRecommendation.priority == priority.lower())
+
+    if entity:
+        stmt = stmt.where(AIRecommendation.entity_type == entity.lower())
+
     res = await db.execute(stmt)
-    recs = res.scalars().all()
+    recs = list(res.scalars().all())
+
+    # Goal filtering in Python (checks both objective and supporting_metrics goal)
+    if goal:
+        target_goal = goal.lower()
+        filtered = []
+        for r in recs:
+            m = r.supporting_metrics or {}
+            g_val = (m.get("goal") or r.objective or "").lower()
+            if target_goal in g_val or g_val in target_goal:
+                filtered.append(r)
+            elif target_goal == "leads" and "lead" in g_val:
+                filtered.append(r)
+            elif target_goal == "sales" and ("sale" in g_val or "purchase" in g_val or "outcome" in g_val):
+                filtered.append(r)
+            elif target_goal == "messaging" and ("message" in g_val or "conversation" in g_val or "chat" in g_val):
+                filtered.append(r)
+        recs = filtered
+
+    # Correct priority rank sorting
+    PRIORITY_RANK = {
+        "critical": 0,
+        "high": 1,
+        "medium": 2,
+        "low": 3,
+        "opportunity": 4
+    }
+    recs.sort(key=lambda x: (
+        PRIORITY_RANK.get((x.priority or "medium").lower(), 2),
+        -(x.created_at.timestamp() if x.created_at else 0)
+    ))
 
     # Resolve target entity names to display references in the UI
     campaign_ids = [r.entity_id for r in recs if r.entity_type == "campaign"] + [r.campaign_id for r in recs if r.campaign_id]
@@ -137,6 +202,7 @@ async def list_recommendations(
         elif r.entity_type == "creative":
             entity_name = creative_names.get(r.entity_id)
 
+        metrics = r.supporting_metrics or {}
         out_recs.append(
             AIRecommendationResponse(
                 id=r.id,
@@ -154,9 +220,21 @@ async def list_recommendations(
                 campaign_id=r.campaign_id,
                 adset_id=r.adset_id,
                 ad_id=r.ad_id,
+                goal=getattr(r, "goal", None) or r.objective or metrics.get("goal"),
+                outcome=getattr(r, "outcome", None) or metrics.get("outcome"),
+                problem=getattr(r, "problem", None) or r.problem or metrics.get("problem"),
+                root_cause=getattr(r, "root_cause", None) or r.root_cause or metrics.get("root_cause"),
+                evidence=getattr(r, "evidence", None) or r.evidence or metrics.get("evidence"),
+                suggested_action=getattr(r, "suggested_action", None) or metrics.get("suggested_action"),
+                expected_impact=getattr(r, "expected_impact", None) or r.expected_impact or metrics.get("expected_impact"),
+                data_period=getattr(r, "data_period", None) or metrics.get("data_period", "last_7_days"),
+                comparison_period=getattr(r, "comparison_period", None) or metrics.get("comparison_period", "previous_7_days"),
             )
         )
     return out_recs
+
+
+
 
 
 @router.post("/{recommendation_id}/apply", response_model=RecommendationActionResponse, summary="Apply a recommendation")
@@ -189,9 +267,15 @@ async def apply_recommendation(
             detail="You do not own this ad account pipeline."
         )
 
-    # Set status to accepted
+
+
+
+    # Set status to accepted and record accepted_at
     rec.status = "accepted"
-    rec.updated_at = datetime.now(timezone.utc)
+    metrics = dict(rec.supporting_metrics or {})
+    metrics["accepted_at"] = datetime.utcnow().isoformat()
+    rec.supporting_metrics = metrics
+    rec.updated_at = datetime.utcnow()
     await db.commit()
 
     return RecommendationActionResponse(
@@ -203,6 +287,7 @@ async def apply_recommendation(
 @router.post("/{recommendation_id}/dismiss", response_model=RecommendationActionResponse, summary="Dismiss a recommendation")
 async def dismiss_recommendation(
     recommendation_id: uuid.UUID,
+    reason: Optional[str] = Query(None, description="Dismissal reason"),
     claims: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -226,19 +311,314 @@ async def dismiss_recommendation(
     res_acc = await db.execute(stmt_acc)
     if not res_acc.scalar_one_or_none():
         raise HTTPException(
-            status_code=status.HTTP_430_FORBIDDEN if hasattr(status, "HTTP_430_FORBIDDEN") else status.HTTP_403_FORBIDDEN,
+            status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not own this ad account pipeline."
         )
 
-    # Set status to dismissed
+    # Set status to dismissed and record dismissed_at
     rec.status = "dismissed"
-    rec.updated_at = datetime.now(timezone.utc)
+    metrics = dict(rec.supporting_metrics or {})
+    metrics["dismissed_at"] = datetime.utcnow().isoformat()
+    if reason:
+        metrics["dismiss_reason"] = reason
+    rec.supporting_metrics = metrics
+    rec.updated_at = datetime.utcnow()
     await db.commit()
 
     return RecommendationActionResponse(
         status="success",
         message="Recommendation successfully dismissed."
     )
+
+
+@router.post("/{recommendation_id}/view", response_model=RecommendationActionResponse, summary="Mark recommendation as viewed")
+async def view_recommendation(
+    recommendation_id: uuid.UUID,
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Marks a recommendation as viewed if its current status is new.
+    """
+    user = await get_db_user_from_claims(claims, db)
+
+    stmt = select(AIRecommendation).where(AIRecommendation.id == recommendation_id)
+    res = await db.execute(stmt)
+    rec = res.scalar_one_or_none()
+    
+    if not rec:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Recommendation not found."
+        )
+
+    # Verify authorization
+    stmt_acc = select(MetaAdAccount).where(MetaAdAccount.id == rec.ad_account_id).where(MetaAdAccount.user_id == user.id)
+    res_acc = await db.execute(stmt_acc)
+    if not res_acc.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not own this ad account pipeline."
+        )
+
+    # Update status to viewed
+    if rec.status == "new":
+        rec.status = "viewed"
+        metrics = dict(rec.supporting_metrics or {})
+        metrics["viewed_at"] = datetime.utcnow().isoformat()
+        rec.supporting_metrics = metrics
+        rec.updated_at = datetime.utcnow()
+        await db.commit()
+
+    return RecommendationActionResponse(
+        status="success",
+        message="Recommendation successfully marked as viewed."
+    )
+
+
+@router.get("/summary", response_model=DecisionCenterSummary, summary="Get Decision Center summary")
+async def get_decision_center_summary(
+    ad_account_id: str = Query(..., description="Active Ad account ID string (UUID or meta_account_id)"),
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Returns counts and a grounded AI summary statement of active suggestions.
+    """
+    user = await get_db_user_from_claims(claims, db)
+
+    # Resolve Active Ad Account
+    stmt = select(MetaAdAccount).where(MetaAdAccount.user_id == user.id)
+    try:
+        acc_uuid = uuid.UUID(ad_account_id)
+        stmt = stmt.where(MetaAdAccount.id == acc_uuid)
+    except ValueError:
+        stmt = stmt.where(MetaAdAccount.meta_account_id == ad_account_id)
+
+    res = await db.execute(stmt)
+    ad_acc = res.scalar_one_or_none()
+    if not ad_acc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Active ad account not found."
+        )
+
+    # Fetch active recommendations (new, viewed)
+    stmt = (
+        select(AIRecommendation)
+        .where(AIRecommendation.ad_account_id == ad_acc.id)
+        .where(AIRecommendation.status.in_(["new", "viewed"]))
+    )
+    res = await db.execute(stmt)
+    recs = res.scalars().all()
+
+    total_count = len(recs)
+    critical_count = sum(1 for r in recs if (r.priority or "").lower() == "critical")
+    high_count = sum(1 for r in recs if (r.priority or "").lower() == "high")
+    medium_count = sum(1 for r in recs if (r.priority or "").lower() == "medium")
+    low_count = sum(1 for r in recs if (r.priority or "").lower() == "low")
+    opportunity_count = sum(1 for r in recs if (r.priority or "").lower() == "opportunity")
+
+    # Group counts of issues
+    fatigue_count = sum(1 for r in recs if r.root_cause == "CREATIVE_FATIGUE" or "fatigue" in (r.problem or "").lower())
+    lp_count = sum(1 for r in recs if r.root_cause == "LANDING_PAGE_PROBLEM" or "landing page" in (r.problem or "").lower())
+    scaling_count = sum(1 for r in recs if r.recommendation_type == "SCALING_OPPORTUNITY")
+
+    parts = []
+    if total_count == 0:
+        ai_summary = "Your ad account is in excellent health! No critical issues or optimization opportunities were flagged by the AI engine."
+    else:
+        if critical_count > 0:
+            parts.append(f"{critical_count} critical issue{'s' if critical_count > 1 else ''} require immediate attention")
+        if high_count > 0:
+            parts.append(f"{high_count} high-priority issue{'s' if high_count > 1 else ''} need review")
+        if opportunity_count > 0:
+            parts.append(f"{opportunity_count} scaling opportunit{'ies' if opportunity_count > 1 else 'y'} detected")
+            
+        summary_intro = "Your account has " + ", and ".join(parts) + "."
+        
+        detail_parts = []
+        if fatigue_count > 0:
+            detail_parts.append(f"{fatigue_count} campaign{'s show' if fatigue_count > 1 else ' shows'} signs of creative fatigue with rising frequency and declining click-through rates")
+        if lp_count > 0:
+            detail_parts.append(f"{lp_count} campaign{'s have' if lp_count > 1 else ' has'} landing page conversion bottlenecks despite healthy traffic engagement")
+        if scaling_count > 0:
+            detail_parts.append(f"{scaling_count} campaign{'s are' if scaling_count > 1 else ' is'} prime for controlled budget scaling due to stable, high returns")
+            
+        if detail_parts:
+            ai_summary = f"{summary_intro} Primarily, {', while '.join(detail_parts)}."
+        else:
+            ai_summary = f"{summary_intro} Please review each recommendation details below to decide on manually implementing updates in Meta Ads Manager."
+
+    return DecisionCenterSummary(
+        total_count=total_count,
+        critical_count=critical_count,
+        high_count=high_count,
+        medium_count=medium_count,
+        low_count=low_count,
+        opportunity_count=opportunity_count,
+        ai_summary=ai_summary
+    )
+
+
+class RecommendationEffectivenessResponse(BaseModel):
+    recommendation_id: uuid.UUID
+    title: str
+    campaign_name: str
+    accepted_at: str
+    days_since_acceptance: int
+    before_period: dict
+    after_period: dict
+    kpi_name: str
+    improvement_pct: float
+
+
+@router.get("/effectiveness", response_model=List[RecommendationEffectivenessResponse], summary="Track recommendation effectiveness")
+async def get_recommendation_effectiveness(
+    ad_account_id: str = Query(..., description="Active Ad account ID string (UUID or meta_account_id)"),
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Compares 7 days of campaign metrics before vs after recommendation acceptance to track effectiveness.
+    """
+    user = await get_db_user_from_claims(claims, db)
+
+    # Resolve Active Ad Account
+    stmt = select(MetaAdAccount).where(MetaAdAccount.user_id == user.id)
+    try:
+        acc_uuid = uuid.UUID(ad_account_id)
+        stmt = stmt.where(MetaAdAccount.id == acc_uuid)
+    except ValueError:
+        stmt = stmt.where(MetaAdAccount.meta_account_id == ad_account_id)
+
+    res = await db.execute(stmt)
+    ad_acc = res.scalar_one_or_none()
+    if not ad_acc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Active ad account not found."
+        )
+
+    # Fetch accepted recommendations
+    stmt_recs = (
+        select(AIRecommendation)
+        .where(AIRecommendation.ad_account_id == ad_acc.id)
+        .where(AIRecommendation.status == "accepted")
+    )
+    res_recs = await db.execute(stmt_recs)
+    recs = res_recs.scalars().all()
+
+    effectiveness = []
+    for r in recs:
+        metrics_dict = r.supporting_metrics or {}
+        accepted_at_str = metrics_dict.get("accepted_at")
+        if not accepted_at_str:
+            continue
+            
+        try:
+            accepted_at_dt = datetime.fromisoformat(accepted_at_str).date()
+        except Exception:
+            continue
+
+        # Get Campaign Name
+        stmt_camp = select(Campaign.name).where(Campaign.id == r.campaign_id)
+        res_camp = await db.execute(stmt_camp)
+        camp_name = res_camp.scalar() or f"Campaign {r.campaign_id}"
+
+        # Fetch daily metrics before & after accepted date
+        before_start = accepted_at_dt - timedelta(days=7)
+        after_end = accepted_at_dt + timedelta(days=7)
+
+        stmt_daily = (
+            select(CampaignDailyMetrics)
+            .where(CampaignDailyMetrics.campaign_id == r.campaign_id)
+            .where(CampaignDailyMetrics.date >= before_start)
+            .where(CampaignDailyMetrics.date <= after_end)
+        )
+        res_daily = await db.execute(stmt_daily)
+        daily_rows = res_daily.scalars().all()
+
+        before_rows = [row for row in daily_rows if row.date < accepted_at_dt]
+        after_rows = [row for row in daily_rows if row.date > accepted_at_dt]
+
+        # Skip if not enough data has passed to evaluate (e.g. less than 1 day after)
+        if not before_rows or not after_rows:
+            continue
+
+        def aggregate_effectiveness_stats(rows):
+            total_spend = sum(float(row.spend or 0.0) for row in rows)
+            total_impr = sum(int(row.impressions or 0) for row in rows)
+            total_clicks = sum(int(row.clicks or 0) for row in rows)
+            total_leads = sum(int(row.leads or 0) for row in rows)
+            total_purchases = sum(int(row.purchases or 0) for row in rows)
+            
+            ctr = total_clicks / total_impr if total_impr > 0 else 0.0
+            cpc = total_spend / total_clicks if total_clicks > 0 else 0.0
+            
+            # Map conversion count by recommendation goal
+            goal_lower = (metrics_dict.get("goal") or r.objective or "").lower()
+            if "lead" in goal_lower:
+                convs = total_leads
+                cost_per_result = total_spend / total_leads if total_leads > 0 else 0.0
+                kpi_name = "Cost Per Lead (CPL)"
+            else:
+                convs = total_purchases
+                cost_per_result = total_spend / total_purchases if total_purchases > 0 else 0.0
+                kpi_name = "Cost Per Acquisition (CPA)"
+
+            return {
+                "spend": total_spend,
+                "conversions": convs,
+                "ctr": ctr,
+                "cpc": cpc,
+                "cost_per_result": cost_per_result,
+                "kpi_name": kpi_name
+            }
+
+        before_aggregated = aggregate_effectiveness_stats(before_rows)
+        after_aggregated = aggregate_effectiveness_stats(after_rows)
+
+        # Calculate improvement percentage
+        kpi_name = before_aggregated["kpi_name"]
+        before_cpr = before_aggregated["cost_per_result"]
+        after_cpr = after_aggregated["cost_per_result"]
+
+        if before_cpr > 0:
+            # Lower cost is better, so a negative change is an improvement
+            improvement_pct = ((before_cpr - after_cpr) / before_cpr) * 100.0
+        else:
+            improvement_pct = 0.0
+
+        days_since = (date.today() - accepted_at_dt).days
+
+        effectiveness.append(
+            RecommendationEffectivenessResponse(
+                recommendation_id=r.id,
+                title=r.title,
+                campaign_name=camp_name,
+                accepted_at=accepted_at_str,
+                days_since_acceptance=days_since,
+                before_period={
+                    "spend": before_aggregated["spend"],
+                    "conversions": before_aggregated["conversions"],
+                    "ctr": before_aggregated["ctr"],
+                    "cpc": before_aggregated["cpc"],
+                    "cost_per_result": before_aggregated["cost_per_result"]
+                },
+                after_period={
+                    "spend": after_aggregated["spend"],
+                    "conversions": after_aggregated["conversions"],
+                    "ctr": after_aggregated["ctr"],
+                    "cpc": after_aggregated["cpc"],
+                    "cost_per_result": after_aggregated["cost_per_result"]
+                },
+                kpi_name=kpi_name,
+                improvement_pct=improvement_pct
+            )
+        )
+
+    return effectiveness
 
 
 # ──────────────────────────────────────────────

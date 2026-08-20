@@ -64,6 +64,7 @@ class CampaignItemResponse(BaseModel):
     metrics: CampaignMetrics
     performance_goal: Optional[str] = None
     optimization_event: Optional[str] = None
+    outcome: Optional[str] = None
 
 
 # ──────────────────────────────────────────────
@@ -253,6 +254,10 @@ async def list_campaigns(
         calls = calls_map.get(camp.id, 0)
 
         goals = adsets_goals.get(camp.id, {})
+        from app.services.goal_engine import PerformanceGoalEngine
+        pg = goals.get("performance_goal")
+        profile = PerformanceGoalEngine.get_metric_profile(objective=camp.objective, goal=pg)
+        outcome = profile.get("outcome")
 
         campaigns.append(
             CampaignItemResponse(
@@ -265,6 +270,7 @@ async def list_campaigns(
                 lifetime_budget=float(camp.lifetime_budget) if camp.lifetime_budget else None,
                 performance_goal=goals.get("performance_goal"),
                 optimization_event=goals.get("optimization_event"),
+                outcome=outcome,
                 metrics=CampaignMetrics(
                     spend=spend,
                     impressions=impressions,

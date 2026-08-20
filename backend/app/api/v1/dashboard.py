@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 from app.database import get_db
 from app.dependencies import get_current_user, require_active_subscription
@@ -16,6 +16,8 @@ from app.api.v1.meta import get_db_user_from_claims
 from app.models.meta import MetaAdAccount
 from app.models.campaign import Campaign
 from app.models.metrics import CampaignDailyMetrics
+
+from app.services.goal_engine import PerformanceGoalEngine
 
 logger = structlog.get_logger()
 router = APIRouter(
@@ -125,6 +127,9 @@ class DashboardOverviewResponse(BaseModel):
     # Video Retention funnel object
     video_retention: VideoIntelligence
 
+    # Goal Metric Profile
+    goal_profile: Optional[Dict[str, Any]] = None
+
 
 class ChartDataPoint(BaseModel):
     date: date
@@ -171,7 +176,7 @@ class HealthScoreResponse(BaseModel):
 # Helper: Query Aggregated Metrics
 # ──────────────────────────────────────────────
 async def query_aggregated_metrics(
-    db: AsyncSession, ad_account_uuid: uuid.UUID, start: date, end: date
+    db: AsyncSession, ad_account_uuid: uuid.UUID, start: date, end: date, goal: str = "all"
 ) -> dict:
     """Runs database aggregations for all connections of this Meta ad account."""
     # Resolve meta_account_id from uuid
@@ -187,6 +192,17 @@ async def query_aggregated_metrics(
         .where(CampaignDailyMetrics.date >= start)
         .where(CampaignDailyMetrics.date <= end)
     )
+
+    if goal == "sales":
+        stmt = stmt.where(Campaign.objective.ilike("%sales%"))
+    elif goal == "leads":
+        stmt = stmt.where(Campaign.objective.ilike("%leads%"))
+    elif goal == "engagement":
+        stmt = stmt.where(
+            (Campaign.objective.ilike("%engagement%")) | 
+            (Campaign.objective.ilike("%messaging%"))
+        )
+
     res = await db.execute(stmt)
     rows = res.scalars().all()
     
@@ -364,6 +380,7 @@ async def get_overview_analytics(
     ad_account_id: str = Query(..., description="Active Ad account ID string (UUID or meta_account_id)"),
     start_date: date = Query(..., description="Start date of filter window"),
     end_date: date = Query(..., description="End date of filter window"),
+    goal: str = Query("all", description="Filter objective by sales, leads, engagement, or all"),
     claims: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -400,8 +417,8 @@ async def get_overview_analytics(
     prev_start = start_date - timedelta(days=period_len)
 
     # 3. Query metrics for both periods
-    curr_data_sums = await query_aggregated_metrics(db, ad_acc.id, start_date, end_date)
-    prev_data_sums = await query_aggregated_metrics(db, ad_acc.id, prev_start, prev_end)
+    curr_data_sums = await query_aggregated_metrics(db, ad_acc.id, start_date, end_date, goal=goal)
+    prev_data_sums = await query_aggregated_metrics(db, ad_acc.id, prev_start, prev_end, goal=goal)
 
     # 4. Calculate rates
     curr_rates = calculate_rates(curr_data_sums)
@@ -521,7 +538,15 @@ async def get_overview_analytics(
         budget=budget_overview,
         
         # Video Retention object
-        video_retention=video_retention
+        video_retention=video_retention,
+
+        # Goal Metric Profile
+        goal_profile=PerformanceGoalEngine.get_metric_profile(
+            objective=goal if goal != "all" else (active_camps[0].objective if active_camps else "sales"),
+            goal=None,
+            outcome=None,
+            available_fields=list(curr_rates.keys())
+        )
     )
 
 
@@ -530,6 +555,7 @@ async def get_chart_analytics(
     ad_account_id: str = Query(..., description="Active Ad account ID string (UUID or meta_account_id)"),
     start_date: date = Query(..., description="Start date of filter window"),
     end_date: date = Query(..., description="End date of filter window"),
+    goal: str = Query("all", description="Filter objective by sales, leads, engagement, or all"),
     claims: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -567,8 +593,19 @@ async def get_chart_analytics(
         .where(MetaAdAccount.meta_account_id == ad_acc.meta_account_id)
         .where(CampaignDailyMetrics.date >= start_date)
         .where(CampaignDailyMetrics.date <= end_date)
-        .order_by(CampaignDailyMetrics.date.asc())
     )
+
+    if goal == "sales":
+        stmt = stmt.where(Campaign.objective.ilike("%sales%"))
+    elif goal == "leads":
+        stmt = stmt.where(Campaign.objective.ilike("%leads%"))
+    elif goal == "engagement":
+        stmt = stmt.where(
+            (Campaign.objective.ilike("%engagement%")) | 
+            (Campaign.objective.ilike("%messaging%"))
+        )
+
+    stmt = stmt.order_by(CampaignDailyMetrics.date.asc())
     res = await db.execute(stmt)
     rows = res.scalars().all()
 
@@ -643,6 +680,7 @@ async def get_chart_analytics(
 @router.get("/health", response_model=HealthScoreResponse, summary="Query account health rating")
 async def get_account_health_score(
     ad_account_id: str = Query(..., description="Active Ad account ID string (UUID or meta_account_id)"),
+    goal: str = Query("all", description="Filter objective by sales, leads, engagement, or all"),
     claims: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -672,136 +710,222 @@ async def get_account_health_score(
     # Fetch last 14 days of performance logs to calculate metrics
     today = date.today()
     start = today - timedelta(days=14)
-    data = await query_aggregated_metrics(db, ad_acc.id, start, today)
+    data = await query_aggregated_metrics(db, ad_acc.id, start, today, goal=goal)
     rates = calculate_rates(data)
 
     # Fetch campaigns once to identify objective(s) and budget limits
+    from sqlalchemy.orm import selectinload
     stmt_camp = (
         select(Campaign)
         .join(MetaAdAccount, Campaign.ad_account_id == MetaAdAccount.id)
         .where(MetaAdAccount.meta_account_id == ad_acc.meta_account_id)
         .where(Campaign.status == "ACTIVE")
+        .options(selectinload(Campaign.ad_sets))
     )
     res_camp = await db.execute(stmt_camp)
     active_camps = res_camp.scalars().all()
 
-    # Detect Active Objectives
-    sales_active = False
-    leads_active = False
-    messaging_active = False
-    engagement_active = False
+    # 1. Resolve and group active campaign data by resolved objective via PerformanceGoalEngine (SSOT)
+    objective_raws = {}
     
+    for c in active_camps:
+        stmt_m = (
+            select(CampaignDailyMetrics)
+            .where(CampaignDailyMetrics.campaign_id == c.id)
+            .where(CampaignDailyMetrics.date >= start)
+            .where(CampaignDailyMetrics.date <= today)
+        )
+        res_m = await db.execute(stmt_m)
+        rows_m = res_m.scalars().all()
+        
+        pg = c.ad_sets[0].performance_goal if c.ad_sets else None
+        prof = PerformanceGoalEngine.get_metric_profile(objective=c.objective, goal=pg)
+        obj_key = prof["objective"]
+        
+        if obj_key not in objective_raws:
+            objective_raws[obj_key] = {
+                "spend": 0.0, "impressions": 0, "clicks": 0, "purchases": 0, "revenue": 0.0,
+                "leads": 0, "conversations": 0, "calls": 0, "post_engagement": 0, "video_views": 0,
+                "campaign_objective": c.objective,
+                "performance_goal": pg,
+                "profile": prof
+            }
+        
+        for r in rows_m:
+            objective_raws[obj_key]["spend"] += float(r.spend or 0.0)
+            objective_raws[obj_key]["impressions"] += int(r.impressions or 0)
+            objective_raws[obj_key]["clicks"] += int(r.clicks or 0)
+            objective_raws[obj_key]["purchases"] += int(r.purchases or 0)
+            objective_raws[obj_key]["revenue"] += float(r.revenue or 0.0)
+            objective_raws[obj_key]["leads"] += int(r.leads or 0)
+            if r.actions:
+                objective_raws[obj_key]["conversations"] += int(r.actions.get("conversations") or 0)
+                objective_raws[obj_key]["calls"] += int(r.actions.get("calls") or 0)
+                objective_raws[obj_key]["post_engagement"] += int(r.actions.get("post_engagement") or 0)
+                objective_raws[obj_key]["video_views"] += int(r.actions.get("video_views") or 0)
+
+    # Fallback to historical metrics if no active campaigns
+    if not active_camps:
+        detected_obj = "sales"
+        if rates.get("purchases", 0) > 0:
+            detected_obj = "sales"
+        elif rates.get("leads", 0) > 0:
+            detected_obj = "leads"
+        elif rates.get("conversations", 0) > 0:
+            detected_obj = "messaging"
+        elif rates.get("post_engagement", 0) > 0 or rates.get("video_views", 0) > 0:
+            detected_obj = "engagement"
+            
+        objective_raws[detected_obj] = {
+            "spend": data.get("spend") or 0.0,
+            "impressions": data.get("impressions") or 0,
+            "clicks": data.get("clicks") or 0,
+            "purchases": data.get("purchases") or 0,
+            "revenue": data.get("revenue") or 0.0,
+            "leads": data.get("leads") or 0,
+            "conversations": data.get("conversations") or 0,
+            "calls": data.get("calls") or 0,
+            "post_engagement": data.get("post_engagement") or 0,
+            "video_views": data.get("video_views") or 0,
+            "campaign_objective": detected_obj,
+            "performance_goal": None,
+            "profile": PerformanceGoalEngine.get_metric_profile(objective=detected_obj)
+        }
+
+    # If goal query param is set, filter to only evaluate that specific objective
+    if goal != "all":
+        objective_raws = {k: v for k, v in objective_raws.items() if k == goal}
+
+    # Evaluate health per objective first
+    objective_scores = {}
     positives = []
     negatives = []
     risks = []
     opportunities = []
 
-    for c in active_camps:
-        obj = (c.objective or "").upper()
-        cname = (c.name or "").upper()
-        if "SALES" in obj or "OUTCOME_SALES" in obj:
-            sales_active = True
-        elif "LEADS" in obj or "OUTCOME_LEADS" in obj:
-            leads_active = True
-        elif "ENGAGEMENT" in obj or "OUTCOME_ENGAGEMENT" in obj:
-            if "MESSAGING" in cname or "CONVERSATION" in cname or (rates.get("conversations") or 0) > 0:
-                messaging_active = True
+    for obj_key, raw_obj in objective_raws.items():
+        obj_rates = calculate_rates(raw_obj)
+        profile = raw_obj["profile"]
+        statuses = profile.get("metric_statuses", {})
+        primary_metric = profile.get("primary")[0] if profile.get("primary") else "purchases"
+        
+        # Skip evaluating if the primary outcome is not available or requires CRM
+        if statuses.get(primary_metric) in ("CRM_REQUIRED", "UNAVAILABLE", "NOT_APPLICABLE"):
+            continue
+
+        score = 100
+        
+        if obj_key == "sales":
+            if obj_rates["purchases"] == 0:
+                score = 40
+                negatives.append("Zero purchases detected in active Sales campaigns")
+                risks.append("Inefficient bottom-of-funnel checkout conversions")
             else:
-                engagement_active = True
-        elif "MESSAGING" in obj:
-            messaging_active = True
+                positives.append("Active purchase conversions verified")
+                if obj_rates["roas"] >= 2.0:
+                    positives.append(f"Strong overall Sales ROAS ({obj_rates['roas']:.2f}x)")
+                    opportunities.append("Scale budget on top converting sales ad sets")
+                elif 0.0 < obj_rates["roas"] < 2.0:
+                    score -= 30
+                    negatives.append(f"Low overall Sales ROAS ({obj_rates['roas']:.2f}x)")
+                    risks.append("High customer acquisition costs")
+            objective_scores[obj_key] = score
             
-    # Fallback to historical metrics if no active campaigns
-    if not active_camps:
-        if (rates.get("purchases") or 0) > 0:
-            sales_active = True
-        if (rates.get("leads") or 0) > 0:
-            leads_active = True
-        if (rates.get("conversations") or 0) > 0:
-            messaging_active = True
-        if (rates.get("thruplays") or 0) > 0 or (rates.get("post_engagement") or 0) > 0:
-            engagement_active = True
-
-    # Default if absolutely nothing detected (fallback to Sales & Leads)
-    if not (sales_active or leads_active or messaging_active or engagement_active):
-        sales_active = True
-        leads_active = True
-
-    # Compute scores for each active objective
-    scores = []
-    
-    # A. Sales Objective
-    if sales_active:
-        sales_score = 100
-        if rates["purchases"] == 0:
-            sales_score = 40
-            negatives.append("Zero purchases detected in active Sales campaigns")
-            risks.append("Inefficient bottom-of-funnel checkout conversions")
-        else:
-            positives.append("Active purchase conversions verified")
-            if rates["roas"] >= 2.0:
-                positives.append(f"Strong overall Sales ROAS ({rates['roas']:.2f}x)")
-                opportunities.append("Scale budget on top converting sales ad sets")
-            elif 0.0 < rates["roas"] < 2.0:
-                sales_score -= 30
-                negatives.append(f"Low overall Sales ROAS ({rates['roas']:.2f}x)")
-                risks.append("High customer acquisition costs")
-        scores.append(sales_score)
-
-    # B. Leads Objective
-    if leads_active:
-        leads_score = 100
-        if rates["leads"] == 0:
-            leads_score = 40
-            negatives.append("Zero leads detected in active Lead campaigns")
-            risks.append("Inefficient lead generation form conversions")
-        else:
-            positives.append("Active lead generation conversions verified")
-            cpl_val = rates.get("cpl") or 0.0
-            if 0.0 < cpl_val <= 200.00:
-                positives.append(f"Efficient Lead CPL (₹{cpl_val:.2f})")
-            elif cpl_val > 200.00:
-                leads_score -= 30
-                negatives.append(f"High Lead CPL (₹{cpl_val:.2f})")
-                risks.append("Rising lead acquisition costs")
-        scores.append(leads_score)
-
-    # C. Messaging Objective
-    if messaging_active:
-        msg_score = 100
-        if rates["conversations"] == 0:
-            msg_score = 40
-            negatives.append("Zero conversations detected in active Messaging campaigns")
-            risks.append("Inefficient thread entry conversions")
-        else:
-            positives.append("Active messaging conversation starts verified")
-            cpc_conv = rates.get("cost_per_conversation") or 0.0
-            if 0.0 < cpc_conv <= 250.00:
-                positives.append(f"Healthy Messaging Cost/Conv (₹{cpc_conv:.2f})")
-                opportunities.append("Scale budget on high-reply messaging ad sets")
-            elif cpc_conv > 250.00:
-                msg_score -= 30
-                negatives.append(f"High Messaging Cost/Conv (₹{cpc_conv:.2f})")
-                risks.append("High conversation acquisition costs")
-        scores.append(msg_score)
-
-    # D. Engagement Objective
-    if engagement_active:
-        eng_score = 100
-        if rates["post_engagement"] == 0 and rates["video_views"] == 0:
-            eng_score = 40
-            negatives.append("Zero social or video views detected in active Engagement campaigns")
-        else:
-            positives.append("Active social branding interactions verified")
-            if rates["engagement_rate"] >= 0.02:
-                positives.append(f"Strong post engagement rate ({rates['engagement_rate']*100:.2f}%)")
+        elif obj_key == "leads":
+            if obj_rates["leads"] == 0:
+                score = 40
+                negatives.append("Zero leads detected in active Lead campaigns")
+                risks.append("Inefficient lead generation form conversions")
             else:
-                eng_score -= 20
-                negatives.append(f"Low post engagement rate ({rates['engagement_rate']*100:.2f}%)")
-        scores.append(eng_score)
+                positives.append("Active lead generation conversions verified")
+                cpl_val = obj_rates.get("cpl") or 0.0
+                if 0.0 < cpl_val <= 200.00:
+                    positives.append(f"Efficient Lead CPL (₹{cpl_val:.2f})")
+                elif cpl_val > 200.00:
+                    score -= 30
+                    negatives.append(f"High Lead CPL (₹{cpl_val:.2f})")
+                    risks.append("Rising lead acquisition costs")
+            objective_scores[obj_key] = score
+            
+        elif obj_key == "messaging":
+            if obj_rates["conversations"] == 0:
+                score = 40
+                negatives.append("Zero conversations detected in active Messaging campaigns")
+                risks.append("Inefficient thread entry conversions")
+            else:
+                positives.append("Active messaging conversation starts verified")
+                cpc_conv = obj_rates.get("cost_per_conversation") or 0.0
+                if 0.0 < cpc_conv <= 250.00:
+                    positives.append(f"Healthy Messaging Cost/Conv (₹{cpc_conv:.2f})")
+                elif cpc_conv > 250.00:
+                    score -= 30
+                    negatives.append(f"High Messaging Cost/Conv (₹{cpc_conv:.2f})")
+                    risks.append("High conversation acquisition costs")
+            objective_scores[obj_key] = score
+            
+        elif obj_key == "engagement":
+            if profile["outcome"] in ("calls", "calls_lead"):
+                if obj_rates["calls"] == 0:
+                    score = 40
+                    negatives.append("Zero calls detected in active Phone Call campaigns")
+                else:
+                    positives.append("Active phone call conversions verified")
+                    cpc_call = obj_rates.get("cost_per_call") or 0.0
+                    if 0.0 < cpc_call <= 300.00:
+                        positives.append(f"Healthy Phone Call Cost (₹{cpc_call:.2f})")
+                    else:
+                        score -= 30
+                        negatives.append(f"High Cost per Call (₹{cpc_call:.2f})")
+            else:
+                if obj_rates["post_engagement"] == 0 and obj_rates["video_views"] == 0:
+                    score = 40
+                    negatives.append("Zero social or video views detected in active Engagement campaigns")
+                else:
+                    positives.append("Active social branding interactions verified")
+                    if obj_rates["engagement_rate"] >= 0.02:
+                        positives.append(f"Strong post engagement rate ({obj_rates['engagement_rate']*100:.2f}%)")
+                    else:
+                        score -= 20
+                        negatives.append(f"Low post engagement rate ({obj_rates['engagement_rate']*100:.2f}%)")
+            objective_scores[obj_key] = score
+            
+        elif obj_key == "traffic":
+            if obj_rates["clicks"] == 0:
+                score = 40
+                negatives.append("Zero clicks detected in active Traffic campaigns")
+            else:
+                positives.append("Active web traffic redirection verified")
+                if obj_rates["ctr"] >= 0.01:
+                    positives.append(f"Healthy Link CTR ({obj_rates['ctr']*100:.2f}%)")
+                else:
+                    score -= 30
+                    negatives.append(f"Low Link CTR ({obj_rates['ctr']*100:.2f}%)")
+            objective_scores[obj_key] = score
+            
+        elif obj_key == "awareness":
+            if obj_rates["impressions"] == 0:
+                score = 40
+                negatives.append("Zero impressions detected in active Awareness campaigns")
+            else:
+                positives.append("Active brand reach impressions verified")
+                cpm_val = obj_rates.get("cpm") or 0.0
+                if 0.0 < cpm_val <= 100.00:
+                    positives.append(f"Low cost CPM (₹{cpm_val:.2f})")
+                else:
+                    score -= 20
+                    negatives.append(f"High cost CPM (₹{cpm_val:.2f})")
+            objective_scores[obj_key] = score
 
-    # Calculate overall average business score from active objectives
-    business_score = int(sum(scores) / len(scores)) if scores else 100
+    # 11. Weight overall business health score by relative ad spends
+    total_spend = sum(raw_obj["spend"] for raw_obj in objective_raws.values())
+    if total_spend > 0 and objective_scores:
+        weighted_sum = 0.0
+        for obj_key, score in objective_scores.items():
+            obj_spend = objective_raws[obj_key]["spend"]
+            weighted_sum += score * (obj_spend / total_spend)
+        business_score = int(weighted_sum)
+    else:
+        business_score = int(sum(objective_scores.values()) / len(objective_scores)) if objective_scores else 100
 
     # 2. Funnel Score (CTR, Landing Page Views)
     funnel_score = 100

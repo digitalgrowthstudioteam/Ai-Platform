@@ -228,7 +228,7 @@ export default function OverviewPage() {
   const loadDashboardData = async () => {
     if (!selectedAccount) return;
     const { startStr, endStr } = getDates(datePreset, customStartDate, customEndDate);
-    const cacheKey = `dgs_cached_dashboard_${selectedAccount.id}_${datePreset}_${startStr}_${endStr}`;
+    const cacheKey = `dgs_cached_dashboard_${selectedAccount.id}_${datePreset}_${startStr}_${endStr}_${goalFilter}`;
 
     // Load cached dashboard overview and chart data for instant layout rendering
     const cached = sessionStorage.getItem(cacheKey);
@@ -248,8 +248,8 @@ export default function OverviewPage() {
 
       // 1. Fetch critical metrics and chart data first (critical path)
       const [overviewRes, chartRes] = await Promise.all([
-        api.getDashboardOverview(selectedAccount.id, startStr, endStr),
-        api.getDashboardChart(selectedAccount.id, startStr, endStr),
+        api.getDashboardOverview(selectedAccount.id, startStr, endStr, goalFilter),
+        api.getDashboardChart(selectedAccount.id, startStr, endStr, goalFilter),
       ]);
 
       setMetrics(overviewRes);
@@ -257,7 +257,7 @@ export default function OverviewPage() {
       setLoadingData(false); // Hide spinner as soon as critical stats are ready
 
       // 2. Fetch supplementary data in the background (non-blocking)
-      const healthPromise = api.getDashboardHealth(selectedAccount.id).then((res) => {
+      const healthPromise = api.getDashboardHealth(selectedAccount.id, goalFilter).then((res) => {
         setHealth(res);
         return res;
       }).catch((e) => {
@@ -331,7 +331,7 @@ export default function OverviewPage() {
     if (!checkingConnection && selectedAccount) {
       loadDashboardData();
     }
-  }, [checkingConnection, selectedAccount, datePreset, customStartDate, customEndDate]);
+  }, [checkingConnection, selectedAccount, datePreset, customStartDate, customEndDate, goalFilter]);
 
   if (checkingConnection || loadingAccounts) {
     return (
@@ -353,19 +353,65 @@ export default function OverviewPage() {
   // Render metric card helper
   const renderKpiCard = (title: string, value: number, trend: number, formatType: "currency" | "percent" | "multiplier" | "number", icon: any, color: string) => {
     const Icon = icon;
-    const isUp = (trend || 0) >= 0;
     
+    // Resolve key and status from goal_profile
+    const getMetricKey = (t: string): string => {
+      const clean = t.toLowerCase().trim();
+      if (clean.includes("spend")) return "spend";
+      if (clean.includes("impressions")) return "impressions";
+      if (clean.includes("cpa") || clean.includes("cost per purchase")) return "cpa";
+      if (clean.includes("roas")) return "roas";
+      if (clean.includes("ctr")) return "ctr";
+      if (clean.includes("cpm")) return "cpm";
+      if (clean.includes("cpc")) return "cpc";
+      if (clean.includes("link click")) return "link_clicks";
+      if (clean.includes("total click") || clean.includes("clicks")) return "clicks";
+      if (clean.includes("cpl") || clean.includes("cost per lead")) return "cpl";
+      if (clean.includes("lead")) return "leads";
+      if (clean.includes("add to cart") || clean.includes("cart add")) return "add_to_cart";
+      if (clean.includes("checkout")) return "initiate_checkout";
+      if (clean.includes("cost per conversation")) return "cost_per_conversation";
+      if (clean.includes("conversation")) return "conversations";
+      if (clean.includes("aov") || clean.includes("average order")) return "aov";
+      if (clean.includes("engagement rate")) return "engagement_rate";
+      if (clean.includes("hook rate")) return "hook_rate";
+      if (clean.includes("video views")) return "video_views";
+      if (clean.includes("thruplay")) return "thruplays";
+      if (clean.includes("post engagement")) return "post_engagement";
+      if (clean.includes("purchase")) return "purchases";
+      return clean.replace(/ /g, "_");
+    };
+
+    const metricKey = getMetricKey(title);
+    const status = metrics?.goal_profile?.metric_statuses?.[metricKey];
+
     let formattedVal = "—";
-    if (value !== null && value !== undefined && !isNaN(value)) {
-      const valNum = Number(value);
-      if (formatType === "currency") {
-        formattedVal = formatCurrency(valNum);
-      } else if (formatType === "percent") {
-        formattedVal = `${(valNum * 100).toFixed(2)}%`;
-      } else if (formatType === "multiplier") {
-        formattedVal = title.includes("Frequency") ? valNum.toFixed(2) : `${valNum.toFixed(2)}x`;
-      } else {
-        formattedVal = formatNumber(valNum);
+    let isStatusMetric = false;
+
+    if (status === "CRM_REQUIRED") {
+      formattedVal = "CRM Required";
+      isStatusMetric = true;
+    } else if (status === "UNAVAILABLE") {
+      formattedVal = "Unavailable";
+      isStatusMetric = true;
+    } else if (status === "NOT_APPLICABLE") {
+      formattedVal = "N/A";
+      isStatusMetric = true;
+    } else if (status === "INSUFFICIENT_DATA") {
+      formattedVal = "Insufficient Data";
+      isStatusMetric = true;
+    } else {
+      if (value !== null && value !== undefined && !isNaN(value)) {
+        const valNum = Number(value);
+        if (formatType === "currency") {
+          formattedVal = formatCurrency(valNum);
+        } else if (formatType === "percent") {
+          formattedVal = `${(valNum * 100).toFixed(2)}%`;
+        } else if (formatType === "multiplier") {
+          formattedVal = title.includes("Frequency") ? valNum.toFixed(2) : `${valNum.toFixed(2)}x`;
+        } else {
+          formattedVal = formatNumber(valNum);
+        }
       }
     }
 
@@ -384,17 +430,23 @@ export default function OverviewPage() {
         <div className="flex justify-between items-start">
           <div className="flex flex-col">
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{title}</span>
-            <span className="text-2xl font-extrabold text-slate-900 mt-1 block">{formattedVal}</span>
+            <span className={`text-2xl font-extrabold mt-1 block ${isStatusMetric ? "text-slate-400 text-lg font-bold" : "text-slate-900"}`}>{formattedVal}</span>
           </div>
           <div className={`p-2.5 rounded-xl border ${bgColors[color] || bgColors.blue} flex items-center justify-center shrink-0`}>
             <Icon size={18} />
           </div>
         </div>
         <div className="mt-4 pt-3 border-t border-slate-100">
-          <span className={`text-[11px] font-semibold flex items-center gap-0.5 ${safeTrend >= 0 ? "text-emerald-600" : "text-rose-500"}`}>
-            {safeTrend >= 0 ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
-            <span className="font-bold">{Math.abs(safeTrend).toFixed(1)}%</span> vs prev period
-          </span>
+          {isStatusMetric ? (
+            <span className="text-[11px] font-medium text-slate-400">
+              {status === "CRM_REQUIRED" ? "Requires CRM integration" : "Metric not available"}
+            </span>
+          ) : (
+            <span className={`text-[11px] font-semibold flex items-center gap-0.5 ${safeTrend >= 0 ? "text-emerald-600" : "text-rose-500"}`}>
+              {safeTrend >= 0 ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
+              <span className="font-bold">{Math.abs(safeTrend).toFixed(1)}%</span> vs prev period
+            </span>
+          )}
         </div>
       </div>
     );

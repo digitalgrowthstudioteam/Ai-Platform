@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 from app.database import get_db
 from app.dependencies import get_current_user, require_active_subscription
@@ -75,6 +75,10 @@ class AdItemResponse(BaseModel):
     adset_name: str
     metrics: AdMetrics
     creative: Optional[CreativeDetails] = None
+    goal: Optional[str] = None
+    performance_goal: Optional[str] = None
+    outcome: Optional[str] = None
+    goal_profile: Optional[Dict[str, Any]] = None
 
 
 class AdSetMetrics(BaseModel):
@@ -114,6 +118,9 @@ class AdSetItemResponse(BaseModel):
     optimization_event: Optional[str] = None
     performance_goal_profile_id: Optional[str] = None
     metrics: AdSetMetrics
+    goal: Optional[str] = None
+    outcome: Optional[str] = None
+    goal_profile: Optional[Dict[str, Any]] = None
 
 
 class CreativeItemResponse(BaseModel):
@@ -209,7 +216,9 @@ async def list_ads(
         select(
             Ad,
             AdSet.name.label("adset_name"),
+            AdSet.performance_goal.label("adset_performance_goal"),
             Campaign.name.label("campaign_name"),
+            Campaign.objective.label("campaign_objective"),
             Creative,
             func.coalesce(metrics_subq.c.spend, 0).label("spend"),
             func.coalesce(metrics_subq.c.impressions, 0).label("impressions"),
@@ -310,6 +319,13 @@ async def list_ads(
                 landing_page_url=cr.landing_page_url,
             )
 
+        # Resolve goal engine details
+        from app.services.goal_engine import PerformanceGoalEngine
+        prof = PerformanceGoalEngine.get_metric_profile(
+            objective=row.campaign_objective,
+            goal=row.adset_performance_goal
+        )
+
         ads.append(
             AdItemResponse(
                 id=ad.id,
@@ -340,6 +356,10 @@ async def list_ads(
                     roas_trend=roas_trend,
                 ),
                 creative=creative_details,
+                goal=prof.get("objective"),
+                performance_goal=row.adset_performance_goal,
+                outcome=prof.get("outcome"),
+                goal_profile=prof
             )
         )
     return ads
@@ -503,6 +523,13 @@ async def list_adsets(
 
         conversations = conversations_map.get(adset.id, 0)
 
+        # Resolve goal engine details
+        from app.services.goal_engine import PerformanceGoalEngine
+        prof = PerformanceGoalEngine.get_metric_profile(
+            objective=row.campaign_objective,
+            goal=adset.performance_goal
+        )
+
         adsets.append(
             AdSetItemResponse(
                 id=adset.id,
@@ -539,6 +566,9 @@ async def list_adsets(
                     cpc_trend=cpc_trend,
                     roas_trend=roas_trend,
                 ),
+                goal=prof.get("objective"),
+                outcome=prof.get("outcome"),
+                goal_profile=prof
             )
         )
     return adsets
