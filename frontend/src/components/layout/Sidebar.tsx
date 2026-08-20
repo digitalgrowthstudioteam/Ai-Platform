@@ -27,6 +27,7 @@ import {
   ChevronUp,
   ShieldAlert,
   Brain,
+  Sparkles,
 } from "lucide-react";
 
 interface NavItem {
@@ -47,6 +48,8 @@ const navigation: NavSection[] = [
     label: "",
     items: [
       { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+      { label: "Today's Brief", href: "/briefs/daily", icon: Sparkles },
+      { label: "Weekly Brief", href: "/briefs/weekly", icon: Zap },
     ],
   },
   {

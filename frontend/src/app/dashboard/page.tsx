@@ -844,48 +844,6 @@ export default function OverviewPage() {
         </div>
       ) : metrics ? (
         <>
-          {/* AI Brief Summary Highlights */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div className="card p-5 border border-blue-100 bg-blue-50/10 rounded-lg flex flex-col justify-between space-y-3">
-              <div>
-                <div className="flex items-center gap-1.5 text-blue-600">
-                  <Sparkles size={16} />
-                  <span className="text-xs font-black uppercase tracking-wider">Today's AI Brief</span>
-                </div>
-                <h4 className="text-sm font-bold text-slate-800 mt-2">
-                  {dailyBrief && dailyBrief.primary_kpi_change !== undefined
-                    ? `Yesterday ${dailyBrief.primary_kpi} ${dailyBrief.primary_kpi_change >= 0 ? "increased" : "decreased"} ${Math.abs(dailyBrief.primary_kpi_change * 100).toFixed(0)}%`
-                    : "Yesterday's performance overview"}
-                </h4>
-                <p className="text-xs text-subtle font-medium mt-1">
-                  {dailyBrief 
-                    ? `${dailyBrief.top_priorities?.length || 3} priorities need your attention today.`
-                    : "Generating today's AI priorities..."}
-                </p>
-              </div>
-              <Link href="/briefs/daily" className="text-xs font-bold text-primary hover:underline flex items-center gap-1 mt-2">
-                View Daily Brief <ChevronRight size={14} />
-              </Link>
-            </div>
-            
-            <div className="card p-5 border border-indigo-100 bg-indigo-50/10 rounded-lg flex flex-col justify-between space-y-3">
-              <div>
-                <div className="flex items-center gap-1.5 text-indigo-600">
-                  <Zap size={16} />
-                  <span className="text-xs font-black uppercase tracking-wider">Weekly AI Brief</span>
-                </div>
-                <h4 className="text-sm font-bold text-slate-800 mt-2 truncate max-w-full">
-                  {weeklyBrief?.winning_pattern?.pattern || "Weekly performance summary"}
-                </h4>
-                <p className="text-xs text-subtle font-medium mt-1 line-clamp-2">
-                  {weeklyBrief?.winning_pattern?.description || "Review weekly brief insights."}
-                </p>
-              </div>
-              <Link href="/briefs/weekly" className="text-xs font-bold text-primary hover:underline flex items-center gap-1 mt-2">
-                View Weekly Brief <ChevronRight size={14} />
-              </Link>
-            </div>
-          </div>
 
           {/* KPI Cards Grid */}
           {goalFilter === "all" && (
