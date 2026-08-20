@@ -241,8 +241,15 @@ export default function DailyBriefPage() {
  
   const bestCamp = getBestPerformingCampaign();
  
+  const getGreeting = () => {
+    const hr = new Date().getHours();
+    if (hr < 12) return "Good morning 👋";
+    if (hr < 17) return "Good afternoon 👋";
+    return "Good evening 👋";
+  };
+
   return (
-    <div className="animate-fade-in space-y-6 max-w-4xl mx-auto pb-12">
+    <div className="animate-fade-in space-y-6 pb-12">
       {/* Back Link */}
       <Link href="/dashboard" className="flex items-center gap-1.5 text-xs text-subtle font-bold hover:text-slate-700 transition">
         <ArrowLeft size={14} /> Back to Dashboard
@@ -254,7 +261,7 @@ export default function DailyBriefPage() {
         
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div className="space-y-1">
-            <h1 className="text-2xl font-black text-slate-900 leading-tight">Good morning 👋</h1>
+            <h1 className="text-2xl font-black text-slate-900 leading-tight">{getGreeting()}</h1>
             <p className="text-xs text-slate-500 font-semibold">Here's what changed in your Meta Ads account.</p>
             <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1">
               {reportDateStr} &bull; Synced {new Date(brief.generated_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}

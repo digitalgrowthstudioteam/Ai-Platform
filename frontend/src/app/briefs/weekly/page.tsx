@@ -55,7 +55,7 @@ export default function WeeklyBriefPage() {
       }
       setBrief(data);
  
-      const ddData = await api.getBriefDrilldown(selectedAccount.id, data.end_date);
+      const ddData = await api.getBriefDrilldown(selectedAccount.id, data.end_date, 7);
       setDrilldown(ddData);
  
       // Expand campaigns by default
@@ -242,8 +242,15 @@ export default function WeeklyBriefPage() {
  
   const bestCamp = getBestPerformingCampaign();
  
+  const getGreeting = () => {
+    const hr = new Date().getHours();
+    if (hr < 12) return "Good morning 👋";
+    if (hr < 17) return "Good afternoon 👋";
+    return "Good evening 👋";
+  };
+
   return (
-    <div className="animate-fade-in space-y-6 max-w-4xl mx-auto pb-12">
+    <div className="animate-fade-in space-y-6 pb-12">
       {/* Back Link */}
       <Link href="/dashboard" className="flex items-center gap-1.5 text-xs text-subtle font-bold hover:text-slate-700 transition">
         <ArrowLeft size={14} /> Back to Dashboard
@@ -257,7 +264,7 @@ export default function WeeklyBriefPage() {
           <div className="space-y-1">
             <div className="text-[10px] font-black uppercase tracking-widest text-indigo-600">Weekly Performance Report</div>
             <h1 className="text-2xl font-black text-slate-900 leading-tight">WEEKLY AI BRIEF</h1>
-            <p className="text-xs text-slate-500 font-semibold">Your Meta Ads performance this week</p>
+            <p className="text-xs text-slate-500 font-semibold">{getGreeting()} &bull; Your Meta Ads performance this week</p>
             <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1">
               Current Period: <span className="font-extrabold text-slate-700">{startDateStr} &ndash; {endDateStr}</span> 
               <span className="mx-2">&bull;</span>

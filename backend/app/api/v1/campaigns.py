@@ -685,6 +685,7 @@ async def get_adset_daily_metrics(
 async def get_brief_drilldown(
     ad_account_id: str = Query(..., description="Active Ad account ID string"),
     report_date: Optional[str] = Query(None, description="Report date (YYYY-MM-DD), default is yesterday"),
+    days: int = Query(1, description="Number of days to check spend for"),
     claims: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -712,12 +713,14 @@ async def get_brief_drilldown(
     else:
         target_date = date.today() - timedelta(days=1)
 
-    # 3. Find campaigns with spend > 0.01 yesterday (target_date)
+    # 3. Find campaigns with spend > 0.01 over the period ending on target_date
+    start_dt = target_date - timedelta(days=days - 1)
     c_stmt = (
         select(Campaign)
         .join(CampaignDailyMetrics, Campaign.id == CampaignDailyMetrics.campaign_id)
         .where(Campaign.ad_account_id == ad_acc.id)
-        .where(CampaignDailyMetrics.date == target_date)
+        .where(CampaignDailyMetrics.date >= start_dt)
+        .where(CampaignDailyMetrics.date <= target_date)
         .where(CampaignDailyMetrics.spend >= 0.01)
         .group_by(Campaign.id)
     )
@@ -753,11 +756,13 @@ async def get_brief_drilldown(
     for r in all_metrics:
         adset_metrics_map.setdefault(r.ad_set_id, []).append(r)
 
-    # Yesterday spend per campaign map
+    # Spend per campaign over the period map
     yesterday_c_spend_stmt = (
-        select(CampaignDailyMetrics.campaign_id, CampaignDailyMetrics.spend)
+        select(CampaignDailyMetrics.campaign_id, func.sum(CampaignDailyMetrics.spend).label("spend"))
         .where(CampaignDailyMetrics.campaign_id.in_(active_campaign_ids))
-        .where(CampaignDailyMetrics.date == target_date)
+        .where(CampaignDailyMetrics.date >= start_dt)
+        .where(CampaignDailyMetrics.date <= target_date)
+        .group_by(CampaignDailyMetrics.campaign_id)
     )
     yesterday_c_spend_res = await db.execute(yesterday_c_spend_stmt)
     yesterday_c_spend = {r.campaign_id: float(r.spend or 0.0) for r in yesterday_c_spend_res.all()}
