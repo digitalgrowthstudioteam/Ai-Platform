@@ -429,13 +429,22 @@ async def get_decision_center_summary(
         ai_summary = "Your ad account is in excellent health! No critical issues or optimization opportunities were flagged by the AI engine."
     else:
         if critical_count > 0:
-            parts.append(f"{critical_count} critical issue{'s' if critical_count > 1 else ''} require immediate attention")
+            parts.append(f"{critical_count} critical issue{'s' if critical_count > 1 else ''}")
         if high_count > 0:
-            parts.append(f"{high_count} high-priority issue{'s' if high_count > 1 else ''} need review")
+            parts.append(f"{high_count} high-priority issue{'s' if high_count > 1 else ''}")
+        if medium_count > 0:
+            parts.append(f"{medium_count} medium-priority issue{'s' if medium_count > 1 else ''}")
+        if low_count > 0:
+            parts.append(f"{low_count} low-priority suggestion{'s' if low_count > 1 else ''}")
         if opportunity_count > 0:
-            parts.append(f"{opportunity_count} scaling opportunit{'ies' if opportunity_count > 1 else 'y'} detected")
+            parts.append(f"{opportunity_count} scaling opportunit{'ies' if opportunity_count > 1 else 'y'}")
             
-        summary_intro = "Your account has " + ", and ".join(parts) + "."
+        if len(parts) > 1:
+            summary_intro = "Your account has " + ", ".join(parts[:-1]) + ", and " + parts[-1] + "."
+        elif len(parts) == 1:
+            summary_intro = "Your account has " + parts[0] + "."
+        else:
+            summary_intro = "Your account has active recommendations available."
         
         detail_parts = []
         if fatigue_count > 0:

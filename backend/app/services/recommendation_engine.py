@@ -150,6 +150,10 @@ class RecommendationEngine:
         active_stmt = select(Campaign).where(Campaign.ad_account_id == ad_account_uuid).where(Campaign.status == "ACTIVE").options(selectinload(Campaign.ad_sets))
         active_res = await db.execute(active_stmt)
         active_campaigns = active_res.scalars().all()
+        if not active_campaigns:
+            all_stmt = select(Campaign).where(Campaign.ad_account_id == ad_account_uuid).options(selectinload(Campaign.ad_sets))
+            all_res = await db.execute(all_stmt)
+            active_campaigns = all_res.scalars().all()
         
         is_messaging_acc = False
         is_leads_acc = False
