@@ -134,20 +134,20 @@ class ApiClient {
   }
 
   // Phase 6: Analytics Engine endpoints
-  async getDashboardOverview(adAccountId: string, startDate: string, endDate: string) {
+  async getDashboardOverview(adAccountId: string, startDate: string, endDate: string, goal: string = "all") {
     return this.request<any>(
-      `/dashboard/overview?ad_account_id=${adAccountId}&start_date=${startDate}&end_date=${endDate}`
+      `/dashboard/overview?ad_account_id=${adAccountId}&start_date=${startDate}&end_date=${endDate}&goal=${goal}`
     );
   }
 
-  async getDashboardChart(adAccountId: string, startDate: string, endDate: string) {
+  async getDashboardChart(adAccountId: string, startDate: string, endDate: string, goal: string = "all") {
     return this.request<any[]>(
-      `/dashboard/chart?ad_account_id=${adAccountId}&start_date=${startDate}&end_date=${endDate}`
+      `/dashboard/chart?ad_account_id=${adAccountId}&start_date=${startDate}&end_date=${endDate}&goal=${goal}`
     );
   }
 
-  async getDashboardHealth(adAccountId: string) {
-    return this.request<any>(`/dashboard/health?ad_account_id=${adAccountId}`);
+  async getDashboardHealth(adAccountId: string, goal: string = "all") {
+    return this.request<any>(`/dashboard/health?ad_account_id=${adAccountId}&goal=${goal}`);
   }
 
   async getCampaigns(adAccountId: string, startDate: string, endDate: string) {
@@ -231,8 +231,29 @@ class ApiClient {
   }
 
   // Phase 8: AI Recommendations endpoints
-  async getRecommendations(adAccountId: string) {
-    return this.request<any[]>(`/recommendations?ad_account_id=${adAccountId}`);
+  async getRecommendations(adAccountId: string, filters?: { goal?: string; priority?: string; status?: string; entity?: string }) {
+    let url = `/recommendations?ad_account_id=${adAccountId}`;
+    if (filters) {
+      if (filters.goal) url += `&goal=${encodeURIComponent(filters.goal)}`;
+      if (filters.priority) url += `&priority=${encodeURIComponent(filters.priority)}`;
+      if (filters.status) url += `&status=${encodeURIComponent(filters.status)}`;
+      if (filters.entity) url += `&entity=${encodeURIComponent(filters.entity)}`;
+    }
+    return this.request<any[]>(url);
+  }
+
+  async getRecommendationsSummary(adAccountId: string) {
+    return this.request<any>(`/recommendations/summary?ad_account_id=${adAccountId}`);
+  }
+
+  async getRecommendationEffectiveness(adAccountId: string) {
+    return this.request<any[]>(`/recommendations/effectiveness?ad_account_id=${adAccountId}`);
+  }
+
+  async viewRecommendation(recommendationId: string) {
+    return this.request<{ status: string; message: string }>(`/recommendations/${recommendationId}/view`, {
+      method: "POST",
+    });
   }
 
   async applyRecommendation(recommendationId: string) {
@@ -241,8 +262,12 @@ class ApiClient {
     });
   }
 
-  async dismissRecommendation(recommendationId: string) {
-    return this.request<{ status: string; message: string }>(`/recommendations/${recommendationId}/dismiss`, {
+  async dismissRecommendation(recommendationId: string, reason?: string) {
+    let url = `/recommendations/${recommendationId}/dismiss`;
+    if (reason) {
+      url += `?reason=${encodeURIComponent(reason)}`;
+    }
+    return this.request<{ status: string; message: string }>(url, {
       method: "POST",
     });
   }

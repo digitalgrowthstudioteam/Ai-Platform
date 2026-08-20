@@ -1094,20 +1094,143 @@ class RecommendationEngine:
             )
             recommendations_to_add.extend(root_cause_diagnoses)
 
-        # ──────────────────────────────────────────────
-        # Idempotent database operations
-        # ──────────────────────────────────────────────
-        delete_stmt = (
-            delete(AIRecommendation)
-            .where(AIRecommendation.ad_account_id == ad_account_uuid)
-            .where(AIRecommendation.status.in_(["new", "viewed"]))
-        )
-        await db.execute(delete_stmt)
-        await db.commit()
+        # 1. Fetch existing recommendations for this ad account
+        existing_stmt = select(AIRecommendation).where(AIRecommendation.ad_account_id == ad_account_uuid)
+        existing_res = await db.execute(existing_stmt)
+        existing_recs = list(existing_res.scalars().all())
+        
+        existing_lookup = {}
+        for r in existing_recs:
+            key = (r.campaign_id, r.recommendation_type, r.root_cause)
+            existing_lookup[key] = r
 
-        # Add new suggestions — apply DataQualityGuard to each recommendation
+        # Cache campaign objectives, outcomes, and historical baselines
+        from app.services.goal_engine import PerformanceGoalEngine
+        campaign_info = {}
+        campaign_baselines = {}
+        for c_item in active_campaigns:
+            pg_item = c_item.ad_sets[0].performance_goal if c_item.ad_sets else None
+            prof_item = PerformanceGoalEngine.get_metric_profile(objective=c_item.objective, goal=pg_item)
+            campaign_info[c_item.id] = {
+                "goal": prof_item["objective"],
+                "outcome": prof_item["outcome"]
+            }
+
+            # Fetch all daily metrics for this campaign to compute historical baselines
+            stmt_all = (
+                select(CampaignDailyMetrics)
+                .where(CampaignDailyMetrics.campaign_id == c_item.id)
+                .order_by(CampaignDailyMetrics.date.desc())
+            )
+            res_all = await db.execute(stmt_all)
+            all_rows = list(res_all.scalars().all())
+
+            today_date = date.today()
+
+            def calc_period_stats(metric_rows):
+                if not metric_rows:
+                    return {"spend": 0.0, "conversions": 0, "ctr": 0.0, "cpc": 0.0, "cpa": 0.0, "cpl": 0.0, "purchases": 0, "leads": 0}
+                total_spend = sum(float(r.spend or 0.0) for r in metric_rows)
+                total_impr = sum(int(r.impressions or 0) for r in metric_rows)
+                total_clicks = sum(int(r.clicks or 0) for r in metric_rows)
+                total_leads = sum(int(r.leads or 0) for r in metric_rows)
+                total_purchases = sum(int(r.purchases or 0) for r in metric_rows)
+                
+                ctr = total_clicks / total_impr if total_impr > 0 else 0.0
+                cpc = total_spend / total_clicks if total_clicks > 0 else 0.0
+                cpa = total_spend / total_purchases if total_purchases > 0 else 0.0
+                cpl = total_spend / total_leads if total_leads > 0 else 0.0
+                
+                return {
+                    "spend": total_spend,
+                    "conversions": total_leads + total_purchases,
+                    "ctr": ctr,
+                    "cpc": cpc,
+                    "cpa": cpa,
+                    "cpl": cpl,
+                    "purchases": total_purchases,
+                    "leads": total_leads
+                }
+
+            rows_7d = [r for r in all_rows if (today_date - r.date).days <= 7]
+            rows_14d = [r for r in all_rows if (today_date - r.date).days <= 14]
+            rows_30d = [r for r in all_rows if (today_date - r.date).days <= 30]
+            rows_90d = [r for r in all_rows if (today_date - r.date).days <= 90]
+
+            baseline_7d = calc_period_stats(rows_7d)
+            baseline_14d = calc_period_stats(rows_14d)
+            baseline_30d = calc_period_stats(rows_30d)
+            baseline_90d = calc_period_stats(rows_90d)
+            baseline_lifetime = calc_period_stats(all_rows)
+
+            cpa_anomaly = (baseline_7d["cpa"] - baseline_30d["cpa"]) / baseline_30d["cpa"] > 0.40 if baseline_30d["cpa"] > 0 else False
+            cpl_anomaly = (baseline_7d["cpl"] - baseline_30d["cpl"]) / baseline_30d["cpl"] > 0.40 if baseline_30d["cpl"] > 0 else False
+            cpc_anomaly = (baseline_7d["cpc"] - baseline_30d["cpc"]) / baseline_30d["cpc"] > 0.40 if baseline_30d["cpc"] > 0 else False
+            ctr_anomaly = (baseline_7d["ctr"] - baseline_30d["ctr"]) / baseline_30d["ctr"] < -0.30 if baseline_30d["ctr"] > 0 else False
+
+            cpc_trend = "RISING" if baseline_7d["cpc"] > baseline_14d["cpc"] > baseline_30d["cpc"] else ("FALLING" if baseline_7d["cpc"] < baseline_14d["cpc"] < baseline_30d["cpc"] else "STABLE")
+            ctr_trend = "DECLINING" if baseline_7d["ctr"] < baseline_14d["ctr"] < baseline_30d["ctr"] else ("IMPROVING" if baseline_7d["ctr"] > baseline_14d["ctr"] > baseline_30d["ctr"] else "STABLE")
+            cpa_trend = "RISING" if baseline_7d["cpa"] > baseline_14d["cpa"] > baseline_30d["cpa"] else ("FALLING" if baseline_7d["cpa"] < baseline_14d["cpa"] < baseline_30d["cpa"] else "STABLE")
+
+            campaign_baselines[c_item.id] = {
+                "baseline_7d": baseline_7d,
+                "baseline_14d": baseline_14d,
+                "baseline_30d": baseline_30d,
+                "baseline_90d": baseline_90d,
+                "baseline_lifetime": baseline_lifetime,
+                "anomalies": {
+                    "cpa_anomaly": cpa_anomaly,
+                    "cpl_anomaly": cpl_anomaly,
+                    "cpc_anomaly": cpc_anomaly,
+                    "ctr_anomaly": ctr_anomaly
+                },
+                "trends": {
+                    "cpc_trend": cpc_trend,
+                    "ctr_trend": ctr_trend,
+                    "cpa_trend": cpa_trend
+                }
+            }
+
+        matched_ids = set()
         count = 0
         for rec in recommendations_to_add:
+            if rec.supporting_metrics is None:
+                rec.supporting_metrics = {}
+                
+            info = campaign_info.get(rec.campaign_id or rec.entity_id)
+            if info:
+                if "goal" not in rec.supporting_metrics:
+                    rec.supporting_metrics["goal"] = info["goal"]
+                if "outcome" not in rec.supporting_metrics:
+                    rec.supporting_metrics["outcome"] = info["outcome"]
+
+            # Set historical baseline metrics in supporting_metrics
+            camp_id = rec.campaign_id or rec.entity_id
+            base_data = campaign_baselines.get(camp_id)
+            if base_data:
+                rec.supporting_metrics.update(base_data)
+                    
+            if "data_period" not in rec.supporting_metrics:
+                rec.supporting_metrics["data_period"] = "last_14_days" if rec.recommendation_type == "SCALING_OPPORTUNITY" else "last_7_days"
+            if "comparison_period" not in rec.supporting_metrics:
+                rec.supporting_metrics["comparison_period"] = "previous_14_days" if rec.recommendation_type == "SCALING_OPPORTUNITY" else "previous_7_days"
+                
+            # Suggested action mapping for main suggestions
+            if "suggested_action" not in rec.supporting_metrics:
+                action = "MONITOR"
+                r_type = rec.recommendation_type.upper()
+                if "SCALING" in r_type or "SCALE" in r_type:
+                    action = "CONSIDER_SCALING"
+                elif "CONVERSION" in r_type:
+                    action = "REVIEW_FUNNEL"
+                elif "CREATIVE" in r_type or "FATIGUE" in r_type:
+                    action = "REVIEW_CREATIVE"
+                rec.supporting_metrics["suggested_action"] = action
+
+            # Enforce opportunity priority
+            if "OPPORTUNITY" in rec.recommendation_type.upper():
+                rec.priority = "opportunity"
+
             # Run data quality check using the recommendation's supporting metrics
             metrics = rec.supporting_metrics or {}
             verdict = DataQualityGuard.check_entity(
@@ -1131,12 +1254,43 @@ class RecommendationEngine:
                 rec.evidence = (rec.evidence or "") + f" [DataQuality: {verdict.verdict} — {verdict.reason}]"
                 logger.debug("Recommendation downgraded by DataQualityGuard", title=rec.title, verdict=verdict.verdict)
 
-            db.add(rec)
-            count += 1
+            # Check duplication/upsert
+            key = (rec.campaign_id, rec.recommendation_type, rec.root_cause)
+            if key in existing_lookup:
+                old_rec = existing_lookup[key]
+                old_rec.title = rec.title
+                old_rec.description = rec.description
+                old_rec.reason = rec.reason
+                old_rec.evidence = rec.evidence
+                old_rec.expected_impact = rec.expected_impact
+                old_rec.confidence_score = rec.confidence_score
+                old_rec.priority = rec.priority
+                # Merge supporting metrics
+                old_metrics = old_rec.supporting_metrics or {}
+                old_metrics.update(rec.supporting_metrics or {})
+                old_rec.supporting_metrics = old_metrics
+                # Reactivate if it was expired
+                if old_rec.status == "expired":
+                    old_rec.status = "new"
+                old_rec.updated_at = datetime.utcnow()
+                matched_ids.add(old_rec.id)
+            else:
+                db.add(rec)
+                count += 1
+
+        # Expire stale recommendations
+        for r in existing_recs:
+            if r.id not in matched_ids and r.status in ("new", "viewed"):
+                r.status = "expired"
+                if r.supporting_metrics is None:
+                    r.supporting_metrics = {}
+                r.supporting_metrics["expired_at"] = datetime.utcnow().isoformat()
+                r.updated_at = datetime.utcnow()
             
         await db.commit()
-        logger.info("AI Recommendations compiled (with data quality guard)", count=count)
+        logger.info("AI Recommendations compiled (with lifecycle updates)", count=count)
         return count
+
 
     @classmethod
     async def evaluate_root_cause_diagnosis(
@@ -1219,32 +1373,57 @@ class RecommendationEngine:
         p_derived = MetricEngine.calculate_derived_metrics(prev)
 
         c_spend = curr["spend"]
-        c_conversions = curr["purchases"] + curr["leads"] + curr["calls"] + curr["conversations"]
-
-        # Determine Goal of the Campaign
-        perf_goal = "conversions"
+        
+        # Determine Goal and Outcome of the Campaign via PerformanceGoalEngine (SSOT)
+        from app.services.goal_engine import PerformanceGoalEngine
+        
+        pg = "conversions"
         if camp.ad_sets:
-            perf_goal = camp.ad_sets[0].performance_goal or "conversions"
+            pg = camp.ad_sets[0].performance_goal or "conversions"
         else:
             # Fallback to objective parsing
             obj = (camp.objective or "").upper()
             if "LEAD" in obj:
-                perf_goal = "leads"
+                pg = "leads"
             elif "SALES" in obj or "CONVERSIONS" in obj:
-                perf_goal = "purchases"
+                pg = "purchases"
             elif "MESSAGING" in obj or "CONVERSATION" in obj or "ENGAGEMENT" in obj:
-                perf_goal = "conversations"
+                pg = "conversations"
+
+        profile = PerformanceGoalEngine.get_metric_profile(objective=camp.objective, goal=pg)
+        outcome = profile.get("outcome")
+        goal_val = profile.get("objective")
+        primary_metric = profile.get("primary")[0] if profile.get("primary") else "purchases"
 
         # Determine if it's messaging/conversation goal
-        perf_goal_upper = perf_goal.upper()
-        is_messaging_goal = (
-            "CONVERSATION" in perf_goal_upper or 
-            "MESSAGING" in perf_goal_upper or 
-            "ENGAGEMENT" in perf_goal_upper or
-            "REPLY" in perf_goal_upper or
-            "CONVERSATION" in (camp.objective or "").upper() or
-            "MESSAGING" in (camp.objective or "").upper()
-        )
+        is_messaging_goal = outcome in ("messenger", "instagram_messages", "whatsapp")
+        
+        # Determine performance goal mapped key
+        perf_goal = "conversions"
+        if outcome in ("website_purchases", "catalogue_sales"):
+            perf_goal = "purchases"
+        elif outcome in ("website_leads", "instant_forms"):
+            perf_goal = "leads"
+        elif outcome in ("calls", "calls_lead"):
+            perf_goal = "calls"
+        elif is_messaging_goal:
+            perf_goal = "conversations"
+        elif outcome in ("video_views", "video_engagement"):
+            perf_goal = "video_views"
+        
+        # Calculate objective-specific primary conversion count (Generic conversions count removed)
+        c_conversions = 0
+        if primary_metric == "link_clicks":
+            c_conversions = int(curr.get("link_clicks") or 0)
+        elif primary_metric == "reach":
+            c_conversions = int(curr.get("reach") or 0)
+        else:
+            c_conversions = int(curr.get(primary_metric) or 0)
+
+        # Skip evaluation if primary metric is not available/applicable or requires CRM
+        statuses = profile.get("metric_statuses", {})
+        if statuses.get(primary_metric) in ("CRM_REQUIRED", "UNAVAILABLE", "NOT_APPLICABLE"):
+            return diagnoses
 
         # ──────────────────────────────────────────
         # 8.1 Don't Change Engine: Insufficient Data / Learning Period Check
@@ -1511,6 +1690,40 @@ class RecommendationEngine:
                         status="new"
                     )
                 )
+
+            # Landing Page Problem rule (Section 6)
+            if outcome in ("website_leads", "website_purchases"):
+                link_ctr = c_derived.get("ctr") or 0.0
+                lpv_rate = c_derived.get("lpv_rate") or 0.0
+                lp_to_lead_cvr = c_derived.get("landing_page_to_lead_conversion_rate") or 0.0
+                
+                # If CTR is healthy (e.g. >= 1%), LPV Rate is healthy (e.g. >= 70%), and LP -> Lead CVR is poor (e.g. < 5%)
+                if link_ctr >= 0.01 and lpv_rate >= 70.0 and 0.0 < lp_to_lead_cvr < 5.0:
+                    priority, confidence = cls.calculate_priority_and_confidence(
+                        impact=0.80, urgency=0.70, spend=c_spend, num_conversions=c_conversions
+                    )
+                    diagnoses.append(
+                        AIRecommendation(
+                            user_id=user_uuid,
+                            ad_account_id=ad_account_uuid,
+                            entity_type="campaign",
+                            entity_id=camp.id,
+                            campaign_id=camp.id,
+                            recommendation_type="LANDING_PAGE_OPTIMIZATION",
+                            title=f"Review Landing Page Funnel: {camp.name}",
+                            description="CTR and LPV rates are healthy, but conversion rate from landing page to result is low.",
+                            reason="Click-through parameters indicate strong creative interest, but landing page experience fails to convert traffic.",
+                            objective=camp.objective,
+                            problem="Landing page conversion bottleneck",
+                            root_cause="User experience friction or message mismatch on landing page",
+                            evidence=f"CTR: {link_ctr*100:.2f}%, LPV Rate: {lpv_rate:.2f}%, LP CVR: {lp_to_lead_cvr:.2f}%.",
+                            expected_impact="Optimizing page speed, copy clarity, or CTA placement will boost conversion rates and lower CPL/CPA.",
+                            confidence_score=confidence,
+                            priority=priority,
+                            supporting_metrics={"ctr": link_ctr, "lpv_rate": lpv_rate, "lp_cvr": lp_to_lead_cvr},
+                            status="new"
+                        )
+                    )
         elif perf_goal == "calls":
             cpc_call_change = pct_change(c_derived.get("cost_per_call"), p_derived.get("cost_per_call"))
             if cpc_call_change > 0.15:
@@ -1630,5 +1843,122 @@ class RecommendationEngine:
                         status="new"
                     )
                 )
+
+        # Fetch historical daily metrics for baseline computation
+        stmt_all = (
+            select(CampaignDailyMetrics)
+            .where(CampaignDailyMetrics.campaign_id == camp.id)
+            .order_by(CampaignDailyMetrics.date.desc())
+        )
+        res_all = await db.execute(stmt_all)
+        all_rows = list(res_all.scalars().all())
+
+        today_date = date.today()
+
+        def calc_period_stats(metric_rows):
+            if not metric_rows:
+                return {"spend": 0.0, "conversions": 0, "ctr": 0.0, "cpc": 0.0, "cpa": 0.0, "cpl": 0.0, "purchases": 0, "leads": 0}
+            total_spend = sum(float(r.spend or 0.0) for r in metric_rows)
+            total_impr = sum(int(r.impressions or 0) for r in metric_rows)
+            total_clicks = sum(int(r.clicks or 0) for r in metric_rows)
+            total_leads = sum(int(r.leads or 0) for r in metric_rows)
+            total_purchases = sum(int(r.purchases or 0) for r in metric_rows)
+            
+            ctr = total_clicks / total_impr if total_impr > 0 else 0.0
+            cpc = total_spend / total_clicks if total_clicks > 0 else 0.0
+            cpa = total_spend / total_purchases if total_purchases > 0 else 0.0
+            cpl = total_spend / total_leads if total_leads > 0 else 0.0
+            
+            return {
+                "spend": total_spend,
+                "conversions": total_leads + total_purchases,
+                "ctr": ctr,
+                "cpc": cpc,
+                "cpa": cpa,
+                "cpl": cpl,
+                "purchases": total_purchases,
+                "leads": total_leads
+            }
+
+        # Calculate stats per period
+        rows_7d = [r for r in all_rows if (today_date - r.date).days <= 7]
+        rows_14d = [r for r in all_rows if (today_date - r.date).days <= 14]
+        rows_30d = [r for r in all_rows if (today_date - r.date).days <= 30]
+        rows_90d = [r for r in all_rows if (today_date - r.date).days <= 90]
+
+        baseline_7d = calc_period_stats(rows_7d)
+        baseline_14d = calc_period_stats(rows_14d)
+        baseline_30d = calc_period_stats(rows_30d)
+        baseline_90d = calc_period_stats(rows_90d)
+        baseline_lifetime = calc_period_stats(all_rows)
+
+        # Calculate anomalies relative to 30d baseline
+        cpa_anomaly = (baseline_7d["cpa"] - baseline_30d["cpa"]) / baseline_30d["cpa"] > 0.40 if baseline_30d["cpa"] > 0 else False
+        cpl_anomaly = (baseline_7d["cpl"] - baseline_30d["cpl"]) / baseline_30d["cpl"] > 0.40 if baseline_30d["cpl"] > 0 else False
+        cpc_anomaly = (baseline_7d["cpc"] - baseline_30d["cpc"]) / baseline_30d["cpc"] > 0.40 if baseline_30d["cpc"] > 0 else False
+        ctr_anomaly = (baseline_7d["ctr"] - baseline_30d["ctr"]) / baseline_30d["ctr"] < -0.30 if baseline_30d["ctr"] > 0 else False
+
+        # Calculate trend persistence
+        cpc_trend = "RISING" if baseline_7d["cpc"] > baseline_14d["cpc"] > baseline_30d["cpc"] else ("FALLING" if baseline_7d["cpc"] < baseline_14d["cpc"] < baseline_30d["cpc"] else "STABLE")
+        ctr_trend = "DECLINING" if baseline_7d["ctr"] < baseline_14d["ctr"] < baseline_30d["ctr"] else ("IMPROVING" if baseline_7d["ctr"] > baseline_14d["ctr"] > baseline_30d["ctr"] else "STABLE")
+        cpa_trend = "RISING" if baseline_7d["cpa"] > baseline_14d["cpa"] > baseline_30d["cpa"] else ("FALLING" if baseline_7d["cpa"] < baseline_14d["cpa"] < baseline_30d["cpa"] else "STABLE")
+
+        # Post-process diagnoses list to enforce Phase 3/5 attributes
+        for rec in diagnoses:
+            if rec.supporting_metrics is None:
+                rec.supporting_metrics = {}
+            rec.supporting_metrics["goal"] = goal_val
+            rec.supporting_metrics["outcome"] = outcome
+            rec.supporting_metrics["data_period"] = "last_7_days"
+            rec.supporting_metrics["comparison_period"] = "previous_7_days"
+            
+            # Phase 5 properties
+            rec.supporting_metrics["baseline_7d"] = baseline_7d
+            rec.supporting_metrics["baseline_14d"] = baseline_14d
+            rec.supporting_metrics["baseline_30d"] = baseline_30d
+            rec.supporting_metrics["baseline_90d"] = baseline_90d
+            rec.supporting_metrics["baseline_lifetime"] = baseline_lifetime
+            rec.supporting_metrics["anomalies"] = {
+                "cpa_anomaly": cpa_anomaly,
+                "cpl_anomaly": cpl_anomaly,
+                "cpc_anomaly": cpc_anomaly,
+                "ctr_anomaly": ctr_anomaly
+            }
+            rec.supporting_metrics["trends"] = {
+                "cpc_trend": cpc_trend,
+                "ctr_trend": ctr_trend,
+                "cpa_trend": cpa_trend
+            }
+            
+            # Map suggested action
+            action = "MONITOR"
+            r_type = rec.recommendation_type.upper()
+            if "CREATIVE" in r_type or "FATIGUE" in r_type:
+                action = "REVIEW_CREATIVE"
+            elif "LANDING" in r_type:
+                action = "REVIEW_LANDING_PAGE"
+            elif "CPM" in r_type:
+                action = "REVIEW_PLACEMENTS"
+            elif "CPC" in r_type:
+                action = "REVIEW_CPC"
+            elif "DONT_CHANGE" in r_type:
+                action = "KEEP_RUNNING"
+            elif "DECLINE" in r_type:
+                action = "REVIEW_CREATIVE"
+            elif "CPA" in r_type or "CPL" in r_type:
+                action = "REVIEW_FUNNEL"
+                
+            rec.supporting_metrics["suggested_action"] = action
+            
+            # Assign expected impact if not set or generic
+            if not rec.expected_impact or rec.expected_impact == rec.description:
+                if "CREATIVE" in r_type or "FATIGUE" in r_type:
+                    rec.expected_impact = "Potential to restore CTR and lower CPL/CPA by rotating fresh visual variations."
+                elif "LANDING" in r_type:
+                    rec.expected_impact = "Expected to improve click-to-lead conversion rate and reduce lead acquisition cost."
+                elif "BUDGET" in r_type or "SCALE" in r_type:
+                    rec.expected_impact = "Potential to increase total conversion volume while maintaining efficiency margins."
+                else:
+                    rec.expected_impact = "Review and monitor parameters to stabilize performance margins."
 
         return diagnoses

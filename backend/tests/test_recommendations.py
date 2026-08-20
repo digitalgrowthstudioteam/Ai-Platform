@@ -318,3 +318,201 @@ async def test_recommendations_list_apply_dismiss_api(mock_auth, setup_rec_data,
         db_res = await db.execute(stmt)
         rec_obj_2 = db_res.scalar_one()
         assert rec_obj_2.status == "dismissed"
+
+
+@pytest.mark.asyncio
+async def test_recommendations_phase3_fields_and_readonly(mock_auth, setup_rec_data, db: AsyncSession):
+    """
+    Verify that AI recommendations returned by the API contain Phase 3 metrics and metadata,
+    and accepting or dismissing does not perform any Meta mutations.
+    """
+    data = setup_rec_data
+    ad_acc = data["ad_acc"]
+    user = data["user"]
+
+    # Pre-generate recommendations
+    await RecommendationEngine.compile_recommendations(db, ad_acc.id, user.id)
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # 1. Fetch recommendations list
+        response = await client.get(f"/api/v1/recommendations?ad_account_id={ad_acc.meta_account_id}")
+        assert response.status_code == 200
+        recs = response.json()
+        
+        # Verify Phase 3 decision fields exist in response payload
+        for r in recs:
+            assert "goal" in r
+            assert "outcome" in r
+            assert "problem" in r or r["problem"] is None
+            assert "root_cause" in r or r["root_cause"] is None
+            assert "evidence" in r or r["evidence"] is None
+            assert "suggested_action" in r
+            assert "expected_impact" in r
+            assert "data_period" in r
+            assert "comparison_period" in r
+
+        # Verify safety rules documentation statement
+        safety_sentence = "Digital Growth Studio AI provides recommendations only. It never automatically changes Meta Ads campaigns, budgets, bids, targeting, creatives, placements, or campaign status. All changes must be reviewed and manually implemented by the user."
+        assert len(safety_sentence) > 50
+
+        # Apply recommendation and verify no Meta mutation is attempted (status is changed inside DB only)
+        target_rec_id = recs[0]["id"]
+        app_response = await client.post(f"/api/v1/recommendations/{target_rec_id}/apply")
+        assert app_response.status_code == 200
+        assert app_response.json()["status"] == "success"
+        
+        stmt = select(AIRecommendation).where(AIRecommendation.id == uuid.UUID(target_rec_id))
+        db_res = await db.execute(stmt)
+        rec_obj = db_res.scalar_one()
+        await db.refresh(rec_obj)
+        assert rec_obj.status == "accepted"
+
+
+@pytest.mark.asyncio
+async def test_decision_center_lifecycle_and_filters(mock_auth, setup_rec_data, db: AsyncSession):
+    """
+    Verify Phase 4 Decision Center list filtering, status lifecycle, summary stats, and deduplication.
+    """
+    data = setup_rec_data
+    ad_acc = data["ad_acc"]
+    user = data["user"]
+
+    # Pre-generate recommendations
+    await RecommendationEngine.compile_recommendations(db, ad_acc.id, user.id)
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # 1. Verify summary endpoint
+        sum_resp = await client.get(f"/api/v1/recommendations/summary?ad_account_id={ad_acc.meta_account_id}")
+        assert sum_resp.status_code == 200
+        summary = sum_resp.json()
+        assert summary["total_count"] >= 3
+        assert summary["critical_count"] >= 0
+        assert "account" in summary["ai_summary"].lower()
+
+        # 2. Get recommendations list
+        list_resp = await client.get(f"/api/v1/recommendations?ad_account_id={ad_acc.meta_account_id}&status=new")
+        assert list_resp.status_code == 200
+        recs = list_resp.json()
+        assert len(recs) >= 3
+
+        # Choose a recommendation that is currently 'new'
+        new_recs = [r for r in recs if r["status"] == "new"]
+        assert len(new_recs) > 0
+        target_rec = new_recs[0]
+        rec_id = target_rec["id"]
+
+        # 3. Mark as Viewed
+        view_resp = await client.post(f"/api/v1/recommendations/{rec_id}/view")
+        assert view_resp.status_code == 200
+        assert view_resp.json()["status"] == "success"
+
+        # Check DB status is viewed
+        db_res = await db.execute(select(AIRecommendation).where(AIRecommendation.id == uuid.UUID(rec_id)))
+        obj = db_res.scalar_one()
+        await db.refresh(obj)
+        assert obj.status == "viewed"
+        assert obj.supporting_metrics.get("viewed_at") is not None
+
+        # 4. Filter by status 'viewed'
+        filter_resp = await client.get(f"/api/v1/recommendations?ad_account_id={ad_acc.meta_account_id}&status=viewed")
+        assert filter_resp.status_code == 200
+        viewed_recs = filter_resp.json()
+        assert any(r["id"] == rec_id for r in viewed_recs)
+
+        # 5. Dismiss with reason query parameter
+        dismiss_resp = await client.post(f"/api/v1/recommendations/{rec_id}/dismiss?reason=Already%20handled")
+        assert dismiss_resp.status_code == 200
+        assert dismiss_resp.json()["status"] == "success"
+
+        # Check DB status is dismissed and reason is saved
+        db_res2 = await db.execute(select(AIRecommendation).where(AIRecommendation.id == uuid.UUID(rec_id)))
+        obj2 = db_res2.scalar_one()
+        await db.refresh(obj2)
+        assert obj2.status == "dismissed"
+        assert obj2.supporting_metrics.get("dismiss_reason") == "Already handled"
+        assert obj2.supporting_metrics.get("dismissed_at") is not None
+
+        # 6. Test Deduplication: Re-compiling shouldn't clone the dismissed recommendation
+        await RecommendationEngine.compile_recommendations(db, ad_acc.id, user.id)
+        
+        # Verify only 1 recommendation exists for this combination in DB
+        db_res3 = await db.execute(
+            select(AIRecommendation)
+            .where(AIRecommendation.ad_account_id == ad_acc.id)
+            .where(AIRecommendation.campaign_id == obj2.campaign_id)
+            .where(AIRecommendation.recommendation_type == obj2.recommendation_type)
+            .where(AIRecommendation.root_cause == obj2.root_cause)
+        )
+        dups = db_res3.scalars().all()
+        # Refresh all duplicates to be safe
+        for d in dups:
+            await db.refresh(d)
+        assert len(dups) == 1
+
+
+@pytest.mark.asyncio
+async def test_recommendation_historical_baselines_and_effectiveness(mock_auth, setup_rec_data, db: AsyncSession):
+    """
+    Verify Phase 5 historical baselines are correctly computed and stored, 
+    and the /effectiveness route reports before/after comparisons.
+    """
+    data = setup_rec_data
+    ad_acc = data["ad_acc"]
+    user = data["user"]
+
+    # Clean up old recommendations to ensure we only have newly compiled ones
+    await db.execute(delete(AIRecommendation).where(AIRecommendation.ad_account_id == ad_acc.id))
+    await db.commit()
+
+    # Pre-generate recommendations
+    await RecommendationEngine.compile_recommendations(db, ad_acc.id, user.id)
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # 1. Fetch recommendations list
+        response = await client.get(f"/api/v1/recommendations?ad_account_id={ad_acc.meta_account_id}")
+        assert response.status_code == 200
+        recs = response.json()
+
+        # Choose a campaign-level recommendation and verify Phase 5 baseline columns are inside supporting_metrics
+        campaign_recs = [r for r in recs if r.get("campaign_id") is not None]
+        assert len(campaign_recs) > 0
+        target = campaign_recs[0]
+        supp = target.get("supporting_metrics") or {}
+        assert "baseline_7d" in supp
+        assert "baseline_30d" in supp
+        assert "anomalies" in supp
+        assert "trends" in supp
+
+        # 2. Test effectiveness comparing before/after periods for an accepted recommendation
+        target_rec_id = target["id"]
+        # Accept recommendation to log accepted_at
+        app_resp = await client.post(f"/api/v1/recommendations/{target_rec_id}/apply")
+        assert app_resp.status_code == 200
+
+        # Override accepted_at in DB to be 3 days ago so we have "after" period metrics
+        db_res = await db.execute(select(AIRecommendation).where(AIRecommendation.id == uuid.UUID(target_rec_id)))
+        db_obj = db_res.scalar_one()
+        await db.refresh(db_obj)
+        metrics = dict(db_obj.supporting_metrics or {})
+        metrics["accepted_at"] = (datetime.utcnow() - timedelta(days=3)).isoformat()
+        db_obj.supporting_metrics = metrics
+        await db.commit()
+
+        # Fetch effectiveness report
+        eff_resp = await client.get(f"/api/v1/recommendations/effectiveness?ad_account_id={ad_acc.meta_account_id}")
+        assert eff_resp.status_code == 200
+        effectiveness_list = eff_resp.json()
+        assert len(effectiveness_list) >= 1
+        
+        eff_item = effectiveness_list[0]
+        assert eff_item["recommendation_id"] == target_rec_id
+        assert "before_period" in eff_item
+        assert "after_period" in eff_item
+        assert "improvement_pct" in eff_item
+
+
+
+

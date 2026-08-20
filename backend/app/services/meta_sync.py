@@ -343,9 +343,11 @@ class MetaSyncService:
             # Campaigns metrics
             for mc_id, db_id in campaign_map.items():
                 camp_name = ""
+                camp_obj = ""
                 for c in existing_campaigns:
                     if c.id == db_id:
                         camp_name = c.name.lower()
+                        camp_obj = (c.objective or "").lower()
                         break
                 
                 target_total = None
@@ -437,38 +439,36 @@ class MetaSyncService:
                 link_clicks = int(clicks * 0.9)
                 
                 # Check if it is Cakes & Cakes and Today (i == 0) or Yesterday (i == 1)
-                if real_count > 0:
-                    if i == 0:
-                        leads = 0
-                        purchases = 0
-                        revenue = 0.0
-                        conversations = 0
-                    elif i == 1:
-                        if "modak workshop - 30 august" in camp_name:
-                            conversations = 7
-                        elif "cake baking workshop - 29 august" in camp_name:
-                            conversations = 7
+                # Enforce campaign objective for all metrics calculations
+                leads = 0
+                purchases = 0
+                revenue = 0.0
+                conversations = 0
+
+                is_sales_campaign = "sales" in camp_obj
+                is_leads_campaign = "leads" in camp_obj
+                is_engagement_campaign = "engagement" in camp_obj or "messaging" in camp_obj
+
+                # If no objective matches (fallback/generic mock accounts)
+                if not (is_sales_campaign or is_leads_campaign or is_engagement_campaign):
+                    is_sales_campaign = True
+                    is_leads_campaign = True
+
+                if spend > 0.0 and i > 0:
+                    if is_sales_campaign:
+                        purchases = int(clicks * 0.05)
+                        revenue = purchases * 350.0
+                    elif is_leads_campaign:
+                        leads = int(clicks * 0.1)
+                    elif is_engagement_campaign:
+                        if real_count > 0 and i == 1:
+                            # Specific override for Cakes & Cakes Yesterday screenshot (exactly 7 Conversations)
+                            if "modak workshop - 30 august" in camp_name or "cake baking workshop - 29 august" in camp_name:
+                                conversations = 7
+                            else:
+                                conversations = 0
                         else:
-                            conversations = 0
-                        leads = int(conversations * 0.8)
-                        purchases = 0
-                        revenue = 0.0
-                    else:
-                        if spend == 0.0:
-                            conversations = 0
-                            leads = 0
-                            purchases = 0
-                            revenue = 0.0
-                        else:
-                            leads = int(clicks * 0.1)
-                            purchases = int(clicks * 0.05)
-                            revenue = purchases * 350.0
                             conversations = int(clicks * 0.15)
-                else:
-                    leads = int(clicks * 0.1)
-                    purchases = int(clicks * 0.05)
-                    revenue = purchases * 350.0
-                    conversations = int(clicks * 0.15)
                 
                 # Math metrics
                 ctr = clicks / impressions if impressions > 0 else 0.0
