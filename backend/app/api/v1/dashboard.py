@@ -1029,17 +1029,54 @@ async def get_account_health_score(
         status_cls = "critical"
 
     # Setup checklist items (backward compatibility)
+    has_sales = "sales" in objective_raws
+    has_leads = "leads" in objective_raws or "lead" in objective_raws
+    has_engagement = "engagement" in objective_raws or "messaging" in objective_raws
+
+    # Conversion tracking
+    if has_sales:
+        conv_status = "Good" if rates["purchases"] > 0 else "No purchases detected"
+        conv_class = "good" if rates["purchases"] > 0 else "attention"
+    elif has_leads:
+        conv_status = "Good" if rates["leads"] > 0 else "No leads detected"
+        conv_class = "good" if rates["leads"] > 0 else "attention"
+    elif has_engagement:
+        convs = rates.get("conversations") or 0
+        conv_status = "Good" if convs > 0 else "No conversations detected"
+        conv_class = "good" if convs > 0 else "attention"
+    else:
+        conv_status = "Good"
+        conv_class = "good"
+
+    # Budget allocation
+    if has_sales:
+        budget_status = "Good" if rates["roas"] >= 2.0 or rates["roas"] == 0.0 else "High CPA / Low ROAS"
+        budget_class = "good" if rates["roas"] >= 2.0 or rates["roas"] == 0.0 else "critical"
+    elif has_leads:
+        cpl_val = rates.get("cpl") or 0.0
+        budget_status = "Good" if cpl_val < 300.0 or cpl_val == 0.0 else "High CPL / Inefficient"
+        budget_class = "good" if cpl_val < 300.0 or cpl_val == 0.0 else "critical"
+    elif has_engagement:
+        spend_val = rates.get("spend") or 0.0
+        convs = rates.get("conversations") or 0
+        cost_per_conv = spend_val / convs if convs > 0 else 0.0
+        budget_status = "Good" if cost_per_conv < 100.0 or cost_per_conv == 0.0 else "High Cost Per Conv"
+        budget_class = "good" if cost_per_conv < 100.0 or cost_per_conv == 0.0 else "critical"
+    else:
+        budget_status = "Good"
+        budget_class = "good"
+
     items = [
         HealthItem(label="Campaign structure", status="Good", statusClass="good"),
         HealthItem(
             label="Conversion tracking", 
-            status="Good" if rates["purchases"] > 0 else "No purchases detected", 
-            statusClass="good" if rates["purchases"] > 0 else "attention"
+            status=conv_status, 
+            statusClass=conv_class
         ),
         HealthItem(
             label="Budget allocation", 
-            status="Good" if rates["roas"] >= 2.0 or rates["roas"] == 0.0 else "High CPA / Low ROAS", 
-            statusClass="good" if rates["roas"] >= 2.0 or rates["roas"] == 0.0 else "critical"
+            status=budget_status, 
+            statusClass=budget_class
         ),
         HealthItem(
             label="Ad creative fatigue", 
