@@ -163,7 +163,7 @@ async def list_campaigns(
         .outerjoin(prev_metrics_subq, Campaign.id == prev_metrics_subq.c.campaign_id)
         .join(MetaAdAccount, Campaign.ad_account_id == MetaAdAccount.id)
         .where(MetaAdAccount.meta_account_id == ad_acc.meta_account_id)
-        .order_by(Campaign.name.asc())
+        .order_by(func.coalesce(metrics_subq.c.spend, 0).desc(), Campaign.name.asc())
     )
     
     res = await db.execute(stmt)
