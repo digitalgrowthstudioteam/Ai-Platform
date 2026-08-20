@@ -62,7 +62,7 @@ class Settings(BaseSettings):
 
     # Sync
     SYNC_COOLDOWN_MINUTES: int = Field(default=15, description="Minimum minutes between manual syncs")
-    INITIAL_SYNC_DAYS: int = Field(default=30, description="Days of historical data for initial sync")
+    INITIAL_SYNC_DAYS: int = Field(default=365, description="Days of historical data for initial sync")
 
     @property
     def cors_origins(self) -> list[str]:
