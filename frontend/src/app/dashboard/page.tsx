@@ -31,6 +31,7 @@ import {
   RefreshCw,
   Brain,
   MessageSquare,
+  Info,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -349,6 +350,124 @@ export default function OverviewPage() {
     return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   };
   const dateRangeLabel = `${formatDateHeader(startStr)} – ${formatDateHeader(endStr)}, 2026`;
+  const METRIC_INFOS: Record<string, { desc: string; formula: string }> = {
+    "spend": {
+      desc: "Total advertising budget spent during the selected timeframe.",
+      formula: "Sum of daily spend values"
+    },
+    "purchases": {
+      desc: "Total number of purchase conversions tracked by Pixel or API.",
+      formula: "Sum of purchase action counts"
+    },
+    "cpa": {
+      desc: "Average cost spent to secure a single completed purchase.",
+      formula: "Spend / Purchases"
+    },
+    "roas": {
+      desc: "Return on Ad Spend. Ratio of revenue generated to total spend.",
+      formula: "Revenue / Spend"
+    },
+    "revenue": {
+      desc: "Total value of purchase conversions tracked by your Pixel.",
+      formula: "Sum of purchase conversion values"
+    },
+    "impressions": {
+      desc: "Total number of times your ads were displayed on screen.",
+      formula: "Total ad views count"
+    },
+    "ctr": {
+      desc: "Click-Through Rate. Percentage of impressions that led to clicks.",
+      formula: "Clicks / Impressions * 100"
+    },
+    "cpm": {
+      desc: "Cost Per Mille. Cost to deliver 1,000 ad impressions.",
+      formula: "Spend / Impressions * 1,000"
+    },
+    "cpc": {
+      desc: "Cost Per Click. Average cost for each ad click.",
+      formula: "Spend / Clicks"
+    },
+    "link_clicks": {
+      desc: "Number of clicks that directed users to target destinations.",
+      formula: "Total link click events"
+    },
+    "clicks": {
+      desc: "Total clicks recorded on any part of the ad (including profile link, comment click, etc.).",
+      formula: "Total clicks count"
+    },
+    "leads": {
+      desc: "Number of lead form completions or registration actions.",
+      formula: "Sum of lead events"
+    },
+    "cpl": {
+      desc: "Cost Per Lead. Average cost to acquire one lead.",
+      formula: "Spend / Leads"
+    },
+    "add_to_cart": {
+      desc: "Number of times users added products to their shopping cart.",
+      formula: "Sum of add to cart events"
+    },
+    "initiate_checkout": {
+      desc: "Number of times users started checkout.",
+      formula: "Sum of initiate checkout events"
+    },
+    "conversations": {
+      desc: "Number of messaging conversations started via Messenger/Instagram/WhatsApp.",
+      formula: "Sum of messaging starts"
+    },
+    "cost_per_conversation": {
+      desc: "Average cost spent to initiate a new messaging conversation.",
+      formula: "Spend / Conversations"
+    },
+    "aov": {
+      desc: "Average Order Value. Average amount spent per purchase.",
+      formula: "Revenue / Purchases"
+    },
+    "engagement_rate": {
+      desc: "Percentage of impressions resulting in interactive post actions.",
+      formula: "Post Engagement / Impressions * 100"
+    },
+    "hook_rate": {
+      desc: "Percentage of impressions that watched at least 3 seconds of video.",
+      formula: "3-Sec Video Views / Impressions * 100"
+    },
+    "video_views": {
+      desc: "Number of video plays lasting at least 3 seconds.",
+      formula: "Total 3-Sec Video Views"
+    },
+    "thruplays": {
+      desc: "Number of video plays completed or lasting at least 15 seconds.",
+      formula: "Total 15-Sec Video Views"
+    },
+    "post_engagement": {
+      desc: "Total number of social reactions, comments, shares, or clicks.",
+      formula: "Sum of all interaction actions"
+    },
+    "reach": {
+      desc: "Number of unique users who saw the ad at least once.",
+      formula: "Unique ad views count"
+    },
+    "frequency": {
+      desc: "Average number of times a unique user saw the ad.",
+      formula: "Impressions / Reach"
+    },
+    "landing_page_views": {
+      desc: "Number of users who successfully loaded the landing page.",
+      formula: "Pixel page view events"
+    },
+    "lpv_rate": {
+      desc: "Landing Page View Rate. Percentage of link clicks leading to page loads.",
+      formula: "Landing Page Views / Link Clicks * 100"
+    },
+    "cost_per_add_to_cart": {
+      desc: "Average cost spent to secure a single add to cart action.",
+      formula: "Spend / Add to Cart"
+    },
+    "cost_per_initiate_checkout": {
+      desc: "Average cost spent to secure a single initiate checkout action.",
+      formula: "Spend / Initiate Checkout"
+    }
+  };
 
   // Render metric card helper
   const renderKpiCard = (title: string, value: number, trend: number, formatType: "currency" | "percent" | "multiplier" | "number", icon: any, color: string) => {
@@ -368,7 +487,9 @@ export default function OverviewPage() {
       if (clean.includes("total click") || clean.includes("clicks")) return "clicks";
       if (clean.includes("cpl") || clean.includes("cost per lead")) return "cpl";
       if (clean.includes("lead")) return "leads";
+      if (clean.includes("cost per cart add") || clean.includes("cost per add to cart")) return "cost_per_add_to_cart";
       if (clean.includes("add to cart") || clean.includes("cart add")) return "add_to_cart";
+      if (clean.includes("cost per checkout") || clean.includes("cost per initiate checkout")) return "cost_per_initiate_checkout";
       if (clean.includes("checkout")) return "initiate_checkout";
       if (clean.includes("cost per conversation")) return "cost_per_conversation";
       if (clean.includes("conversation")) return "conversations";
@@ -424,12 +545,25 @@ export default function OverviewPage() {
     };
 
     const safeTrend = trend !== null && trend !== undefined && !isNaN(trend) ? trend : 0;
+    const info = METRIC_INFOS[metricKey];
 
     return (
       <div className="bg-white border border-slate-150 rounded-xl p-5 hover:shadow-md transition duration-200 flex flex-col justify-between">
         <div className="flex justify-between items-start">
           <div className="flex flex-col">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{title}</span>
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+              {title}
+              {info && (
+                <span className="group relative cursor-pointer inline-flex items-center">
+                  <Info size={12} className="text-slate-350 hover:text-slate-500 transition" />
+                  <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-52 p-2.5 bg-slate-900 text-white text-[10px] font-semibold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-150 shadow-lg z-50 normal-case leading-normal">
+                    <span className="block font-bold text-indigo-300 mb-0.5">{title}</span>
+                    <span className="block font-medium text-slate-200">{info.desc}</span>
+                    <span className="block border-t border-slate-700/60 mt-1.5 pt-1 font-bold text-slate-400">Formula: <code className="text-slate-300 font-mono">{info.formula}</code></span>
+                  </span>
+                </span>
+              )}
+            </span>
             <span className={`text-2xl font-extrabold mt-1 block ${isStatusMetric ? "text-slate-400 text-lg font-bold" : "text-slate-900"}`}>{formattedVal}</span>
           </div>
           <div className={`p-2.5 rounded-xl border ${bgColors[color] || bgColors.blue} flex items-center justify-center shrink-0`}>

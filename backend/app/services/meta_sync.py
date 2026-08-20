@@ -477,18 +477,20 @@ class MetaSyncService:
                 roas = revenue / spend if spend > 0 else 0.0
                 cpl = spend / leads if leads > 0 else 0.0
                 
+                # Only generate video actions if campaign contains "video" or "reels" or "thruplay"
+                has_video = "video" in camp_name or "reels" in camp_name or "thruplay" in camp_name
                 actions = {
-                    "post_engagement": int(impressions * 0.05),
-                    "video_views": int(impressions * 0.3),
-                    "thruplays": int(impressions * 0.1),
+                    "post_engagement": int(impressions * 0.05) if (is_engagement_campaign or "engagement" in camp_name) else 0,
+                    "video_views": int(impressions * 0.3) if has_video else 0,
+                    "thruplays": int(impressions * 0.1) if has_video else 0,
                     "conversations": conversations,
-                    "comments": int(clicks * 0.02),
-                    "shares": int(clicks * 0.01),
-                    "saves": int(clicks * 0.03),
-                    "reactions": int(clicks * 0.08),
-                    "add_to_cart": int(clicks * 0.25),
-                    "initiate_checkout": int(clicks * 0.12),
-                    "landing_page_views": int(link_clicks * 0.85)
+                    "comments": int(clicks * 0.02) if (is_engagement_campaign or "engagement" in camp_name) else 0,
+                    "shares": int(clicks * 0.01) if (is_engagement_campaign or "engagement" in camp_name) else 0,
+                    "saves": int(clicks * 0.03) if (is_engagement_campaign or "engagement" in camp_name) else 0,
+                    "reactions": int(clicks * 0.08) if (is_engagement_campaign or "engagement" in camp_name) else 0,
+                    "add_to_cart": int(clicks * 0.25) if is_sales_campaign else 0,
+                    "initiate_checkout": int(clicks * 0.12) if is_sales_campaign else 0,
+                    "landing_page_views": int(link_clicks * 0.85) if (is_sales_campaign or is_leads_campaign) else 0
                 }
 
                 # 1. Upsert Campaign metrics
