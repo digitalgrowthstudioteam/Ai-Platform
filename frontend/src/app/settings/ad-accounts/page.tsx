@@ -33,6 +33,7 @@ export default function AdAccountsPage() {
   
   const [pendingAccountId, setPendingAccountId] = useState<string | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showDisconnectModal, setShowDisconnectModal] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [upgradeModalMessage, setUpgradeModalMessage] = useState("");
 
@@ -202,9 +203,6 @@ export default function AdAccountsPage() {
 
   // Disconnect Meta Profile
   const handleDisconnect = async () => {
-    if (!confirm("Are you sure you want to disconnect your Meta Ads account? This will stop all active sync cycles and delete imported campaign metrics.")) {
-      return;
-    }
     
     try {
       setDisconnecting(true);
@@ -296,7 +294,7 @@ export default function AdAccountsPage() {
               </div>
               
               <button
-                onClick={handleDisconnect}
+                onClick={() => setShowDisconnectModal(true)}
                 disabled={disconnecting}
                 className="btn btn-secondary border border-border hover:bg-slate-50 text-red-600 flex items-center gap-2 py-2 px-4 rounded-md text-sm font-semibold transition"
               >
@@ -520,6 +518,40 @@ export default function AdAccountsPage() {
                     className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 text-xs rounded-lg transition"
                   >
                     Upgrade Plan / Buy Add-on
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+          {/* Disconnect Confirmation Modal */}
+          {showDisconnectModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+              <div className="bg-white rounded-xl shadow-xl max-w-md w-full border border-slate-100 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                <div className="p-6 space-y-4">
+                  <div className="w-12 h-12 bg-red-50 text-red-600 rounded-full flex items-center justify-center">
+                    <LogOut size={24} />
+                  </div>
+                  <div className="space-y-2">
+                    <h3 className="text-lg font-bold text-slate-900">Disconnect Meta Ads Account?</h3>
+                    <p className="text-sm text-slate-500 leading-relaxed">
+                      Are you sure you want to disconnect your Meta Ads account? This will stop all active sync cycles and delete imported campaign metrics.
+                    </p>
+                  </div>
+                </div>
+                <div className="bg-slate-50 border-t border-slate-100 px-6 py-4 flex items-center justify-end gap-3">
+                  <button
+                    onClick={() => setShowDisconnectModal(false)}
+                    className="border border-slate-200 bg-white text-slate-700 font-semibold px-4 py-2 text-xs rounded-lg hover:bg-slate-100 transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleDisconnect}
+                    disabled={disconnecting}
+                    className="bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 text-xs rounded-lg transition flex items-center gap-1.5"
+                  >
+                    {disconnecting && <Loader2 size={12} className="animate-spin" />}
+                    Yes, Disconnect
                   </button>
                 </div>
               </div>
