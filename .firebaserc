@@ -1,22 +1,5 @@
 {
   "projects": {
     "default": "digital-growth-studio"
-  },
-  "targets": {
-    "digital-growth-studio": {
-      "hosting": {
-        "staging": [
-          "digital-growth-studio"
-        ]
-      }
-    },
-    "partner-dgs": {
-      "hosting": {
-        "prod": [
-          "partner-dgs"
-        ]
-      }
-    }
-  },
-  "etags": {}
+  }
 }
