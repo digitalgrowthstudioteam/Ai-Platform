@@ -321,6 +321,11 @@ class ApiClient {
     });
   }
 
+  async getBriefDrilldown(adAccountId: string, date?: string) {
+    const dateParam = date ? `&report_date=${date}` : "";
+    return this.request<any[]>(`/campaigns/brief-drilldown?ad_account_id=${adAccountId}${dateParam}`);
+  }
+
   async getWeeklyBrief(adAccountId: string, startDate?: string) {
     const dateParam = startDate ? `&start_date=${startDate}` : "";
     return this.request<any>(`/recommendations/brief/weekly?ad_account_id=${adAccountId}${dateParam}`);
