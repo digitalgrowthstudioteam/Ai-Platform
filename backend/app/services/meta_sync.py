@@ -62,7 +62,8 @@ class MetaSyncService:
 
         try:
             # Check for mock bypass
-            if token.startswith("EAAGm0PX") or token == "mock_access_token":
+            is_mock_account = ad_acc.meta_account_id in {"act_101010101", "act_202020202", "act_303030303"}
+            if token.startswith("EAAGm0PX") or token == "mock_access_token" or is_mock_account:
                 logger.info("meta_sync_using_mock_pipeline", ad_account_id=ad_acc.meta_account_id)
                 await self._sync_mock_data(db, ad_acc)
             else:

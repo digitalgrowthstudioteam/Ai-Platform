@@ -123,7 +123,7 @@ class RecommendationEngine:
             conn = res_conn.scalar_one_or_none()
             if conn:
                 token = conn.access_token
-                is_mock = token.startswith("EAAGm0PX") or token == "mock_access_token"
+                is_mock = token.startswith("EAAGm0PX") or token == "mock_access_token" or ad_acc.meta_account_id in {"act_101010101", "act_202020202", "act_303030303"}
 
         # Resolve AI Intelligence entitlement
         from app.services.entitlement_engine import EntitlementEngine

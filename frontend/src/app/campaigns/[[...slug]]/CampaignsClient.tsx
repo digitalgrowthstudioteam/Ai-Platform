@@ -87,6 +87,24 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
   const [recs, setRecs] = useState<any[]>([]);
   const [selectedCampaign, setSelectedCampaign] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const renderTrend = (value: number | undefined) => {
+    if (value === undefined || value === 0) return null;
+    const isUp = value > 0;
+    return (
+      <span className={`inline-flex items-center gap-0.5 text-[9px] font-bold ml-1 ${isUp ? "text-emerald-600" : "text-rose-600"}`}>
+        {isUp ? "▲" : "▼"}{Math.abs(value).toFixed(1)}%
+      </span>
+    );
+  };
+
+  const getResultTrend = (label: string, metrics: any) => {
+    if (label === "Purchases") return metrics.purchases_trend;
+    if (label === "Leads") return metrics.leads_trend;
+    if (label === "Clicks") return metrics.clicks_trend;
+    if (label === "Impressions") return metrics.impressions_trend;
+    return 0;
+  };
   
   // State for subscription and upgrade limits
   const [subscription, setSubscription] = useState<any>(null);
@@ -145,7 +163,7 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
       if (subscription.status === "trialing") {
         limit = 7;
       } else if (subscription.plan === "starter") {
-        limit = 90;
+        limit = 30;
       } else if (subscription.plan === "growth") {
         limit = 90;
       } else if (subscription.plan === "pro" || subscription.plan === "agency") {
@@ -1034,14 +1052,25 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
                                 {c.objective.replace(/_/g, " ")}
                               </span>
                             </td>
-                            <td className="p-4 text-right font-semibold">{formatCurrency(c.metrics.spend)}</td>
+                            <td className="p-4 text-right font-semibold">
+                              {formatCurrency(c.metrics.spend)}
+                              {renderTrend(c.metrics.spend_trend)}
+                            </td>
                             <td className="p-4 text-right font-bold">
                               {objMetrics.resultValue} <span className="text-[9px] font-normal text-slate-400">{objMetrics.resultLabel}</span>
+                              {renderTrend(getResultTrend(objMetrics.resultLabel, c.metrics))}
                             </td>
-                            <td className="p-4 text-right">{objMetrics.costPerResult}</td>
-                            <td className="p-4 text-right text-slate-500">{objMetrics.ctrLabel}</td>
+                            <td className="p-4 text-right">
+                              {objMetrics.costPerResult}
+                              {objMetrics.resultLabel === "Clicks" && renderTrend(c.metrics.cpc_trend)}
+                            </td>
+                            <td className="p-4 text-right text-slate-500">
+                              {objMetrics.ctrLabel}
+                              {renderTrend(c.metrics.ctr_trend)}
+                            </td>
                             <td className="p-4 text-right text-green-600 font-bold">
                               {objMetrics.roasLabel}
+                              {objMetrics.roasLabel !== "—" && renderTrend(c.metrics.roas_trend)}
                             </td>
                             <td className="p-4 text-center">
                               <span className={`px-2 py-0.5 rounded text-[10px] font-black ${

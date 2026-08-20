@@ -13,6 +13,8 @@ from app.api.v1.meta import get_db_user_from_claims
 from app.models.user import User
 from app.models.team import TeamMember
 from app.services.entitlement_engine import EntitlementEngine
+from app.services.email_service import EmailService
+from app.config import get_settings
 
 logger = structlog.get_logger()
 router = APIRouter(prefix="/team", tags=["Team Management"])
@@ -49,7 +51,14 @@ async def list_team_members(
     Returns list of invited team members for the currently logged in workspace owner.
     """
     user = await get_db_user_from_claims(claims, db)
-    stmt = select(TeamMember).where(TeamMember.user_id == user.id).order_by(TeamMember.created_at.desc())
+    
+    # Resolve workspace owner ID
+    stmt_owner = select(TeamMember.user_id).where(TeamMember.email == user.email.lower())
+    res_owner = await db.execute(stmt_owner)
+    owner_id = res_owner.scalar_one_or_none()
+    workspace_owner_id = owner_id if owner_id else user.id
+
+    stmt = select(TeamMember).where(TeamMember.user_id == workspace_owner_id).order_by(TeamMember.created_at.desc())
     res = await db.execute(stmt)
     members = res.scalars().all()
     return members
@@ -66,12 +75,22 @@ async def invite_team_member(
     """
     user = await get_db_user_from_claims(claims, db)
 
+    # Resolve workspace owner
+    stmt_owner = select(TeamMember.user_id).where(TeamMember.email == user.email.lower())
+    res_owner = await db.execute(stmt_owner)
+    owner_id = res_owner.scalar_one_or_none()
+    workspace_owner_id = owner_id if owner_id else user.id
+    
+    stmt_owner_user = select(User).where(User.id == workspace_owner_id)
+    res_owner_user = await db.execute(stmt_owner_user)
+    workspace_owner = res_owner_user.scalar_one()
+
     # 1. Resolve plan entitlements for team members limit
-    entitlements = await EntitlementEngine.resolve_entitlements(user, db)
+    entitlements = await EntitlementEngine.resolve_entitlements(workspace_owner, db)
     max_seats = entitlements.get("max_team_members", 1)
 
     # 2. Count existing team members
-    stmt_count = select(func.count(TeamMember.id)).where(TeamMember.user_id == user.id)
+    stmt_count = select(func.count(TeamMember.id)).where(TeamMember.user_id == workspace_owner_id)
     res_count = await db.execute(stmt_count)
     current_count = res_count.scalar_one()
 
@@ -83,7 +102,7 @@ async def invite_team_member(
         )
 
     # 3. Prevent duplicate invitations for same email
-    stmt_dup = select(TeamMember).where(TeamMember.user_id == user.id).where(TeamMember.email == req.email.lower())
+    stmt_dup = select(TeamMember).where(TeamMember.user_id == workspace_owner_id).where(TeamMember.email == req.email.lower())
     res_dup = await db.execute(stmt_dup)
     if res_dup.scalar_one_or_none():
         raise HTTPException(
@@ -93,7 +112,7 @@ async def invite_team_member(
 
     # 4. Create team member
     member = TeamMember(
-        user_id=user.id,
+        user_id=workspace_owner_id,
         email=req.email.lower(),
         name=req.name,
         role=req.role,
@@ -103,7 +122,17 @@ async def invite_team_member(
     await db.commit()
     await db.refresh(member)
 
-    logger.info("team_member_invited", owner_id=user.id, member_id=member.id, email=member.email)
+    # 5. Send Email Invitation
+    settings = get_settings()
+    invite_link = f"{settings.FRONTEND_URL}/login"
+    await EmailService.send_invitation_email(
+        to_email=req.email.lower(),
+        invitee_name=req.name,
+        inviter_name=user.name or user.email,
+        invite_link=invite_link
+    )
+
+    logger.info("team_member_invited", owner_id=workspace_owner_id, member_id=member.id, email=member.email)
     return member
 
 
@@ -117,7 +146,14 @@ async def remove_team_member(
     Revokes team access and deletes the team member record.
     """
     user = await get_db_user_from_claims(claims, db)
-    stmt = select(TeamMember).where(TeamMember.id == member_id).where(TeamMember.user_id == user.id)
+    
+    # Resolve workspace owner ID
+    stmt_owner = select(TeamMember.user_id).where(TeamMember.email == user.email.lower())
+    res_owner = await db.execute(stmt_owner)
+    owner_id = res_owner.scalar_one_or_none()
+    workspace_owner_id = owner_id if owner_id else user.id
+
+    stmt = select(TeamMember).where(TeamMember.id == member_id).where(TeamMember.user_id == workspace_owner_id)
     res = await db.execute(stmt)
     member = res.scalar_one_or_none()
 
@@ -130,5 +166,5 @@ async def remove_team_member(
     await db.delete(member)
     await db.commit()
 
-    logger.info("team_member_removed", owner_id=user.id, member_id=member_id)
+    logger.info("team_member_removed", owner_id=workspace_owner_id, member_id=member_id)
     return {"status": "success", "message": "Team member successfully removed."}

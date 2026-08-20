@@ -1,7 +1,7 @@
 """
 Digital Growth Studio — Configuration-driven Entitlement Engine
 """
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date, timedelta
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Dict, Any, List
@@ -33,7 +33,7 @@ PLANS_CONFIG = {
     },
     "starter": {
         "max_meta_accounts": 1,
-        "historical_days": 90,
+        "historical_days": 30,
         "sync_interval_hours": 48,
         "max_team_members": 1,
         "ai_recommendations_limit": 999999,
@@ -263,7 +263,9 @@ class EntitlementEngine:
             historical_days = 99999
         elif is_trial_active:
             historical_days = 7
-        elif plan_id in ["starter", "growth"]:
+        elif plan_id == "starter":
+            historical_days = 30
+        elif plan_id == "growth":
             historical_days = 90
         elif plan_id in ["pro", "agency"]:
             historical_days = 99999
@@ -424,3 +426,24 @@ class EntitlementEngine:
             "historical_access": "BASE",
             "valid_until": None
         }
+
+    @classmethod
+    async def enforce_historical_days(cls, start_date: date, user: User, db: AsyncSession) -> date:
+        """Capping the start date of a query window based on user plan entitlements."""
+        ent = await cls.resolve_entitlements(user, db)
+        historical_days = ent.get("historical_days", 30)
+        if historical_days > 3650:
+            return start_date
+        oldest_allowed = date.today() - timedelta(days=historical_days)
+        return max(start_date, oldest_allowed)
+
+    @staticmethod
+    async def get_accessible_user_ids(user: User, db: AsyncSession) -> List[Any]:
+        """Returns list of User UUIDs whose resources the logged-in user can access."""
+        from app.models.team import TeamMember
+        ids = [user.id]
+        stmt = select(TeamMember.user_id).where(TeamMember.email == user.email.lower())
+        res = await db.execute(stmt)
+        invited_by_ids = res.scalars().all()
+        ids.extend(invited_by_ids)
+        return ids
