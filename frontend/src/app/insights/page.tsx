@@ -139,23 +139,9 @@ export default function InsightsPage() {
   const budgetOpportunity = fOpportunity.find(x => x.recommendation_type === "BUDGET_OPPORTUNITY" && x.supporting_metrics?.total_risk);
   
   // Calculate total risk value safely
-  const totalRiskValue = budgetOpportunity?.supporting_metrics?.total_risk || (filteredCampaigns.length > 0 
-    ? Math.round(filteredCampaigns.reduce((acc, curr) => acc + (curr.spend || 0), 0) * 0.12)
-    : 3530);
+  const totalRiskValue = budgetOpportunity?.supporting_metrics?.total_risk || 0;
 
-  const riskEntities = budgetOpportunity?.supporting_metrics?.underperforming_entities || (filteredCampaigns.length > 0 ? [
-    { name: `Ad in ${filteredCampaigns[0].name}`, spend: Math.round(filteredCampaigns[0].spend * 0.12), pct_worse: 42, campaign_id: filteredCampaigns[0].id },
-    ...(filteredCampaigns.length > 1 ? [
-      { name: `Ad in ${filteredCampaigns[1].name}`, spend: Math.round(filteredCampaigns[1].spend * 0.08), pct_worse: 37, campaign_id: filteredCampaigns[1].id }
-    ] : []),
-    ...(filteredCampaigns.length > 2 ? [
-      { name: `Ad in ${filteredCampaigns[2].name}`, spend: Math.round(filteredCampaigns[2].spend * 0.06), pct_worse: 31, campaign_id: filteredCampaigns[2].id }
-    ] : [])
-  ] : [
-    { name: "Ad A (Summer Offer Copy)", spend: 1420, pct_worse: 42, campaign_id: null },
-    { name: "Ad B (Static Product Feature)", spend: 1180, pct_worse: 37, campaign_id: null },
-    { name: "Ad C (Standard CTA banner)", spend: 930, pct_worse: 31, campaign_id: null }
-  ]);
+  const riskEntities = budgetOpportunity?.supporting_metrics?.underperforming_entities || [];
 
   // Parse Budget Efficiency Index dynamically
   const budgetEfficiencyItems = fOpportunity.filter(x => x.recommendation_type === "BUDGET_OPPORTUNITY" && x.supporting_metrics?.efficiency);
@@ -167,19 +153,7 @@ export default function InsightsPage() {
     spendShare: x.supporting_metrics.spend_share * 100,
     resultShare: x.supporting_metrics.result_share * 100,
     type: x.supporting_metrics.efficiency >= 0 ? "opportunity" : "over-allocated"
-  })) : (filteredCampaigns.length > 0 ? filteredCampaigns.slice(0, 3).map((c, idx) => {
-    return {
-      id: c.id,
-      name: c.name,
-      efficiency: c.efficiency,
-      spendShare: c.spend_share * 100,
-      resultShare: c.result_share * 100,
-      type: c.efficiency >= 0 ? "opportunity" : "over-allocated"
-    };
-  }) : [
-    { name: "Campaign A: Agency Leads", efficiency: 16, spendShare: 18, resultShare: 34, type: "opportunity", id: null },
-    { name: "Campaign B: Retargeting Offer", efficiency: -23, spendShare: 42, resultShare: 19, type: "over-allocated", id: null }
-  ]);
+  })) : [];
 
   const totalRecommendationsCount = fCritical.length + fOpportunity.length + fWorking.length + fExperiment.length + fDontChange.length;
 
@@ -261,24 +235,30 @@ export default function InsightsPage() {
             </div>
 
             <div className="space-y-2 text-xs">
-              {riskEntities.map((ent: any, idx: number) => (
-                <div key={idx} className="flex justify-between items-center border-b border-slate-50 pb-2">
-                  {ent.campaign_id ? (
-                    <button
-                      onClick={() => router.push(`/campaigns?c=${ent.campaign_id}`)}
-                      className="font-semibold text-blue-600 hover:underline text-left truncate max-w-[180px] cursor-pointer"
-                    >
-                      {ent.name}
-                    </button>
-                  ) : (
-                    <span className="font-semibold text-slate-700 truncate max-w-[180px]">{ent.name}</span>
-                  )}
-                  <div className="text-right shrink-0">
-                    <span className="font-bold text-slate-800">₹{formatNumber(ent.spend)}</span>
-                    <span className="text-[10px] text-red-500 block font-bold">-{ent.pct_worse.toFixed(0)}% vs benchmark</span>
-                  </div>
+              {riskEntities.length === 0 ? (
+                <div className="text-slate-400 py-6 text-center font-semibold">
+                  No active spend at risk detected.
                 </div>
-              ))}
+              ) : (
+                riskEntities.map((ent: any, idx: number) => (
+                  <div key={idx} className="flex justify-between items-center border-b border-slate-50 pb-2">
+                    {ent.campaign_id ? (
+                      <button
+                        onClick={() => router.push(`/campaigns?c=${ent.campaign_id}`)}
+                        className="font-semibold text-blue-600 hover:underline text-left truncate max-w-[180px] cursor-pointer"
+                      >
+                        {ent.name}
+                      </button>
+                    ) : (
+                      <span className="font-semibold text-slate-700 truncate max-w-[180px]">{ent.name}</span>
+                    )}
+                    <div className="text-right shrink-0">
+                      <span className="font-bold text-slate-800">₹{formatNumber(ent.spend)}</span>
+                      <span className="text-[10px] text-red-500 block font-bold">-{ent.pct_worse.toFixed(0)}% vs benchmark</span>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
 
             <div className="bg-red-50 text-red-700 p-3 rounded-lg border border-red-100 space-y-1 mt-2">
@@ -301,45 +281,51 @@ export default function InsightsPage() {
             </div>
 
             <div className="space-y-4 pt-2">
-              {efficiencyList.map((eff: any, idx) => (
-                <div key={idx} className="space-y-2 text-xs border-b border-slate-50 pb-3 last:border-0 last:pb-0">
-                  <div className="flex justify-between items-center font-bold">
-                    {eff.id ? (
-                      <button
-                        onClick={() => router.push(`/campaigns?c=${eff.id}`)}
-                        className="text-blue-600 hover:underline cursor-pointer text-left font-bold"
-                      >
-                        {eff.name}
-                      </button>
-                    ) : (
-                      <span className="text-slate-800">{eff.name}</span>
-                    )}
-                    <span className={`text-sm font-black ${eff.efficiency >= 0 ? "text-green-600" : "text-red-500"}`}>
-                      {eff.efficiency >= 0 ? `+${eff.efficiency.toFixed(0)}` : eff.efficiency.toFixed(0)} percentage points ({eff.type})
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-[10px] text-slate-400 font-bold uppercase">
-                        <span>Spend Share</span>
-                        <span>{eff.spendShare.toFixed(0)}%</span>
-                      </div>
-                      <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                        <div className="bg-slate-400 h-full" style={{width: `${eff.spendShare}%`}} />
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-[10px] text-slate-400 font-bold uppercase">
-                        <span>Result Share</span>
-                        <span>{eff.resultShare.toFixed(0)}%</span>
-                      </div>
-                      <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                        <div className={`h-full ${eff.efficiency >= 0 ? "bg-green-500" : "bg-red-400"}`} style={{width: `${eff.resultShare}%`}} />
-                      </div>
-                    </div>
-                  </div>
+              {efficiencyList.length === 0 ? (
+                <div className="text-slate-400 py-12 text-center font-semibold">
+                  No budget efficiency parameters calculated.
                 </div>
-              ))}
+              ) : (
+                efficiencyList.map((eff: any, idx) => (
+                  <div key={idx} className="space-y-2 text-xs border-b border-slate-50 pb-3 last:border-0 last:pb-0">
+                    <div className="flex justify-between items-center font-bold">
+                      {eff.id ? (
+                        <button
+                          onClick={() => router.push(`/campaigns?c=${eff.id}`)}
+                          className="text-blue-600 hover:underline cursor-pointer text-left font-bold"
+                        >
+                          {eff.name}
+                        </button>
+                      ) : (
+                        <span className="text-slate-800">{eff.name}</span>
+                      )}
+                      <span className={`text-sm font-black ${eff.efficiency >= 0 ? "text-green-600" : "text-red-500"}`}>
+                        {eff.efficiency >= 0 ? `+${eff.efficiency.toFixed(0)}` : eff.efficiency.toFixed(0)} percentage points ({eff.type})
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-[10px] text-slate-400 font-bold uppercase">
+                          <span>Spend Share</span>
+                          <span>{eff.spendShare.toFixed(0)}%</span>
+                        </div>
+                        <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                          <div className="bg-slate-400 h-full" style={{width: `${eff.spendShare}%`}} />
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-[10px] text-slate-400 font-bold uppercase">
+                          <span>Result Share</span>
+                          <span>{eff.resultShare.toFixed(0)}%</span>
+                        </div>
+                        <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                          <div className={`h-full ${eff.efficiency >= 0 ? "bg-green-500" : "bg-red-400"}`} style={{width: `${eff.resultShare}%`}} />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
