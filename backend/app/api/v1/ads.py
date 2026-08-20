@@ -238,7 +238,7 @@ async def list_ads(
         .outerjoin(metrics_subq, Ad.id == metrics_subq.c.ad_id)
         .outerjoin(prev_metrics_subq, Ad.id == prev_metrics_subq.c.ad_id)
         .where(MetaAdAccount.meta_account_id == ad_acc.meta_account_id)
-        .order_by(Ad.name.asc())
+        .order_by(func.coalesce(metrics_subq.c.spend, 0).desc(), Ad.name.asc())
     )
     
     res = await db.execute(stmt)
