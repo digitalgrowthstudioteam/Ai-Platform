@@ -146,6 +146,27 @@ class RecommendationEngine:
         start_date = today - timedelta(days=historical_days)
         recommendations_to_add = []
 
+        # Compute Account Average CTR dynamically based on historical plan days
+        ctr_stmt = (
+            select(
+                func.sum(CampaignDailyMetrics.clicks).label("clicks"),
+                func.sum(CampaignDailyMetrics.impressions).label("impressions")
+            )
+            .join(Campaign, CampaignDailyMetrics.campaign_id == Campaign.id)
+            .where(Campaign.ad_account_id == ad_account_uuid)
+            .where(CampaignDailyMetrics.date >= start_date)
+        )
+        ctr_res = await db.execute(ctr_stmt)
+        ctr_row = ctr_res.fetchone()
+        
+        account_avg_ctr = 0.015  # Default benchmark is 1.5%
+        is_custom_baseline = False
+        if ctr_row and ctr_row[0] is not None and ctr_row[1] is not None and ctr_row[1] > 0:
+            avg_ctr = float(ctr_row[0]) / float(ctr_row[1])
+            if avg_ctr > 0:
+                account_avg_ctr = avg_ctr
+                is_custom_baseline = True
+
         # Resolve active campaigns in the account to determine primary objective (Conversations, Leads, etc.)
         active_stmt = select(Campaign).where(Campaign.ad_account_id == ad_account_uuid).where(Campaign.status == "ACTIVE").options(selectinload(Campaign.ad_sets))
         active_res = await db.execute(active_stmt)
@@ -670,8 +691,8 @@ class RecommendationEngine:
                     )
                 )
 
-            # Low CTR Check
-            if impressions >= 500 and ctr < 0.015:
+            # Low CTR Check compared to account average CTR baseline
+            if impressions >= 500 and ctr < account_avg_ctr:
                 priority, confidence = cls.calculate_priority_and_confidence(
                     impact=0.65, urgency=0.60, spend=spend, num_conversions=num_conversions, impressions=impressions
                 )
@@ -684,6 +705,21 @@ class RecommendationEngine:
 
                 resolved_campaign_id = ad.ad_set.campaign_id if ad.ad_set else None
 
+                description_text = (
+                    f"CTR is currently {ctr*100:.2f}%, which is below your account's average historical CTR of {account_avg_ctr*100:.2f}% "
+                    f"(calculated over the last {historical_days} days). "
+                    f"Out of {impressions} impressions, it has captured only {clicks} clicks."
+                ) if is_custom_baseline else (
+                    f"CTR is currently {ctr*100:.2f}%, which is below the recommended benchmark of 1.50%. "
+                    f"Out of {impressions} impressions, it has captured only {clicks} clicks."
+                )
+
+                evidence_text = (
+                    f"Impressions: {impressions}, CTR: {ctr*100:.2f}%, Account Avg CTR: {account_avg_ctr*100:.2f}%, clicks: {clicks}"
+                ) if is_custom_baseline else (
+                    f"Impressions: {impressions}, CTR: {ctr*100:.2f}%, Benchmark CTR: 1.50%, clicks: {clicks}"
+                )
+
                 recommendations_to_add.append(
                     AIRecommendation(
                         user_id=user_uuid,
@@ -695,19 +731,16 @@ class RecommendationEngine:
                         ad_id=ad.id,
                         recommendation_type=rec_type,
                         title=title,
-                        description=(
-                            f"CTR is currently {ctr*100:.2f}%, which is below the recommended threshold of 1.5%. "
-                            f"Out of {impressions} impressions, it has captured only {clicks} clicks."
-                        ),
+                        description=description_text,
                         reason="Ad fatigue or copy message is not engaging the target audience.",
                         objective="General",
                         problem="Low ad click-through rate",
                         root_cause="Creative wearout or copy hook mismatch",
-                        evidence=f"Impressions: {impressions}, CTR: {ctr*100:.2f}%, clicks: {clicks}",
+                        evidence=evidence_text,
                         expected_impact="Refreshing copy/headline or swapping the visual card will improve click share and lower CPC.",
                         confidence_score=confidence,
                         priority=priority,
-                        supporting_metrics={"ctr": ctr, "impressions": impressions, "clicks": clicks},
+                        supporting_metrics={"ctr": ctr, "impressions": impressions, "clicks": clicks, "account_avg_ctr": account_avg_ctr},
                         status="new",
                     )
                 )
@@ -946,7 +979,7 @@ class RecommendationEngine:
 
             # 2. Conversion Opportunity Check (8.11 post-click / downstream funnel leak)
             if is_conv_camp:
-                if clicks >= 80 and ctr > 0.015 and cpc < 25.0:
+                if clicks >= 80 and ctr > account_avg_ctr and cpc < 25.0:
                     conversion_rate = (conversations / clicks) if clicks > 0 else 0.0
                     if conversion_rate < 0.10:
                         priority, confidence = cls.calculate_priority_and_confidence(
@@ -976,7 +1009,7 @@ class RecommendationEngine:
                         )
             
             elif is_lead_camp:
-                if clicks >= 100 and ctr > 0.015 and cpc < 20.0:
+                if clicks >= 100 and ctr > account_avg_ctr and cpc < 20.0:
                     conversion_rate = (leads / clicks) if clicks > 0 else 0.0
                     if conversion_rate < 0.02:
                         priority, confidence = cls.calculate_priority_and_confidence(
@@ -1007,7 +1040,7 @@ class RecommendationEngine:
             
             # Sales objective leak
             elif "SALES" in obj or "CONVERSIONS" in obj:
-                if clicks >= 100 and ctr > 0.015 and purchases == 0 and spend > 150.00:
+                if clicks >= 100 and ctr > account_avg_ctr and purchases == 0 and spend > 150.00:
                     priority, confidence = cls.calculate_priority_and_confidence(
                         impact=0.85, urgency=0.75, spend=spend, num_conversions=0
                     )
