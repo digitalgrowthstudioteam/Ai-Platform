@@ -42,6 +42,7 @@ class AIAssistantService:
         """
         Assembles a highly structured JSON context layer for the current ad account,
         scoped to optional campaign_id, adset_id, or ad_id if provided.
+        Uses historical lookback window based on user's plan entitlements.
         """
         # 1. Fetch Ad Account details
         stmt = (
@@ -60,6 +61,24 @@ class AIAssistantService:
 
         sync_status = conn.last_sync_status if conn else "unknown"
         last_sync_at = conn.last_sync_at.isoformat() if (conn and conn.last_sync_at) else "never"
+
+        # Resolve historical days from parent plan entitlements
+        from app.services.entitlement_engine import EntitlementEngine
+        owner_stmt = select(User).where(User.id == ad_account.user_id)
+        owner_res = await db.execute(owner_stmt)
+        owner = owner_res.scalar_one_or_none()
+        
+        historical_days = 30  # Default fallback
+        if owner:
+            ent = await EntitlementEngine.resolve_entitlements(owner, db)
+            raw_days = ent.get("historical_days", 30)
+            if raw_days > 180:
+                historical_days = 180  # Optimized threshold
+            else:
+                historical_days = raw_days
+
+        today = date.today()
+        history_start = today - timedelta(days=historical_days - 1)
 
         context = {
             "account_summary": {
@@ -95,9 +114,6 @@ class AIAssistantService:
                 "recommendation": r.recommendation_text,
             })
 
-        today = date.today()
-        seven_days_ago = today - timedelta(days=6)
-
         # Scoped Focus Logic
         if ad_id:
             ad_stmt = select(Ad).where(Ad.id == ad_id)
@@ -114,7 +130,7 @@ class AIAssistantService:
                         func.sum(AdDailyMetrics.revenue).label("revenue"),
                     )
                     .where(AdDailyMetrics.ad_id == ad_id)
-                    .where(AdDailyMetrics.date >= seven_days_ago)
+                    .where(AdDailyMetrics.date >= history_start)
                 )
                 met_res = await db.execute(metrics_stmt)
                 m = met_res.first()
@@ -140,7 +156,10 @@ class AIAssistantService:
                     "status": ad_obj.status,
                     "ad_set_name": adset_obj.name if adset_obj else "Unknown Set",
                     "campaign_name": camp_obj.name if camp_obj else "Unknown Campaign",
-                    "performance_7d": {
+                    "performance_history_period": {
+                        "start_date": history_start.isoformat(),
+                        "end_date": today.isoformat(),
+                        "days_count": historical_days,
                         "spend": spend,
                         "impressions": impressions,
                         "clicks": clicks,
@@ -169,7 +188,7 @@ class AIAssistantService:
                         func.sum(AdSetDailyMetrics.revenue).label("revenue"),
                     )
                     .where(AdSetDailyMetrics.ad_set_id == adset_id)
-                    .where(AdSetDailyMetrics.date >= seven_days_ago)
+                    .where(AdSetDailyMetrics.date >= history_start)
                 )
                 met_res = await db.execute(metrics_stmt)
                 m = met_res.first()
@@ -193,7 +212,10 @@ class AIAssistantService:
                     "name": adset_obj.name,
                     "status": adset_obj.status,
                     "campaign_name": camp_obj.name if camp_obj else "Unknown Campaign",
-                    "performance_7d": {
+                    "performance_history_period": {
+                        "start_date": history_start.isoformat(),
+                        "end_date": today.isoformat(),
+                        "days_count": historical_days,
                         "spend": spend,
                         "impressions": impressions,
                         "clicks": clicks,
@@ -219,7 +241,7 @@ class AIAssistantService:
                             func.sum(AdDailyMetrics.leads).label("leads"),
                         )
                         .where(AdDailyMetrics.ad_id == ad_obj.id)
-                        .where(AdDailyMetrics.date >= seven_days_ago)
+                        .where(AdDailyMetrics.date >= history_start)
                     )
                     ad_met_res = await db.execute(ad_met_stmt)
                     am = ad_met_res.first()
@@ -229,7 +251,10 @@ class AIAssistantService:
                         "id": str(ad_obj.id),
                         "name": ad_obj.name,
                         "status": ad_obj.status,
-                        "performance_7d": {
+                        "performance_history_period": {
+                            "start_date": history_start.isoformat(),
+                            "end_date": today.isoformat(),
+                            "days_count": historical_days,
                             "spend": ad_spend,
                             "leads": ad_leads,
                             "cpl": ad_spend / ad_leads if ad_leads > 0 else ad_spend
@@ -251,7 +276,7 @@ class AIAssistantService:
                         func.sum(CampaignDailyMetrics.revenue).label("revenue"),
                     )
                     .where(CampaignDailyMetrics.campaign_id == campaign_id)
-                    .where(CampaignDailyMetrics.date >= seven_days_ago)
+                    .where(CampaignDailyMetrics.date >= history_start)
                 )
                 met_res = await db.execute(metrics_stmt)
                 m = met_res.first()
@@ -274,7 +299,10 @@ class AIAssistantService:
                     "objective": c.objective,
                     "status": c.status,
                     "budget_daily": float(c.daily_budget or 0.0),
-                    "performance_7d": {
+                    "performance_history_period": {
+                        "start_date": history_start.isoformat(),
+                        "end_date": today.isoformat(),
+                        "days_count": historical_days,
                         "spend": spend,
                         "impressions": impressions,
                         "clicks": clicks,
@@ -302,7 +330,7 @@ class AIAssistantService:
                             func.sum(AdSetDailyMetrics.leads).label("leads"),
                         )
                         .where(AdSetDailyMetrics.ad_set_id == adset_obj.id)
-                        .where(AdSetDailyMetrics.date >= seven_days_ago)
+                        .where(AdSetDailyMetrics.date >= history_start)
                     )
                     adset_met_res = await db.execute(adset_met_stmt)
                     asm = adset_met_res.first()
@@ -312,7 +340,10 @@ class AIAssistantService:
                         "id": str(adset_obj.id),
                         "name": adset_obj.name,
                         "status": adset_obj.status,
-                        "performance_7d": {
+                        "performance_history_period": {
+                            "start_date": history_start.isoformat(),
+                            "end_date": today.isoformat(),
+                            "days_count": historical_days,
                             "spend": adset_spend,
                             "leads": adset_leads,
                             "cpl": adset_spend / adset_leads if adset_leads > 0 else adset_spend
@@ -332,7 +363,7 @@ class AIAssistantService:
                                 func.sum(AdDailyMetrics.leads).label("leads"),
                             )
                             .where(AdDailyMetrics.ad_id == ad_obj.id)
-                            .where(AdDailyMetrics.date >= seven_days_ago)
+                            .where(AdDailyMetrics.date >= history_start)
                         )
                         ad_met_res = await db.execute(ad_met_stmt)
                         am = ad_met_res.first()
@@ -342,7 +373,10 @@ class AIAssistantService:
                             "id": str(ad_obj.id),
                             "name": ad_obj.name,
                             "status": ad_obj.status,
-                            "performance_7d": {
+                            "performance_history_period": {
+                                "start_date": history_start.isoformat(),
+                                "end_date": today.isoformat(),
+                                "days_count": historical_days,
                                 "spend": ad_spend,
                                 "leads": ad_leads,
                                 "cpl": ad_spend / ad_leads if ad_leads > 0 else ad_spend
@@ -375,7 +409,7 @@ class AIAssistantService:
                     func.sum(CampaignDailyMetrics.revenue).label("revenue"),
                 )
                 .where(CampaignDailyMetrics.campaign_id.in_(campaign_ids))
-                .where(CampaignDailyMetrics.date >= seven_days_ago)
+                .where(CampaignDailyMetrics.date >= history_start)
                 .group_by(CampaignDailyMetrics.campaign_id)
             ) if campaign_ids else None
 
@@ -419,7 +453,10 @@ class AIAssistantService:
                     "status": c.status,
                     "budget_daily": float(c.daily_budget or 0.0),
                     "budget_lifetime": float(c.lifetime_budget or 0.0),
-                    "performance_7d": {
+                    "performance_history_period": {
+                        "start_date": history_start.isoformat(),
+                        "end_date": today.isoformat(),
+                        "days_count": historical_days,
                         "spend": spend,
                         "impressions": impressions,
                         "clicks": clicks,
@@ -603,10 +640,10 @@ class AIAssistantService:
         # Match Intent
         if "cpl" in msg_lower or "cpa" in msg_lower or "increase" in msg_lower or "waadhla" in msg_lower:
             if campaigns:
-                worst = max(campaigns, key=lambda c: c["performance_7d"]["cpl"])
+                worst = max(campaigns, key=lambda c: c["performance_history_period"]["cpl"])
                 worst_name = worst["name"]
                 worst_id = worst["id"]
-                worst_cpl = worst["performance_7d"]["cpl"]
+                worst_cpl = worst["performance_history_period"]["cpl"]
                 
                 # Format using mandatory clickable entities
                 entity_link = f"[{worst_name}](entity:campaign:{worst_id})"
@@ -616,10 +653,10 @@ class AIAssistantService:
 
         if "best" in msg_lower or "performing" in msg_lower or "scale" in msg_lower or "win" in msg_lower:
             if campaigns:
-                best = min(campaigns, key=lambda c: c["performance_7d"]["cpl"] if c["performance_7d"]["cpl"] > 0 else 999999)
+                best = min(campaigns, key=lambda c: c["performance_history_period"]["cpl"] if c["performance_history_period"]["cpl"] > 0 else 999999)
                 best_name = best["name"]
                 best_id = best["id"]
-                best_cpl = best["performance_7d"]["cpl"]
+                best_cpl = best["performance_history_period"]["cpl"]
                 
                 entity_link = f"[{best_name}](entity:campaign:{best_id})"
                 return f"{greeting}\n\nCampaign {entity_link} {campaign_win} It has the lowest Cost Per Lead of ₹{best_cpl:.2f}.\n\nRecommendation:\nConsider scaling daily budget of {entity_link} by 15-20%."
@@ -637,10 +674,11 @@ class AIAssistantService:
 
         # Default Summary
         if campaigns:
-            total_spend = sum(c["performance_7d"]["spend"] for c in campaigns)
-            total_leads = sum(c["performance_7d"]["leads"] for c in campaigns)
+            days_count = campaigns[0]["performance_history_period"]["days_count"]
+            total_spend = sum(c["performance_history_period"]["spend"] for c in campaigns)
+            total_leads = sum(c["performance_history_period"]["leads"] for c in campaigns)
             avg_cpl = total_spend / total_leads if total_leads > 0 else total_spend
-            return f"{greeting}\n\n- Connected Account: **{account_name}**\n- 7-Day Total Spend: ₹{total_spend:.2f}\n- Total Leads: {total_leads}\n- Average CPL: ₹{avg_cpl:.2f}\n\n{suffix}"
+            return f"{greeting}\n\n- Connected Account: **{account_name}**\n- {days_count}-Day Total Spend: ₹{total_spend:.2f}\n- Total Leads: {total_leads}\n- Average CPL: ₹{avg_cpl:.2f}\n\n{suffix}"
         
         return f"Connected to **{account_name}**. I'm ready to answer any questions about your campaign performance or creative assets! {suffix}"
 
@@ -704,6 +742,8 @@ Never fabricate metrics. If the data does not exist, say clearly: "I don't have 
 If data is stale (e.g. last sync was long ago), state: "The latest available data is from [time]. The account has not completed its latest sync yet."
 Do not present estimates as actual Meta data.
 Do not invent campaign names, spend, CPL, ROAS, leads, or other metrics.
+
+Do NOT use markdown headers (like #, ##, ###) in your response. Instead, make headings and titles bold directly (using **bold** on a line by itself) and use bullet points or numbered lists where appropriate.
 
 {focus_instruction}
 
