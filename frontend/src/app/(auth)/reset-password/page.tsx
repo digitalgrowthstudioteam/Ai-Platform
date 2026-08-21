@@ -73,7 +73,7 @@ export default function ResetPasswordPage() {
                 marginBottom: 8,
               }}
             >
-              <img src="/logo.svg" alt="DG" style={{ width: 40, height: 40 }} />
+              <img src="/logo.jpg" alt="DG" style={{ width: 40, height: 40, borderRadius: 8, objectFit: "contain" }} />
             </div>
             <h2 style={{ fontSize: "1.25rem", fontWeight: 700 }}>
               Reset Password
