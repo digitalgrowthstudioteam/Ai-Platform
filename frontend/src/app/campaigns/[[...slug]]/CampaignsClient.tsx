@@ -31,7 +31,8 @@ import {
   X,
   Lightbulb,
   Bot,
-  AlertTriangle
+  AlertTriangle,
+  Settings
 } from "lucide-react";
 import { 
   ResponsiveContainer, 
@@ -45,6 +46,18 @@ import {
   Line
 } from "recharts";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/utils";
+
+const AVAILABLE_COLUMNS = [
+  { key: "status", label: "Status" },
+  { key: "objective", label: "Objective" },
+  { key: "spend", label: "Spend" },
+  { key: "primaryResult", label: "Primary Result" },
+  { key: "costPerResult", label: "Cost Per Result" },
+  { key: "ctr", label: "CTR" },
+  { key: "roas", label: "ROAS" },
+  { key: "health", label: "Health" },
+  { key: "aiStatus", label: "AI Status" },
+];
 
 export default function CampaignsClient({ slug: propSlug }: { slug?: string[] }) {
   const router = useRouter();
@@ -137,6 +150,25 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
   });
 
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const [objectiveFilter, setObjectiveFilter] = useState<string>("ALL");
+  const [visibleColumns, setVisibleColumns] = useState<string[]>([
+    "status",
+    "objective",
+    "spend",
+    "primaryResult",
+    "costPerResult",
+    "ctr",
+    "roas",
+    "health",
+    "aiStatus"
+  ]);
+  const [showColumnCustomizer, setShowColumnCustomizer] = useState(false);
+  const toggleColumn = (key: string) => {
+    setVisibleColumns((prev) => 
+      prev.includes(key) ? prev.filter((c) => c !== key) : [...prev, key]
+    );
+  };
+
   const [sortBy, setSortBy] = useState<string>("spend");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
@@ -842,8 +874,14 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
     };
   };
 
+  const uniqueObjectives = useMemo(() => {
+    const objectives = campaigns.map(c => c.objective);
+    return Array.from(new Set(objectives)).filter(Boolean);
+  }, [campaigns]);
+
   const filteredAndSortedCampaigns = campaigns
     .filter(c => statusFilter === "ALL" || c.status === statusFilter)
+    .filter(c => objectiveFilter === "ALL" || c.objective === objectiveFilter)
     .sort((a, b) => {
       let valA: any = 0;
       let valB: any = 0;
@@ -1044,42 +1082,95 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
             <div className="space-y-4">
               {/* Filters Header */}
               <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 border border-border rounded-lg shadow-xs">
-                <div className="flex items-center gap-3">
-                  <span className="text-xs font-bold text-slate-500">Status Filter:</span>
-                  <select
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    className="text-xs border border-border rounded px-2.5 py-1.5 bg-white font-semibold text-slate-700 focus:outline-none cursor-pointer"
-                  >
-                    <option value="ALL">All Statuses</option>
-                    <option value="ACTIVE">Active</option>
-                    <option value="PAUSED">Paused</option>
-                    <option value="ARCHIVED">Stopped / Archived</option>
-                  </select>
+                <div className="flex flex-wrap items-center gap-4">
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs font-bold text-slate-500">Status Filter:</span>
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                      className="text-xs border border-border rounded px-2.5 py-1.5 bg-white font-semibold text-slate-700 focus:outline-none cursor-pointer"
+                    >
+                      <option value="ALL">All Statuses</option>
+                      <option value="ACTIVE">Active</option>
+                      <option value="PAUSED">Paused</option>
+                      <option value="ARCHIVED">Stopped / Archived</option>
+                    </select>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs font-bold text-slate-500">Objective Filter:</span>
+                    <select
+                      value={objectiveFilter}
+                      onChange={(e) => setObjectiveFilter(e.target.value)}
+                      className="text-xs border border-border rounded px-2.5 py-1.5 bg-white font-semibold text-slate-700 focus:outline-none cursor-pointer text-ellipsis overflow-hidden max-w-[150px]"
+                    >
+                      <option value="ALL">All Objectives</option>
+                      {uniqueObjectives.map(obj => (
+                        <option key={obj} value={obj}>
+                          {obj.replace(/_/g, " ")}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-3">
-                  <span className="text-xs font-bold text-slate-500">Sort By:</span>
-                  <select
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value)}
-                    className="text-xs border border-border rounded px-2.5 py-1.5 bg-white font-semibold text-slate-700 focus:outline-none cursor-pointer"
-                  >
-                    <option value="name">Campaign Name</option>
-                    <option value="spend">Spend</option>
-                    <option value="impressions">Impressions</option>
-                    <option value="clicks">Clicks</option>
-                    <option value="purchases">Conversions</option>
-                    <option value="ctr">CTR</option>
-                    <option value="cpc">CPC</option>
-                    <option value="roas">ROAS</option>
-                  </select>
-                  <button
-                    onClick={() => setSortOrder(prev => prev === "asc" ? "desc" : "asc")}
-                    className="text-xs border border-border rounded px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 font-bold text-slate-600 cursor-pointer"
-                  >
-                    {sortOrder === "asc" ? "↑ Asc" : "↓ Desc"}
-                  </button>
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs font-bold text-slate-500">Sort By:</span>
+                    <select
+                      value={sortBy}
+                      onChange={(e) => setSortBy(e.target.value)}
+                      className="text-xs border border-border rounded px-2.5 py-1.5 bg-white font-semibold text-slate-700 focus:outline-none cursor-pointer"
+                    >
+                      <option value="name">Campaign Name</option>
+                      <option value="spend">Spend</option>
+                      <option value="impressions">Impressions</option>
+                      <option value="clicks">Clicks</option>
+                      <option value="purchases">Conversions</option>
+                      <option value="ctr">CTR</option>
+                      <option value="cpc">CPC</option>
+                      <option value="roas">ROAS</option>
+                    </select>
+                    <button
+                      onClick={() => setSortOrder(prev => prev === "asc" ? "desc" : "asc")}
+                      className="text-xs border border-border rounded px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 font-bold text-slate-600 cursor-pointer"
+                    >
+                      {sortOrder === "asc" ? "↑ Asc" : "↓ Desc"}
+                    </button>
+                  </div>
+
+                  {/* Columns Customizer */}
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowColumnCustomizer(prev => !prev)}
+                      className="text-xs border border-border rounded px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 font-bold text-slate-600 cursor-pointer flex items-center gap-1.5"
+                    >
+                      <Settings size={14} className={showColumnCustomizer ? "animate-spin" : ""} /> Customize Columns
+                    </button>
+                    {showColumnCustomizer && (
+                      <div className="absolute right-0 mt-2 w-52 bg-white border border-border rounded-lg shadow-lg z-50 p-3 space-y-2 text-xs">
+                        <div className="font-bold text-slate-700 pb-1.5 border-b border-slate-100 flex justify-between items-center">
+                          <span>Show/Hide Columns</span>
+                          <button onClick={() => setShowColumnCustomizer(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
+                            <X size={12} />
+                          </button>
+                        </div>
+                        <div className="max-h-60 overflow-y-auto space-y-1.5 pt-1">
+                          {AVAILABLE_COLUMNS.map(col => (
+                            <label key={col.key} className="flex items-center gap-2 py-1 px-1.5 hover:bg-slate-50 rounded cursor-pointer select-none">
+                              <input
+                                type="checkbox"
+                                checked={visibleColumns.includes(col.key)}
+                                onChange={() => toggleColumn(col.key)}
+                                className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-3.5 w-3.5 cursor-pointer"
+                              />
+                              <span className="font-semibold text-slate-600">{col.label}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -1090,15 +1181,15 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
                     <thead className="bg-slate-50/50">
                       <tr className="text-subtle font-bold uppercase tracking-wider border-b border-border">
                         <th className="p-4">Campaign Name</th>
-                        <th className="p-4">Status</th>
-                        <th className="p-4">Objective</th>
-                        <th className="p-4 text-right">Spend</th>
-                        <th className="p-4 text-right">Primary Result</th>
-                        <th className="p-4 text-right">Cost Per Result</th>
-                        <th className="p-4 text-right">CTR</th>
-                        <th className="p-4 text-right">ROAS</th>
-                        <th className="p-4 text-center">Health</th>
-                        <th className="p-4 text-center">AI Status</th>
+                        {visibleColumns.includes("status") && <th className="p-4">Status</th>}
+                        {visibleColumns.includes("objective") && <th className="p-4">Objective</th>}
+                        {visibleColumns.includes("spend") && <th className="p-4 text-right">Spend</th>}
+                        {visibleColumns.includes("primaryResult") && <th className="p-4 text-right">Primary Result</th>}
+                        {visibleColumns.includes("costPerResult") && <th className="p-4 text-right">Cost Per Result</th>}
+                        {visibleColumns.includes("ctr") && <th className="p-4 text-right">CTR</th>}
+                        {visibleColumns.includes("roas") && <th className="p-4 text-right">ROAS</th>}
+                        {visibleColumns.includes("health") && <th className="p-4 text-center">Health</th>}
+                        {visibleColumns.includes("aiStatus") && <th className="p-4 text-center">AI Status</th>}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border font-medium text-slate-700">
@@ -1117,56 +1208,74 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
                               <div className="font-bold text-sm text-slate-800">{c.name}</div>
                               <div className="text-[10px] text-slate-400 mt-1">ID: {c.meta_campaign_id}</div>
                             </td>
-                            <td className="p-4">
-                              <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${c.status === "ACTIVE" ? "text-green-600 bg-green-50" : "text-slate-500 bg-slate-100"}`}>
-                                {c.status}
-                              </span>
-                            </td>
-                            <td className="p-4">
-                              <span className="text-[10px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded font-bold uppercase">
-                                {c.objective.replace(/_/g, " ")}
-                              </span>
-                            </td>
-                            <td className="p-4 text-right font-semibold">
-                              {formatCurrency(c.metrics.spend)}
-                              {renderTrend(c.metrics.spend_trend)}
-                            </td>
-                            <td className="p-4 text-right font-bold">
-                              {objMetrics.resultValue} <span className="text-[9px] font-normal text-slate-400">{objMetrics.resultLabel}</span>
-                              {renderTrend(getResultTrend(objMetrics.resultLabel, c.metrics))}
-                            </td>
-                            <td className="p-4 text-right">
-                              {objMetrics.costPerResult}
-                              {objMetrics.resultLabel === "Clicks" && renderTrend(c.metrics.cpc_trend)}
-                            </td>
-                            <td className="p-4 text-right text-slate-500">
-                              {objMetrics.ctrLabel}
-                              {renderTrend(c.metrics.ctr_trend)}
-                            </td>
-                            <td className="p-4 text-right text-green-600 font-bold">
-                              {objMetrics.roasLabel}
-                              {objMetrics.roasLabel !== "—" && renderTrend(c.metrics.roas_trend)}
-                            </td>
-                            <td className="p-4 text-center">
-                              <span className={`px-2 py-0.5 rounded text-[10px] font-black ${
-                                health > 80 ? "text-green-700 bg-green-50" : health > 65 ? "text-amber-700 bg-amber-50" : "text-red-700 bg-red-50"
-                              }`}>
-                                {health}%
-                              </span>
-                            </td>
-                            <td className="p-4 text-center">
-                              {campRecs.length > 0 ? (
-                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-600 border border-amber-200 inline-flex items-center gap-1">
-                                  <AlertCircle size={10} />
-                                  {campRecs.length} Alerts
+                            {visibleColumns.includes("status") && (
+                              <td className="p-4">
+                                <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${c.status === "ACTIVE" ? "text-green-600 bg-green-50" : "text-slate-500 bg-slate-100"}`}>
+                                  {c.status}
                                 </span>
-                              ) : (
-                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-green-50 text-green-600 border border-green-200 inline-flex items-center gap-1">
-                                  <Check size={10} />
-                                  Optimal
+                              </td>
+                            )}
+                            {visibleColumns.includes("objective") && (
+                              <td className="p-4">
+                                <span className="text-[10px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded font-bold uppercase">
+                                  {c.objective.replace(/_/g, " ")}
                                 </span>
-                              )}
-                            </td>
+                              </td>
+                            )}
+                            {visibleColumns.includes("spend") && (
+                              <td className="p-4 text-right font-semibold">
+                                {formatCurrency(c.metrics.spend)}
+                                {renderTrend(c.metrics.spend_trend)}
+                              </td>
+                            )}
+                            {visibleColumns.includes("primaryResult") && (
+                              <td className="p-4 text-right font-bold">
+                                {objMetrics.resultValue} <span className="text-[9px] font-normal text-slate-400">{objMetrics.resultLabel}</span>
+                                {renderTrend(getResultTrend(objMetrics.resultLabel, c.metrics))}
+                              </td>
+                            )}
+                            {visibleColumns.includes("costPerResult") && (
+                              <td className="p-4 text-right">
+                                {objMetrics.costPerResult}
+                                {objMetrics.resultLabel === "Clicks" && renderTrend(c.metrics.cpc_trend)}
+                              </td>
+                            )}
+                            {visibleColumns.includes("ctr") && (
+                              <td className="p-4 text-right text-slate-500">
+                                {objMetrics.ctrLabel}
+                                {renderTrend(c.metrics.ctr_trend)}
+                              </td>
+                            )}
+                            {visibleColumns.includes("roas") && (
+                              <td className="p-4 text-right text-green-600 font-bold">
+                                {objMetrics.roasLabel}
+                                {objMetrics.roasLabel !== "—" && renderTrend(c.metrics.roas_trend)}
+                              </td>
+                            )}
+                            {visibleColumns.includes("health") && (
+                              <td className="p-4 text-center">
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-black ${
+                                  health > 80 ? "text-green-700 bg-green-50" : health > 65 ? "text-amber-700 bg-amber-50" : "text-red-700 bg-red-50"
+                                }`}>
+                                  {health}%
+                                </span>
+                              </td>
+                            )}
+                            {visibleColumns.includes("aiStatus") && (
+                              <td className="p-4 text-center">
+                                {campRecs.length > 0 ? (
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-600 border border-amber-200 inline-flex items-center gap-1">
+                                    <AlertCircle size={10} />
+                                    {campRecs.length} Alerts
+                                  </span>
+                                ) : (
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-green-50 text-green-600 border border-green-200 inline-flex items-center gap-1">
+                                    <Check size={10} />
+                                    Optimal
+                                  </span>
+                                )}
+                              </td>
+                            )}
                           </tr>
                         );
                       })}
