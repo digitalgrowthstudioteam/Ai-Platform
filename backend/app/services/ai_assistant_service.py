@@ -522,8 +522,9 @@ class AIAssistantService:
         model_name = settings.GEMINI_MODEL
 
         # Direct API Key endpoint
-        if settings.AI_API_KEY:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={settings.AI_API_KEY}"
+        api_key = settings.resolved_api_key
+        if api_key:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
             payload = {
                 "contents": contents,
                 "systemInstruction": {
