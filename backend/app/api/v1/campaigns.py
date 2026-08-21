@@ -925,6 +925,7 @@ class AIOptimizationDashboardItem(BaseModel):
     roas_change_7d: float
     open_recommendations_count: int
     highest_priority: str
+    over_limit: bool = False
 
 
 class AIOptimizationDashboardResponse(BaseModel):
@@ -977,14 +978,17 @@ async def get_ai_optimization_dashboard(
     ent = await EntitlementEngine.resolve_entitlements(user, db)
     limit = ent.get("ai_optimization_campaign_limit", 0)
 
-    # 3. Get total active configs globally for this user
-    stmt_active_total = (
-        select(func.count(AIOptimizationConfig.id))
+    # 3. Fetch all active configs globally ordered by oldest activation first
+    global_stmt = (
+        select(AIOptimizationConfig)
         .where(AIOptimizationConfig.user_id == user.id)
         .where(AIOptimizationConfig.is_active == True)
+        .order_by(AIOptimizationConfig.created_at.asc())
     )
-    res_active_total = await db.execute(stmt_active_total)
-    active_count = res_active_total.scalar_one()
+    global_res = await db.execute(global_stmt)
+    global_configs = global_res.scalars().all()
+    active_count = len(global_configs)
+    entitled_campaign_ids = {cfg.campaign_id for cfg in global_configs[:limit]}
 
     # 4. Fetch all campaigns in this ad account
     stmt_c = select(Campaign).where(Campaign.ad_account_id == ad_acc.id).order_by(Campaign.name.asc())
@@ -1076,6 +1080,10 @@ async def get_ai_optimization_dashboard(
                 highest_prio_val = prio_val
                 highest_prio_str = prio
                 
+        is_over_limit = False
+        if is_active and c.id not in entitled_campaign_ids:
+            is_over_limit = True
+
         items.append(
             AIOptimizationDashboardItem(
                 campaign_id=c.id,
@@ -1092,7 +1100,8 @@ async def get_ai_optimization_dashboard(
                 cpl_change_7d=cpl_change,
                 roas_change_7d=roas_change,
                 open_recommendations_count=open_count,
-                highest_priority=highest_prio_str
+                highest_priority=highest_prio_str,
+                over_limit=is_over_limit
             )
         )
 

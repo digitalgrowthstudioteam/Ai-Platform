@@ -100,6 +100,12 @@ ADDON_PRICES_PAISE = {
     "AI_INTELLIGENCE_INDIVIDUAL_YEARLY": 499900,  # ₹4,999
     "AI_INTELLIGENCE_ALL_MONTHLY": 999900,        # ₹9,999
     "AI_INTELLIGENCE_ALL_YEARLY": 6999900,       # ₹69,999
+    "additional_optimization_campaign": 9900,     # ₹99
+    "credit_pack_100": 19900,                     # ₹199
+    "credit_pack_500": 94900,                     # ₹949
+    "credit_pack_1000": 189900,                    # ₹1,899
+    "credit_pack_3000": 579900,                    # ₹5,799
+    "credit_pack_5000": 899900,                    # ₹8,999
 }
 
 
@@ -386,40 +392,75 @@ async def verify_billing_payment(
     if is_verified:
         now = datetime.now(timezone.utc)
         
-        # Scenario A: User purchased an Add-On
+        # Scenario A: User purchased an Add-On or Credit Pack
         if req.addon_id:
-            # Determine duration
-            days = 365 if req.addon_id in ["lifetime_history_annual", "AI_INTELLIGENCE_INDIVIDUAL_YEARLY", "AI_INTELLIGENCE_ALL_YEARLY"] else 30
-            expiry = now + timedelta(days=days)
-            
-            # Check if user already has this active add-on
-            stmt = (
-                select(SubscriptionAddOn)
-                .where(SubscriptionAddOn.user_id == user.id)
-                .where(SubscriptionAddOn.addon_id == req.addon_id)
-                .where(SubscriptionAddOn.status == "active")
-            )
-            res = await db.execute(stmt)
-            existing = res.scalar_one_or_none()
-            
-            if existing:
-                existing.quantity += (req.quantity or 1)
-                existing.expires_at = expiry
-                existing.razorpay_payment_id = req.razorpay_payment_id
-            else:
-                addon = SubscriptionAddOn(
-                    user_id=user.id,
-                    addon_id=req.addon_id,
-                    quantity=(req.quantity or 1),
-                    status="active",
-                    razorpay_payment_id=req.razorpay_payment_id,
-                    expires_at=expiry,
-                )
-                db.add(addon)
+            if req.addon_id.startswith("credit_pack_"):
+                # One-time Credit Pack purchase
+                pack_credits_map = {
+                    "credit_pack_100": 100,
+                    "credit_pack_500": 500,
+                    "credit_pack_1000": 1000,
+                    "credit_pack_3000": 3000,
+                    "credit_pack_5000": 5000,
+                }
+                credits_to_grant = pack_credits_map.get(req.addon_id, 0) * (req.quantity or 1)
                 
-            await db.commit()
-            logger.info("addon_registered_successfully", user_id=user.id, addon_id=req.addon_id, quantity=req.quantity)
-            return {"status": "success", "message": f"Successfully activated add-on: {req.addon_id}."}
+                # Update user credits
+                user.purchased_credits_remaining += credits_to_grant
+                user.credits += credits_to_grant
+                db.add(user)
+                
+                # Write to credit transactions ledger (signed ledger)
+                from app.models.ai_assistant import AICreditTransaction
+                txn = AICreditTransaction(
+                    user_id=user.id,
+                    credit_amount=credits_to_grant,
+                    amount=credits_to_grant,
+                    credit_type="purchased",
+                    transaction_type="grant",
+                    description=f"Purchased {credits_to_grant} AI Credits Pack",
+                    reason="Credit pack purchase",
+                    reference_id=req.razorpay_payment_id
+                )
+                db.add(txn)
+                
+                await db.commit()
+                logger.info("credits_pack_purchased_successfully", user_id=user.id, addon_id=req.addon_id, credits=credits_to_grant)
+                return {"status": "success", "message": f"Successfully added {credits_to_grant} AI credits to your account."}
+            
+            else:
+                # Determine duration
+                days = 365 if req.addon_id in ["lifetime_history_annual", "AI_INTELLIGENCE_INDIVIDUAL_YEARLY", "AI_INTELLIGENCE_ALL_YEARLY"] else 30
+                expiry = now + timedelta(days=days)
+                
+                # Check if user already has this active add-on
+                stmt = (
+                    select(SubscriptionAddOn)
+                    .where(SubscriptionAddOn.user_id == user.id)
+                    .where(SubscriptionAddOn.addon_id == req.addon_id)
+                    .where(SubscriptionAddOn.status == "active")
+                )
+                res = await db.execute(stmt)
+                existing = res.scalar_one_or_none()
+                
+                if existing:
+                    existing.quantity += (req.quantity or 1)
+                    existing.expires_at = expiry
+                    existing.razorpay_payment_id = req.razorpay_payment_id
+                else:
+                    addon = SubscriptionAddOn(
+                        user_id=user.id,
+                        addon_id=req.addon_id,
+                        quantity=(req.quantity or 1),
+                        status="active",
+                        razorpay_payment_id=req.razorpay_payment_id,
+                        expires_at=expiry,
+                    )
+                    db.add(addon)
+                    
+                await db.commit()
+                logger.info("addon_registered_successfully", user_id=user.id, addon_id=req.addon_id, quantity=req.quantity)
+                return {"status": "success", "message": f"Successfully activated add-on: {req.addon_id}."}
             
         # Scenario B: User upgraded Base Subscription plan
         elif req.plan_id:
@@ -436,6 +477,9 @@ async def verify_billing_payment(
             )
             db.add(sub)
             
+            # Trigger self-healing reset immediately to allocate plan credits
+            await EntitlementEngine.check_and_reset_monthly_credits(user, db)
+            
             # Generate plan upgrade notification
             notif = Notification(
                 user_id=user.id,
@@ -445,7 +489,7 @@ async def verify_billing_payment(
             )
             db.add(notif)
             await db.commit()
-
+ 
             logger.info("subscription_plan_activated", user_id=user.id, plan=req.plan_id)
             return {"status": "success", "message": f"Successfully upgraded plan to {req.plan_id}."}
 

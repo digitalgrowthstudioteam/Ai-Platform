@@ -26,6 +26,11 @@ router = APIRouter(prefix="/assistant", tags=["AI Assistant"])
 # ──────────────────────────────────────────────
 class CreditBalanceResponse(BaseModel):
     credits: int
+    monthly_credits_remaining: int = 0
+    purchased_credits_remaining: int = 0
+    trial_credits_remaining: int = 0
+    monthly_credits_limit: int = 0
+    monthly_credits_used: int = 0
 
 class ConversationCreateRequest(BaseModel):
     ad_account_id: uuid.UUID
@@ -83,10 +88,29 @@ async def get_ai_credits(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Returns current user's AI credits balance.
+    Returns current user's AI credits balance with detailed breakdown.
     """
     user = await get_db_user_from_claims(claims, db)
-    return CreditBalanceResponse(credits=user.credits)
+    
+    # Auto-heal credits reset in case they hit this read route first
+    from app.services.entitlement_engine import EntitlementEngine
+    try:
+        await EntitlementEngine.check_and_reset_monthly_credits(user, db)
+    except Exception as reset_err:
+        logger.error("failed_credits_reset_self_healing_read", error=str(reset_err))
+        
+    plan_config = EntitlementEngine.get_plan_config(user.plan_id)
+    monthly_limit = plan_config.get("monthly_credits", 0)
+    monthly_used = max(0, monthly_limit - user.monthly_credits_remaining)
+    
+    return CreditBalanceResponse(
+        credits=user.credits,
+        monthly_credits_remaining=user.monthly_credits_remaining,
+        purchased_credits_remaining=user.purchased_credits_remaining,
+        trial_credits_remaining=user.trial_credits_remaining,
+        monthly_credits_limit=monthly_limit,
+        monthly_credits_used=monthly_used
+    )
 
 
 @router.get("/conversations", response_model=List[ConversationResponse], summary="List assistant conversations")

@@ -91,6 +91,8 @@ async def clean_database_state(db: AsyncSession):
     from app.models.ml_features import MLFeatureRecord, OptimizationAction
     from app.models.ai_optimization import AIOptimizationConfig, AIOptimizationLog
     from app.models.ai_assistant import AIChatConversation, AIChatMessage, AICreditTransaction
+    from app.models.admin_config import AdminConfig
+    from app.models.ai_usage import AIUsageRecord
     from sqlalchemy import update
 
     # Order of deletion is important to satisfy SQLite foreign keys if enabled
@@ -98,6 +100,8 @@ async def clean_database_state(db: AsyncSession):
     await db.execute(delete(AIChatMessage))
     await db.execute(delete(AICreditTransaction))
     await db.execute(delete(AIChatConversation))
+    await db.execute(delete(AdminConfig))
+    await db.execute(delete(AIUsageRecord))
     await db.execute(delete(AIOptimizationConfig))
     await db.execute(delete(AIOptimizationLog))
     await db.execute(delete(MLFeatureRecord))

@@ -86,6 +86,10 @@ class AdminCreditsOverrideRequest(BaseModel):
     credits: int
 
 
+class AdminOptimizationSlotsOverrideRequest(BaseModel):
+    slots: int
+
+
 # ──────────────────────────────────────────────
 # Helper: Verify Admin Role
 # ──────────────────────────────────────────────
@@ -861,4 +865,116 @@ async def admin_resync_user(
         "status": "success",
         "message": f"Resync triggered for {synced_count} ad account(s) belonging to {user.email}.",
         "forced": force,
+    }
+
+
+# ──────────────────────────────────────────────
+# Admin: AI Credits & Optimization Limits overrides
+# ──────────────────────────────────────────────
+
+@router.post("/users/{user_id}/optimization-slots", summary="Assign admin override optimization slots to user")
+async def override_user_optimization_slots(
+    user_id: uuid.UUID,
+    req: AdminOptimizationSlotsOverrideRequest,
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Super Admin endpoint to override a user's AI optimization campaign slots directly.
+    """
+    verify_admin(claims)
+    
+    stmt = select(User).where(User.id == user_id)
+    res = await db.execute(stmt)
+    user = res.scalar_one_or_none()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found."
+        )
+    
+    user.admin_assigned_optimization_slots = req.slots
+    db.add(user)
+    await db.commit()
+    
+    logger.info("admin_optimization_slots_override_success", user_id=str(user_id), slots=req.slots)
+    return {
+        "status": "success",
+        "message": f"Successfully updated user admin assigned optimization slots to {req.slots}."
+    }
+
+
+@router.get("/ai/dashboard", summary="Get internal cost and profitability dashboard stats")
+async def get_admin_ai_dashboard(
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Internal SaaS metrics dashboard for tracking Gemini token costs, pack revenues, and profit margins.
+    """
+    verify_admin(claims)
+    
+    from app.models.ai_usage import AIUsageRecord
+    from app.models.ai_assistant import AICreditTransaction
+    from sqlalchemy import case
+    
+    # 1. Aggregate AIUsageRecord stats
+    usage_stmt = (
+        select(
+            func.count(AIUsageRecord.id).label("total_requests"),
+            func.sum(AIUsageRecord.input_tokens).label("in_tok"),
+            func.sum(AIUsageRecord.output_tokens).label("out_tok"),
+            func.sum(AIUsageRecord.estimated_cost).label("cost_usd"),
+            func.sum(case((AIUsageRecord.request_type == 'ai_assistant', 1), else_=0)).label("assistant_reqs"),
+            func.sum(case((AIUsageRecord.request_type == 'ai_optimization', 1), else_=0)).label("optimization_reqs")
+        )
+        .where(AIUsageRecord.success == True)
+    )
+    usage_res = await db.execute(usage_stmt)
+    row = usage_res.first()
+    
+    total_assistant = int(row.assistant_reqs or 0) if row else 0
+    total_optimization = int(row.optimization_reqs or 0) if row else 0
+    in_tokens = int(row.in_tok or 0) if row else 0
+    out_tokens = int(row.out_tok or 0) if row else 0
+    estimated_cost_usd = float(row.cost_usd or 0.0) if row else 0.0
+    
+    # 2. Aggregate Credit Pack revenue from transaction ledger
+    revenue_stmt = (
+        select(AICreditTransaction)
+        .where(AICreditTransaction.transaction_type == 'grant')
+        .where(AICreditTransaction.reason == 'Credit pack purchase')
+    )
+    rev_res = await db.execute(revenue_stmt)
+    txns = rev_res.scalars().all()
+    
+    pack_prices_inr = {
+        100: 199.0,
+        500: 949.0,
+        1000: 1899.0,
+        3000: 5799.0,
+        5000: 8999.0
+    }
+    revenue_inr = 0.0
+    for txn in txns:
+        # txn.credit_amount holds the quantity granted
+        revenue_inr += pack_prices_inr.get(txn.credit_amount, 0.0)
+        
+    # Convert USD costs to INR (using standard SaaS exchange rate of 83.5)
+    cost_inr = estimated_cost_usd * 83.5
+    profit_inr = revenue_inr - cost_inr
+    margin_pct = (profit_inr / revenue_inr) * 100 if revenue_inr > 0 else 0.0
+    if revenue_inr == 0 and cost_inr > 0:
+        margin_pct = -100.0
+        
+    return {
+        "total_assistant_requests": total_assistant,
+        "total_optimization_requests": total_optimization,
+        "total_input_tokens": in_tokens,
+        "total_output_tokens": out_tokens,
+        "estimated_cost_usd": estimated_cost_usd,
+        "credit_pack_revenue_inr": revenue_inr,
+        "estimated_cost_inr": cost_inr,
+        "profit_inr": profit_inr,
+        "margin_pct": margin_pct
     }

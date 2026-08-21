@@ -46,6 +46,16 @@ async def lifespan(app: FastAPI):
     from app.core.firebase import initialize_firebase
     initialize_firebase(settings.FIREBASE_PRIVATE_KEY_PATH)
 
+    # Seed admin pricing configurations dynamically
+    from app.database import async_session_factory
+    from app.services.config_seeder import seed_admin_configs
+    async with async_session_factory() as db_session:
+        try:
+            await seed_admin_configs(db_session)
+        except Exception as seed_err:
+            logger.error("database_config_seeding_failed", error=seed_err)
+
+
     # Initialize background check task to run sync checks periodically (fallback if celery beat is offline)
     async def periodic_check_loop():
         # Pause briefly on startup to let server bind and resolve db connections

@@ -16,6 +16,7 @@ from app.models.meta import MetaAdAccount
 from app.models.metrics import CampaignDailyMetrics, AdDailyMetrics
 from app.models.recommendation import AIRecommendation
 from app.models.ai_optimization import AIOptimizationConfig, AIOptimizationLog
+from app.models.ai_usage import AIUsageRecord
 
 logger = structlog.get_logger()
 settings = get_settings()
@@ -48,11 +49,38 @@ class AIOptimizationService:
         if not configs:
             logger.info("No active AI Optimization campaigns to analyze", ad_account_id=ad_account_uuid)
             return 0
+
+        # Load user campaign limit
+        from app.models.user import User
+        from app.services.entitlement_engine import EntitlementEngine
+        
+        user_stmt = select(User).where(User.id == user_uuid)
+        user_res = await db.execute(user_stmt)
+        user = user_res.scalar_one_or_none()
+        if not user:
+            return 0
             
-        logger.info(f"Found {len(configs)} campaigns with AI Optimization active", ad_account_id=ad_account_uuid)
+        ent = await EntitlementEngine.resolve_entitlements(user, db)
+        limit = ent.get("ai_optimization_campaign_limit", 0)
+
+        # Query all active configs globally to determine limit boundary
+        global_stmt = (
+            select(AIOptimizationConfig)
+            .where(AIOptimizationConfig.user_id == user_uuid)
+            .where(AIOptimizationConfig.is_active == True)
+            .order_by(AIOptimizationConfig.created_at.asc())
+        )
+        global_res = await db.execute(global_stmt)
+        global_configs = global_res.scalars().all()
+        entitled_campaign_ids = [cfg.campaign_id for cfg in global_configs[:limit]]
+            
+        logger.info(f"Found {len(configs)} campaigns with AI Optimization active, limit={limit}", ad_account_id=ad_account_uuid)
         
         processed_count = 0
         for config in configs:
+            if config.campaign_id not in entitled_campaign_ids:
+                logger.info("skipping_campaign_optimization_over_entitlement", campaign_id=config.campaign_id, limit=limit)
+                continue
             try:
                 # Run the analysis cycle for this specific campaign
                 triggered = await cls.analyze_campaign(db, config, user_uuid)
@@ -379,10 +407,48 @@ class AIOptimizationService:
                         raw_res = r.json()
                         text_res = raw_res["candidates"][0]["content"]["parts"][0]["text"]
                         ai_recommendation_dict = json.loads(text_res)
+                        
+                        # Log token counts in AIUsageRecord
+                        usage = raw_res.get("usageMetadata", {})
+                        in_tok = usage.get("promptTokenCount", 0)
+                        out_tok = usage.get("candidatesTokenCount", 0)
+                        tot_tok = usage.get("totalTokenCount", 0)
+                        est_cost = (in_tok * 0.000000075) + (out_tok * 0.00000030)
+                        
+                        db.add(AIUsageRecord(
+                            user_id=user_uuid,
+                            ad_account_id=ad_account_uuid,
+                            model="gemini-1.5-flash",
+                            request_type="ai_optimization",
+                            input_tokens=in_tok,
+                            output_tokens=out_tok,
+                            total_tokens=tot_tok,
+                            estimated_cost=est_cost,
+                            credit_charged=0,
+                            success=True
+                        ))
                     else:
                         logger.error("Gemini direct API call returned error status", status=r.status_code, body=r.text)
+                        db.add(AIUsageRecord(
+                            user_id=user_uuid,
+                            ad_account_id=ad_account_uuid,
+                            model="gemini-1.5-flash",
+                            request_type="ai_optimization",
+                            success=False,
+                            error_code="GEMINI_API_ERROR",
+                            credit_charged=0
+                        ))
             except Exception as ex:
                 logger.error("Gemini direct API call exception", error=str(ex))
+                db.add(AIUsageRecord(
+                    user_id=user_uuid,
+                    ad_account_id=ad_account_uuid,
+                    model="gemini-1.5-flash",
+                    request_type="ai_optimization",
+                    success=False,
+                    error_code="GEMINI_API_EXCEPTION",
+                    credit_charged=0
+                ))
                 
         elif has_sa and token:
             # Call Vertex AI REST API via service account
@@ -411,10 +477,48 @@ class AIOptimizationService:
                         raw_res = r.json()
                         text_res = raw_res["candidates"][0]["content"]["parts"][0]["text"]
                         ai_recommendation_dict = json.loads(text_res)
+                        
+                        # Log token counts in AIUsageRecord
+                        usage = raw_res.get("usageMetadata", {})
+                        in_tok = usage.get("promptTokenCount", 0)
+                        out_tok = usage.get("candidatesTokenCount", 0)
+                        tot_tok = usage.get("totalTokenCount", 0)
+                        est_cost = (in_tok * 0.000000075) + (out_tok * 0.00000030)
+                        
+                        db.add(AIUsageRecord(
+                            user_id=user_uuid,
+                            ad_account_id=ad_account_uuid,
+                            model="gemini-1.5-flash",
+                            request_type="ai_optimization",
+                            input_tokens=in_tok,
+                            output_tokens=out_tok,
+                            total_tokens=tot_tok,
+                            estimated_cost=est_cost,
+                            credit_charged=0,
+                            success=True
+                        ))
                     else:
                         logger.error("Vertex AI REST API call returned error status", status=r.status_code, body=r.text)
+                        db.add(AIUsageRecord(
+                            user_id=user_uuid,
+                            ad_account_id=ad_account_uuid,
+                            model="gemini-1.5-flash",
+                            request_type="ai_optimization",
+                            success=False,
+                            error_code="VERTEX_API_ERROR",
+                            credit_charged=0
+                        ))
             except Exception as ex:
                 logger.error("Vertex AI REST API call exception", error=str(ex))
+                db.add(AIUsageRecord(
+                    user_id=user_uuid,
+                    ad_account_id=ad_account_uuid,
+                    model="gemini-1.5-flash",
+                    request_type="ai_optimization",
+                    success=False,
+                    error_code="VERTEX_API_EXCEPTION",
+                    credit_charged=0
+                ))
 
         # ────────────────────────────────────────────────────────────
         # HIGH-FIDELITY LOCAL REASONING ENGINE (fallback / local dev support)
@@ -424,6 +528,19 @@ class AIOptimizationService:
             logger.info("Using local reasoning engine for AI Optimization recommendations")
             ai_recommendation_dict = cls._run_local_reasoning_engine(context, campaign)
             gemini_model_used = "local-simulated-flash"
+            
+            db.add(AIUsageRecord(
+                user_id=user_uuid,
+                ad_account_id=ad_account_uuid,
+                model="local-simulated-flash",
+                request_type="ai_optimization",
+                input_tokens=150,
+                output_tokens=220,
+                total_tokens=370,
+                estimated_cost=0.0,
+                credit_charged=0,
+                success=True
+            ))
 
         # ────────────────────────────────────────────────────────────
         # DEDUPLICATION & REPLAY PROTECTION LAYER

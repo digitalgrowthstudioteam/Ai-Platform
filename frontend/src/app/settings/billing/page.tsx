@@ -32,6 +32,7 @@ export default function BillingPage() {
   const [addonQuantities, setAddonQuantities] = useState<Record<string, number>>({
     additional_account: 1,
     additional_team_member: 1,
+    additional_optimization_campaign: 1,
   });
   const [notification, setNotification] = useState<{
     type: "success" | "warning" | "error";
@@ -491,9 +492,13 @@ export default function BillingPage() {
                         <Check size={13} className="text-blue-600 shrink-0" />
                         <span>1 Meta Ad Account</span>
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        <Check size={13} className="text-blue-600 shrink-0" />
-                        <span>Unlimited Campaigns</span>
+                      <div className="flex items-center gap-1.5 font-bold text-emerald-600">
+                        <Check size={13} className="text-emerald-600 shrink-0" />
+                        <span>1 AI Optimization Campaign</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 font-bold text-emerald-600">
+                        <Check size={13} className="text-emerald-600 shrink-0" />
+                        <span>25 AI Assistant Credits / mo</span>
                       </div>
                       <div className="flex items-center gap-1.5">
                         <Check size={13} className="text-blue-600 shrink-0" />
@@ -560,6 +565,14 @@ export default function BillingPage() {
                       <Check size={13} className="text-blue-600 shrink-0" />
                       <span>3 Meta Ad Accounts</span>
                     </div>
+                    <div className="flex items-center gap-1.5 font-bold text-emerald-600">
+                      <Check size={13} className="text-emerald-600 shrink-0" />
+                      <span>3 AI Optimization Campaigns</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 font-bold text-emerald-600">
+                      <Check size={13} className="text-emerald-600 shrink-0" />
+                      <span>150 AI Assistant Credits / mo</span>
+                    </div>
                     <div className="flex items-center gap-1.5">
                       <Check size={13} className="text-blue-600 shrink-0" />
                       <span>90 Days historical data</span>
@@ -621,6 +634,14 @@ export default function BillingPage() {
                       <Check size={13} className="text-indigo-600 shrink-0" />
                       <span>10 Meta Ad Accounts</span>
                     </div>
+                    <div className="flex items-center gap-1.5 font-bold text-emerald-600">
+                      <Check size={13} className="text-emerald-600 shrink-0" />
+                      <span>5 AI Optimization Campaigns</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 font-bold text-emerald-600">
+                      <Check size={13} className="text-emerald-600 shrink-0" />
+                      <span>350 AI Assistant Credits / mo</span>
+                    </div>
                     <div className="flex items-center gap-1.5">
                       <Check size={13} className="text-indigo-600 shrink-0" />
                       <span>180 Days historical data</span>
@@ -677,6 +698,14 @@ export default function BillingPage() {
                     <div className="flex items-center gap-1.5 font-bold text-purple-700">
                       <Check size={13} className="text-purple-600 shrink-0" />
                       <span>25 Meta Ad Accounts</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 font-bold text-emerald-600">
+                      <Check size={13} className="text-emerald-600 shrink-0" />
+                      <span>10 AI Optimization Campaigns</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 font-bold text-emerald-600">
+                      <Check size={13} className="text-emerald-600 shrink-0" />
+                      <span>500 AI Assistant Credits / mo</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <Check size={13} className="text-purple-600 shrink-0" />
@@ -765,6 +794,52 @@ export default function BillingPage() {
                   >
                     {actionLoading === "addon_additional_account" && <Loader2 size={12} className="animate-spin" />}
                     <span>Add +{addonQuantities.additional_account || 1} Account</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Addon 1B: Additional AI Optimization Campaign */}
+              <div className="bg-white border border-slate-200 p-6 rounded-2xl shadow-xs space-y-4 flex flex-col justify-between">
+                <div className="space-y-2">
+                  <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl w-fit">
+                    <TrendingUp size={20} />
+                  </div>
+                  <h3 className="text-sm font-bold text-slate-900">Additional AI Optimization Campaign</h3>
+                  <div className="text-xl font-extrabold text-slate-950">
+                    ₹99 <span className="text-xs text-slate-400 font-normal">/ month / campaign slot</span>
+                  </div>
+                  <p className="text-xs text-slate-500 leading-relaxed font-normal">
+                    Monitor 1 more Meta Ads campaign simultaneously under continuous AI Optimization monitoring.
+                  </p>
+                </div>
+
+                <div className="space-y-3 pt-2">
+                  <div className="flex items-center justify-between text-xs font-semibold">
+                    <span className="text-slate-600">Quantity:</span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setAddonQuantities(q => ({ ...q, additional_optimization_campaign: Math.max(1, (q.additional_optimization_campaign || 1) - 1) }))}
+                        className="w-7 h-7 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md font-bold flex items-center justify-center"
+                      >
+                        -
+                      </button>
+                      <span className="w-6 text-center font-bold">{addonQuantities.additional_optimization_campaign || 1}</span>
+                      <button
+                        onClick={() => setAddonQuantities(q => ({ ...q, additional_optimization_campaign: (q.additional_optimization_campaign || 1) + 1 }))}
+                        className="w-7 h-7 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md font-bold flex items-center justify-center"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+
+                  <button
+                    disabled={actionLoading === "addon_additional_optimization_campaign"}
+                    onClick={() => handleAddonCheckout("additional_optimization_campaign")}
+                    className="w-full py-2.5 rounded-xl font-bold text-xs bg-slate-900 hover:bg-slate-800 text-white transition flex items-center justify-center gap-1.5 shadow-xs"
+                  >
+                    {actionLoading === "addon_additional_optimization_campaign" && <Loader2 size={12} className="animate-spin" />}
+                    <span>Add +{addonQuantities.additional_optimization_campaign || 1} Campaign Slot</span>
                   </button>
                 </div>
               </div>
@@ -906,6 +981,41 @@ export default function BillingPage() {
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* SECTION 3: PURCHASE AI ASSISTANT CREDITS PACKS */}
+          <div className="space-y-4 pt-6 border-t border-slate-200">
+            <div>
+              <h2 className="text-lg font-extrabold text-slate-950">AI Assistant Credit Packs</h2>
+              <p className="text-xs text-slate-500 font-medium">Top up your AI Assistant credits. Packs never expire and are consumed after monthly included credits.</p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+              {[
+                { id: "credit_pack_100", name: "100 Credits", price: "₹199", desc: "For occasional questions" },
+                { id: "credit_pack_500", name: "500 Credits", price: "₹949", desc: "Best value starter top-up" },
+                { id: "credit_pack_1000", name: "1,000 Credits", price: "₹1,899", desc: "For active day-to-day use" },
+                { id: "credit_pack_3000", name: "3,000 Credits", price: "₹5,799", desc: "Premium high-volume power pack" },
+                { id: "credit_pack_5000", name: "5,000 Credits", price: "₹8,999", desc: "Enterprise scale mass operations" },
+              ].map((pack) => (
+                <div key={pack.id} className="bg-white border border-slate-200 p-5 rounded-2xl shadow-xs space-y-4 flex flex-col justify-between text-center">
+                  <div className="space-y-1">
+                    <div className="text-[10px] font-extrabold text-blue-600 uppercase tracking-widest">Credit Pack</div>
+                    <h4 className="text-sm font-bold text-slate-950">{pack.name}</h4>
+                    <div className="text-lg font-black text-slate-900">{pack.price}</div>
+                    <p className="text-[10px] text-slate-400 font-medium leading-relaxed">{pack.desc}</p>
+                  </div>
+                  <button
+                    disabled={actionLoading === `addon_${pack.id}`}
+                    onClick={() => handleAddonCheckout(pack.id)}
+                    className="w-full py-2 rounded-xl font-bold text-[11px] bg-blue-600 hover:bg-blue-700 text-white transition flex items-center justify-center gap-1.5"
+                  >
+                    {actionLoading === `addon_${pack.id}` && <Loader2 size={10} className="animate-spin" />}
+                    Buy Pack
+                  </button>
+                </div>
+              ))}
             </div>
           </div>
         </>
