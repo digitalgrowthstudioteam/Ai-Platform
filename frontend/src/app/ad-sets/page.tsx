@@ -626,7 +626,7 @@ export default function AdSetsPage() {
                                 {k.metric.includes("spend") || k.metric.includes("cost_") || k.metric === "cpc" || k.metric === "cpa" || k.metric === "cpm"
                                   ? formatCurrency(k.value)
                                   : k.metric.includes("rate") || k.metric.includes("ctr")
-                                  ? formatPercent(k.value / 100)
+                                  ? formatPercent(k.value)
                                   : formatNumber(k.value)}
                               </div>
                             </div>
@@ -648,7 +648,7 @@ export default function AdSetsPage() {
                                   {m.metric.includes("spend") || m.metric.includes("cost_") || m.metric === "cpc" || m.metric === "cpa" || m.metric === "cpm"
                                     ? formatCurrency(m.value)
                                     : m.metric.includes("rate") || m.metric.includes("ctr")
-                                    ? formatPercent(m.value / 100)
+                                    ? formatPercent(m.value)
                                     : formatNumber(m.value)}
                                 </div>
                                 {m.change_percent !== null && (
