@@ -36,6 +36,7 @@ interface NavItem {
   icon: React.ComponentType<{ size?: number }>;
   badge?: string;
   disabled?: boolean;
+  onClick?: () => void;
 }
 
 interface NavSection {
@@ -67,10 +68,19 @@ const navigation: NavSection[] = [
     ],
   },
   {
-    label: "Automation",
+    label: "AUTOMATION",
     items: [
-      { label: "Rules", href: "/rules", icon: Zap, badge: "Coming Soon", disabled: true },
-      { label: "AI Active", href: "/auto-optimize", icon: Bot, badge: "Coming Soon", disabled: true },
+      { label: "AI Optimization", href: "/ai-optimization", icon: Zap },
+      { 
+        label: "AI Assistant", 
+        href: "#assistant", 
+        icon: Bot,
+        onClick: () => {
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent("toggle-ai-assistant"));
+          }
+        }
+      },
     ],
   },
   {
@@ -168,6 +178,22 @@ export default function Sidebar() {
                       <span className="coming-soon">{item.badge}</span>
                     )}
                   </div>
+                );
+              }
+
+              if (item.onClick) {
+                return (
+                  <button
+                    key={item.href}
+                    onClick={item.onClick}
+                    className={`sidebar-item w-full text-left flex items-center gap-3 ${isActive ? "active" : ""}`}
+                  >
+                    <Icon size={18} />
+                    <span>{item.label}</span>
+                    {item.badge && (
+                      <span className="sidebar-badge">{item.badge}</span>
+                    )}
+                  </button>
                 );
               }
 

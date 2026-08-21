@@ -20,6 +20,7 @@ PLANS_CONFIG = {
         "sync_interval_hours": 999999,
         "max_team_members": 0,
         "ai_recommendations_limit": 0,
+        "ai_optimization_campaign_limit": 0,
         "feature_gates": {
             "creative_analysis": False,
             "copy_analysis": False,
@@ -37,6 +38,7 @@ PLANS_CONFIG = {
         "sync_interval_hours": 48,
         "max_team_members": 1,
         "ai_recommendations_limit": 999999,
+        "ai_optimization_campaign_limit": 1,
         "feature_gates": {
             "creative_analysis": True,
             "copy_analysis": True,
@@ -54,6 +56,7 @@ PLANS_CONFIG = {
         "sync_interval_hours": 12,
         "max_team_members": 3,
         "ai_recommendations_limit": 999999,
+        "ai_optimization_campaign_limit": 3,
         "feature_gates": {
             "creative_analysis": True,
             "copy_analysis": True,
@@ -71,6 +74,7 @@ PLANS_CONFIG = {
         "sync_interval_hours": 6,
         "max_team_members": 10,
         "ai_recommendations_limit": 999999,
+        "ai_optimization_campaign_limit": 10,
         "feature_gates": {
             "creative_analysis": True,
             "copy_analysis": True,
@@ -88,6 +92,7 @@ PLANS_CONFIG = {
         "sync_interval_hours": 6,
         "max_team_members": 25,
         "ai_recommendations_limit": 999999,
+        "ai_optimization_campaign_limit": 25,
         "feature_gates": {
             "creative_analysis": True,
             "copy_analysis": True,
@@ -287,6 +292,7 @@ class EntitlementEngine:
             "sync_interval_hours": sync_interval_hours,
             "historical_days": historical_days,
             "ai_recommendations_limit": base_config["ai_recommendations_limit"],
+            "ai_optimization_campaign_limit": base_config.get("ai_optimization_campaign_limit", 0),
             "ai_deep_analysis": has_ai_deep,
             "feature_gates": feature_gates,
             "active_addons": [

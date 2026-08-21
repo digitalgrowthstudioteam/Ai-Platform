@@ -103,6 +103,10 @@ class AIRecommendation(BaseModel):
         DateTime(timezone=True),
         nullable=True,
     )
+    fingerprint: Mapped[Optional[str]] = mapped_column(
+        String(255),
+        nullable=True,
+    )
 
     # Relationships
     user: Mapped["User"] = relationship(

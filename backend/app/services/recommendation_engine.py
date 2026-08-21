@@ -1326,6 +1326,14 @@ class RecommendationEngine:
             
         await db.commit()
         logger.info("AI Recommendations compiled (with lifecycle updates)", count=count)
+        
+        # Continuous run for AI Optimization campaigns
+        try:
+            from app.services.ai_optimization_service import AIOptimizationService
+            await AIOptimizationService.analyze_active_campaigns(db, ad_account_uuid, user_uuid)
+        except Exception as opt_err:
+            logger.error("AI Optimization run failed in compilation hook", error=str(opt_err))
+
         return count
 
 

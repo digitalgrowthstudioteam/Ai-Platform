@@ -14,6 +14,7 @@ from app.api.v1.admin import router as admin_router
 from app.api.v1.team import router as team_router
 from app.api.v1.support import router as support_router
 from app.api.v1.notification import router as notification_router
+from app.api.v1.assistant import router as assistant_router
 
 api_v1_router = APIRouter()
 api_v1_router.include_router(auth_router)
@@ -27,6 +28,7 @@ api_v1_router.include_router(admin_router, tags=["Admin Control Panel"])
 api_v1_router.include_router(team_router, tags=["Team Management"])
 api_v1_router.include_router(support_router, tags=["Help & Support Tickets"])
 api_v1_router.include_router(notification_router, tags=["Notifications"])
+api_v1_router.include_router(assistant_router, tags=["AI Assistant"])
 
 
 # ──────────────────────────────────────────────
