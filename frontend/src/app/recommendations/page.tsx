@@ -1018,22 +1018,41 @@ export default function RecommendationsPage() {
               </p>
               
               <div className="space-y-3.5 text-xs font-medium text-slate-600">
-                <div className="flex justify-between border-b border-slate-100 pb-2">
-                  <span className="text-slate-500 font-semibold">Broad Targeting</span>
-                  <span className="font-bold text-slate-800">Coincides with 17% lower cost</span>
-                </div>
-                <div className="flex justify-between border-b border-slate-100 pb-2">
-                  <span className="text-slate-500 font-semibold">Video Ads (9:16 vertical)</span>
-                  <span className="font-bold text-slate-800">Outperforms static images by 1.8x</span>
-                </div>
-                <div className="flex justify-between border-b border-slate-100 pb-2">
-                  <span className="text-slate-500 font-semibold">Headline length</span>
-                  <span className="font-bold text-slate-800">Short text under 6 words is optimal</span>
-                </div>
-                <div className="flex justify-between pb-1">
-                  <span className="text-slate-500 font-semibold">WhatsApp CTA</span>
-                  <span className="font-bold text-slate-800">Drives 24% higher engagement vs site link</span>
-                </div>
+                {(() => {
+                  const broadTargetingMem = memories.find(m => m.pattern_key?.toUpperCase().includes("TARGETING"));
+                  const videoAdsMem = memories.find(m => m.pattern_key?.toUpperCase().includes("VIDEO"));
+                  const headlineMem = memories.find(m => m.pattern_key?.toUpperCase().includes("HEADLINE"));
+                  const ctaMem = memories.find(m => m.pattern_key?.toUpperCase().includes("CTA") || m.pattern_key?.toUpperCase().includes("WHATSAPP"));
+
+                  return (
+                    <>
+                      <div className="flex justify-between border-b border-slate-100 pb-2">
+                        <span className="text-slate-500 font-semibold">Broad Targeting</span>
+                        <span className="font-bold text-slate-800 text-right max-w-[60%]">
+                          {broadTargetingMem ? broadTargetingMem.description : "N/A"}
+                        </span>
+                      </div>
+                      <div className="flex justify-between border-b border-slate-100 pb-2">
+                        <span className="text-slate-500 font-semibold">Video Ads (9:16 vertical)</span>
+                        <span className="font-bold text-slate-800 text-right max-w-[60%]">
+                          {videoAdsMem ? videoAdsMem.description : "N/A"}
+                        </span>
+                      </div>
+                      <div className="flex justify-between border-b border-slate-100 pb-2">
+                        <span className="text-slate-500 font-semibold">Headline length</span>
+                        <span className="font-bold text-slate-800 text-right max-w-[60%]">
+                          {headlineMem ? headlineMem.description : "N/A"}
+                        </span>
+                      </div>
+                      <div className="flex justify-between pb-1">
+                        <span className="text-slate-500 font-semibold">WhatsApp CTA</span>
+                        <span className="font-bold text-slate-800 text-right max-w-[60%]">
+                          {ctaMem ? ctaMem.description : "N/A"}
+                        </span>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
             </div>
           </div>

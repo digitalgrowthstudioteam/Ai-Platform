@@ -2219,22 +2219,25 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
 
                 <div className="card border border-border bg-white shadow-sm rounded-xl p-6 space-y-4">
                   <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Evaluation Evidence Checkpoints</h3>
-                  <div className="space-y-3 text-xs font-medium text-slate-600">
-                    <div className="flex items-start gap-2.5 bg-slate-50 p-3 rounded-lg border border-slate-100">
-                      <span className="text-blue-500 font-bold mt-0.5">✓</span>
-                      <div>
-                        <div className="font-bold text-slate-800">Conversion Latency Safe</div>
-                        <p className="text-slate-500 font-normal mt-0.5">Pixel sync delays are within normal parameters, ensuring stable attribution.</p>
+                  {(() => {
+                    const adsetRecs = recs.filter(r => (r.entity_id === selectedAdSet.id || r.meta_entity_id === selectedAdSet.meta_adset_id) && r.evidence);
+                    if (adsetRecs.length === 0) {
+                      return <div className="text-xs text-slate-400 font-bold uppercase tracking-wider bg-slate-50 border border-slate-100 rounded-lg p-3 text-center">N/A</div>;
+                    }
+                    return (
+                      <div className="space-y-3 text-xs font-medium text-slate-600">
+                        {adsetRecs.map((r, idx) => (
+                          <div key={idx} className="flex items-start gap-2.5 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                            <span className="text-blue-500 font-bold mt-0.5">✓</span>
+                            <div>
+                              <div className="font-bold text-slate-800">{r.title} Evidence</div>
+                              <p className="text-slate-500 font-normal mt-0.5">{r.evidence}</p>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    </div>
-                    <div className="flex items-start gap-2.5 bg-slate-50 p-3 rounded-lg border border-slate-100">
-                      <span className="text-blue-500 font-bold mt-0.5">✓</span>
-                      <div>
-                        <div className="font-bold text-slate-800">CPM Bidding Competitiveness</div>
-                        <p className="text-slate-500 font-normal mt-0.5">Bidding competition is normal. No sudden cost delivery spikes detected compared to the prior 7-day baseline.</p>
-                      </div>
-                    </div>
-                  </div>
+                    );
+                  })()}
                 </div>
               </div>
             )}
@@ -2628,59 +2631,63 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
                 </div>
 
                 {/* AI Diagnosis summary */}
-                <div className="card border border-border bg-white shadow-sm rounded-lg p-5 space-y-4">
-                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">3. AI Diagnosis Summary</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                    <div className="border border-slate-100 rounded-lg p-3 space-y-1 bg-green-50/10">
-                      <div className="text-[9px] font-bold text-green-600 uppercase flex items-center gap-1">
-                        <ThumbsUp size={12} /> What's Working
-                      </div>
-                      <p className="text-xs text-slate-700 leading-normal">
-                        {selectedCampaign.metrics.roas >= 1.5 
-                          ? `Efficient Return on Spend delivery (ROAS: ${selectedCampaign.metrics.roas.toFixed(2)}x).`
-                          : "Ad delivery distribution remains highly stable across core placements."}
-                      </p>
-                    </div>
+                {(() => {
+                  const campaignRecs = recs.filter(r => r.campaign_id === selectedCampaign.id || r.meta_campaign_id === selectedCampaign.meta_campaign_id);
+                  const firstRec = campaignRecs[0];
+                  
+                  const whatsWorking = selectedCampaign.metrics.roas >= 1.0 
+                    ? `Positive ROAS delivery observed (ROAS: ${selectedCampaign.metrics.roas.toFixed(2)}x).` 
+                    : selectedCampaign.metrics.clicks > 0 
+                    ? `Traffic is flowing (CTR: ${(selectedCampaign.metrics.ctr * 100).toFixed(2)}%).` 
+                    : "N/A";
+                  
+                  const whatsDeclining = firstRec ? firstRec.title : "N/A";
+                  const whyItHappens = firstRec ? (firstRec.reason || firstRec.root_cause || "Attribution variances detected.") : "N/A";
+                  const recAction = firstRec ? firstRec.description : "N/A";
+                  const dontChange = firstRec && firstRec.evidence ? "Baseline pacing parameters remain stable." : "N/A";
 
-                    <div className="border border-slate-100 rounded-lg p-3 space-y-1 bg-red-50/10">
-                      <div className="text-[9px] font-bold text-red-500 uppercase flex items-center gap-1">
-                        <ThumbsDown size={12} /> What's Declining
-                      </div>
-                      <p className="text-xs text-slate-700 leading-normal">
-                        {selectedCampaign.metrics.ctr < 0.012 
-                          ? `Ad CTR (${(selectedCampaign.metrics.ctr*100).toFixed(2)}%) indicates moderate creative fatigue.`
-                          : "Slight conversion rate latency observed over the target period."}
-                      </p>
-                    </div>
+                  return (
+                    <div className="card border border-border bg-white shadow-sm rounded-lg p-5 space-y-4">
+                      <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">3. AI Diagnosis Summary</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                        <div className="border border-slate-100 rounded-lg p-3 space-y-1 bg-green-50/10">
+                          <div className="text-[9px] font-bold text-green-600 uppercase flex items-center gap-1">
+                            <ThumbsUp size={12} /> What's Working
+                          </div>
+                          <p className="text-xs text-slate-700 leading-normal">{whatsWorking}</p>
+                        </div>
 
-                    <div className="border border-slate-100 rounded-lg p-3 space-y-1 bg-amber-50/10">
-                      <div className="text-[9px] font-bold text-amber-600 uppercase flex items-center gap-1">
-                        <Info size={12} /> Why It Happens
-                      </div>
-                      <p className="text-xs text-slate-700 leading-normal">
-                        Creative assets have been active for &gt; 15 days without rotation, causing slight audience saturation.
-                      </p>
-                    </div>
+                        <div className="border border-slate-100 rounded-lg p-3 space-y-1 bg-red-50/10">
+                          <div className="text-[9px] font-bold text-red-500 uppercase flex items-center gap-1">
+                            <ThumbsDown size={12} /> What's Declining
+                          </div>
+                          <p className="text-xs text-slate-700 leading-normal">{whatsDeclining}</p>
+                        </div>
 
-                    <div className="border border-slate-100 rounded-lg p-3 space-y-1 bg-blue-50/10">
-                      <div className="text-[9px] font-bold text-blue-600 uppercase flex items-center gap-1">
-                        <Zap size={12} /> Recommended Action
-                      </div>
-                      <p className="text-xs text-slate-700 leading-normal">
-                        Refresh copy text and swap visual assets in low-performing ad sets.
-                      </p>
-                    </div>
+                        <div className="border border-slate-100 rounded-lg p-3 space-y-1 bg-amber-50/10">
+                          <div className="text-[9px] font-bold text-amber-600 uppercase flex items-center gap-1">
+                            <Info size={12} /> Why It Happens
+                          </div>
+                          <p className="text-xs text-slate-700 leading-normal">{whyItHappens}</p>
+                        </div>
 
-                    <div className="border border-slate-100 rounded-lg p-3 space-y-1 bg-slate-50">
-                      <div className="text-[9px] font-bold text-slate-500 uppercase flex items-center gap-1">
-                        <Check size={12} /> Don't Change
+                        <div className="border border-slate-100 rounded-lg p-3 space-y-1 bg-blue-50/10">
+                          <div className="text-[9px] font-bold text-blue-600 uppercase flex items-center gap-1">
+                            <Zap size={12} /> Recommended Action
+                          </div>
+                          <p className="text-xs text-slate-700 leading-normal">{recAction}</p>
+                        </div>
+
+                        <div className="border border-slate-100 rounded-lg p-3 space-y-1 bg-slate-50">
+                          <div className="text-[9px] font-bold text-slate-500 uppercase flex items-center gap-1">
+                            <Check size={12} /> Don't Change
+                          </div>
+                          <p className="text-xs text-slate-700 leading-normal">{dontChange}</p>
+                        </div>
                       </div>
-                      <p className="text-xs text-slate-700 leading-normal">
-                        Keep daily budget pacing configurations active without manual tweaks.
-                      </p>
                     </div>
-                  </div>
-                </div>
+                  );
+                })()}
 
                 {/* Ad Set Performance */}
                 <div className="card border border-border bg-white shadow-sm rounded-lg p-5 space-y-4">
