@@ -317,27 +317,49 @@ export default function LandingPage() {
         </p>
 
         {/* Hero Trial Badge & Call to Action Buttons */}
-        <div className="mt-8 flex flex-col items-center justify-center gap-4">
-          <div className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-3.5 py-1 rounded-md">
-            <CheckCircle size={14} className="text-emerald-600" />
-            <span>Free 3-Day Trial Available on All Plans</span>
-          </div>
+        <div className="mt-10 flex flex-col items-center justify-center gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl w-full text-left">
+            {/* Card 1: Free Ads Health Check */}
+            <div className="bg-white border border-slate-200 hover:border-blue-500/80 p-6 rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 group flex flex-col justify-between relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 rounded-bl-full pointer-events-none transition-all group-hover:scale-110" />
+              <div>
+                <div className="bg-blue-50 text-blue-600 p-3 rounded-xl w-fit mb-4">
+                  <Activity size={24} />
+                </div>
+                <h3 className="text-xl font-bold text-slate-900 mb-2">Get Free Ads Health Check</h3>
+                <p className="text-sm text-slate-600 leading-relaxed mb-6">
+                  Connect your Meta Ads account securely via OAuth. We will run a real-time audit of your campaigns, CPC, CPL, CTR, and output a premium PDF report with a customized health score.
+                </p>
+              </div>
+              <Link
+                href="/health-check"
+                className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold text-xs py-3.5 px-5 rounded-xl transition shadow-md shadow-blue-500/10 flex items-center justify-center gap-2 active:scale-98"
+              >
+                <span>Run Free Health Audit</span>
+                <ArrowRight size={14} />
+              </Link>
+            </div>
 
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3.5 w-full sm:w-auto mt-2">
-            <Link
-              href="/signup"
-              className="w-full sm:w-auto bg-gradient-to-r from-blue-600 via-blue-650 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold text-sm px-8 py-4 rounded-xl transition-all shadow-xl shadow-blue-600/25 hover:shadow-2xl hover:shadow-blue-600/35 flex items-center justify-center gap-2 group active:scale-98"
-            >
-              <span>Start Free 3-Day Trial</span>
-              <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
-            </Link>
-            <a
-              href="#how-it-works"
-              className="w-full sm:w-auto bg-white hover:bg-slate-50 border border-slate-200/90 text-slate-800 font-bold text-sm px-8 py-4 rounded-xl transition shadow-xs hover:border-slate-300 flex items-center justify-center gap-2"
-            >
-              <span>See How It Works</span>
-              <ChevronDown size={15} className="text-slate-400" />
-            </a>
+            {/* Card 2: Strategy Recommendations */}
+            <div className="bg-white border border-slate-200 hover:border-indigo-500/80 p-6 rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 group flex flex-col justify-between relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/5 rounded-bl-full pointer-events-none transition-all group-hover:scale-110" />
+              <div>
+                <div className="bg-indigo-50 text-indigo-600 p-3 rounded-xl w-fit mb-4">
+                  <Sliders size={24} />
+                </div>
+                <h3 className="text-xl font-bold text-slate-900 mb-2">Get Campaign Recommendation</h3>
+                <p className="text-sm text-slate-600 leading-relaxed mb-6">
+                  Answer a slide-by-slide 10-question Strategy checklist. Calculate your Strategy Readiness Score (0-100) and identify your top advertising implementation priorities.
+                </p>
+              </div>
+              <Link
+                href="/recommendation"
+                className="w-full bg-slate-900 hover:bg-slate-950 text-white font-bold text-xs py-3.5 px-5 rounded-xl transition shadow-md flex items-center justify-center gap-2 active:scale-98"
+              >
+                <span>Get Campaign Strategy</span>
+                <ArrowRight size={14} />
+              </Link>
+            </div>
           </div>
         </div>
 
