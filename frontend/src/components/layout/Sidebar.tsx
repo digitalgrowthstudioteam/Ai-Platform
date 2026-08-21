@@ -154,7 +154,7 @@ export default function Sidebar() {
     <aside className="sidebar" id="sidebar">
       {/* Logo */}
       <div className="sidebar-logo">
-        <img src="/logo.svg" alt="Digital Growth Studio" />
+        <img src="/logo.jpg" alt="Digital Growth Studio" className="w-8 h-8 rounded-lg object-contain" />
         <div className="sidebar-logo-text">
           <span className="sidebar-logo-title">Digital Growth Studio</span>
           <span className="sidebar-logo-subtitle">AI Ads Optimizer</span>
