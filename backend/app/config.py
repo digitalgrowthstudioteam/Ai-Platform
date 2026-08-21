@@ -59,7 +59,7 @@ class Settings(BaseSettings):
     # AI (Phase 8)
     AI_API_KEY: Optional[str] = Field(default=None, description="AI/LLM API Key")
     AI_MODEL: str = Field(default="gpt-4o-mini", description="AI model to use")
-    GEMINI_MODEL: str = Field(default="gemini-3.6-flash", description="Gemini model to use for assistant and analysis")
+    GEMINI_MODEL: str = Field(default="gemini-1.5-flash", description="Gemini model to use for assistant and analysis")
 
     # Sync
     SYNC_COOLDOWN_MINUTES: int = Field(default=15, description="Minimum minutes between manual syncs")
