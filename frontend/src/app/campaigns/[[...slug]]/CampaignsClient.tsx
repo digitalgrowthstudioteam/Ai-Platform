@@ -139,7 +139,7 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
   });
   
   // State for date presets
-  const [datePreset, setDatePreset] = useState<string>("30d");
+  const [datePreset, setDatePreset] = useState<string>("today");
   const [customStartDate, setCustomStartDate] = useState<string>(() => {
     const d = new Date();
     d.setDate(d.getDate() - 7);
