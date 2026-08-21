@@ -254,7 +254,14 @@ class ApiClient {
 
   // AI Assistant endpoints
   async getAiCredits() {
-    return this.request<{ credits: number }>("/assistant/credits");
+    return this.request<{
+      credits: number;
+      monthly_credits_remaining: number;
+      purchased_credits_remaining: number;
+      trial_credits_remaining: number;
+      monthly_credits_limit: number;
+      monthly_credits_used: number;
+    }>("/assistant/credits");
   }
 
   async getConversations(adAccountId: string) {
@@ -577,6 +584,27 @@ class ApiClient {
       method: "POST",
       body: { credits },
     });
+  }
+
+  async updateUserOptimizationSlots(userId: string, slots: number) {
+    return this.request<{ status: string; message: string }>(`/admin/users/${userId}/optimization-slots`, {
+      method: "POST",
+      body: { slots },
+    });
+  }
+
+  async getAdminAiDashboard() {
+    return this.request<{
+      total_assistant_requests: number;
+      total_optimization_requests: number;
+      total_input_tokens: number;
+      total_output_tokens: number;
+      estimated_cost_usd: number;
+      credit_pack_revenue_inr: number;
+      estimated_cost_inr: number;
+      profit_inr: number;
+      margin_pct: number;
+    }>("/admin/ai/dashboard");
   }
 
   // Team Endpoints

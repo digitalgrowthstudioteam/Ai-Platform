@@ -71,6 +71,30 @@ class User(BaseModel):
         String(128),
         nullable=True,
     )
+    trial_credits_remaining: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+    )
+    monthly_credits_remaining: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+    )
+    purchased_credits_remaining: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+    )
+    admin_assigned_optimization_slots: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+    )
+    last_credits_reset_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
 
     # Relationships
     subscriptions: Mapped[List["Subscription"]] = relationship(

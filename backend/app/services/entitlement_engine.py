@@ -1,11 +1,13 @@
 """
 Digital Growth Studio — Configuration-driven Entitlement Engine
 """
+import structlog
 from datetime import datetime, timezone, date, timedelta
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Dict, Any, List
 
+logger = structlog.get_logger()
 from app.models.user import User
 from app.models.subscription_addon import SubscriptionAddOn
 from app.models.subscription import Subscription
@@ -21,6 +23,7 @@ PLANS_CONFIG = {
         "max_team_members": 0,
         "ai_recommendations_limit": 0,
         "ai_optimization_campaign_limit": 0,
+        "monthly_credits": 0,
         "feature_gates": {
             "creative_analysis": False,
             "copy_analysis": False,
@@ -39,6 +42,7 @@ PLANS_CONFIG = {
         "max_team_members": 1,
         "ai_recommendations_limit": 999999,
         "ai_optimization_campaign_limit": 1,
+        "monthly_credits": 25,
         "feature_gates": {
             "creative_analysis": True,
             "copy_analysis": True,
@@ -57,6 +61,7 @@ PLANS_CONFIG = {
         "max_team_members": 3,
         "ai_recommendations_limit": 999999,
         "ai_optimization_campaign_limit": 3,
+        "monthly_credits": 150,
         "feature_gates": {
             "creative_analysis": True,
             "copy_analysis": True,
@@ -74,7 +79,8 @@ PLANS_CONFIG = {
         "sync_interval_hours": 6,
         "max_team_members": 10,
         "ai_recommendations_limit": 999999,
-        "ai_optimization_campaign_limit": 10,
+        "ai_optimization_campaign_limit": 5,
+        "monthly_credits": 350,
         "feature_gates": {
             "creative_analysis": True,
             "copy_analysis": True,
@@ -92,7 +98,8 @@ PLANS_CONFIG = {
         "sync_interval_hours": 6,
         "max_team_members": 25,
         "ai_recommendations_limit": 999999,
-        "ai_optimization_campaign_limit": 25,
+        "ai_optimization_campaign_limit": 10,
+        "monthly_credits": 500,
         "feature_gates": {
             "creative_analysis": True,
             "copy_analysis": True,
@@ -200,11 +207,129 @@ class EntitlementEngine:
         return active_addons
 
     @classmethod
+    async def check_and_reset_monthly_credits(cls, user: User, db: AsyncSession) -> None:
+        """
+        Self-healing credit reset logic.
+        Detects if user is in a new billing cycle by comparing user.last_credits_reset_at
+        with their active subscription's started_at. If they are in a new cycle:
+        - Expire previous unused monthly credits.
+        - Grant new plan-included credits.
+        - Register signed ledger transactions.
+        """
+        from app.models.subscription import Subscription
+        from app.models.ai_assistant import AICreditTransaction
+        
+        # 1. Fetch latest active subscription
+        stmt = (
+            select(Subscription)
+            .where(Subscription.user_id == user.id)
+            .where(Subscription.status == "active")
+            .order_by(Subscription.expires_at.desc())
+        )
+        res = await db.execute(stmt)
+        sub = res.scalar_one_or_none()
+        
+        if not sub:
+            # Check trial credits init
+            if user.trial_status == "active" and user.trial_credits_remaining == 0 and not user.trial_used:
+                user.trial_credits_remaining = 5
+                user.credits = user.purchased_credits_remaining + 5
+                # Create ledger entry
+                db.add(AICreditTransaction(
+                    user_id=user.id,
+                    credit_amount=5,
+                    amount=5,
+                    credit_type="trial",
+                    transaction_type="grant",
+                    description="Free Trial credits granted",
+                    reason="Free Trial signup"
+                ))
+                user.trial_used = True
+                db.add(user)
+                await db.commit()
+            return
+
+        # Paid subscription active
+        plan_id = sub.plan.lower()
+        plan_config = cls.get_plan_config(plan_id)
+        plan_included_credits = plan_config.get("monthly_credits", 0)
+
+        # Determine if we should reset
+        should_reset = False
+        if user.last_credits_reset_at is None:
+            should_reset = True
+        else:
+            reset_at = user.last_credits_reset_at
+            if reset_at.tzinfo is None:
+                reset_at = reset_at.replace(tzinfo=timezone.utc)
+            sub_started = sub.started_at
+            if sub_started.tzinfo is None:
+                sub_started = sub_started.replace(tzinfo=timezone.utc)
+            if reset_at < sub_started:
+                should_reset = True
+
+        if should_reset:
+            logger.info("resetting_monthly_credits_billing_cycle", user_id=user.id, plan=plan_id)
+            
+            # Expire old monthly credits (audit record)
+            old_remaining = user.monthly_credits_remaining
+            if old_remaining > 0:
+                db.add(AICreditTransaction(
+                    user_id=user.id,
+                    credit_amount=old_remaining,
+                    amount=-old_remaining,
+                    credit_type="monthly_included",
+                    transaction_type="expire",
+                    description=f"Expired {old_remaining} unused monthly credits from previous cycle",
+                    reason="Monthly credit reset expiration"
+                ))
+
+            # Clear trial credits if any remaining
+            old_trial = user.trial_credits_remaining
+            if old_trial > 0:
+                db.add(AICreditTransaction(
+                    user_id=user.id,
+                    credit_amount=old_trial,
+                    amount=-old_trial,
+                    credit_type="trial",
+                    transaction_type="expire",
+                    description=f"Expired {old_trial} unused trial credits upon upgrading/billing reset",
+                    reason="Trial credits expiration"
+                ))
+                user.trial_credits_remaining = 0
+
+            # Grant new monthly credits
+            user.monthly_credits_remaining = plan_included_credits
+            user.last_credits_reset_at = datetime.now(timezone.utc)
+            user.credits = user.purchased_credits_remaining + plan_included_credits
+            
+            # Log grant transaction
+            db.add(AICreditTransaction(
+                user_id=user.id,
+                credit_amount=plan_included_credits,
+                amount=plan_included_credits,
+                credit_type="monthly_included",
+                transaction_type="grant",
+                description=f"Granted {plan_included_credits} monthly included credits for {plan_id.upper()} plan",
+                reason="Monthly plan credits allocation",
+                reference_id=sub.razorpay_subscription_id
+            ))
+            
+            db.add(user)
+            await db.commit()
+
+    @classmethod
     async def resolve_entitlements(cls, user: User, db: AsyncSession) -> Dict[str, Any]:
         """
         Combines user subscription plan limits and active add-on quantities.
         Dynamically checks for active trials and active paid subscriptions.
         """
+        # Run self-healing monthly credits reset
+        try:
+            await cls.check_and_reset_monthly_credits(user, db)
+        except Exception as reset_err:
+            logger.error("failed_credits_reset_self_healing", user_id=user.id, error=str(reset_err))
+
         # 1. Check if user has active trial
         is_trial_active = False
         if user.trial_status == "active" and user.trial_ends_at:
@@ -232,7 +357,7 @@ class EntitlementEngine:
                 user.trial_started_at = None
                 user.trial_used = True
                 db.add(user)
-                # Note: db.commit() is expected to be called by the caller, but we can safely call it or flush
+                await db.commit()
             plan_id = sub.plan.lower()
             is_trial_active = False
         elif is_trial_active:
@@ -285,6 +410,11 @@ class EntitlementEngine:
         if has_ai_deep:
             feature_gates["ai_deep_analysis"] = True
 
+        # AI Optimization campaign limit calculation
+        additional_opt_qty = sum(a.quantity for a in addons if a.addon_id == "additional_optimization_campaign")
+        base_opt_limit = base_config.get("ai_optimization_campaign_limit", 0)
+        total_opt_limit = base_opt_limit + additional_opt_qty + getattr(user, "admin_assigned_optimization_slots", 0)
+
         return {
             "plan_id": plan_id,
             "max_meta_accounts": max_meta_accounts,
@@ -292,7 +422,7 @@ class EntitlementEngine:
             "sync_interval_hours": sync_interval_hours,
             "historical_days": historical_days,
             "ai_recommendations_limit": base_config["ai_recommendations_limit"],
-            "ai_optimization_campaign_limit": base_config.get("ai_optimization_campaign_limit", 0),
+            "ai_optimization_campaign_limit": total_opt_limit,
             "ai_deep_analysis": has_ai_deep,
             "feature_gates": feature_gates,
             "active_addons": [

@@ -28,6 +28,8 @@ from app.models.ticket import SupportTicket
 from app.models.notification import Notification
 from app.models.ai_optimization import AIOptimizationConfig, AIOptimizationLog
 from app.models.ai_assistant import AIChatConversation, AIChatMessage, AICreditTransaction
+from app.models.admin_config import AdminConfig
+from app.models.ai_usage import AIUsageRecord
 
 __all__ = [
     "BaseModel",
@@ -62,4 +64,6 @@ __all__ = [
     "AIChatConversation",
     "AIChatMessage",
     "AICreditTransaction",
+    "AdminConfig",
+    "AIUsageRecord",
 ]

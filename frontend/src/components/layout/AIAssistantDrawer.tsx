@@ -21,6 +21,13 @@ export default function AIAssistantDrawer() {
   const { selectedAccount } = useAdAccount();
   const [isOpen, setIsOpen] = useState(false);
   const [credits, setCredits] = useState<number>(0);
+  const [creditsBreakdown, setCreditsBreakdown] = useState<{
+    monthly_credits_remaining: number;
+    purchased_credits_remaining: number;
+    trial_credits_remaining: number;
+    monthly_credits_limit: number;
+    monthly_credits_used: number;
+  } | null>(null);
   const [conversations, setConversations] = useState<any[]>([]);
   const [activeConvoId, setActiveConvoId] = useState<string | null>(null);
   const [messages, setMessages] = useState<any[]>([]);
@@ -60,6 +67,13 @@ export default function AIAssistantDrawer() {
       // Credits
       const credRes = await api.getAiCredits();
       setCredits(credRes.credits);
+      setCreditsBreakdown({
+        monthly_credits_remaining: credRes.monthly_credits_remaining,
+        purchased_credits_remaining: credRes.purchased_credits_remaining,
+        trial_credits_remaining: credRes.trial_credits_remaining,
+        monthly_credits_limit: credRes.monthly_credits_limit,
+        monthly_credits_used: credRes.monthly_credits_used,
+      });
 
       // Conversations scoped strictly to selected ad account
       const convos = await api.getConversations(selectedAccount.id);
@@ -201,6 +215,21 @@ export default function AIAssistantDrawer() {
       };
       setMessages(prev => [...prev, modelBubble]);
       setCredits(res.credits_remaining);
+      
+      // Refresh credits breakdown
+      try {
+        const credRes = await api.getAiCredits();
+        setCredits(credRes.credits);
+        setCreditsBreakdown({
+          monthly_credits_remaining: credRes.monthly_credits_remaining,
+          purchased_credits_remaining: credRes.purchased_credits_remaining,
+          trial_credits_remaining: credRes.trial_credits_remaining,
+          monthly_credits_limit: credRes.monthly_credits_limit,
+          monthly_credits_used: credRes.monthly_credits_used,
+        });
+      } catch (creditsErr) {
+        console.warn("Failed to refresh credits breakdown:", creditsErr);
+      }
 
       // Refresh conversations list to update title if it was changed
       const updatedConvos = await api.getConversations(selectedAccount.id);
@@ -301,11 +330,41 @@ export default function AIAssistantDrawer() {
                 {selectedAccount?.name || "No Account Selected"}
               </span>
             </div>
-            <div className="text-right flex flex-col">
+            <div className="text-right flex flex-col relative group cursor-pointer z-50">
               <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">AI Credits</span>
-              <span className={`font-bold ${credits > 0 ? 'text-emerald-400' : 'text-rose-500 animate-pulse'}`}>
+              <span className={`font-bold flex items-center justify-end gap-1 ${credits > 0 ? 'text-emerald-400' : 'text-rose-500 animate-pulse'}`}>
                 {credits} remaining
+                <span className="text-[9px] text-slate-500">▼</span>
               </span>
+              
+              {/* Dropdown breakdown info card on hover */}
+              {creditsBreakdown && (
+                <div className="absolute right-0 top-full mt-1.5 w-60 bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-2xl text-left pointer-events-none opacity-0 group-hover:opacity-100 transition-all duration-200 translate-y-1 group-hover:translate-y-0 z-[10000]">
+                  <div className="text-[11px] font-bold text-slate-400 border-b border-slate-800 pb-1.5 mb-2">Credit Breakdown</div>
+                  <div className="space-y-1.5 text-xs text-slate-300">
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Monthly Included Limit</span>
+                      <span className="font-semibold">{creditsBreakdown.monthly_credits_limit}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Monthly Included Remaining</span>
+                      <span className="font-semibold text-emerald-400">{creditsBreakdown.monthly_credits_remaining}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Purchased (No Expiry)</span>
+                      <span className="font-semibold text-sky-400">{creditsBreakdown.purchased_credits_remaining}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Free Trial Remaining</span>
+                      <span className="font-semibold text-amber-400">{creditsBreakdown.trial_credits_remaining}</span>
+                    </div>
+                    <div className="flex justify-between border-t border-slate-800 pt-1.5 mt-1.5 font-bold text-white">
+                      <span>Total Available</span>
+                      <span className="text-emerald-400">{credits}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

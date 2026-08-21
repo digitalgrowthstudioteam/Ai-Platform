@@ -235,8 +235,15 @@ export default function AIOptimizationDashboard() {
                       >
                         {/* Name & Objective */}
                         <td className="p-4 max-w-sm">
-                          <div className="font-bold text-sm text-slate-800 hover:text-blue-600 transition truncate">
-                            {c.campaign_name}
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-sm text-slate-800 hover:text-blue-600 transition truncate">
+                              {c.campaign_name}
+                            </span>
+                            {c.over_limit && (
+                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-rose-50 border border-rose-100 text-[9px] font-bold text-rose-700">
+                                Over Limit
+                              </span>
+                            )}
                           </div>
                           <div className="flex items-center gap-1.5 mt-1.5">
                             <span className="text-[9px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded font-bold uppercase">
@@ -255,13 +262,13 @@ export default function AIOptimizationDashboard() {
                               onClick={() => handleToggle(c)}
                               disabled={activatingId !== null}
                               className={`w-9 h-5 flex items-center rounded-full p-0.5 transition-colors cursor-pointer duration-300 focus:outline-hidden ${
-                                c.is_active ? "bg-blue-600 justify-end" : "bg-slate-200 justify-start"
+                                c.is_active ? (c.over_limit ? "bg-rose-500 justify-end" : "bg-blue-600 justify-end") : "bg-slate-200 justify-start"
                               }`}
                             >
                               <div className="w-4 h-4 rounded-full bg-white shadow-md transform transition-transform duration-300" />
                             </button>
-                            <span className={`text-[10px] font-bold uppercase ${c.is_active ? "text-blue-600" : "text-slate-400"}`}>
-                              {c.is_active ? "Active" : "Inactive"}
+                            <span className={`text-[10px] font-bold uppercase ${c.is_active ? (c.over_limit ? "text-rose-500" : "text-blue-600") : "text-slate-400"}`}>
+                              {c.is_active ? (c.over_limit ? "Over Limit" : "Active") : "Inactive"}
                             </span>
                           </div>
                         </td>

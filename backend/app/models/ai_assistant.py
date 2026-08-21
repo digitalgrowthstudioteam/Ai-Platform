@@ -85,7 +85,7 @@ class AIChatMessage(BaseModel):
 class AICreditTransaction(BaseModel):
     """
     AICreditTransaction model.
-    Audit log record created whenever an AI operation consumes credits.
+    Audit log record representing a signed ledger transaction (grants, consumption, expiries, adjustments).
     """
     __tablename__ = "ai_credit_transactions"
 
@@ -93,9 +93,9 @@ class AICreditTransaction(BaseModel):
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
     )
-    ad_account_id: Mapped[uuid.UUID] = mapped_column(
+    ad_account_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         ForeignKey("meta_ad_accounts.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
     )
     conversation_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         ForeignKey("ai_chat_conversations.id", ondelete="SET NULL"),
@@ -110,14 +110,37 @@ class AICreditTransaction(BaseModel):
         nullable=False,
         default=1,
     )
+    amount: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=-1,
+    )
+    credit_type: Mapped[str] = mapped_column(
+        String(50),  # "monthly_included", "purchased", "trial"
+        nullable=False,
+        default="monthly_included",
+    )
+    transaction_type: Mapped[str] = mapped_column(
+        String(50),  # "grant", "consume", "expire", "adjustment", "refund"
+        nullable=False,
+        default="consume",
+    )
+    description: Mapped[Optional[str]] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+    reference_id: Mapped[Optional[str]] = mapped_column(
+        String(100),
+        nullable=True,
+    )
     reason: Mapped[str] = mapped_column(
         String(255),
         nullable=False,
         default="AI Assistant response",
     )
-    gemini_model: Mapped[str] = mapped_column(
+    gemini_model: Mapped[Optional[str]] = mapped_column(
         String(100),
-        nullable=False,
+        nullable=True,
         default="gemini-1.5-flash",
     )
     request_reference_id: Mapped[Optional[str]] = mapped_column(
@@ -127,4 +150,5 @@ class AICreditTransaction(BaseModel):
 
     # Relationships
     user: Mapped["User"] = relationship("User")
-    ad_account: Mapped["MetaAdAccount"] = relationship("MetaAdAccount")
+    ad_account: Mapped[Optional["MetaAdAccount"]] = relationship("MetaAdAccount")
+

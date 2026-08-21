@@ -17,6 +17,7 @@ from app.models.metrics import CampaignDailyMetrics, AdSetDailyMetrics, AdDailyM
 from app.models.recommendation import AIRecommendation
 from app.models.ai_optimization import AIOptimizationConfig
 from app.models.ai_assistant import AIChatConversation, AIChatMessage, AICreditTransaction
+from app.models.ai_usage import AIUsageRecord
 
 logger = structlog.get_logger()
 settings = get_settings()
@@ -203,9 +204,10 @@ class AIAssistantService:
         system_prompt: str,
         history: list,
         user_message: str
-    ) -> str:
+    ) -> tuple:
         """
         Calls Gemini Flash using direct REST HTTP requests (standard API key or Vertex OAuth token).
+        Returns a tuple of (reply_text, usage_metadata_dict).
         """
         # Format the contents payload (history + new user message)
         contents = []
@@ -234,7 +236,7 @@ class AIAssistantService:
                 },
                 "generationConfig": {
                     "temperature": 0.3,
-                    "maxOutputTokens": 800
+                    "maxOutputTokens": 1200
                 }
             }
             try:
@@ -243,7 +245,13 @@ class AIAssistantService:
                     if resp.status_code == 200:
                         data = resp.json()
                         text = data["candidates"][0]["content"]["parts"][0]["text"]
-                        return text
+                        usage = data.get("usageMetadata", {})
+                        meta = {
+                            "input_tokens": usage.get("promptTokenCount", 0),
+                            "output_tokens": usage.get("candidatesTokenCount", 0),
+                            "total_tokens": usage.get("totalTokenCount", 0)
+                        }
+                        return text, meta
                     else:
                         logger.error("gemini_api_key_call_failed", status=resp.status_code, body=resp.text)
             except Exception as e:
@@ -265,7 +273,7 @@ class AIAssistantService:
                 },
                 "generationConfig": {
                     "temperature": 0.3,
-                    "maxOutputTokens": 800
+                    "maxOutputTokens": 1200
                 }
             }
             try:
@@ -274,14 +282,21 @@ class AIAssistantService:
                     if resp.status_code == 200:
                         data = resp.json()
                         text = data["candidates"][0]["content"]["parts"][0]["text"]
-                        return text
+                        usage = data.get("usageMetadata", {})
+                        meta = {
+                            "input_tokens": usage.get("promptTokenCount", 0),
+                            "output_tokens": usage.get("candidatesTokenCount", 0),
+                            "total_tokens": usage.get("totalTokenCount", 0)
+                        }
+                        return text, meta
                     else:
                         logger.error("vertex_oauth_call_failed", status=resp.status_code, body=resp.text)
             except Exception as e:
                 logger.error("vertex_oauth_exception", error=str(e))
 
         # Secure Fallback to local Reasoning Engine
-        return await cls._run_local_fallback(user_message, system_prompt)
+        fallback_text = await cls._run_local_fallback(user_message, system_prompt)
+        return fallback_text, {"input_tokens": 150, "output_tokens": 200, "total_tokens": 350}
 
     @classmethod
     async def _run_local_fallback(cls, message: str, system_prompt: str) -> str:
@@ -446,10 +461,21 @@ Here is the current ad account context:
 
         # 6. Query Gemini
         try:
-            assistant_reply = await cls.query_gemini(system_prompt, history_list, message_content)
+            assistant_reply, usage_metadata = await cls.query_gemini(system_prompt, history_list, message_content)
         except Exception as e:
             logger.error("gemini_failed", error=str(e))
-            # Mark user message as error context if needed, but do not deduct credits
+            # Log usage record for failure
+            db.add(AIUsageRecord(
+                user_id=user_id,
+                ad_account_id=ad_account_id,
+                conversation_id=conversation_id,
+                model=settings.GEMINI_MODEL,
+                request_type="ai_assistant",
+                success=False,
+                error_code="GEMINI_API_EXCEPTION",
+                credit_charged=0
+            ))
+            await db.commit()
             return "I couldn't generate a response right now. Please try again.", False
 
         if not assistant_reply or "used all your AI Credits" in assistant_reply:
@@ -462,6 +488,33 @@ Here is the current ad account context:
             user_res_ref = await db.execute(user_stmt_ref)
             user_ref = user_res_ref.scalar_one()
 
+            if user_ref.credits <= 0:
+                # Log usage record for failure (credits exhausted)
+                db.add(AIUsageRecord(
+                    user_id=user_id,
+                    ad_account_id=ad_account_id,
+                    conversation_id=conversation_id,
+                    model=settings.GEMINI_MODEL,
+                    request_type="ai_assistant",
+                    success=False,
+                    error_code="CREDITS_EXHAUSTED",
+                    credit_charged=0
+                ))
+                await db.commit()
+                return "You've used all your AI Credits.", False
+
+            # Credit Consumption Order: Trial -> Monthly -> Purchased
+            credit_type = "monthly_included"
+            if user_ref.trial_credits_remaining > 0:
+                user_ref.trial_credits_remaining -= 1
+                credit_type = "trial"
+            elif user_ref.monthly_credits_remaining > 0:
+                user_ref.monthly_credits_remaining -= 1
+                credit_type = "monthly_included"
+            elif user_ref.purchased_credits_remaining > 0:
+                user_ref.purchased_credits_remaining -= 1
+                credit_type = "purchased"
+            
             user_ref.credits = max(0, user_ref.credits - 1)
             db.add(user_ref)
 
@@ -475,13 +528,17 @@ Here is the current ad account context:
             db.add(model_msg)
             await db.flush() # Gain model_msg.id
 
-            # Save credit transaction log
+            # Save credit transaction log (signed ledger)
             txn = AICreditTransaction(
                 user_id=user_id,
                 ad_account_id=ad_account_id,
                 conversation_id=conversation_id,
                 message_id=model_msg.id,
                 credit_amount=1,
+                amount=-1,
+                credit_type=credit_type,
+                transaction_type="consume",
+                description="AI Assistant query reply",
                 reason="AI Assistant response",
                 gemini_model=settings.GEMINI_MODEL,
             )
@@ -491,6 +548,30 @@ Here is the current ad account context:
             # Associate msg with txn
             model_msg.credit_transaction_id = txn.id
             db.add(model_msg)
+
+            # Log AIUsageRecord
+            in_tokens = usage_metadata.get("input_tokens", 0)
+            out_tokens = usage_metadata.get("output_tokens", 0)
+            tot_tokens = usage_metadata.get("total_tokens", 0)
+            # Estimate USD Cost: Input = $0.075 / 1M, Output = $0.30 / 1M
+            est_cost = (in_tokens * 0.000000075) + (out_tokens * 0.00000030)
+
+            usage_record = AIUsageRecord(
+                user_id=user_id,
+                ad_account_id=ad_account_id,
+                conversation_id=conversation_id,
+                message_id=model_msg.id,
+                model=settings.GEMINI_MODEL,
+                request_type="ai_assistant",
+                input_tokens=in_tokens,
+                output_tokens=out_tokens,
+                total_tokens=tot_tokens,
+                estimated_cost=est_cost,
+                credit_charged=1,
+                credit_transaction_id=txn.id,
+                success=True
+            )
+            db.add(usage_record)
 
             await db.commit()
             return assistant_reply, True
