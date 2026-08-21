@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { AuthProvider } from "@/context/AuthContext";
 import ProtectedRoute from "@/components/shared/ProtectedRoute";
 import DashboardLayout from "@/components/layout/DashboardLayout";
+import { ThemeProvider } from "@/context/ThemeContext";
 
 import { AdAccountProvider } from "@/context/AdAccountContext";
 
@@ -18,16 +19,24 @@ export default function AppWrapper({ children }: AppWrapperProps) {
   const isAuthRoute = ["/login", "/signup", "/reset-password"].includes(cleanPath);
 
   if (isPublicRoute || isAuthRoute) {
-    return <AuthProvider>{children}</AuthProvider>;
+    return (
+      <AuthProvider>
+        <ThemeProvider>
+          {children}
+        </ThemeProvider>
+      </AuthProvider>
+    );
   }
 
   return (
     <AuthProvider>
-      <ProtectedRoute>
-        <AdAccountProvider>
-          <DashboardLayout>{children}</DashboardLayout>
-        </AdAccountProvider>
-      </ProtectedRoute>
+      <ThemeProvider>
+        <ProtectedRoute>
+          <AdAccountProvider>
+            <DashboardLayout>{children}</DashboardLayout>
+          </AdAccountProvider>
+        </ProtectedRoute>
+      </ThemeProvider>
     </AuthProvider>
   );
 }

@@ -126,20 +126,28 @@ export default function Sidebar() {
   const isAdmin = user?.email === "flasshgames2026@gmail.com" || user?.email === "digitalgrowthstudioteam@gmail.com";
 
   const visibleNavigation = navigation.map((section) => {
+    let items = [...section.items];
+
+    // Hide AI Assistant for non-admins
+    if (!isAdmin) {
+      items = items.filter((item) => item.label !== "AI Assistant");
+    }
+
     if (section.label === "SETTINGS" && isAdmin) {
       // Add Super Admin menu item if not already present
-      const hasAdminItem = section.items.some((item) => item.href === "/settings/admin");
+      const hasAdminItem = items.some((item) => item.href === "/settings/admin");
       if (!hasAdminItem) {
-        return {
-          ...section,
-          items: [
-            ...section.items,
-            { label: "Super Admin", href: "/settings/admin", icon: ShieldAlert } as NavItem,
-          ],
-        };
+        items = [
+          ...items,
+          { label: "Super Admin", href: "/settings/admin", icon: ShieldAlert } as NavItem,
+        ];
       }
     }
-    return section;
+
+    return {
+      ...section,
+      items,
+    };
   });
 
   return (

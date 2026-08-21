@@ -3,12 +3,23 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
-import { User, Key, Shield, Award, Loader2, AlertCircle, CheckCircle, Trash2, Calendar, RefreshCcw } from "lucide-react";
+import { User, Key, Shield, Award, Loader2, AlertCircle, CheckCircle, Trash2, Calendar, RefreshCcw, Palette, RotateCcw } from "lucide-react";
 import { updateProfile } from "firebase/auth";
 import { trackAccountDeletion } from "@/lib/analytics";
+import { useTheme } from "@/context/ThemeContext";
+
+const THEME_PRESETS = [
+  { name: "Classic Blue", primary: "#2563EB", sidebar: "#0F172A" },
+  { name: "Forest Emerald", primary: "#10B981", sidebar: "#060814" },
+  { name: "Midnight Purple", primary: "#8B5CF6", sidebar: "#09090B" },
+  { name: "Sunset Amber", primary: "#F59E0B", sidebar: "#1C1917" },
+  { name: "Crimson Onyx", primary: "#EF4444", sidebar: "#0D0E12" },
+  { name: "Ocean Cyan", primary: "#06B6D4", sidebar: "#020813" },
+];
 
 export default function AccountSettingsPage() {
   const { user, resetPassword } = useAuth();
+  const { primaryColor, sidebarBg, setPrimaryColor, setSidebarBg, resetTheme } = useTheme();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [subscription, setSubscription] = useState<any>(null);
@@ -413,6 +424,96 @@ export default function AccountSettingsPage() {
                 Manage Billing & Upgrades
               </a>
             </div>
+          </div>
+
+          {/* Dashboard Theme Card */}
+          <div className="bg-white border border-slate-150 rounded-2xl p-6 shadow-xs">
+            <h3 className="text-sm font-bold text-slate-900 mb-4 flex items-center gap-1.5 border-b border-slate-100 pb-3">
+              <Palette size={16} className="text-blue-600" /> Dashboard Appearance
+            </h3>
+            
+            <p className="text-slate-500 text-[11px] leading-relaxed mb-4">
+              Personalize the primary accent color and sidebar background color of your dashboard workspace.
+            </p>
+
+            {/* Presets */}
+            <div className="space-y-2.5 mb-5">
+              <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Curated Presets</div>
+              <div className="grid grid-cols-2 gap-2">
+                {THEME_PRESETS.map((preset) => {
+                  const isActive = primaryColor.toLowerCase() === preset.primary.toLowerCase() && 
+                                   sidebarBg.toLowerCase() === preset.sidebar.toLowerCase();
+                  return (
+                    <button
+                      key={preset.name}
+                      type="button"
+                      onClick={() => {
+                        setPrimaryColor(preset.primary);
+                        setSidebarBg(preset.sidebar);
+                      }}
+                      className={`flex items-center gap-2 p-2 border rounded-xl text-left transition-all hover:scale-[1.02] cursor-pointer ${
+                        isActive 
+                          ? "border-blue-600 bg-blue-50/20 font-bold" 
+                          : "border-slate-150 hover:bg-slate-50"
+                      }`}
+                    >
+                      <div className="flex h-5 w-8 rounded-md overflow-hidden border border-slate-200 shrink-0">
+                        <div className="w-1/2" style={{ backgroundColor: preset.sidebar }} />
+                        <div className="w-1/2" style={{ backgroundColor: preset.primary }} />
+                      </div>
+                      <span className="text-[10px] text-slate-700 truncate">{preset.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Custom Inputs */}
+            <div className="space-y-3.5 pt-4 border-t border-slate-100">
+              <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Custom Color Control</div>
+              
+              <div className="flex items-center justify-between gap-4 p-2 bg-slate-50 rounded-xl border border-slate-100">
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Accent Color</span>
+                  <span className="text-[11px] font-mono text-slate-800 uppercase font-semibold">{primaryColor}</span>
+                </div>
+                <input
+                  type="color"
+                  value={primaryColor}
+                  onChange={(e) => setPrimaryColor(e.target.value)}
+                  className="w-8 h-8 rounded-lg border border-slate-250 cursor-pointer overflow-hidden p-0"
+                  style={{ appearance: 'none', WebkitAppearance: 'none' }}
+                />
+              </div>
+
+              <div className="flex items-center justify-between gap-4 p-2 bg-slate-50 rounded-xl border border-slate-100">
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Sidebar BG</span>
+                  <span className="text-[11px] font-mono text-slate-800 uppercase font-semibold">{sidebarBg}</span>
+                </div>
+                <input
+                  type="color"
+                  value={sidebarBg}
+                  onChange={(e) => setSidebarBg(e.target.value)}
+                  className="w-8 h-8 rounded-lg border border-slate-250 cursor-pointer overflow-hidden p-0"
+                  style={{ appearance: 'none', WebkitAppearance: 'none' }}
+                />
+              </div>
+            </div>
+
+            {/* Reset Option */}
+            {(primaryColor.toLowerCase() !== "#2563eb" || sidebarBg.toLowerCase() !== "#0f172a") && (
+              <div className="pt-4 mt-4 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={resetTheme}
+                  className="w-full py-2 flex items-center justify-center gap-1.5 border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-xl text-xs font-bold transition"
+                >
+                  <RotateCcw size={12} />
+                  Reset to Default Theme
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
