@@ -139,7 +139,8 @@ async def list_recommendations(
     # Filter to only active campaigns/ads with spend in last 7 days
     from datetime import date, timedelta
     from sqlalchemy import func
-    from app.models.campaign import Campaign, AdSet, Ad, CampaignDailyMetrics, AdDailyMetrics
+    from app.models.campaign import Campaign, AdSet, Ad
+    from app.models.metrics import CampaignDailyMetrics, AdDailyMetrics
 
     seven_days_ago = date.today() - timedelta(days=7)
     

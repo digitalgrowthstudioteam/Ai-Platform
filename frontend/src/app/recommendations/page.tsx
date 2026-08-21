@@ -298,7 +298,7 @@ export default function RecommendationsPage() {
     let strongestCta = isMsg ? "\"Send Message\" (WhatsApp)" : "\"Learn More\" Button";
 
     const formatCurrency = (val: number | undefined) => {
-      if (val === undefined || val === null) return "—";
+      if (val === undefined || val === null || val === 0) return "—";
       return new Intl.NumberFormat("en-IN", {
         style: "currency",
         currency: "INR",
@@ -307,19 +307,21 @@ export default function RecommendationsPage() {
     };
 
     const formatPercent = (val: number | undefined) => {
-      if (val === undefined || val === null) return "—";
+      if (val === undefined || val === null || val === 0) return "—";
       return `${val.toFixed(2)}%`;
     };
 
     const formatROAS = (val: number | undefined) => {
-      if (val === undefined || val === null) return "—";
+      if (val === undefined || val === null || val === 0) return "—";
       return `${val.toFixed(2)}x`;
     };
 
     const avgCpm = overview?.cpm?.value !== undefined ? formatCurrency(overview.cpm.value) : "—";
     const avgRoas = overview?.roas?.value !== undefined ? formatROAS(overview.roas.value) : "—";
     const avgCtr = overview?.ctr?.value !== undefined ? formatPercent(overview.ctr.value) : "—";
-    const avgCpl = overview?.cpl?.value !== undefined ? formatCurrency(overview.cpl.value) : "—";
+    const avgCpl = isMsg
+      ? (overview?.cost_per_conversation?.value !== undefined ? formatCurrency(overview.cost_per_conversation.value) : "—")
+      : (overview?.cpl?.value !== undefined ? formatCurrency(overview.cpl.value) : "—");
 
     console.log("DEBUG dnaMap:", {
       overview,
@@ -341,7 +343,8 @@ export default function RecommendationsPage() {
       avgCpm,
       avgRoas,
       avgCtr,
-      avgCpl
+      avgCpl,
+      cplLabel: isMsg ? "Avg Cost / Message" : "Avg Account CPL"
     };
   };
 
@@ -976,7 +979,7 @@ export default function RecommendationsPage() {
                 <span className="text-sm font-black text-white">{dnaMap.avgCtr}</span>
               </div>
               <div className="space-y-1 bg-white/5 p-3.5 rounded-lg border border-white/10">
-                <span className="text-white/40 block font-bold uppercase tracking-wider text-[10px]">Avg Account CPL</span>
+                <span className="text-white/40 block font-bold uppercase tracking-wider text-[10px]">{dnaMap.cplLabel}</span>
                 <span className="text-sm font-black text-white">{dnaMap.avgCpl}</span>
               </div>
             </div>

@@ -199,16 +199,31 @@ class ApiClient {
     );
   }
 
-  async getPlacements(adAccountId: string) {
-    return this.request<any[]>(
-      `/ads/placements?ad_account_id=${adAccountId}`
-    );
+  async getPlacements(adAccountId: string, campaignId?: string, adsetId?: string, startDate?: string, endDate?: string) {
+    let url = `/ads/placements?ad_account_id=${adAccountId}`;
+    if (campaignId) url += `&campaign_id=${campaignId}`;
+    if (adsetId) url += `&adset_id=${adsetId}`;
+    if (startDate) url += `&start_date=${startDate}`;
+    if (endDate) url += `&end_date=${endDate}`;
+    return this.request<any[]>(url);
   }
 
-  async getDemographics(adAccountId: string) {
-    return this.request<any[]>(
-      `/ads/demographics?ad_account_id=${adAccountId}`
-    );
+  async getDemographics(adAccountId: string, campaignId?: string, adsetId?: string, startDate?: string, endDate?: string) {
+    let url = `/ads/demographics?ad_account_id=${adAccountId}`;
+    if (campaignId) url += `&campaign_id=${campaignId}`;
+    if (adsetId) url += `&adset_id=${adsetId}`;
+    if (startDate) url += `&start_date=${startDate}`;
+    if (endDate) url += `&end_date=${endDate}`;
+    return this.request<any[]>(url);
+  }
+
+  async getRegions(adAccountId: string, campaignId?: string, adsetId?: string, startDate?: string, endDate?: string) {
+    let url = `/ads/regions?ad_account_id=${adAccountId}`;
+    if (campaignId) url += `&campaign_id=${campaignId}`;
+    if (adsetId) url += `&adset_id=${adsetId}`;
+    if (startDate) url += `&start_date=${startDate}`;
+    if (endDate) url += `&end_date=${endDate}`;
+    return this.request<any[]>(url);
   }
 
   async getAudiences(adAccountId: string) {
