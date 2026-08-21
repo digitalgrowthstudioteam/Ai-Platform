@@ -280,12 +280,12 @@ async def list_ads(
         prev_purchases = int(row.prev_purchases)
         prev_revenue = float(row.prev_revenue)
 
-        ctr = (clicks / impressions) if impressions > 0 else 0.0
+        ctr = (clicks / impressions * 100.0) if impressions > 0 else 0.0
         cpc = (spend / clicks) if clicks > 0 else 0.0
         cpm = (spend / impressions * 1000) if impressions > 0 else 0.0
         roas = (revenue / spend) if spend > 0 else 0.0
 
-        prev_ctr = (prev_clicks / prev_impressions) if prev_impressions > 0 else 0.0
+        prev_ctr = (prev_clicks / prev_impressions * 100.0) if prev_impressions > 0 else 0.0
         prev_cpc = (prev_spend / prev_clicks) if prev_clicks > 0 else 0.0
         prev_roas = (prev_revenue / prev_spend) if prev_spend > 0 else 0.0
 
@@ -498,12 +498,12 @@ async def list_adsets(
         prev_purchases = int(row.prev_purchases)
         prev_revenue = float(row.prev_revenue)
 
-        ctr = (clicks / impressions) if impressions > 0 else 0.0
+        ctr = (clicks / impressions * 100.0) if impressions > 0 else 0.0
         cpc = (spend / clicks) if clicks > 0 else 0.0
         cpm = (spend / impressions * 1000) if impressions > 0 else 0.0
         roas = (revenue / spend) if spend > 0 else 0.0
 
-        prev_ctr = (prev_clicks / prev_impressions) if prev_impressions > 0 else 0.0
+        prev_ctr = (prev_clicks / prev_impressions * 100.0) if prev_impressions > 0 else 0.0
         prev_cpc = (prev_spend / prev_clicks) if prev_clicks > 0 else 0.0
         prev_roas = (prev_revenue / prev_spend) if prev_spend > 0 else 0.0
 
@@ -746,7 +746,7 @@ async def list_placements(
             if val.get("action_type") == "purchase":
                 revenue = float(val.get("value", 0.0))
 
-        ctr = (clicks / impressions) if impressions > 0 else 0.0
+        ctr = (clicks / impressions * 100.0) if impressions > 0 else 0.0
         cpc = (spend / clicks) if clicks > 0 else 0.0
         roas = (revenue / spend) if spend > 0 else 0.0
 
@@ -835,7 +835,7 @@ async def list_demographics(
             if val.get("action_type") == "purchase":
                 revenue = float(val.get("value", 0.0))
 
-        ctr = (clicks / impressions) if impressions > 0 else 0.0
+        ctr = (clicks / impressions * 100.0) if impressions > 0 else 0.0
         cpc = (spend / clicks) if clicks > 0 else 0.0
         roas = (revenue / spend) if spend > 0 else 0.0
 

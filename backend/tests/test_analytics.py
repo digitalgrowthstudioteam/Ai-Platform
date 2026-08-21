@@ -244,7 +244,7 @@ async def test_dashboard_overview_metrics(mock_auth, setup_analytics_data, db: A
         assert metrics["roas"]["value"] == 2.0  # 1000.00 revenue / 500.00 spend
         assert metrics["cpa"]["value"] == 50.0  # 500.00 spend / 10 purchases
         assert metrics["cpc"]["value"] == 2.50  # 500.00 spend / 200 clicks
-        assert metrics["ctr"]["value"] == 0.02  # 200 clicks / 10000 impressions
+        assert metrics["ctr"]["value"] == 2.0  # 200 clicks / 10000 impressions
 
         # Verify Trends Comparison Deltas (Current Spend 500.00 vs Previous Spend 250.00 => +100% change)
         assert metrics["spend"]["trend"] == 100.0
