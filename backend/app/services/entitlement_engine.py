@@ -330,7 +330,15 @@ class EntitlementEngine:
         except Exception as reset_err:
             logger.error("failed_credits_reset_self_healing", user_id=user.id, error=str(reset_err))
 
-        # 1. Check if user has active trial
+        # Resolve accessible user IDs (which includes user.id and team owners who invited this user)
+        from app.models.team import TeamMember
+        from sqlalchemy import func
+        stmt_owners = select(TeamMember.user_id).where(func.lower(TeamMember.email) == user.email.lower())
+        res_owners = await db.execute(stmt_owners)
+        owner_ids = list(res_owners.scalars().all())
+        user_ids = [user.id] + owner_ids
+
+        # 1. Check if user or any team owner has active trial
         is_trial_active = False
         if user.trial_status == "active" and user.trial_ends_at:
             ends_at = user.trial_ends_at
@@ -339,26 +347,50 @@ class EntitlementEngine:
             if datetime.now(timezone.utc) <= ends_at:
                 is_trial_active = True
 
-        # 2. Check if user has active paid subscription
+        if not is_trial_active and len(owner_ids) > 0:
+            stmt_trial = select(User).where(User.id.in_(owner_ids)).where(User.trial_status == "active")
+            res_trial = await db.execute(stmt_trial)
+            trial_users = res_trial.scalars().all()
+            for tu in trial_users:
+                if tu.trial_ends_at:
+                    ends_at = tu.trial_ends_at
+                    if ends_at.tzinfo is None:
+                        ends_at = ends_at.replace(tzinfo=timezone.utc)
+                    if datetime.now(timezone.utc) <= ends_at:
+                        is_trial_active = True
+                        break
+
+        # 2. Check active paid subscriptions for all user_ids
         stmt = (
             select(Subscription)
-            .where(Subscription.user_id == user.id)
+            .where(Subscription.user_id.in_(user_ids))
             .where(Subscription.status == "active")
             .order_by(Subscription.expires_at.desc())
         )
         res = await db.execute(stmt)
-        sub = res.scalar_one_or_none()
+        subs = list(res.scalars().all())
 
-        if sub:
-            # Self-healing trial removal if user has a paid subscription
-            if user.trial_status != "none" or user.trial_ends_at is not None:
-                user.trial_status = "none"
-                user.trial_ends_at = None
-                user.trial_started_at = None
-                user.trial_used = True
-                db.add(user)
-                await db.commit()
-            plan_id = sub.plan.lower()
+        plan_rank = {"free": 0, "starter": 1, "growth": 2, "pro": 3, "agency": 4}
+        best_sub = None
+        best_rank = -1
+        for s in subs:
+            plan_name = s.plan.lower()
+            rank = plan_rank.get(plan_name, 0)
+            if rank > best_rank:
+                best_rank = rank
+                best_sub = s
+
+        if best_sub:
+            # Self-healing trial removal if user themselves has a paid subscription
+            if best_sub.user_id == user.id:
+                if user.trial_status != "none" or user.trial_ends_at is not None:
+                    user.trial_status = "none"
+                    user.trial_ends_at = None
+                    user.trial_started_at = None
+                    user.trial_used = True
+                    db.add(user)
+                    await db.commit()
+            plan_id = best_sub.plan.lower()
             is_trial_active = False
         elif is_trial_active:
             plan_id = "starter"
@@ -367,8 +399,10 @@ class EntitlementEngine:
 
         base_config = cls.get_plan_config(plan_id)
         
-        # Load user add-ons
-        addons = await cls.get_active_addons(user.id, db)
+        # Load user add-ons for all user IDs
+        addons = []
+        for uid in user_ids:
+            addons.extend(await cls.get_active_addons(uid, db))
         
         # 1. Total allowed accounts (Base + Additional Add-Ons)
         additional_accounts_qty = sum(a.quantity for a in addons if a.addon_id == "additional_account")
