@@ -1707,16 +1707,16 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
                   {/* Primary KPIs Cards */}
                   <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-6">
                     {adSetPerformance.primary_metrics.map((k: any, idx: number) => (
-                      <div key={idx} className="card border border-border bg-white shadow-sm rounded-xl p-5 flex flex-col justify-between space-y-4">
+                      <div key={idx} className="card border border-slate-150 bg-white shadow-xs rounded-2xl p-5 flex flex-col justify-between hover:shadow-md hover:border-slate-200 transition-all duration-200 space-y-4 min-h-[180px]">
                         <div className="flex justify-between items-start">
                           <div>
-                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">{k.name}</span>
-                            <span className="text-[8px] font-semibold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded mt-1 inline-block uppercase">Primary KPI</span>
+                            <span className="text-[10px] font-bold text-slate-450 uppercase tracking-wider block">{k.name}</span>
+                            <span className="text-[8px] font-bold text-blue-600 bg-blue-50/80 px-2 py-0.5 rounded-full mt-1.5 inline-block uppercase tracking-wider">Primary KPI</span>
                           </div>
                           {k.change_percent !== null && (
-                            <div className={`flex items-center gap-0.5 text-[10px] font-bold ${
-                              k.status === "good" ? "text-emerald-600" :
-                              k.status === "critical" ? "text-rose-600" : "text-slate-500"
+                            <div className={`flex items-center gap-0.5 text-xs font-extrabold px-2 py-1 rounded-lg ${
+                              k.status === "good" ? "text-emerald-700 bg-emerald-50" :
+                              k.status === "critical" ? "text-rose-700 bg-rose-50" : "text-slate-600 bg-slate-50"
                             }`}>
                               {k.trend === "improving" ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
                               {k.change_percent > 0 ? "+" : ""}{k.change_percent.toFixed(1)}%
@@ -1724,8 +1724,8 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
                           )}
                         </div>
 
-                        <div>
-                          <div className="text-2xl font-black text-slate-800">
+                        <div className="flex items-baseline justify-between">
+                          <div className="text-3xl font-black text-slate-900 tracking-tight">
                             {k.metric.includes("spend") || k.metric.includes("cost_") || k.metric === "cpc" || k.metric === "cpa" || k.metric === "cpm"
                               ? formatCurrency(k.value)
                               : k.metric.includes("rate") || k.metric.includes("ctr")
@@ -1733,6 +1733,47 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
                               : formatNumber(k.value)}
                           </div>
                         </div>
+
+                        {/* Historical Context Bar */}
+                        {(() => {
+                          const formatVal = (val: number) => {
+                            if (k.metric.includes("spend") || k.metric.includes("cost_") || k.metric === "cpc" || k.metric === "cpa" || k.metric === "cpm") {
+                              return formatCurrency(val);
+                            }
+                            if (k.metric.includes("rate") || k.metric.includes("ctr")) {
+                              return formatPercent(val);
+                            }
+                            return formatNumber(val);
+                          };
+                          return (
+                            <div className="bg-slate-50 border border-slate-100 rounded-xl p-2.5 grid grid-cols-4 gap-1 text-center divide-x divide-slate-200/60 mt-1">
+                              <div className="px-1">
+                                <div className="text-[8px] text-slate-400 font-extrabold uppercase tracking-wider">3 Days</div>
+                                <div className="text-[10px] font-bold text-slate-800 mt-0.5 truncate">
+                                  {k.history ? formatVal(k.history["3d"]) : "—"}
+                                </div>
+                              </div>
+                              <div className="px-1">
+                                <div className="text-[8px] text-slate-400 font-extrabold uppercase tracking-wider">7 Days</div>
+                                <div className="text-[10px] font-bold text-slate-800 mt-0.5 truncate">
+                                  {k.history ? formatVal(k.history["7d"]) : "—"}
+                                </div>
+                              </div>
+                              <div className="px-1">
+                                <div className="text-[8px] text-slate-400 font-extrabold uppercase tracking-wider">14 Days</div>
+                                <div className="text-[10px] font-bold text-slate-800 mt-0.5 truncate">
+                                  {k.history ? formatVal(k.history["14d"]) : "—"}
+                                </div>
+                              </div>
+                              <div className="px-1">
+                                <div className="text-[8px] text-slate-400 font-extrabold uppercase tracking-wider">28 Days</div>
+                                <div className="text-[10px] font-bold text-slate-800 mt-0.5 truncate">
+                                  {k.history ? formatVal(k.history["28d"]) : "—"}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
                     ))}
                   </div>

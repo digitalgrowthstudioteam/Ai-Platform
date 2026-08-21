@@ -406,6 +406,63 @@ async def get_adset_performance(
     curr_metrics = await get_metrics_for_period(start_date, end_date)
     prev_metrics = await get_metrics_for_period(prev_start, prev_end)
 
+    # 4b. Fetch 28-day history metrics for aggregate calculations
+    history_start = end_date - timedelta(days=27)
+    stmt_hist = (
+        select(AdSetDailyMetrics)
+        .where(AdSetDailyMetrics.ad_set_id == adset_id)
+        .where(AdSetDailyMetrics.date >= history_start)
+        .where(AdSetDailyMetrics.date <= end_date)
+    )
+    res_hist = await db.execute(stmt_hist)
+    rows_hist = res_hist.scalars().all()
+
+    def aggregate_history(days: int) -> dict:
+        cutoff = end_date - timedelta(days=days-1)
+        period_rows = [r for r in rows_hist if r.date >= cutoff]
+        
+        aggregated_actions = {}
+        total_spend = 0.0
+        total_impressions = 0
+        total_reach = 0
+        total_clicks = 0
+        total_link_clicks = 0
+        total_leads = 0
+        total_purchases = 0
+        total_revenue = 0.0
+
+        for row in period_rows:
+            total_spend += float(row.spend or 0.0)
+            total_impressions += int(row.impressions or 0)
+            total_reach += int(row.reach or 0)
+            total_clicks += int(row.clicks or 0)
+            total_link_clicks += int(row.link_clicks or 0)
+            total_leads += int(row.leads or 0)
+            total_purchases += int(row.purchases or 0)
+            total_revenue += float(row.revenue or 0.0)
+            
+            if row.actions:
+                for k, v in row.actions.items():
+                    aggregated_actions[k] = aggregated_actions.get(k, 0) + int(v or 0)
+
+        raw_map = {
+            "spend": total_spend,
+            "impressions": total_impressions,
+            "reach": total_reach,
+            "clicks": total_clicks,
+            "link_clicks": total_link_clicks,
+            "leads": total_leads,
+            "purchases": total_purchases,
+            "revenue": total_revenue,
+            **aggregated_actions
+        }
+        return MetricEngine.calculate_derived_metrics(raw_map)
+
+    hist_3d = aggregate_history(3)
+    hist_7d = aggregate_history(7)
+    hist_14d = aggregate_history(14)
+    hist_28d = aggregate_history(28)
+
     # 5. Format metric nodes
     def compile_metric_node(m_id: str) -> dict:
         metadata = METRIC_CATALOG.get(m_id) or {"name": m_id.replace("_", " ").title(), "category": "PRIMARY", "unit": "count", "format": "float", "precision": 2}
@@ -452,7 +509,13 @@ async def get_adset_performance(
             "status": status,
             "formula": formula_map.get(m_id, "native_meta_integration"),
             "data_source": "Meta API Normalized Layer",
-            "availability": "available" if val is not None else "unavailable"
+            "availability": "available" if val is not None else "unavailable",
+            "history": {
+                "3d": hist_3d.get(m_id, 0.0) if hist_3d.get(m_id) is not None else 0.0,
+                "7d": hist_7d.get(m_id, 0.0) if hist_7d.get(m_id) is not None else 0.0,
+                "14d": hist_14d.get(m_id, 0.0) if hist_14d.get(m_id) is not None else 0.0,
+                "28d": hist_28d.get(m_id, 0.0) if hist_28d.get(m_id) is not None else 0.0,
+            }
         }
 
     # Split into response sections

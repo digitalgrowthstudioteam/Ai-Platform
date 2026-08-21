@@ -139,7 +139,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           )}
         </main>
       </div>
-      <AIAssistantDrawer />
+      {isAdmin && <AIAssistantDrawer />}
     </div>
   );
 }
