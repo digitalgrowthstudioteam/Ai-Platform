@@ -1292,22 +1292,25 @@ export default function AdSetsPage() {
 
                 <div className="card border border-border bg-white shadow-sm rounded-xl p-6 space-y-4">
                   <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Evaluation Evidence Checkpoints</h3>
-                  <div className="space-y-3 text-xs font-medium text-slate-600">
-                    <div className="flex items-start gap-2.5 bg-slate-50 p-3 rounded-lg border border-slate-100">
-                      <span className="text-blue-500 font-bold mt-0.5">✓</span>
-                      <div>
-                        <div className="font-bold text-slate-800">Conversion Latency Safe</div>
-                        <p className="text-slate-500 font-normal mt-0.5">Pixel sync delays are within normal parameters, ensuring stable attribution.</p>
+                  {(() => {
+                    const adsetRecs = recs.filter(r => (r.entity_id === selectedAdSet.id || r.meta_entity_id === selectedAdSet.meta_adset_id) && r.evidence);
+                    if (adsetRecs.length === 0) {
+                      return <div className="text-xs text-slate-400 font-bold uppercase tracking-wider bg-slate-50 border border-slate-100 rounded-lg p-3 text-center">N/A</div>;
+                    }
+                    return (
+                      <div className="space-y-3 text-xs font-medium text-slate-600">
+                        {adsetRecs.map((r, idx) => (
+                          <div key={idx} className="flex items-start gap-2.5 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                            <span className="text-blue-500 font-bold mt-0.5">✓</span>
+                            <div>
+                              <div className="font-bold text-slate-800">{r.title} Evidence</div>
+                              <p className="text-slate-500 font-normal mt-0.5">{r.evidence}</p>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    </div>
-                    <div className="flex items-start gap-2.5 bg-slate-50 p-3 rounded-lg border border-slate-100">
-                      <span className="text-blue-500 font-bold mt-0.5">✓</span>
-                      <div>
-                        <div className="font-bold text-slate-800">CPM Bidding Competitiveness</div>
-                        <p className="text-slate-500 font-normal mt-0.5">Bidding competition is normal. No sudden cost delivery spikes detected compared to the prior 7-day baseline.</p>
-                      </div>
-                    </div>
-                  </div>
+                    );
+                  })()}
                 </div>
               </div>
             )}
