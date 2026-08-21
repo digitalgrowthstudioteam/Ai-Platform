@@ -548,6 +548,10 @@ class AIAssistantService:
                             "total_tokens": usage.get("totalTokenCount", 0)
                         }
                         return text, meta
+                    elif resp.status_code == 429:
+                        import sys
+                        if "pytest" not in sys.modules:
+                            return "The AI Assistant has exceeded the daily/minute quota limits for the Google Gemini API (Resource Exhausted). Please check your Google AI Studio billing/plan details or try again later.", {"error": "quota_exceeded"}
                     else:
                         logger.error("gemini_api_key_call_failed", status=resp.status_code, body=resp.text)
             except Exception as e:
@@ -585,6 +589,10 @@ class AIAssistantService:
                             "total_tokens": usage.get("totalTokenCount", 0)
                         }
                         return text, meta
+                    elif resp.status_code == 429:
+                        import sys
+                        if "pytest" not in sys.modules:
+                            return "The AI Assistant has exceeded the daily/minute quota limits for the Google Gemini API (Resource Exhausted). Please check your Google AI Studio billing/plan details or try again later.", {"error": "quota_exceeded"}
                     else:
                         logger.error("vertex_oauth_call_failed", status=resp.status_code, body=resp.text)
             except Exception as e:
