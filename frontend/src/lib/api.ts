@@ -285,12 +285,25 @@ class ApiClient {
     return this.request<any[]>(`/assistant/conversations/${conversationId}/messages`);
   }
 
-  async sendAssistantMessage(conversationId: string, content: string, adAccountId: string) {
+  async sendAssistantMessage(
+    conversationId: string, 
+    content: string, 
+    adAccountId: string,
+    campaignId?: string | null,
+    adSetId?: string | null,
+    adId?: string | null
+  ) {
     return this.request<{ role: string; content: string; credits_remaining: number }>(
       `/assistant/conversations/${conversationId}/messages`,
       {
         method: "POST",
-        body: { content, ad_account_id: adAccountId },
+        body: { 
+          content, 
+          ad_account_id: adAccountId,
+          campaign_id: campaignId || null,
+          adset_id: adSetId || null,
+          ad_id: adId || null
+        },
       }
     );
   }
