@@ -26,6 +26,8 @@ from app.models.ml_features import MLFeatureRecord, OptimizationAction
 from app.models.team import TeamMember
 from app.models.ticket import SupportTicket
 from app.models.notification import Notification
+from app.models.ai_optimization import AIOptimizationConfig, AIOptimizationLog
+from app.models.ai_assistant import AIChatConversation, AIChatMessage, AICreditTransaction
 
 __all__ = [
     "BaseModel",
@@ -55,4 +57,9 @@ __all__ = [
     "TeamMember",
     "SupportTicket",
     "Notification",
+    "AIOptimizationConfig",
+    "AIOptimizationLog",
+    "AIChatConversation",
+    "AIChatMessage",
+    "AICreditTransaction",
 ]

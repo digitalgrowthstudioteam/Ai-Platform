@@ -892,3 +892,505 @@ async def get_brief_drilldown(
     return results
 
 
+# ──────────────────────────────────────────────
+# AI Optimization Schemas & Endpoints
+# ──────────────────────────────────────────────
+
+class AIOptimizationConfigResponse(BaseModel):
+    is_active: bool
+    business_objective: Optional[str] = None
+    primary_kpi: Optional[str] = None
+    secondary_kpi: Optional[str] = None
+    target_cpl: Optional[float] = None
+    target_cpa: Optional[float] = None
+    target_roas: Optional[float] = None
+    last_analysis_at: Optional[datetime] = None
+    active_count: int
+    limit: int
+
+
+class AIOptimizationDashboardItem(BaseModel):
+    campaign_id: uuid.UUID
+    campaign_name: str
+    ad_account_name: str
+    is_active: bool
+    last_analysis_at: Optional[datetime] = None
+    spend: float
+    leads: int
+    purchases: int
+    revenue: float
+    cpl: float
+    roas: float
+    cpl_change_7d: float
+    roas_change_7d: float
+    open_recommendations_count: int
+    highest_priority: str
+
+
+class AIOptimizationDashboardResponse(BaseModel):
+    active_count: int
+    limit: int
+    campaigns: List[AIOptimizationDashboardItem]
+
+
+class ActivateAIOptimizationRequest(BaseModel):
+    business_objective: Optional[str] = None
+    primary_kpi: Optional[str] = None
+    secondary_kpi: Optional[str] = None
+    target_cpl: Optional[float] = None
+    target_cpa: Optional[float] = None
+    target_roas: Optional[float] = None
+
+
+@router.get("/ai-optimization/dashboard", response_model=AIOptimizationDashboardResponse, summary="Get AI Optimization dashboard data")
+async def get_ai_optimization_dashboard(
+    ad_account_id: str = Query(..., description="Active Ad account ID string (UUID or meta_account_id)"),
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Lists campaigns with their optimization config status and 7D metrics aggregates.
+    """
+    user = await get_db_user_from_claims(claims, db)
+    from app.services.entitlement_engine import EntitlementEngine
+    from app.models.ai_optimization import AIOptimizationConfig
+    from app.models.recommendation import AIRecommendation
+
+    # 1. Resolve Active Ad Account
+    accessible_ids = await EntitlementEngine.get_accessible_user_ids(user, db)
+    stmt = select(MetaAdAccount).where(MetaAdAccount.user_id.in_(accessible_ids))
+    try:
+        acc_uuid = uuid.UUID(ad_account_id)
+        stmt = stmt.where(MetaAdAccount.id == acc_uuid)
+    except ValueError:
+        stmt = stmt.where(MetaAdAccount.meta_account_id == ad_account_id)
+
+    res = await db.execute(stmt)
+    ad_acc = res.scalar_one_or_none()
+    if not ad_acc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Active ad account not found."
+        )
+
+    # 2. Get SaaS plan limits
+    ent = await EntitlementEngine.resolve_entitlements(user, db)
+    limit = ent.get("ai_optimization_campaign_limit", 0)
+
+    # 3. Get total active configs globally for this user
+    stmt_active_total = (
+        select(func.count(AIOptimizationConfig.id))
+        .where(AIOptimizationConfig.user_id == user.id)
+        .where(AIOptimizationConfig.is_active == True)
+    )
+    res_active_total = await db.execute(stmt_active_total)
+    active_count = res_active_total.scalar_one()
+
+    # 4. Fetch all campaigns in this ad account
+    stmt_c = select(Campaign).where(Campaign.ad_account_id == ad_acc.id).order_by(Campaign.name.asc())
+    res_c = await db.execute(stmt_c)
+    campaigns = res_c.scalars().all()
+
+    # 5. Fetch all optimization configs for campaigns in this ad account
+    stmt_cfg = select(AIOptimizationConfig).where(AIOptimizationConfig.ad_account_id == ad_acc.id)
+    res_cfg = await db.execute(stmt_cfg)
+    configs = {cfg.campaign_id: cfg for cfg in res_cfg.scalars().all()}
+
+    # 6. Fetch daily metrics to compute 7d values
+    today = date.today()
+    start_date = today - timedelta(days=14)
+    stmt_metrics = (
+        select(CampaignDailyMetrics)
+        .join(Campaign, CampaignDailyMetrics.campaign_id == Campaign.id)
+        .where(Campaign.ad_account_id == ad_acc.id)
+        .where(CampaignDailyMetrics.date >= start_date)
+    )
+    res_metrics = await db.execute(stmt_metrics)
+    all_metrics = res_metrics.scalars().all()
+
+    # Group metrics by campaign
+    metrics_by_camp = {}
+    for m in all_metrics:
+        if m.campaign_id not in metrics_by_camp:
+            metrics_by_camp[m.campaign_id] = []
+        metrics_by_camp[m.campaign_id].append(m)
+
+    # 7. Fetch active recommendations count and highest priority per campaign
+    stmt_recs = (
+        select(AIRecommendation)
+        .where(AIRecommendation.ad_account_id == ad_acc.id)
+        .where(AIRecommendation.status.in_(["new", "viewed"]))
+    )
+    res_recs = await db.execute(stmt_recs)
+    active_recs = res_recs.scalars().all()
+    
+    recs_by_camp = {}
+    for r in active_recs:
+        c_id = r.campaign_id or r.entity_id
+        if not c_id:
+            continue
+        if c_id not in recs_by_camp:
+            recs_by_camp[c_id] = []
+        recs_by_camp[c_id].append(r)
+
+    # Compile list items
+    items = []
+    for c in campaigns:
+        cfg = configs.get(c.id)
+        is_active = cfg.is_active if cfg else False
+        last_analysis = cfg.last_analysis_at if cfg else None
+        
+        # Calculate 7D stats
+        camp_metrics = metrics_by_camp.get(c.id, [])
+        cur_m = [m for m in camp_metrics if m.date >= today - timedelta(days=7)]
+        prev_m = [m for m in camp_metrics if today - timedelta(days=14) <= m.date < today - timedelta(days=7)]
+        
+        spend = sum(float(m.spend or 0.0) for m in cur_m)
+        leads = sum(m.leads or 0 for m in cur_m)
+        purchases = sum(m.purchases or 0 for m in cur_m)
+        revenue = sum(float(m.revenue or 0.0) for m in cur_m)
+        cpl = spend / leads if leads > 0 else spend
+        roas = revenue / spend if spend > 0 else 0.0
+        
+        prev_spend = sum(float(m.spend or 0.0) for m in prev_m)
+        prev_leads = sum(m.leads or 0 for m in prev_m)
+        prev_purchases = sum(m.purchases or 0 for m in prev_m)
+        prev_revenue = sum(float(m.revenue or 0.0) for m in prev_m)
+        prev_cpl = prev_spend / prev_leads if prev_leads > 0 else prev_spend
+        prev_roas = prev_revenue / prev_spend if prev_spend > 0 else 0.0
+        
+        cpl_change = (cpl - prev_cpl) / prev_cpl if prev_cpl > 0 else 0.0
+        roas_change = (roas - prev_roas) / prev_roas if prev_roas > 0 else 0.0
+        
+        # Recommendations summary
+        camp_recs = recs_by_camp.get(c.id, [])
+        open_count = len(camp_recs)
+        
+        priority_order = {"critical": 4, "high": 3, "medium": 2, "low": 1, "opportunity": 2}
+        highest_prio_val = 0
+        highest_prio_str = "none"
+        for r in camp_recs:
+            prio = (r.priority or "info").lower()
+            prio_val = priority_order.get(prio, 0)
+            if prio_val > highest_prio_val:
+                highest_prio_val = prio_val
+                highest_prio_str = prio
+                
+        items.append(
+            AIOptimizationDashboardItem(
+                campaign_id=c.id,
+                campaign_name=c.name,
+                ad_account_name=ad_acc.account_name or "Connected Account",
+                is_active=is_active,
+                last_analysis_at=last_analysis,
+                spend=spend,
+                leads=leads,
+                purchases=purchases,
+                revenue=revenue,
+                cpl=cpl,
+                roas=roas,
+                cpl_change_7d=cpl_change,
+                roas_change_7d=roas_change,
+                open_recommendations_count=open_count,
+                highest_priority=highest_prio_str
+            )
+        )
+
+    # Sort items: active first, then spend descending
+    items.sort(key=lambda x: (not x.is_active, -x.spend))
+
+    return AIOptimizationDashboardResponse(
+        active_count=active_count,
+        limit=limit,
+        campaigns=items
+    )
+
+
+@router.get("/{campaign_id}/ai-optimization", response_model=AIOptimizationConfigResponse, summary="Get AI Optimization status for a campaign")
+async def get_ai_optimization_status(
+    campaign_id: uuid.UUID,
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Returns AI active state and targets for a single campaign.
+    """
+    user = await get_db_user_from_claims(claims, db)
+    from app.services.entitlement_engine import EntitlementEngine
+    from app.models.ai_optimization import AIOptimizationConfig
+
+    # 1. Fetch the campaign and check ownership
+    stmt = (
+        select(Campaign)
+        .join(MetaAdAccount, Campaign.ad_account_id == MetaAdAccount.id)
+        .where(Campaign.id == campaign_id)
+    )
+    res = await db.execute(stmt)
+    campaign = res.scalar_one_or_none()
+    
+    if not campaign:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Campaign not found."
+        )
+
+    # Validate ownership
+    accessible_ids = await EntitlementEngine.get_accessible_user_ids(user, db)
+    stmt_acc = select(MetaAdAccount).where(MetaAdAccount.id == campaign.ad_account_id).where(MetaAdAccount.user_id.in_(accessible_ids))
+    res_acc = await db.execute(stmt_acc)
+    ad_acc = res_acc.scalar_one_or_none()
+    if not ad_acc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to this campaign's ad account."
+        )
+
+    # 2. Query dynamic limits
+    ent = await EntitlementEngine.resolve_entitlements(user, db)
+    limit = ent.get("ai_optimization_campaign_limit", 0)
+
+    # Total active configs globally for this user
+    stmt_active_total = (
+        select(func.count(AIOptimizationConfig.id))
+        .where(AIOptimizationConfig.user_id == user.id)
+        .where(AIOptimizationConfig.is_active == True)
+    )
+    res_active_total = await db.execute(stmt_active_total)
+    active_count = res_active_total.scalar_one()
+
+    # Get campaign optimization config
+    stmt_cfg = select(AIOptimizationConfig).where(AIOptimizationConfig.campaign_id == campaign_id)
+    res_cfg = await db.execute(stmt_cfg)
+    cfg = res_cfg.scalar_one_or_none()
+
+    if not cfg:
+        return AIOptimizationConfigResponse(
+            is_active=False,
+            active_count=active_count,
+            limit=limit
+        )
+
+    return AIOptimizationConfigResponse(
+        is_active=cfg.is_active,
+        business_objective=cfg.business_objective,
+        primary_kpi=cfg.primary_kpi,
+        secondary_kpi=cfg.secondary_kpi,
+        target_cpl=cfg.target_cpl,
+        target_cpa=cfg.target_cpa,
+        target_roas=cfg.target_roas,
+        last_analysis_at=cfg.last_analysis_at,
+        active_count=active_count,
+        limit=limit
+    )
+
+
+@router.post("/{campaign_id}/ai-optimization/activate", response_model=AIOptimizationConfigResponse, summary="Activate AI Optimization for a campaign")
+async def activate_ai_optimization(
+    campaign_id: uuid.UUID,
+    payload: Optional[ActivateAIOptimizationRequest] = None,
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Activates AI optimization for a campaign, checking plan limits.
+    """
+    user = await get_db_user_from_claims(claims, db)
+    from app.services.entitlement_engine import EntitlementEngine
+    from app.models.ai_optimization import AIOptimizationConfig
+
+    # 1. Retrieve the campaign and verify ownership
+    stmt = (
+        select(Campaign)
+        .join(MetaAdAccount, Campaign.ad_account_id == MetaAdAccount.id)
+        .where(Campaign.id == campaign_id)
+    )
+    res = await db.execute(stmt)
+    campaign = res.scalar_one_or_none()
+    
+    if not campaign:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Campaign not found."
+        )
+
+    accessible_ids = await EntitlementEngine.get_accessible_user_ids(user, db)
+    stmt_acc = select(MetaAdAccount).where(MetaAdAccount.id == campaign.ad_account_id).where(MetaAdAccount.user_id.in_(accessible_ids))
+    res_acc = await db.execute(stmt_acc)
+    ad_acc = res_acc.scalar_one_or_none()
+    if not ad_acc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to this campaign's ad account."
+        )
+
+    # 2. Check limits
+    ent = await EntitlementEngine.resolve_entitlements(user, db)
+    limit = ent.get("ai_optimization_campaign_limit", 0)
+
+    # Check if config already exists and is active
+    stmt_cfg = select(AIOptimizationConfig).where(AIOptimizationConfig.campaign_id == campaign_id)
+    res_cfg = await db.execute(stmt_cfg)
+    cfg = res_cfg.scalar_one_or_none()
+
+    is_already_active = cfg.is_active if cfg else False
+
+    # Get total active configs globally for this user
+    stmt_active_total = (
+        select(func.count(AIOptimizationConfig.id))
+        .where(AIOptimizationConfig.user_id == user.id)
+        .where(AIOptimizationConfig.is_active == True)
+    )
+    res_active_total = await db.execute(stmt_active_total)
+    active_count = res_active_total.scalar_one()
+
+    if not is_already_active:
+        if active_count >= limit:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="You have reached your AI Optimization limit for your current plan."
+            )
+
+    # 3. Create or update config
+    payload_data = payload.dict() if payload else {}
+    if not cfg:
+        cfg = AIOptimizationConfig(
+            user_id=user.id,
+            ad_account_id=campaign.ad_account_id,
+            campaign_id=campaign_id,
+            is_active=True,
+            business_objective=payload_data.get("business_objective"),
+            primary_kpi=payload_data.get("primary_kpi"),
+            secondary_kpi=payload_data.get("secondary_kpi"),
+            target_cpl=payload_data.get("target_cpl"),
+            target_cpa=payload_data.get("target_cpa"),
+            target_roas=payload_data.get("target_roas"),
+            memory={}
+        )
+        db.add(cfg)
+        active_count += 1
+    else:
+        cfg.is_active = True
+        if "business_objective" in payload_data:
+            cfg.business_objective = payload_data.get("business_objective")
+        if "primary_kpi" in payload_data:
+            cfg.primary_kpi = payload_data.get("primary_kpi")
+        if "secondary_kpi" in payload_data:
+            cfg.secondary_kpi = payload_data.get("secondary_kpi")
+        if "target_cpl" in payload_data:
+            cfg.target_cpl = payload_data.get("target_cpl")
+        if "target_cpa" in payload_data:
+            cfg.target_cpa = payload_data.get("target_cpa")
+        if "target_roas" in payload_data:
+            cfg.target_roas = payload_data.get("target_roas")
+        
+        db.add(cfg)
+        if not is_already_active:
+            active_count += 1
+
+    await db.commit()
+    await db.refresh(cfg)
+
+    # Run analysis immediately in the background task
+    try:
+        from app.services.ai_optimization_service import AIOptimizationService
+        import asyncio
+        asyncio.create_task(AIOptimizationService.analyze_campaign(db, cfg, user.id))
+    except Exception as run_err:
+        logger.error("Failed triggering immediate analysis on activation", error=str(run_err))
+
+    return AIOptimizationConfigResponse(
+        is_active=cfg.is_active,
+        business_objective=cfg.business_objective,
+        primary_kpi=cfg.primary_kpi,
+        secondary_kpi=cfg.secondary_kpi,
+        target_cpl=cfg.target_cpl,
+        target_cpa=cfg.target_cpa,
+        target_roas=cfg.target_roas,
+        last_analysis_at=cfg.last_analysis_at,
+        active_count=active_count,
+        limit=limit
+    )
+
+
+@router.post("/{campaign_id}/ai-optimization/deactivate", response_model=AIOptimizationConfigResponse, summary="Deactivate AI Optimization for a campaign")
+async def deactivate_ai_optimization(
+    campaign_id: uuid.UUID,
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Deactivates campaign optimization without losing recommendations or data history.
+    """
+    user = await get_db_user_from_claims(claims, db)
+    from app.services.entitlement_engine import EntitlementEngine
+    from app.models.ai_optimization import AIOptimizationConfig
+
+    # 1. Fetch the campaign and check ownership
+    stmt = (
+        select(Campaign)
+        .join(MetaAdAccount, Campaign.ad_account_id == MetaAdAccount.id)
+        .where(Campaign.id == campaign_id)
+    )
+    res = await db.execute(stmt)
+    campaign = res.scalar_one_or_none()
+    
+    if not campaign:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Campaign not found."
+        )
+
+    accessible_ids = await EntitlementEngine.get_accessible_user_ids(user, db)
+    stmt_acc = select(MetaAdAccount).where(MetaAdAccount.id == campaign.ad_account_id).where(MetaAdAccount.user_id.in_(accessible_ids))
+    res_acc = await db.execute(stmt_acc)
+    ad_acc = res_acc.scalar_one_or_none()
+    if not ad_acc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to this campaign's ad account."
+        )
+
+    # 2. Get configuration
+    stmt_cfg = select(AIOptimizationConfig).where(AIOptimizationConfig.campaign_id == campaign_id)
+    res_cfg = await db.execute(stmt_cfg)
+    cfg = res_cfg.scalar_one_or_none()
+
+    if not cfg:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="AI Optimization config not found for this campaign."
+        )
+
+    cfg.is_active = False
+    db.add(cfg)
+    await db.commit()
+    await db.refresh(cfg)
+
+    # Get total active configs globally for this user
+    stmt_active_total = (
+        select(func.count(AIOptimizationConfig.id))
+        .where(AIOptimizationConfig.user_id == user.id)
+        .where(AIOptimizationConfig.is_active == True)
+    )
+    res_active_total = await db.execute(stmt_active_total)
+    active_count = res_active_total.scalar_one()
+
+    # Query dynamic limits
+    ent = await EntitlementEngine.resolve_entitlements(user, db)
+    limit = ent.get("ai_optimization_campaign_limit", 0)
+
+    return AIOptimizationConfigResponse(
+        is_active=cfg.is_active,
+        business_objective=cfg.business_objective,
+        primary_kpi=cfg.primary_kpi,
+        secondary_kpi=cfg.secondary_kpi,
+        target_cpl=cfg.target_cpl,
+        target_cpa=cfg.target_cpa,
+        target_roas=cfg.target_roas,
+        last_analysis_at=cfg.last_analysis_at,
+        active_count=active_count,
+        limit=limit
+    )
+
+
+

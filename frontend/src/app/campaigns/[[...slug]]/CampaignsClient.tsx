@@ -29,7 +29,9 @@ import {
   Activity,
   ExternalLink,
   X,
-  Lightbulb
+  Lightbulb,
+  Bot,
+  AlertTriangle
 } from "lucide-react";
 import { 
   ResponsiveContainer, 
@@ -110,6 +112,18 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
   const [subscription, setSubscription] = useState<any>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [upgradeModalMessage, setUpgradeModalMessage] = useState("");
+  
+  // State for AI Optimization campaign config
+  const [aiConfig, setAiConfig] = useState<any | null>(null);
+  const [loadingAiConfig, setLoadingAiConfig] = useState(false);
+  const [showAiModal, setShowAiModal] = useState(false);
+  const [activating, setActivating] = useState(false);
+  const [kpiInputs, setKpiInputs] = useState({
+    business_objective: "",
+    primary_kpi: "",
+    target_cpl: "",
+    target_roas: ""
+  });
   
   // State for date presets
   const [datePreset, setDatePreset] = useState<string>("30d");
@@ -382,6 +396,7 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
   useEffect(() => {
     if (selectedCampaign && selectedAccount) {
       loadCampaignDetails(selectedCampaign.name);
+      loadCampaignAiConfig(selectedCampaign.id);
     }
   }, [selectedCampaign?.id, datePreset, customStartDate, customEndDate, selectedAccount?.id]);
 
@@ -570,6 +585,66 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
       console.error("Failed to load campaign hierarchy detail:", err);
     } finally {
       setLoadingDetails(false);
+    }
+  };
+
+  const loadCampaignAiConfig = async (campaignId: string) => {
+    try {
+      setLoadingAiConfig(true);
+      const res = await api.getCampaignAiConfig(campaignId);
+      setAiConfig(res);
+      setKpiInputs({
+        business_objective: res.business_objective || "",
+        primary_kpi: res.primary_kpi || "",
+        target_cpl: res.target_cpl ? String(res.target_cpl) : "",
+        target_roas: res.target_roas ? String(res.target_roas) : ""
+      });
+    } catch (e) {
+      console.error("Failed to load campaign AI optimization config:", e);
+    } finally {
+      setLoadingAiConfig(false);
+    }
+  };
+
+  const handleToggleAiOptimization = async () => {
+    if (!selectedCampaign) return;
+    if (aiConfig && aiConfig.is_active) {
+      // Deactivate
+      try {
+        setActivating(true);
+        const res = await api.deactivateCampaignAiConfig(selectedCampaign.id);
+        setAiConfig(res);
+      } catch (err: any) {
+        alert(err.message || "Failed to deactivate AI Optimization.");
+      } finally {
+        setActivating(false);
+      }
+    } else {
+      // Open Activation Confirmation Modal
+      setShowAiModal(true);
+    }
+  };
+
+  const handleConfirmActivate = async () => {
+    if (!selectedCampaign) return;
+    
+    // Validate target values if provided
+    const payload: any = {
+      business_objective: kpiInputs.business_objective || null,
+      primary_kpi: kpiInputs.primary_kpi || null,
+      target_cpl: kpiInputs.target_cpl ? parseFloat(kpiInputs.target_cpl) : null,
+      target_roas: kpiInputs.target_roas ? parseFloat(kpiInputs.target_roas) : null
+    };
+
+    try {
+      setActivating(true);
+      const res = await api.activateCampaignAiConfig(selectedCampaign.id, payload);
+      setAiConfig(res);
+      setShowAiModal(false);
+    } catch (err: any) {
+      alert(err.message || "Failed to activate AI Optimization.");
+    } finally {
+      setActivating(false);
     }
   };
 
@@ -2095,6 +2170,35 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
                   <span className="text-[10px] text-green-600 bg-green-50 border border-green-150 px-2 py-0.5 rounded font-bold flex items-center gap-1">
                     <Check size={10} /> Synced
                   </span>
+                  
+                  {/* AI Optimization Status Badge & Toggle Button */}
+                  <span className={`text-[10px] px-2 py-0.5 rounded font-bold flex items-center gap-1 border ${
+                    aiConfig?.is_active 
+                      ? "text-blue-700 bg-blue-50 border-blue-200" 
+                      : "text-slate-500 bg-slate-50 border-slate-200"
+                  }`}>
+                    Bot AI Optimization: {aiConfig?.is_active ? "ACTIVE" : "INACTIVE"}
+                  </span>
+                  
+                  <button
+                    onClick={handleToggleAiOptimization}
+                    disabled={activating}
+                    className={`text-[10px] px-2.5 py-0.5 rounded-md font-bold transition flex items-center gap-1 cursor-pointer disabled:opacity-50 ${
+                      aiConfig?.is_active 
+                        ? "text-red-700 bg-red-50 hover:bg-red-100 border border-red-200"
+                        : "text-white bg-blue-600 hover:bg-blue-700 font-extrabold"
+                    }`}
+                  >
+                    {activating ? (
+                      <>
+                        <Loader2 className="animate-spin" size={10} /> Loading...
+                      </>
+                    ) : aiConfig?.is_active ? (
+                      "Deactivate AI Optimization"
+                    ) : (
+                      "Activate AI Optimization"
+                    )}
+                  </button>
                 </div>
               </div>
 
@@ -2486,6 +2590,110 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
             )}
 
             {/* Campaign tabs cleaned (Ads, Breakdowns, AI Diagnosis removed) */}
+          </div>
+        </div>
+      )}
+
+      {/* AI Optimization Settings / Activation Modal */}
+      {showAiModal && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 animate-fade-in p-4">
+          <div className="bg-white border border-slate-100 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-scale-up">
+            <div className="bg-slate-900 text-white p-6 relative">
+              <button 
+                onClick={() => setShowAiModal(false)}
+                className="absolute top-4 right-4 text-slate-400 hover:text-white transition cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+              <div className="flex items-center gap-2">
+                <Bot className="text-blue-400 animate-pulse" size={24} />
+                <h3 className="text-lg font-black tracking-wide">Activate AI Optimization</h3>
+              </div>
+              <p className="text-xs text-slate-300 mt-2 leading-relaxed">
+                AI will continuously monitor this campaign using your account's regular sync schedule and generate optimization recommendations.
+              </p>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              <div className="flex items-center justify-between bg-slate-50 border border-slate-100 p-3 rounded-lg text-xs font-bold text-slate-600">
+                <span>Plan Limits Utilization:</span>
+                <span className={`${(aiConfig?.active_count || 0) >= (aiConfig?.limit || 0) ? "text-rose-600" : "text-blue-600"}`}>
+                  {aiConfig?.active_count || 0} / {aiConfig?.limit || 0} Campaigns Active
+                </span>
+              </div>
+
+              {(aiConfig?.active_count || 0) >= (aiConfig?.limit || 0) ? (
+                <div className="bg-rose-50 border border-rose-100 text-rose-700 p-4 rounded-xl text-xs space-y-1.5">
+                  <div className="font-extrabold flex items-center gap-1.5">
+                    <AlertTriangle size={14} /> AI Optimization Limit Reached
+                  </div>
+                  <p className="leading-relaxed">
+                    You have reached your AI Optimization limit for your current plan. Please upgrade your subscription plan or deactivate optimization on another campaign before activating this one.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3.5">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                      Target CPL (Cost Per Lead) - Optional
+                    </label>
+                    <input 
+                      type="number"
+                      placeholder="e.g. 150"
+                      value={kpiInputs.target_cpl}
+                      onChange={(e) => setKpiInputs({...kpiInputs, target_cpl: e.target.value})}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2 text-sm font-semibold text-slate-700 focus:outline-hidden focus:border-blue-500 transition"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                      Target ROAS (Return on Ad Spend) - Optional
+                    </label>
+                    <input 
+                      type="number"
+                      step="0.1"
+                      placeholder="e.g. 3.5"
+                      value={kpiInputs.target_roas}
+                      onChange={(e) => setKpiInputs({...kpiInputs, target_roas: e.target.value})}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2 text-sm font-semibold text-slate-700 focus:outline-hidden focus:border-blue-500 transition"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                      Primary Business Objective - Optional
+                    </label>
+                    <input 
+                      type="text"
+                      placeholder="e.g. Maximize Purchases"
+                      value={kpiInputs.business_objective}
+                      onChange={(e) => setKpiInputs({...kpiInputs, business_objective: e.target.value})}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2 text-sm font-semibold text-slate-700 focus:outline-hidden focus:border-blue-500 transition"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="bg-slate-50 border-t border-slate-100 px-6 py-4 flex justify-end gap-2.5">
+              <button 
+                onClick={() => setShowAiModal(false)}
+                className="btn btn-outline py-2 px-4 rounded-xl text-xs font-bold text-slate-500 border border-slate-200 hover:bg-slate-100 transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              {(aiConfig?.active_count || 0) < (aiConfig?.limit || 0) && (
+                <button 
+                  onClick={handleConfirmActivate}
+                  disabled={activating}
+                  className="btn btn-primary py-2 px-5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 transition cursor-pointer flex items-center gap-1.5"
+                >
+                  {activating && <Loader2 className="animate-spin" size={12} />}
+                  Confirm Activation
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}

@@ -226,8 +226,66 @@ class ApiClient {
   async triggerSync(adAccountId?: string) {
     return this.request<{ status: string; message: string }>("/meta/sync/trigger", {
       method: "POST",
-      body: JSON.stringify({ ad_account_id: adAccountId }),
+      body: { ad_account_id: adAccountId },
     });
+  }
+
+  // AI Optimization endpoints
+  async getCampaignAiConfig(campaignId: string) {
+    return this.request<any>(`/campaigns/${campaignId}/ai-optimization`);
+  }
+
+  async activateCampaignAiConfig(campaignId: string, payload: any) {
+    return this.request<any>(`/campaigns/${campaignId}/ai-optimization/activate`, {
+      method: "POST",
+      body: payload
+    });
+  }
+
+  async deactivateCampaignAiConfig(campaignId: string) {
+    return this.request<any>(`/campaigns/${campaignId}/ai-optimization/deactivate`, {
+      method: "POST"
+    });
+  }
+
+  async getAiOptimizationDashboard(adAccountId: string) {
+    return this.request<any>(`/campaigns/ai-optimization/dashboard?ad_account_id=${adAccountId}`);
+  }
+
+  // AI Assistant endpoints
+  async getAiCredits() {
+    return this.request<{ credits: number }>("/assistant/credits");
+  }
+
+  async getConversations(adAccountId: string) {
+    return this.request<any[]>(`/assistant/conversations?ad_account_id=${adAccountId}`);
+  }
+
+  async createConversation(adAccountId: string, title?: string) {
+    return this.request<any>("/assistant/conversations", {
+      method: "POST",
+      body: { ad_account_id: adAccountId, title },
+    });
+  }
+
+  async deleteConversation(conversationId: string) {
+    return this.request<any>(`/assistant/conversations/${conversationId}`, {
+      method: "DELETE",
+    });
+  }
+
+  async getMessages(conversationId: string) {
+    return this.request<any[]>(`/assistant/conversations/${conversationId}/messages`);
+  }
+
+  async sendAssistantMessage(conversationId: string, content: string, adAccountId: string) {
+    return this.request<{ role: string; content: string; credits_remaining: number }>(
+      `/assistant/conversations/${conversationId}/messages`,
+      {
+        method: "POST",
+        body: { content, ad_account_id: adAccountId },
+      }
+    );
   }
 
   // Phase 8: AI Recommendations endpoints
@@ -596,6 +654,7 @@ class ApiClient {
   async getMyProfile() {
     return this.request<any>("/auth/me");
   }
+
 }
 
 export const api = new ApiClient(API_BASE_URL);

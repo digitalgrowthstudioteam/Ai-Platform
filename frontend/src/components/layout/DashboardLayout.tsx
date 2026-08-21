@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
+import AIAssistantDrawer from "./AIAssistantDrawer";
 import { Lock, Sparkles, Settings } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
@@ -138,6 +139,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           )}
         </main>
       </div>
+      <AIAssistantDrawer />
     </div>
   );
 }
