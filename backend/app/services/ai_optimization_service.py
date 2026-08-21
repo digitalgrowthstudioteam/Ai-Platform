@@ -259,10 +259,10 @@ class AIOptimizationService:
             
             # Criteria for winning ad: Spend > 10% of campaign spend, results > 2, and CPL 30% below avg (or ROAS > 3.5)
             if ad_spend > (cur_spend * 0.1) and ((ad_leads >= 2 and ad_cpl < (campaign_avg_cpl * 0.7)) or ad_roas > 3.5):
-                winning_ads.append({"id": ad_id, "name": ad_name, "cpl": ad_cpl, "roas": ad_roas, "spend": ad_spend})
+                winning_ads.append({"id": str(ad_id), "name": ad_name, "cpl": ad_cpl, "roas": ad_roas, "spend": ad_spend})
             # Criteria for losing ad: Spend > 20% of campaign spend, and 0 results
             elif ad_spend > (cur_spend * 0.15) and ad_leads == 0 and ad_purchases == 0:
-                losing_ads.append({"id": ad_id, "name": ad_name, "spend": ad_spend})
+                losing_ads.append({"id": str(ad_id), "name": ad_name, "spend": ad_spend})
 
         # ────────────────────────────────────────────────────────────
         # FIRST LAYER INTELLIGENCE GATE (Cost-Control Gate)

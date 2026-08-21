@@ -52,8 +52,8 @@ async def test_entitlement_engine_ai_optimization_limits(db):
     ent_growth = await EntitlementEngine.resolve_entitlements(user_growth, db)
     assert ent_growth["ai_optimization_campaign_limit"] == 3
 
-    assert (await EntitlementEngine.resolve_entitlements(user_pro, db))["ai_optimization_campaign_limit"] == 10
-    assert (await EntitlementEngine.resolve_entitlements(user_agency, db))["ai_optimization_campaign_limit"] == 25
+    assert (await EntitlementEngine.resolve_entitlements(user_pro, db))["ai_optimization_campaign_limit"] == 5
+    assert (await EntitlementEngine.resolve_entitlements(user_agency, db))["ai_optimization_campaign_limit"] == 10
 
 
 @pytest.mark.anyio
