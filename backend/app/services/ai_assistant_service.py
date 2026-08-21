@@ -668,7 +668,7 @@ class AIAssistantService:
             if recs:
                 summary = []
                 for idx, r in enumerate(recs[:2], 1):
-                    summary.append(f"{idx}. **{r['title']}** - Priority: {r['priority']}. {r['evidence']}")
+                    summary.append(f"{idx}. {r['title']} - Priority: {r['priority']}. {r['evidence']}")
                 return f"{greeting}\n\nWe have identified active recommendations in your Decision Center:\n\n" + "\n".join(summary) + f"\n\n{suffix}"
             else:
                 return f"{greeting}\n\n{no_rec}"
@@ -679,9 +679,9 @@ class AIAssistantService:
             total_spend = sum(c["performance_history_period"]["spend"] for c in campaigns)
             total_leads = sum(c["performance_history_period"]["leads"] for c in campaigns)
             avg_cpl = total_spend / total_leads if total_leads > 0 else total_spend
-            return f"{greeting}\n\n- Connected Account: **{account_name}**\n- {days_count}-Day Total Spend: ₹{total_spend:.2f}\n- Total Leads: {total_leads}\n- Average CPL: ₹{avg_cpl:.2f}\n\n{suffix}"
+            return f"{greeting}\n\n- Connected Account: {account_name}\n- {days_count}-Day Total Spend: ₹{total_spend:.2f}\n- Total Leads: {total_leads}\n- Average CPL: ₹{avg_cpl:.2f}\n\n{suffix}"
         
-        return f"Connected to **{account_name}**. I'm ready to answer any questions about your campaign performance or creative assets! {suffix}"
+        return f"Connected to {account_name}. I'm ready to answer any questions about your campaign performance or creative assets! {suffix}"
 
     @classmethod
     async def process_user_message(
@@ -744,7 +744,7 @@ If data is stale (e.g. last sync was long ago), state: "The latest available dat
 Do not present estimates as actual Meta data.
 Do not invent campaign names, spend, CPL, ROAS, leads, or other metrics.
 
-Do NOT use markdown headers (like #, ##, ###) in your response. Instead, make headings and titles bold directly (using **bold** on a line by itself) and use bullet points or numbered lists where appropriate.
+Do NOT use markdown headers (like #, ##, ###) or markdown bold/italic formatting (like **bold** or *italic*) anywhere in your response. Since the UI does not render markdown bold, any use of asterisks will be displayed literally to the user. Instead, emphasize headings and titles by writing them in ALL CAPITAL LETTERS directly on a line by itself (e.g. OVERALL ACCOUNT CTR), and use bullet points or numbered lists where appropriate.
 
 {focus_instruction}
 
