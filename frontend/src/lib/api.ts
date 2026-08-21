@@ -218,7 +218,7 @@ class ApiClient {
   }
 
   async getSyncStatus() {
-    return this.request<{ last_sync_at?: string; last_sync_status?: string; last_sync_error?: string }>(
+    return this.request<{ last_sync_at?: string; last_sync_status?: string; last_sync_error?: string; sync_interval_hours?: number }>(
       "/meta/sync/status"
     );
   }

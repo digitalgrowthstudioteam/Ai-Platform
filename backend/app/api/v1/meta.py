@@ -674,6 +674,7 @@ class SyncStatusResponse(BaseModel):
     last_sync_at: Optional[datetime] = None
     last_sync_status: Optional[str] = None
     last_sync_error: Optional[str] = None
+    sync_interval_hours: Optional[int] = 12
 
 
 @router.post("/sync/trigger", summary="Trigger Meta marketing database sync", dependencies=[Depends(require_active_subscription)])
@@ -769,9 +770,14 @@ async def get_sync_status(
             detail="No active Meta integration connection found."
         )
         
+    from app.services.entitlement_engine import EntitlementEngine
+    entitlements = await EntitlementEngine.resolve_entitlements(user, db)
+    sync_interval_hours = entitlements.get("sync_interval_hours", 12)
+        
     return SyncStatusResponse(
         last_sync_at=connection.last_sync_at,
         last_sync_status=connection.last_sync_status,
         last_sync_error=connection.last_sync_error,
+        sync_interval_hours=sync_interval_hours,
     )
 

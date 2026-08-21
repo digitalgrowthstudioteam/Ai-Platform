@@ -13,7 +13,8 @@ export default function Topbar() {
   const [syncStatus, setSyncStatus] = useState<{
     lastSyncAt: string | null;
     status: string | null;
-  }>({ lastSyncAt: null, status: null });
+    syncIntervalHours?: number;
+  }>({ lastSyncAt: null, status: null, syncIntervalHours: 12 });
 
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -66,6 +67,7 @@ export default function Topbar() {
       const newStatus = {
         lastSyncAt: res.last_sync_at || null,
         status: res.last_sync_status || null,
+        syncIntervalHours: res.sync_interval_hours ?? 12,
       };
       setSyncStatus(newStatus);
       sessionStorage.setItem("dgs_cached_sync_status", JSON.stringify(newStatus));
@@ -100,6 +102,44 @@ export default function Topbar() {
     }
   }, [user]);
 
+  const [countdownText, setCountdownText] = useState<string>("");
+
+  useEffect(() => {
+    if (!syncStatus.lastSyncAt || syncStatus.status === "in_progress") {
+      setCountdownText("");
+      return;
+    }
+
+    const updateTimer = () => {
+      const lastSync = new Date(syncStatus.lastSyncAt!);
+      const intervalMs = (syncStatus.syncIntervalHours || 12) * 60 * 60 * 1000;
+      const nextSync = new Date(lastSync.getTime() + intervalMs);
+      const diffMs = nextSync.getTime() - Date.now();
+
+      if (diffMs <= 0) {
+        setCountdownText("Sync overdue / Syncing...");
+        return;
+      }
+
+      const totalSecs = Math.floor(diffMs / 1000);
+      const hours = Math.floor(totalSecs / 3600);
+      const mins = Math.floor((totalSecs % 3600) / 60);
+      const secs = totalSecs % 60;
+
+      const pad = (num: number) => String(num).padStart(2, "0");
+
+      if (hours > 0) {
+        setCountdownText(`Next sync in: ${pad(hours)}h ${pad(mins)}m ${pad(secs)}s`);
+      } else {
+        setCountdownText(`Next sync in: ${pad(mins)}m ${pad(secs)}s`);
+      }
+    };
+
+    updateTimer();
+    const intervalId = setInterval(updateTimer, 1000);
+    return () => clearInterval(intervalId);
+  }, [syncStatus.lastSyncAt, syncStatus.status, syncStatus.syncIntervalHours]);
+
   // Format sync status message
   let syncLabel = "No sync recorded";
   let syncClass = "synced";
@@ -114,8 +154,7 @@ export default function Topbar() {
     syncClass = "failed";
     syncIcon = <AlertTriangle size={12} className="text-red-500" />;
   } else if (syncStatus.lastSyncAt) {
-    const timeString = timeAgo(new Date(syncStatus.lastSyncAt));
-    syncLabel = `Synced ${timeString}`;
+    syncLabel = countdownText || `Synced ${timeAgo(new Date(syncStatus.lastSyncAt))}`;
     syncClass = "synced";
     syncIcon = <span className="topbar-sync-dot bg-green-500" />;
   }
