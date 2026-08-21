@@ -66,10 +66,21 @@ class MessageSendResponse(BaseModel):
 # Helper
 # ──────────────────────────────────────────────
 async def verify_ad_account_ownership(db: AsyncSession, ad_account_id: uuid.UUID, user_id: uuid.UUID) -> MetaAdAccount:
+    from app.services.entitlement_engine import EntitlementEngine
+    user_stmt = select(User).where(User.id == user_id)
+    user_res = await db.execute(user_stmt)
+    user = user_res.scalar_one_or_none()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User not found."
+        )
+
+    accessible_ids = await EntitlementEngine.get_accessible_user_ids(user, db)
     stmt = (
         select(MetaAdAccount)
         .where(MetaAdAccount.id == ad_account_id)
-        .where(MetaAdAccount.user_id == user_id)
+        .where(MetaAdAccount.user_id.in_(accessible_ids))
     )
     res = await db.execute(stmt)
     ad_acc = res.scalar_one_or_none()
