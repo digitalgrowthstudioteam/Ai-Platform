@@ -31,6 +31,17 @@ export default function AIAssistantDrawer() {
   const [conversations, setConversations] = useState<any[]>([]);
   const [activeConvoId, setActiveConvoId] = useState<string | null>(null);
   const [messages, setMessages] = useState<any[]>([]);
+
+  // Dynamic context selector metadata states
+  const [campaigns, setCampaigns] = useState<any[]>([]);
+  const [adSets, setAdSets] = useState<any[]>([]);
+  const [ads, setAds] = useState<any[]>([]);
+  const [loadingMetadata, setLoadingMetadata] = useState(false);
+
+  const [selectedScope, setSelectedScope] = useState<"account" | "campaign" | "adset" | "ad">("account");
+  const [selectedCampaignId, setSelectedCampaignId] = useState<string>("");
+  const [selectedAdSetId, setSelectedAdSetId] = useState<string>("");
+  const [selectedAdId, setSelectedAdId] = useState<string>("");
   
   // Input and UI loading states
   const [inputValue, setInputValue] = useState("");
@@ -64,8 +75,19 @@ export default function AIAssistantDrawer() {
     setLoadingConvos(true);
     setErrorMsg(null);
     try {
-      // Credits
-      const credRes = await api.getAiCredits();
+      setLoadingMetadata(true);
+      const end = new Date().toISOString().split("T")[0];
+      const start = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString().split("T")[0];
+
+      // Fetch credits, conversations, and account metadata (campaigns, adsets, ads) concurrently
+      const [credRes, convos, campsList, adSetsList, adsList] = await Promise.all([
+        api.getAiCredits(),
+        api.getConversations(selectedAccount.id),
+        api.getCampaigns(selectedAccount.id, start, end).catch(() => []),
+        api.getAdSets(selectedAccount.id, start, end).catch(() => []),
+        api.getAds(selectedAccount.id, start, end).catch(() => []),
+      ]);
+
       setCredits(credRes.credits);
       setCreditsBreakdown({
         monthly_credits_remaining: credRes.monthly_credits_remaining,
@@ -75,9 +97,10 @@ export default function AIAssistantDrawer() {
         monthly_credits_used: credRes.monthly_credits_used,
       });
 
-      // Conversations scoped strictly to selected ad account
-      const convos = await api.getConversations(selectedAccount.id);
       setConversations(convos);
+      setCampaigns(campsList || []);
+      setAdSets(adSetsList || []);
+      setAds(adsList || []);
 
       if (convos.length > 0) {
         // Automatically load the latest conversation if none is active
@@ -95,6 +118,7 @@ export default function AIAssistantDrawer() {
       setErrorMsg("Failed to load assistant history.");
     } finally {
       setLoadingConvos(false);
+      setLoadingMetadata(false);
     }
   };
 
@@ -110,6 +134,10 @@ export default function AIAssistantDrawer() {
     setActiveConvoId(null);
     setMessages([]);
     setShowHistoryDropdown(false);
+    setSelectedScope("account");
+    setSelectedCampaignId("");
+    setSelectedAdSetId("");
+    setSelectedAdId("");
   }, [selectedAccount?.id]);
 
   // Load message logs of a specific conversation
@@ -178,6 +206,20 @@ export default function AIAssistantDrawer() {
       return;
     }
 
+    // Dynamic Context Scoping Validations
+    if (selectedScope === "campaign" && !selectedCampaignId) {
+      setErrorMsg("Please select a Campaign first.");
+      return;
+    }
+    if (selectedScope === "adset" && (!selectedCampaignId || !selectedAdSetId)) {
+      setErrorMsg("Please select a Campaign and an Ad Set first.");
+      return;
+    }
+    if (selectedScope === "ad" && (!selectedCampaignId || !selectedAdSetId || !selectedAdId)) {
+      setErrorMsg("Please select a Campaign, Ad Set, and Ad first.");
+      return;
+    }
+
     setIsSending(true);
     setErrorMsg(null);
 
@@ -203,7 +245,14 @@ export default function AIAssistantDrawer() {
       }
 
       // Send to backend
-      const res = await api.sendAssistantMessage(targetConvoId!, text, selectedAccount.id);
+      const res = await api.sendAssistantMessage(
+        targetConvoId!, 
+        text, 
+        selectedAccount.id,
+        selectedScope === "campaign" || selectedScope === "adset" || selectedScope === "ad" ? selectedCampaignId : null,
+        selectedScope === "adset" || selectedScope === "ad" ? selectedAdSetId : null,
+        selectedScope === "ad" ? selectedAdId : null
+      );
       
       // Update assistant response bubble
       const modelBubble = {
@@ -415,6 +464,116 @@ export default function AIAssistantDrawer() {
                     </button>
                   </button>
                 ))
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Context Selector Section */}
+        <div className="px-4 py-3 bg-slate-900 border-b border-slate-800 space-y-2.5 text-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Analysis Focus</span>
+            
+            {/* Scope Selection Tabs */}
+            <div className="flex bg-slate-950 p-0.5 rounded-lg border border-slate-800">
+              {(["account", "campaign", "adset", "ad"] as const).map((scope) => (
+                <button
+                  key={scope}
+                  onClick={() => {
+                    setSelectedScope(scope);
+                    setErrorMsg(null);
+                    // Clear lower dependent levels
+                    if (scope === "account") {
+                      setSelectedCampaignId("");
+                      setSelectedAdSetId("");
+                      setSelectedAdId("");
+                    } else if (scope === "campaign") {
+                      setSelectedAdSetId("");
+                      setSelectedAdId("");
+                    } else if (scope === "adset") {
+                      setSelectedAdId("");
+                    }
+                  }}
+                  className={`px-2 py-1 rounded-md text-[9px] font-bold uppercase transition ${
+                    selectedScope === scope 
+                      ? "bg-blue-600 text-white shadow-xs" 
+                      : "text-slate-500 hover:text-slate-300"
+                  }`}
+                >
+                  {scope === "account" ? "Account" : scope === "campaign" ? "Campaign" : scope === "adset" ? "Ad Set" : "Ad"}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Dynamic selector lists */}
+          {selectedScope !== "account" && (
+            <div className="grid grid-cols-1 gap-2 pt-0.5">
+              {/* Campaign Dropdown */}
+              <div>
+                <label className="block text-[9px] text-slate-500 font-bold uppercase tracking-wider mb-1">Select Campaign</label>
+                <select
+                  value={selectedCampaignId}
+                  onChange={(e) => {
+                    setSelectedCampaignId(e.target.value);
+                    setSelectedAdSetId("");
+                    setSelectedAdId("");
+                    setErrorMsg(null);
+                  }}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-md px-2 py-1.5 text-xs text-slate-300 font-medium focus:outline-hidden focus:border-blue-500 cursor-pointer"
+                >
+                  <option value="">-- Choose Campaign --</option>
+                  {campaigns.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Ad Set Dropdown */}
+              {(selectedScope === "adset" || selectedScope === "ad") && (
+                <div>
+                  <label className="block text-[9px] text-slate-500 font-bold uppercase tracking-wider mb-1">Select Ad Set</label>
+                  <select
+                    disabled={!selectedCampaignId}
+                    value={selectedAdSetId}
+                    onChange={(e) => {
+                      setSelectedAdSetId(e.target.value);
+                      setSelectedAdId("");
+                      setErrorMsg(null);
+                    }}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-md px-2 py-1.5 text-xs text-slate-300 font-medium focus:outline-hidden focus:border-blue-500 disabled:opacity-40 cursor-pointer"
+                  >
+                    <option value="">-- Choose Ad Set --</option>
+                    {adSets
+                      .filter((s) => !selectedCampaignId || s.campaign_id === selectedCampaignId)
+                      .map((s) => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Ad Dropdown */}
+              {selectedScope === "ad" && (
+                <div>
+                  <label className="block text-[9px] text-slate-500 font-bold uppercase tracking-wider mb-1">Select Ad</label>
+                  <select
+                    disabled={!selectedAdSetId}
+                    value={selectedAdId}
+                    onChange={(e) => {
+                      setSelectedAdId(e.target.value);
+                      setErrorMsg(null);
+                    }}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-md px-2 py-1.5 text-xs text-slate-300 font-medium focus:outline-hidden focus:border-blue-500 disabled:opacity-40 cursor-pointer"
+                  >
+                    <option value="">-- Choose Ad --</option>
+                    {ads
+                      .filter((ad) => !selectedAdSetId || ad.ad_set_id === selectedAdSetId)
+                      .map((ad) => (
+                        <option key={ad.id} value={ad.id}>{ad.name}</option>
+                      ))}
+                  </select>
+                </div>
               )}
             </div>
           )}

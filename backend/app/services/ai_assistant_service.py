@@ -8,6 +8,7 @@ from datetime import datetime, date, timedelta, timezone
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 import httpx
+from typing import Optional, Dict, Any, List
 
 from app.config import get_settings
 from app.models.user import User
@@ -30,9 +31,17 @@ class AIAssistantService:
     """
 
     @classmethod
-    async def build_context(cls, db: AsyncSession, ad_account_id: uuid.UUID) -> str:
+    async def build_context(
+        cls,
+        db: AsyncSession,
+        ad_account_id: uuid.UUID,
+        campaign_id: Optional[uuid.UUID] = None,
+        adset_id: Optional[uuid.UUID] = None,
+        ad_id: Optional[uuid.UUID] = None,
+    ) -> str:
         """
-        Assembles a highly structured JSON context layer for the current ad account.
+        Assembles a highly structured JSON context layer for the current ad account,
+        scoped to optional campaign_id, adset_id, or ad_id if provided.
         """
         # 1. Fetch Ad Account details
         stmt = (
@@ -64,7 +73,6 @@ class AIAssistantService:
                 "sync_status": sync_status,
                 "last_successful_sync": last_sync_at,
             },
-            "campaigns": [],
             "active_recommendations": [],
         }
 
@@ -87,95 +95,346 @@ class AIAssistantService:
                 "recommendation": r.recommendation_text,
             })
 
-        # 3. Fetch Campaigns
-        camp_stmt = select(Campaign).where(Campaign.ad_account_id == ad_account_id)
-        camp_res = await db.execute(camp_stmt)
-        campaigns = camp_res.scalars().all()
-        campaign_ids = [c.id for c in campaigns]
-
-        # Fetch active AI Optimization configs
-        opt_stmt = select(AIOptimizationConfig).where(AIOptimizationConfig.campaign_id.in_(campaign_ids)) if campaign_ids else None
-        opt_configs = {}
-        if opt_stmt is not None:
-            opt_res = await db.execute(opt_stmt)
-            for opt in opt_res.scalars().all():
-                opt_configs[opt.campaign_id] = opt
-
-        # Fetch 7D aggregates for all campaigns
         today = date.today()
         seven_days_ago = today - timedelta(days=6)
+
+        # Scoped Focus Logic
+        if ad_id:
+            ad_stmt = select(Ad).where(Ad.id == ad_id)
+            ad_res = await db.execute(ad_stmt)
+            ad_obj = ad_res.scalar_one_or_none()
+            if ad_obj:
+                metrics_stmt = (
+                    select(
+                        func.sum(AdDailyMetrics.spend).label("spend"),
+                        func.sum(AdDailyMetrics.impressions).label("impressions"),
+                        func.sum(AdDailyMetrics.clicks).label("clicks"),
+                        func.sum(AdDailyMetrics.leads).label("leads"),
+                        func.sum(AdDailyMetrics.purchases).label("purchases"),
+                        func.sum(AdDailyMetrics.revenue).label("revenue"),
+                    )
+                    .where(AdDailyMetrics.ad_id == ad_id)
+                    .where(AdDailyMetrics.date >= seven_days_ago)
+                )
+                met_res = await db.execute(metrics_stmt)
+                m = met_res.first()
+                spend = float(m.spend or 0.0) if m else 0.0
+                leads = int(m.leads or 0) if m else 0
+                purchases = int(m.purchases or 0) if m else 0
+                revenue = float(m.revenue or 0.0) if m else 0.0
+                impressions = int(m.impressions or 0) if m else 0
+                clicks = int(m.clicks or 0) if m else 0
+
+                cpl = spend / leads if leads > 0 else spend
+                cpa = spend / purchases if purchases > 0 else spend
+                roas = revenue / spend if spend > 0 else 0.0
+                ctr = clicks / impressions if impressions > 0 else 0.0
+
+                adset_obj = await db.get(AdSet, ad_obj.ad_set_id)
+                camp_obj = await db.get(Campaign, adset_obj.campaign_id) if adset_obj else None
+
+                context["focus_scope"] = "ad"
+                context["focused_ad"] = {
+                    "id": str(ad_obj.id),
+                    "name": ad_obj.name,
+                    "status": ad_obj.status,
+                    "ad_set_name": adset_obj.name if adset_obj else "Unknown Set",
+                    "campaign_name": camp_obj.name if camp_obj else "Unknown Campaign",
+                    "performance_7d": {
+                        "spend": spend,
+                        "impressions": impressions,
+                        "clicks": clicks,
+                        "leads": leads,
+                        "purchases": purchases,
+                        "revenue": revenue,
+                        "cpl": cpl,
+                        "cpa": cpa,
+                        "roas": roas,
+                        "ctr": ctr
+                    }
+                }
         
-        metrics_stmt = (
-            select(
-                CampaignDailyMetrics.campaign_id,
-                func.sum(CampaignDailyMetrics.spend).label("spend"),
-                func.sum(CampaignDailyMetrics.impressions).label("impressions"),
-                func.sum(CampaignDailyMetrics.clicks).label("clicks"),
-                func.sum(CampaignDailyMetrics.leads).label("leads"),
-                func.sum(CampaignDailyMetrics.purchases).label("purchases"),
-                func.sum(CampaignDailyMetrics.revenue).label("revenue"),
-            )
-            .where(CampaignDailyMetrics.campaign_id.in_(campaign_ids))
-            .where(CampaignDailyMetrics.date >= seven_days_ago)
-            .group_by(CampaignDailyMetrics.campaign_id)
-        ) if campaign_ids else None
+        elif adset_id:
+            adset_stmt = select(AdSet).where(AdSet.id == adset_id)
+            adset_res = await db.execute(adset_stmt)
+            adset_obj = adset_res.scalar_one_or_none()
+            if adset_obj:
+                metrics_stmt = (
+                    select(
+                        func.sum(AdSetDailyMetrics.spend).label("spend"),
+                        func.sum(AdSetDailyMetrics.impressions).label("impressions"),
+                        func.sum(AdSetDailyMetrics.clicks).label("clicks"),
+                        func.sum(AdSetDailyMetrics.leads).label("leads"),
+                        func.sum(AdSetDailyMetrics.purchases).label("purchases"),
+                        func.sum(AdSetDailyMetrics.revenue).label("revenue"),
+                    )
+                    .where(AdSetDailyMetrics.ad_set_id == adset_id)
+                    .where(AdSetDailyMetrics.date >= seven_days_ago)
+                )
+                met_res = await db.execute(metrics_stmt)
+                m = met_res.first()
+                spend = float(m.spend or 0.0) if m else 0.0
+                leads = int(m.leads or 0) if m else 0
+                purchases = int(m.purchases or 0) if m else 0
+                revenue = float(m.revenue or 0.0) if m else 0.0
+                impressions = int(m.impressions or 0) if m else 0
+                clicks = int(m.clicks or 0) if m else 0
 
-        metrics_map = {}
-        if metrics_stmt is not None:
-            metrics_res = await db.execute(metrics_stmt)
-            for row in metrics_res.all():
-                metrics_map[row.campaign_id] = row
+                cpl = spend / leads if leads > 0 else spend
+                cpa = spend / purchases if purchases > 0 else spend
+                roas = revenue / spend if spend > 0 else 0.0
+                ctr = clicks / impressions if impressions > 0 else 0.0
 
-        # Compile campaigns context
-        for c in campaigns:
-            m = metrics_map.get(c.id)
-            spend = float(m.spend or 0.0) if m else 0.0
-            leads = int(m.leads or 0) if m else 0
-            purchases = int(m.purchases or 0) if m else 0
-            revenue = float(m.revenue or 0.0) if m else 0.0
-            impressions = int(m.impressions or 0) if m else 0
-            clicks = int(m.clicks or 0) if m else 0
+                camp_obj = await db.get(Campaign, adset_obj.campaign_id)
 
-            cpl = spend / leads if leads > 0 else spend
-            cpa = spend / purchases if purchases > 0 else spend
-            roas = revenue / spend if spend > 0 else 0.0
-            ctr = clicks / impressions if impressions > 0 else 0.0
-            cpc = spend / clicks if clicks > 0 else 0.0
-            cpm = (spend / impressions) * 1000.0 if impressions > 0 else 0.0
-
-            opt_cfg = opt_configs.get(c.id)
-            opt_data = None
-            if opt_cfg:
-                opt_data = {
-                    "is_active": opt_cfg.is_active,
-                    "target_cpl": opt_cfg.target_cpl,
-                    "target_roas": opt_cfg.target_roas,
-                    "history_observations_count": len(opt_cfg.memory.get("historical_alerts", [])) if isinstance(opt_cfg.memory, dict) else 0
+                context["focus_scope"] = "adset"
+                context["focused_ad_set"] = {
+                    "id": str(adset_obj.id),
+                    "name": adset_obj.name,
+                    "status": adset_obj.status,
+                    "campaign_name": camp_obj.name if camp_obj else "Unknown Campaign",
+                    "performance_7d": {
+                        "spend": spend,
+                        "impressions": impressions,
+                        "clicks": clicks,
+                        "leads": leads,
+                        "purchases": purchases,
+                        "revenue": revenue,
+                        "cpl": cpl,
+                        "cpa": cpa,
+                        "roas": roas,
+                        "ctr": ctr
+                    }
                 }
 
-            context["campaigns"].append({
-                "id": str(c.id),
-                "name": c.name,
-                "objective": c.objective,
-                "status": c.status,
-                "budget_daily": float(c.daily_budget or 0.0),
-                "budget_lifetime": float(c.lifetime_budget or 0.0),
-                "performance_7d": {
-                    "spend": spend,
-                    "impressions": impressions,
-                    "clicks": clicks,
-                    "leads": leads,
-                    "purchases": purchases,
-                    "revenue": revenue,
-                    "cpl": cpl,
-                    "cpa": cpa,
-                    "roas": roas,
-                    "ctr": ctr,
-                    "cpc": cpc,
-                    "cpm": cpm,
-                },
-                "ai_optimization": opt_data,
-            })
+                # Fetch ads belonging to this ad set
+                ads_stmt = select(Ad).where(Ad.ad_set_id == adset_id)
+                ads_res = await db.execute(ads_stmt)
+                ads_objs = ads_res.scalars().all()
+                context["focused_ad_set_ads"] = []
+                for ad_obj in ads_objs:
+                    ad_met_stmt = (
+                        select(
+                            func.sum(AdDailyMetrics.spend).label("spend"),
+                            func.sum(AdDailyMetrics.leads).label("leads"),
+                        )
+                        .where(AdDailyMetrics.ad_id == ad_obj.id)
+                        .where(AdDailyMetrics.date >= seven_days_ago)
+                    )
+                    ad_met_res = await db.execute(ad_met_stmt)
+                    am = ad_met_res.first()
+                    ad_spend = float(am.spend or 0.0) if am else 0.0
+                    ad_leads = int(am.leads or 0) if am else 0
+                    context["focused_ad_set_ads"].append({
+                        "id": str(ad_obj.id),
+                        "name": ad_obj.name,
+                        "status": ad_obj.status,
+                        "performance_7d": {
+                            "spend": ad_spend,
+                            "leads": ad_leads,
+                            "cpl": ad_spend / ad_leads if ad_leads > 0 else ad_spend
+                        }
+                    })
+
+        elif campaign_id:
+            camp_stmt = select(Campaign).where(Campaign.id == campaign_id)
+            camp_res = await db.execute(camp_stmt)
+            c = camp_res.scalar_one_or_none()
+            if c:
+                metrics_stmt = (
+                    select(
+                        func.sum(CampaignDailyMetrics.spend).label("spend"),
+                        func.sum(CampaignDailyMetrics.impressions).label("impressions"),
+                        func.sum(CampaignDailyMetrics.clicks).label("clicks"),
+                        func.sum(CampaignDailyMetrics.leads).label("leads"),
+                        func.sum(CampaignDailyMetrics.purchases).label("purchases"),
+                        func.sum(CampaignDailyMetrics.revenue).label("revenue"),
+                    )
+                    .where(CampaignDailyMetrics.campaign_id == campaign_id)
+                    .where(CampaignDailyMetrics.date >= seven_days_ago)
+                )
+                met_res = await db.execute(metrics_stmt)
+                m = met_res.first()
+                spend = float(m.spend or 0.0) if m else 0.0
+                leads = int(m.leads or 0) if m else 0
+                purchases = int(m.purchases or 0) if m else 0
+                revenue = float(m.revenue or 0.0) if m else 0.0
+                impressions = int(m.impressions or 0) if m else 0
+                clicks = int(m.clicks or 0) if m else 0
+
+                cpl = spend / leads if leads > 0 else spend
+                cpa = spend / purchases if purchases > 0 else spend
+                roas = revenue / spend if spend > 0 else 0.0
+                ctr = clicks / impressions if impressions > 0 else 0.0
+
+                context["focus_scope"] = "campaign"
+                context["focused_campaign"] = {
+                    "id": str(c.id),
+                    "name": c.name,
+                    "objective": c.objective,
+                    "status": c.status,
+                    "budget_daily": float(c.daily_budget or 0.0),
+                    "performance_7d": {
+                        "spend": spend,
+                        "impressions": impressions,
+                        "clicks": clicks,
+                        "leads": leads,
+                        "purchases": purchases,
+                        "revenue": revenue,
+                        "cpl": cpl,
+                        "cpa": cpa,
+                        "roas": roas,
+                        "ctr": ctr
+                    }
+                }
+
+                # Fetch child adsets
+                adsets_stmt = select(AdSet).where(AdSet.campaign_id == campaign_id)
+                adsets_res = await db.execute(adsets_stmt)
+                adsets_objs = adsets_res.scalars().all()
+                context["focused_campaign_adsets"] = []
+                adset_ids = [adset.id for adset in adsets_objs]
+
+                for adset_obj in adsets_objs:
+                    adset_met_stmt = (
+                        select(
+                            func.sum(AdSetDailyMetrics.spend).label("spend"),
+                            func.sum(AdSetDailyMetrics.leads).label("leads"),
+                        )
+                        .where(AdSetDailyMetrics.ad_set_id == adset_obj.id)
+                        .where(AdSetDailyMetrics.date >= seven_days_ago)
+                    )
+                    adset_met_res = await db.execute(adset_met_stmt)
+                    asm = adset_met_res.first()
+                    adset_spend = float(asm.spend or 0.0) if asm else 0.0
+                    adset_leads = int(asm.leads or 0) if asm else 0
+                    context["focused_campaign_adsets"].append({
+                        "id": str(adset_obj.id),
+                        "name": adset_obj.name,
+                        "status": adset_obj.status,
+                        "performance_7d": {
+                            "spend": adset_spend,
+                            "leads": adset_leads,
+                            "cpl": adset_spend / adset_leads if adset_leads > 0 else adset_spend
+                        }
+                    })
+
+                # Fetch child ads
+                if adset_ids:
+                    ads_stmt = select(Ad).where(Ad.ad_set_id.in_(adset_ids))
+                    ads_res = await db.execute(ads_stmt)
+                    ads_objs = ads_res.scalars().all()
+                    context["focused_campaign_ads"] = []
+                    for ad_obj in ads_objs:
+                        ad_met_stmt = (
+                            select(
+                                func.sum(AdDailyMetrics.spend).label("spend"),
+                                func.sum(AdDailyMetrics.leads).label("leads"),
+                            )
+                            .where(AdDailyMetrics.ad_id == ad_obj.id)
+                            .where(AdDailyMetrics.date >= seven_days_ago)
+                        )
+                        ad_met_res = await db.execute(ad_met_stmt)
+                        am = ad_met_res.first()
+                        ad_spend = float(am.spend or 0.0) if am else 0.0
+                        ad_leads = int(am.leads or 0) if am else 0
+                        context["focused_campaign_ads"].append({
+                            "id": str(ad_obj.id),
+                            "name": ad_obj.name,
+                            "status": ad_obj.status,
+                            "performance_7d": {
+                                "spend": ad_spend,
+                                "leads": ad_leads,
+                                "cpl": ad_spend / ad_leads if ad_leads > 0 else ad_spend
+                            }
+                        })
+
+        else:
+            # Fetch Campaigns (Default overall account view)
+            camp_stmt = select(Campaign).where(Campaign.ad_account_id == ad_account_id)
+            camp_res = await db.execute(camp_stmt)
+            campaigns = camp_res.scalars().all()
+            campaign_ids = [c.id for c in campaigns]
+
+            # Fetch active AI Optimization configs
+            opt_stmt = select(AIOptimizationConfig).where(AIOptimizationConfig.campaign_id.in_(campaign_ids)) if campaign_ids else None
+            opt_configs = {}
+            if opt_stmt is not None:
+                opt_res = await db.execute(opt_stmt)
+                for opt in opt_res.scalars().all():
+                    opt_configs[opt.campaign_id] = opt
+
+            metrics_stmt = (
+                select(
+                    CampaignDailyMetrics.campaign_id,
+                    func.sum(CampaignDailyMetrics.spend).label("spend"),
+                    func.sum(CampaignDailyMetrics.impressions).label("impressions"),
+                    func.sum(CampaignDailyMetrics.clicks).label("clicks"),
+                    func.sum(CampaignDailyMetrics.leads).label("leads"),
+                    func.sum(CampaignDailyMetrics.purchases).label("purchases"),
+                    func.sum(CampaignDailyMetrics.revenue).label("revenue"),
+                )
+                .where(CampaignDailyMetrics.campaign_id.in_(campaign_ids))
+                .where(CampaignDailyMetrics.date >= seven_days_ago)
+                .group_by(CampaignDailyMetrics.campaign_id)
+            ) if campaign_ids else None
+
+            metrics_map = {}
+            if metrics_stmt is not None:
+                metrics_res = await db.execute(metrics_stmt)
+                for row in metrics_res.all():
+                    metrics_map[row.campaign_id] = row
+
+            context["campaigns"] = []
+            for c in campaigns:
+                m = metrics_map.get(c.id)
+                spend = float(m.spend or 0.0) if m else 0.0
+                leads = int(m.leads or 0) if m else 0
+                purchases = int(m.purchases or 0) if m else 0
+                revenue = float(m.revenue or 0.0) if m else 0.0
+                impressions = int(m.impressions or 0) if m else 0
+                clicks = int(m.clicks or 0) if m else 0
+
+                cpl = spend / leads if leads > 0 else spend
+                cpa = spend / purchases if purchases > 0 else spend
+                roas = revenue / spend if spend > 0 else 0.0
+                ctr = clicks / impressions if impressions > 0 else 0.0
+                cpc = spend / clicks if clicks > 0 else 0.0
+                cpm = (spend / impressions) * 1000.0 if impressions > 0 else 0.0
+
+                opt_cfg = opt_configs.get(c.id)
+                opt_data = None
+                if opt_cfg:
+                    opt_data = {
+                        "is_active": opt_cfg.is_active,
+                        "target_cpl": opt_cfg.target_cpl,
+                        "target_roas": opt_cfg.target_roas,
+                        "history_observations_count": len(opt_cfg.memory.get("historical_alerts", [])) if isinstance(opt_cfg.memory, dict) else 0
+                    }
+
+                context["campaigns"].append({
+                    "id": str(c.id),
+                    "name": c.name,
+                    "objective": c.objective,
+                    "status": c.status,
+                    "budget_daily": float(c.daily_budget or 0.0),
+                    "budget_lifetime": float(c.lifetime_budget or 0.0),
+                    "performance_7d": {
+                        "spend": spend,
+                        "impressions": impressions,
+                        "clicks": clicks,
+                        "leads": leads,
+                        "purchases": purchases,
+                        "revenue": revenue,
+                        "cpl": cpl,
+                        "cpa": cpa,
+                        "roas": roas,
+                        "ctr": ctr,
+                        "cpc": cpc,
+                        "cpm": cpm,
+                    },
+                    "ai_optimization": opt_data,
+                })
 
         return json.dumps(context, indent=2)
 
@@ -223,7 +482,6 @@ class AIAssistantService:
             "parts": [{"text": user_message}]
         })
 
-        # centralized configuration model
         model_name = settings.GEMINI_MODEL
 
         # Direct API Key endpoint
@@ -393,11 +651,15 @@ class AIAssistantService:
         user_id: uuid.UUID,
         ad_account_id: uuid.UUID,
         conversation_id: uuid.UUID,
-        message_content: str
+        message_content: str,
+        campaign_id: Optional[uuid.UUID] = None,
+        adset_id: Optional[uuid.UUID] = None,
+        ad_id: Optional[uuid.UUID] = None,
     ) -> tuple[str, bool]:
         """
         Orchestrates transaction-safe atomic credit checking, sends query to Gemini,
         deducts credit on success, and logs transaction history.
+        Scoping allows focusing on specific campaign_id, adset_id, or ad_id.
         Returns a tuple: (assistant_response, success_flag).
         """
         # 1. Row-level lock the user to check credits atomically
@@ -413,7 +675,7 @@ class AIAssistantService:
             return "You've used all your AI Credits.", False
 
         # 2. Build Context Layer
-        context_str = await cls.build_context(db, ad_account_id)
+        context_str = await cls.build_context(db, ad_account_id, campaign_id, adset_id, ad_id)
 
         # 3. Retrieve conversation history
         history_stmt = (
@@ -425,6 +687,15 @@ class AIAssistantService:
         history_messages = history_res.scalars().all()
         history_list = [{"role": msg.role, "content": msg.content} for msg in history_messages]
 
+        # Scoped Target Prompt instruction
+        focus_instruction = "The user is looking at the overall Ad Account performance. Provide general summaries."
+        if ad_id:
+            focus_instruction = f"The user is focusing on Ad ID {ad_id}. Base all replies and comparisons directly on this specific Ad entity."
+        elif adset_id:
+            focus_instruction = f"The user is focusing on Ad Set ID {adset_id}. Base all replies and comparisons directly on this specific Ad Set entity."
+        elif campaign_id:
+            focus_instruction = f"The user is focusing on Campaign ID {campaign_id}. Base all replies and comparisons directly on this specific Campaign."
+
         # 4. Define system instructions
         system_prompt = f"""You are the Digital Growth Studio AI Assistant.
 You may only analyze data provided in the current ad account context.
@@ -433,6 +704,8 @@ Never fabricate metrics. If the data does not exist, say clearly: "I don't have 
 If data is stale (e.g. last sync was long ago), state: "The latest available data is from [time]. The account has not completed its latest sync yet."
 Do not present estimates as actual Meta data.
 Do not invent campaign names, spend, CPL, ROAS, leads, or other metrics.
+
+{focus_instruction}
 
 Whenever you mention an entity (Campaign, Ad Set, Ad, or Creative) in your response, you MUST reference it in the following structured format to make it clickable:
 - Campaign: [Campaign Name](entity:campaign:campaign_id)

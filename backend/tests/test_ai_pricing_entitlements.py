@@ -11,6 +11,7 @@ from app.models.admin_config import AdminConfig
 from app.models.ai_usage import AIUsageRecord
 from app.models.ai_assistant import AIChatConversation, AIChatMessage, AICreditTransaction
 from app.models.ai_optimization import AIOptimizationConfig
+from app.models.campaign import Campaign, AdSet, Ad
 
 from app.services.config_seeder import seed_admin_configs
 from app.services.entitlement_engine import EntitlementEngine
@@ -309,3 +310,102 @@ async def test_over_limit_campaigns_skipped(db):
 
     finally:
         AIOptimizationService.analyze_campaign = original_analyze
+
+
+@pytest.mark.asyncio
+async def test_assistant_scoped_context(db):
+    """
+    Verifies that the build_context method properly scopes JSON metadata when campaign_id,
+    adset_id, or ad_id are supplied.
+    """
+    await seed_admin_configs(db)
+    
+    user = User(
+        firebase_uid="fb_scope_user",
+        email="scope_user@digitalgrowthstudio.in",
+        name="Scope User",
+        credits=50,
+        trial_credits_remaining=5
+    )
+    db.add(user)
+    await db.flush()
+
+    from app.models.meta import MetaConnection, MetaAdAccount
+    conn = MetaConnection(
+        user_id=user.id,
+        meta_user_id="meta_scope_user",
+        status="connected",
+        access_token="mock_token"
+    )
+    db.add(conn)
+    await db.flush()
+
+    ad_acc = MetaAdAccount(
+        user_id=user.id,
+        meta_connection_id=conn.id,
+        meta_account_id="act_scope_acc",
+        account_name="Scope Account",
+        currency="INR",
+        timezone="Asia/Kolkata",
+        account_status=1
+    )
+    db.add(ad_acc)
+    await db.flush()
+
+    camp = Campaign(
+        ad_account_id=ad_acc.id,
+        meta_campaign_id="camp_999",
+        name="Campaign Targeted Focus",
+        status="ACTIVE",
+        objective="LEAD_GENERATION",
+        daily_budget=2000
+    )
+    db.add(camp)
+    await db.flush()
+
+    adset = AdSet(
+        campaign_id=camp.id,
+        meta_adset_id="adset_999",
+        name="AdSet Focus Group",
+        status="ACTIVE",
+        optimization_goal="LEADS",
+        billing_event="IMPRESSIONS"
+    )
+    db.add(adset)
+    await db.flush()
+
+    ad = Ad(
+        ad_set_id=adset.id,
+        meta_ad_id="ad_999",
+        name="Ad Targeted Creative",
+        status="ACTIVE"
+    )
+    db.add(ad)
+    await db.commit()
+
+    # Query context focusing on the campaign
+    context_json = await AIAssistantService.build_context(db, ad_acc.id, campaign_id=camp.id)
+    import json
+    data = json.loads(context_json)
+    
+    assert data["focus_scope"] == "campaign"
+    assert data["focused_campaign"]["name"] == "Campaign Targeted Focus"
+    assert len(data["focused_campaign_adsets"]) == 1
+    assert data["focused_campaign_adsets"][0]["name"] == "AdSet Focus Group"
+    assert len(data["focused_campaign_ads"]) == 1
+    assert data["focused_campaign_ads"][0]["name"] == "Ad Targeted Creative"
+
+    # Query context focusing on the ad set
+    context_json_adset = await AIAssistantService.build_context(db, ad_acc.id, adset_id=adset.id)
+    data_adset = json.loads(context_json_adset)
+    assert data_adset["focus_scope"] == "adset"
+    assert data_adset["focused_ad_set"]["name"] == "AdSet Focus Group"
+    assert len(data_adset["focused_ad_set_ads"]) == 1
+
+    # Query context focusing on the ad
+    context_json_ad = await AIAssistantService.build_context(db, ad_acc.id, ad_id=ad.id)
+    data_ad = json.loads(context_json_ad)
+    assert data_ad["focus_scope"] == "ad"
+    assert data_ad["focused_ad"]["name"] == "Ad Targeted Creative"
+    assert data_ad["focused_ad"]["ad_set_name"] == "AdSet Focus Group"
+

@@ -45,6 +45,9 @@ class ConversationResponse(BaseModel):
 class MessageSendRequest(BaseModel):
     content: str
     ad_account_id: uuid.UUID
+    campaign_id: Optional[uuid.UUID] = None
+    adset_id: Optional[uuid.UUID] = None
+    ad_id: Optional[uuid.UUID] = None
 
 class MessageResponse(BaseModel):
     id: uuid.UUID
@@ -292,6 +295,9 @@ async def send_message(
         ad_account_id=req.ad_account_id,
         conversation_id=conversation_id,
         message_content=req.content,
+        campaign_id=req.campaign_id,
+        adset_id=req.adset_id,
+        ad_id=req.ad_id,
     )
 
     if not success:
