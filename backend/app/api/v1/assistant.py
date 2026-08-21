@@ -33,7 +33,7 @@ class CreditBalanceResponse(BaseModel):
     monthly_credits_used: int = 0
 
 class ConversationCreateRequest(BaseModel):
-    ad_account_id: uuid.UUID
+    ad_account_id: str
     title: Optional[str] = "New Conversation"
 
 class ConversationResponse(BaseModel):
@@ -44,7 +44,7 @@ class ConversationResponse(BaseModel):
 
 class MessageSendRequest(BaseModel):
     content: str
-    ad_account_id: uuid.UUID
+    ad_account_id: str
     campaign_id: Optional[uuid.UUID] = None
     adset_id: Optional[uuid.UUID] = None
     ad_id: Optional[uuid.UUID] = None
@@ -65,7 +65,7 @@ class MessageSendResponse(BaseModel):
 # ──────────────────────────────────────────────
 # Helper
 # ──────────────────────────────────────────────
-async def verify_ad_account_ownership(db: AsyncSession, ad_account_id: uuid.UUID, user_id: uuid.UUID) -> MetaAdAccount:
+async def verify_ad_account_ownership(db: AsyncSession, ad_account_id: str, user_id: uuid.UUID) -> MetaAdAccount:
     from app.services.entitlement_engine import EntitlementEngine
     user_stmt = select(User).where(User.id == user_id)
     user_res = await db.execute(user_stmt)
@@ -77,11 +77,13 @@ async def verify_ad_account_ownership(db: AsyncSession, ad_account_id: uuid.UUID
         )
 
     accessible_ids = await EntitlementEngine.get_accessible_user_ids(user, db)
-    stmt = (
-        select(MetaAdAccount)
-        .where(MetaAdAccount.id == ad_account_id)
-        .where(MetaAdAccount.user_id.in_(accessible_ids))
-    )
+    stmt = select(MetaAdAccount).where(MetaAdAccount.user_id.in_(accessible_ids))
+    try:
+        acc_uuid = uuid.UUID(ad_account_id)
+        stmt = stmt.where(MetaAdAccount.id == acc_uuid)
+    except (ValueError, TypeError):
+        stmt = stmt.where(MetaAdAccount.meta_account_id == ad_account_id)
+
     res = await db.execute(stmt)
     ad_acc = res.scalar_one_or_none()
     if not ad_acc:
@@ -98,30 +100,54 @@ async def verify_ad_account_ownership(db: AsyncSession, ad_account_id: uuid.UUID
 
 @router.get("/credits", response_model=CreditBalanceResponse, summary="Get AI Credits balance")
 async def get_ai_credits(
+    ad_account_id: Optional[str] = None,
     claims: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Returns current user's AI credits balance with detailed breakdown.
+    Returns current user's (or effective parent owner's) AI credits balance with detailed breakdown.
     """
     user = await get_db_user_from_claims(claims, db)
     
+    # If ad_account_id is provided, resolve effective workspace owner user
+    target_user = user
+    if ad_account_id:
+        try:
+            from app.services.entitlement_engine import EntitlementEngine
+            accessible_ids = await EntitlementEngine.get_accessible_user_ids(user, db)
+            stmt = select(MetaAdAccount).where(MetaAdAccount.user_id.in_(accessible_ids))
+            try:
+                acc_uuid = uuid.UUID(ad_account_id)
+                stmt = stmt.where(MetaAdAccount.id == acc_uuid)
+            except (ValueError, TypeError):
+                stmt = stmt.where(MetaAdAccount.meta_account_id == ad_account_id)
+            res = await db.execute(stmt)
+            acc = res.scalar_one_or_none()
+            if acc:
+                owner_stmt = select(User).where(User.id == acc.user_id)
+                owner_res = await db.execute(owner_stmt)
+                owner_user = owner_res.scalar_one_or_none()
+                if owner_user:
+                    target_user = owner_user
+        except Exception as resolve_err:
+            logger.error("failed_resolving_effective_user_credits", error=str(resolve_err))
+
     # Auto-heal credits reset in case they hit this read route first
     from app.services.entitlement_engine import EntitlementEngine
     try:
-        await EntitlementEngine.check_and_reset_monthly_credits(user, db)
+        await EntitlementEngine.check_and_reset_monthly_credits(target_user, db)
     except Exception as reset_err:
         logger.error("failed_credits_reset_self_healing_read", error=str(reset_err))
         
-    plan_config = EntitlementEngine.get_plan_config(user.plan_id)
+    plan_config = EntitlementEngine.get_plan_config(target_user.plan_id)
     monthly_limit = plan_config.get("monthly_credits", 0)
-    monthly_used = max(0, monthly_limit - user.monthly_credits_remaining)
+    monthly_used = max(0, monthly_limit - target_user.monthly_credits_remaining)
     
     return CreditBalanceResponse(
-        credits=user.credits,
-        monthly_credits_remaining=user.monthly_credits_remaining,
-        purchased_credits_remaining=user.purchased_credits_remaining,
-        trial_credits_remaining=user.trial_credits_remaining,
+        credits=target_user.credits,
+        monthly_credits_remaining=target_user.monthly_credits_remaining,
+        purchased_credits_remaining=target_user.purchased_credits_remaining,
+        trial_credits_remaining=target_user.trial_credits_remaining,
         monthly_credits_limit=monthly_limit,
         monthly_credits_used=monthly_used
     )
@@ -129,20 +155,20 @@ async def get_ai_credits(
 
 @router.get("/conversations", response_model=List[ConversationResponse], summary="List assistant conversations")
 async def list_conversations(
-    ad_account_id: uuid.UUID,
+    ad_account_id: str,
     claims: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Lists user conversation histories scoped to the active ad_account_id.
+    Lists user conversation histories scoped to the active ad_account_id (UUID or meta_account_id string).
     """
     user = await get_db_user_from_claims(claims, db)
-    await verify_ad_account_ownership(db, ad_account_id, user.id)
+    ad_acc = await verify_ad_account_ownership(db, ad_account_id, user.id)
 
     stmt = (
         select(AIChatConversation)
         .where(AIChatConversation.user_id == user.id)
-        .where(AIChatConversation.ad_account_id == ad_account_id)
+        .where(AIChatConversation.ad_account_id == ad_acc.id)
         .order_by(AIChatConversation.updated_at.desc())
     )
     res = await db.execute(stmt)
@@ -169,11 +195,11 @@ async def create_conversation(
     Instantiates a new persistent chat session scoped to the selected ad account.
     """
     user = await get_db_user_from_claims(claims, db)
-    await verify_ad_account_ownership(db, req.ad_account_id, user.id)
+    ad_acc = await verify_ad_account_ownership(db, req.ad_account_id, user.id)
 
     convo = AIChatConversation(
         user_id=user.id,
-        ad_account_id=req.ad_account_id,
+        ad_account_id=ad_acc.id,
         title=req.title or "New Conversation"
     )
     db.add(convo)
@@ -275,14 +301,14 @@ async def send_message(
     user = await get_db_user_from_claims(claims, db)
     
     # 1. Enforce Server-Side Ownership Boundaries
-    await verify_ad_account_ownership(db, req.ad_account_id, user.id)
+    ad_acc = await verify_ad_account_ownership(db, req.ad_account_id, user.id)
 
     # 2. Check Conversation session ownership and match ad account
     convo_stmt = (
         select(AIChatConversation)
         .where(AIChatConversation.id == conversation_id)
         .where(AIChatConversation.user_id == user.id)
-        .where(AIChatConversation.ad_account_id == req.ad_account_id)
+        .where(AIChatConversation.ad_account_id == ad_acc.id)
     )
     convo_res = await db.execute(convo_stmt)
     convo = convo_res.scalar_one_or_none()
@@ -292,8 +318,17 @@ async def send_message(
             detail="Conversation context does not match user account or selected ad account boundary."
         )
 
+    # Load parent owner user to check and deduct credits if team shared
+    effective_user = user
+    if ad_acc.user_id != user.id:
+        owner_stmt = select(User).where(User.id == ad_acc.user_id)
+        owner_res = await db.execute(owner_stmt)
+        owner_user = owner_res.scalar_one_or_none()
+        if owner_user:
+            effective_user = owner_user
+
     # 3. Check credits before request
-    if user.credits <= 0:
+    if effective_user.credits <= 0:
         raise HTTPException(
             status_code=400,
             detail="You've used all your AI Credits."
@@ -302,8 +337,8 @@ async def send_message(
     # 4. Invoke service
     reply, success = await AIAssistantService.process_user_message(
         db=db,
-        user_id=user.id,
-        ad_account_id=req.ad_account_id,
+        user_id=effective_user.id,
+        ad_account_id=ad_acc.id,
         conversation_id=conversation_id,
         message_content=req.content,
         campaign_id=req.campaign_id,
@@ -317,8 +352,8 @@ async def send_message(
             detail=reply
         )
 
-    # Refresh user to fetch latest authoritative credits count
-    await db.refresh(user)
+    # Refresh effective user to fetch latest authoritative credits count
+    await db.refresh(effective_user)
 
     # Update conversation title if default and this is first user message
     if convo.title == "New Conversation":
@@ -329,5 +364,5 @@ async def send_message(
     return MessageSendResponse(
         role="model",
         content=reply,
-        credits_remaining=user.credits,
+        credits_remaining=effective_user.credits,
     )

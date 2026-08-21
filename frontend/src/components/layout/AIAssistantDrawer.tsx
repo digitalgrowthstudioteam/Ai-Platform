@@ -81,7 +81,7 @@ export default function AIAssistantDrawer() {
 
       // Fetch credits, conversations, and account metadata (campaigns, adsets, ads) concurrently
       const [credRes, convos, campsList, adSetsList, adsList] = await Promise.all([
-        api.getAiCredits(),
+        api.getAiCredits(selectedAccount.id),
         api.getConversations(selectedAccount.id),
         api.getCampaigns(selectedAccount.id, start, end).catch(() => []),
         api.getAdSets(selectedAccount.id, start, end).catch(() => []),
@@ -267,7 +267,7 @@ export default function AIAssistantDrawer() {
       
       // Refresh credits breakdown
       try {
-        const credRes = await api.getAiCredits();
+        const credRes = await api.getAiCredits(selectedAccount.id);
         setCredits(credRes.credits);
         setCreditsBreakdown({
           monthly_credits_remaining: credRes.monthly_credits_remaining,

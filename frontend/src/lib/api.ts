@@ -253,7 +253,8 @@ class ApiClient {
   }
 
   // AI Assistant endpoints
-  async getAiCredits() {
+  async getAiCredits(adAccountId?: string) {
+    const query = adAccountId ? `?ad_account_id=${adAccountId}` : "";
     return this.request<{
       credits: number;
       monthly_credits_remaining: number;
@@ -261,7 +262,7 @@ class ApiClient {
       trial_credits_remaining: number;
       monthly_credits_limit: number;
       monthly_credits_used: number;
-    }>("/assistant/credits");
+    }>(`/assistant/credits${query}`);
   }
 
   async getConversations(adAccountId: string) {
