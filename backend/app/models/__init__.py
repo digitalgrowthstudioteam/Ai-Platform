@@ -30,6 +30,7 @@ from app.models.ai_optimization import AIOptimizationConfig, AIOptimizationLog
 from app.models.ai_assistant import AIChatConversation, AIChatMessage, AICreditTransaction
 from app.models.admin_config import AdminConfig
 from app.models.ai_usage import AIUsageRecord
+from app.models.funnel import FunnelRecommendation, FunnelAudit, FunnelEvent
 
 __all__ = [
     "BaseModel",
@@ -66,4 +67,7 @@ __all__ = [
     "AICreditTransaction",
     "AdminConfig",
     "AIUsageRecord",
+    "FunnelRecommendation",
+    "FunnelAudit",
+    "FunnelEvent",
 ]

@@ -712,6 +712,36 @@ class ApiClient {
     return this.request<any>("/auth/me");
   }
 
+  // Lead Funnel Endpoints
+  async submitRecommendation(answers: Record<string, any>) {
+    return this.request<any>("/funnel/recommendation", {
+      method: "POST",
+      body: { answers },
+    });
+  }
+
+  async getLatestRecommendation() {
+    return this.request<any>("/funnel/recommendation/latest");
+  }
+
+  async runHealthCheckAudit(adAccountId: string) {
+    return this.request<any>("/funnel/health-check/audit", {
+      method: "POST",
+      body: { ad_account_id: adAccountId },
+    });
+  }
+
+  async getLatestHealthAudit() {
+    return this.request<any>("/funnel/health-check/audit/latest");
+  }
+
+  async logFunnelEvent(eventName: string, payload?: Record<string, any>) {
+    return this.request<any>("/funnel/event", {
+      method: "POST",
+      body: { event_name: eventName, payload },
+    });
+  }
+
 }
 
 export const api = new ApiClient(API_BASE_URL);
