@@ -321,6 +321,14 @@ export default function RecommendationsPage() {
     const avgCtr = overview?.ctr?.value !== undefined ? formatPercent(overview.ctr.value) : "—";
     const avgCpl = overview?.cpl?.value !== undefined ? formatCurrency(overview.cpl.value) : "—";
 
+    console.log("DEBUG dnaMap:", {
+      overview,
+      avgCpm,
+      avgRoas,
+      avgCtr,
+      avgCpl
+    });
+
     return {
       bestFormat,
       bestHook,
