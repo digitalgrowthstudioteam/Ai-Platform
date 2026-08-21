@@ -72,6 +72,9 @@ export default function RecommendationsPage() {
   const [experiments, setExperiments] = useState<any[]>([]);
   const [effectivenessList, setEffectivenessList] = useState<any[]>([]);
   const [completingExperimentId, setCompletingExperimentId] = useState<string | null>(null);
+  const [overview, setOverview] = useState<any>(null);
+  const [planName, setPlanName] = useState<string>("Growth");
+  const [historicalDays, setHistoricalDays] = useState<number>(90);
   
   const [notification, setNotification] = useState<{
     type: "success" | "info";
@@ -110,6 +113,48 @@ export default function RecommendationsPage() {
         setEffectivenessList(resEff);
       } catch (effErr) {
         console.error("Failed to load recommendation effectiveness logs:", effErr);
+      }
+
+      // 6. Fetch subscription & dashboard overview for DNA
+      let planDays = 90;
+      let planStr = "Growth";
+      try {
+        const subRes = await api.getSubscription();
+        const plan = (subRes?.plan || "").toLowerCase();
+        if (plan === "starter" || plan === "free") {
+          planDays = 30;
+          planStr = "Starter";
+        } else if (plan === "growth") {
+          planDays = 90;
+          planStr = "Growth";
+        } else if (plan === "pro") {
+          planDays = 180;
+          planStr = "Pro";
+        } else if (plan === "agency") {
+          planDays = 365;
+          planStr = "Agency";
+        }
+      } catch (e) {
+        console.error("Failed to fetch plan:", e);
+      }
+      setPlanName(planStr);
+      setHistoricalDays(planDays);
+
+      try {
+        const endDateObj = new Date();
+        const startDateObj = new Date();
+        startDateObj.setDate(endDateObj.getDate() - planDays);
+
+        const pad = (n: number) => String(n).padStart(2, "0");
+        const formatYMD = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+        
+        const startStr = formatYMD(startDateObj);
+        const endStr = formatYMD(endDateObj);
+
+        const resOverview = await api.getDashboardOverview(selectedAccount.id, startStr, endStr, "all");
+        setOverview(resOverview);
+      } catch (e) {
+        console.error("Failed to fetch dashboard overview for DNA:", e);
       }
     } catch (err) {
       console.error("Failed to load recommendations workspace data:", err);
@@ -252,6 +297,30 @@ export default function RecommendationsPage() {
       
     let strongestCta = isMsg ? "\"Send Message\" (WhatsApp)" : "\"Learn More\" Button";
 
+    const formatCurrency = (val: number | undefined) => {
+      if (val === undefined || val === null) return "—";
+      return new Intl.NumberFormat("en-IN", {
+        style: "currency",
+        currency: "INR",
+        maximumFractionDigits: 2
+      }).format(val);
+    };
+
+    const formatPercent = (val: number | undefined) => {
+      if (val === undefined || val === null) return "—";
+      return `${val.toFixed(2)}%`;
+    };
+
+    const formatROAS = (val: number | undefined) => {
+      if (val === undefined || val === null) return "—";
+      return `${val.toFixed(2)}x`;
+    };
+
+    const avgCpm = overview?.cpm?.value !== undefined ? formatCurrency(overview.cpm.value) : "—";
+    const avgRoas = overview?.roas?.value !== undefined ? formatROAS(overview.roas.value) : "—";
+    const avgCtr = overview?.ctr?.value !== undefined ? formatPercent(overview.ctr.value) : "—";
+    const avgCpl = overview?.cpl?.value !== undefined ? formatCurrency(overview.cpl.value) : "—";
+
     return {
       bestFormat,
       bestHook,
@@ -260,7 +329,11 @@ export default function RecommendationsPage() {
       bestAudience: "Broad targeting pool",
       fatigueRate: "~14 Days wearout pacing",
       strongestCta,
-      scope: "Active 90d window"
+      scope: `Active ${planName} plan (${historicalDays}d) window`,
+      avgCpm,
+      avgRoas,
+      avgCtr,
+      avgCpl
     };
   };
 
@@ -878,6 +951,25 @@ export default function RecommendationsPage() {
               <div className="space-y-1 bg-white/5 p-3.5 rounded-lg border border-white/10">
                 <span className="text-white/40 block font-bold uppercase tracking-wider text-[10px]">Scope Window</span>
                 <span className="text-sm font-black text-white">{dnaMap.scope}</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-xs mt-6">
+              <div className="space-y-1 bg-white/5 p-3.5 rounded-lg border border-white/10">
+                <span className="text-white/40 block font-bold uppercase tracking-wider text-[10px]">Avg Account CPM</span>
+                <span className="text-sm font-black text-white">{dnaMap.avgCpm}</span>
+              </div>
+              <div className="space-y-1 bg-white/5 p-3.5 rounded-lg border border-white/10">
+                <span className="text-white/40 block font-bold uppercase tracking-wider text-[10px]">Avg Account ROAS</span>
+                <span className="text-sm font-black text-white">{dnaMap.avgRoas}</span>
+              </div>
+              <div className="space-y-1 bg-white/5 p-3.5 rounded-lg border border-white/10">
+                <span className="text-white/40 block font-bold uppercase tracking-wider text-[10px]">Avg Account CTR</span>
+                <span className="text-sm font-black text-white">{dnaMap.avgCtr}</span>
+              </div>
+              <div className="space-y-1 bg-white/5 p-3.5 rounded-lg border border-white/10">
+                <span className="text-white/40 block font-bold uppercase tracking-wider text-[10px]">Avg Account CPL</span>
+                <span className="text-sm font-black text-white">{dnaMap.avgCpl}</span>
               </div>
             </div>
           </div>
