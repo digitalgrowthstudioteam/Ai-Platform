@@ -150,10 +150,6 @@ export default function AdAccountsPage() {
         setSaving(false);
       }
     } else {
-      if (!industries[accountId]) {
-        setError("Please select an industry vertical before activating.");
-        return;
-      }
       setError(null);
       setPendingAccountId(accountId);
       setShowConfirmModal(true);
