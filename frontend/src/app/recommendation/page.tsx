@@ -304,10 +304,8 @@ export default function RecommendationPage() {
       {/* HEADER */}
       <header className="bg-white border-b border-slate-200/80 px-6 py-4">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="bg-blue-600 p-2 rounded-lg text-white">
-              <Sparkles size={16} />
-            </div>
+          <Link href="/" className="flex items-center gap-2.5">
+            <img src="/logo.jpg" alt="Logo" className="w-8 h-8 rounded-lg object-cover shadow-xs" />
             <span className="font-extrabold text-sm tracking-tight">Digital Growth Studio</span>
           </Link>
           <div className="text-xs font-semibold text-slate-500">

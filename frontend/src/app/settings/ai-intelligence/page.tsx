@@ -24,7 +24,7 @@ import {
   PauseCircle,
   Lock,
 } from "lucide-react";
-import { trackPurchase } from "@/lib/analytics";
+import { trackPurchase, trackInitiateCheckout } from "@/lib/analytics";
 
 interface AIAccount {
   id: string;
@@ -97,6 +97,7 @@ export default function AIIntelligenceHub() {
     try {
       setBtnLoading(addonId);
       const order = await api.createAddonBillingOrder(addonId, qty);
+      trackInitiateCheckout(addonId, order.amount / 100, order.currency || "INR");
       
       const options = {
         key: order.key_id || "rzp_test_mock_key_id",
@@ -622,26 +623,6 @@ export default function AIIntelligenceHub() {
                 </button>
               </div>
 
-            </div>
-          </div>
-
-          {/* Admin Stats Tracker & Gross Margin Tracker */}
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
-            <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-              Workspace Cost projection
-            </h4>
-            <div className="space-y-3 text-xs leading-normal">
-              <div className="flex justify-between items-center">
-                <span className="text-slate-500 font-normal">Processing Cost:</span>
-                <span className="font-bold text-slate-800">₹{processingCostEstimate.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-slate-500 font-normal">Estimated Margin:</span>
-                <span className="font-bold text-emerald-600">{marginPercentage.toFixed(1)}%</span>
-              </div>
-              <div className="pt-2 border-t border-slate-100 text-[10px] text-slate-400 font-normal leading-normal">
-                LLM processing infrastructure has a 97% gross margin per covered Meta Ad Account.
-              </div>
             </div>
           </div>
         </div>
