@@ -145,38 +145,70 @@ export default function CreativeAnalyzerPage() {
   const filteredPerformance = getFilteredPerformanceData(creativePerformance);
 
   const getCorrelations = () => {
-    let winFormat = "Single Image Ads";
-    let loseFormat = "Carousel Ads";
+    let winFormat = "N/A";
+    let loseFormat = "N/A";
     let winCost = Infinity;
     let loseCost = -Infinity;
     let winRoas = -Infinity;
     let loseRoas = Infinity;
 
-    Object.entries(formatMetrics).forEach(([key, val]: [string, any]) => {
+    const activeFormats = Object.entries(formatMetrics).filter(([_, val]: [string, any]) => val.count > 0);
+
+    if (activeFormats.length === 0) {
+      return {
+        winFormat: "N/A",
+        loseFormat: "N/A",
+        winCost: 0,
+        loseCost: 0,
+        winRoas: 0,
+        loseRoas: 0
+      };
+    }
+
+    if (activeFormats.length === 1) {
+      const [key, val]: [string, any] = activeFormats[0];
+      const label = key === "IMAGE" ? "Single Image Ads" : (key === "VIDEO" ? "Single Video Ads" : "Carousel Ads");
+      const cost = val.conversations > 0 ? val.spend / val.conversations : val.spend;
+      const roas = val.spend > 0 ? val.revenue / val.spend : 0;
+      return {
+        winFormat: label,
+        loseFormat: "N/A",
+        winCost: cost,
+        loseCost: 0,
+        winRoas: roas,
+        loseRoas: 0
+      };
+    }
+
+    activeFormats.forEach(([key, val]: [string, any]) => {
       const label = key === "IMAGE" ? "Single Image Ads" : (key === "VIDEO" ? "Single Video Ads" : "Carousel Ads");
       const cost = val.conversations > 0 ? val.spend / val.conversations : val.spend;
       const roas = val.spend > 0 ? val.revenue / val.spend : 0;
       
       if (isMessaging) {
-        if (val.count > 0 && cost < winCost) {
+        if (cost < winCost) {
           winCost = cost;
           winFormat = label;
         }
-        if (val.count > 0 && cost > loseCost) {
+        if (cost > loseCost) {
           loseCost = cost;
           loseFormat = label;
         }
       } else {
-        if (val.count > 0 && roas > winRoas) {
+        if (roas > winRoas) {
           winRoas = roas;
           winFormat = label;
         }
-        if (val.count > 0 && roas < loseRoas) {
+        if (roas < loseRoas) {
           loseRoas = roas;
           loseFormat = label;
         }
       }
     });
+
+    if (winFormat === loseFormat) {
+      loseFormat = "N/A";
+    }
 
     return {
       winFormat,
@@ -204,14 +236,14 @@ export default function CreativeAnalyzerPage() {
       const loser = sorted[sorted.length - 1];
 
       if (winner) {
-        winHook = winner.dna.hook !== "N/A" ? winner.dna.hook : "Benefit-focused Hook";
-        winHeadline = winner.dna.copy.hook !== "N/A" ? winner.dna.copy.hook : "Outcome-focused Headline";
-        winPlacement = winner.dna.format === "Short-form video" ? "Instagram Reels" : "Facebook Feed";
+        winHook = winner.dna.hook;
+        winHeadline = winner.dna.copy.hook;
+        winPlacement = winner.dna.format === "Short-form video" ? "Instagram Reels" : (winner.dna.format === "N/A" || winner.dna.format === "Single Image" ? "Facebook Feed" : "N/A");
       }
-      if (loser) {
-        loseHook = loser.dna.hook !== "N/A" ? loser.dna.hook : "Product-focused Hook";
-        loseHeadline = loser.dna.copy.hook !== "N/A" ? loser.dna.copy.hook : "Checklist Headline";
-        losePlacement = loser.dna.format === "Carousel" ? "Facebook Audience Network" : "Instagram Stories";
+      if (loser && loser.id !== winner.id) {
+        loseHook = loser.dna.hook;
+        loseHeadline = loser.dna.copy.hook;
+        losePlacement = correlations.loseFormat === "N/A" ? "N/A" : (loser.dna.format === "Carousel" ? "Facebook Audience Network" : "Instagram Stories");
       }
     }
 
@@ -635,13 +667,15 @@ export default function CreativeAnalyzerPage() {
     const winner = sorted[0];
     const loser = sorted[sorted.length - 1];
 
+    const winHookDesc = winner.dna.hook && winner.dna.hook !== "N/A" ? `its "${winner.dna.hook}" hook` : "its visual layout";
+
     if (isMessaging) {
       const winnerCost = winner.conversations > 0 ? winner.spend / winner.conversations : 0;
       const loserCost = loser.conversations > 0 ? loser.spend / loser.conversations : 0;
-      return `The data correlates with strongest performance in "${winner.creative.headline}" (${winnerCost > 0 ? formatCurrency(winnerCost) : "—"} cost per conversation). This correlates with its "${winner.dna.hook}" hook and UGC visual structure delivering a ${winner.ctr.toFixed(2)}% CTR. Conversely, "${loser.creative.headline}" (${loserCost > 0 ? formatCurrency(loserCost) : "—"} cost per conversation) correlates with weaker output primarily due to high frequency fatigue (${loser.frequency.toFixed(1)}x) and lower post-click conversion rates.`;
+      return `The data correlates with strongest performance in "${winner.creative.headline}" (${winnerCost > 0 ? formatCurrency(winnerCost) : "—"} cost per conversation). This correlates with ${winHookDesc} and UGC visual structure delivering a ${winner.ctr.toFixed(2)}% CTR. Conversely, "${loser.creative.headline}" (${loserCost > 0 ? formatCurrency(loserCost) : "—"} cost per conversation) correlates with weaker output primarily due to high frequency fatigue (${loser.frequency.toFixed(1)}x) and lower post-click conversion rates.`;
     }
 
-    return `The data correlates with strongest performance in "${winner.creative.headline}" (${winner.roas.toFixed(2)}x ROAS). This correlates with its "${winner.dna.hook}" hook and UGC visual structure delivering a ${winner.ctr.toFixed(2)}% CTR. Conversely, "${loser.creative.headline}" (${loser.roas.toFixed(2)}x ROAS) correlates with weaker output primarily due to high frequency fatigue (${loser.frequency.toFixed(1)}x) and lower post-click conversion rates.`;
+    return `The data correlates with strongest performance in "${winner.creative.headline}" (${winner.roas.toFixed(2)}x ROAS). This correlates with ${winHookDesc} and UGC visual structure delivering a ${winner.ctr.toFixed(2)}% CTR. Conversely, "${loser.creative.headline}" (${loser.roas.toFixed(2)}x ROAS) correlates with weaker output primarily due to high frequency fatigue (${loser.frequency.toFixed(1)}x) and lower post-click conversion rates.`;
   };
 
   if (loadingAccounts || loading) {
@@ -1065,10 +1099,13 @@ export default function CreativeAnalyzerPage() {
                 </div>
                 <div className="bg-white p-3 rounded-lg border border-green-100 text-[11px] leading-relaxed text-slate-600 font-medium">
                   <span className="font-bold text-slate-800">Winning Pattern: </span>
-                  {isMessaging 
-                    ? `Your top performing format is ${correlations.winFormat} with ${hookCorrelations.winHook} and ${hookCorrelations.winHeadline}. This setup correlates with the lowest cost per conversation (CPL) for ${selectedAccount.name}.`
-                    : `Your top performing format is ${correlations.winFormat} with ${hookCorrelations.winHook} and ${hookCorrelations.winHeadline}. This setup correlates with the highest ROAS for ${selectedAccount.name}.`
-                  }
+                  {hookCorrelations.winHook === "N/A" && hookCorrelations.winHeadline === "N/A" ? (
+                    `Your top performing format is ${correlations.winFormat}. Add hook and headline metadata to generate advanced creative DNA correlations.`
+                  ) : (
+                    isMessaging 
+                      ? `Your top performing format is ${correlations.winFormat} with ${hookCorrelations.winHook} and ${hookCorrelations.winHeadline}. This setup correlates with the lowest cost per conversation (CPL) for ${selectedAccount.name}.`
+                      : `Your top performing format is ${correlations.winFormat} with ${hookCorrelations.winHook} and ${hookCorrelations.winHeadline}. This setup correlates with the highest ROAS for ${selectedAccount.name}.`
+                  )}
                 </div>
               </div>
             </div>
@@ -1098,10 +1135,13 @@ export default function CreativeAnalyzerPage() {
                 </div>
                 <div className="bg-white p-3 rounded-lg border border-red-100 text-[11px] leading-relaxed text-slate-600 font-medium">
                   <span className="font-bold text-slate-800">Losing Pattern: </span>
-                  {isMessaging 
-                    ? `Conversely, ${correlations.loseFormat} combined with ${hookCorrelations.loseHook} correlate with higher Cost Per Conversation (₹${(correlations.loseCost || 180).toFixed(0)}+) and suffer from frequency wearout.`
-                    : `Conversely, ${correlations.loseFormat} combined with ${hookCorrelations.loseHook} correlate with lower conversion efficiency and suffer from frequency wearout.`
-                  }
+                  {correlations.loseFormat === "N/A" ? (
+                    "No underperforming format or creative DNA pattern detected. All connected ad pipelines are running stably."
+                  ) : (
+                    isMessaging 
+                      ? `Conversely, ${correlations.loseFormat} combined with ${hookCorrelations.loseHook !== "N/A" ? hookCorrelations.loseHook : "weaker creative elements"} correlate with higher Cost Per Conversation and suffer from frequency wearout.`
+                      : `Conversely, ${correlations.loseFormat} combined with ${hookCorrelations.loseHook !== "N/A" ? hookCorrelations.loseHook : "weaker creative elements"} correlate with lower conversion efficiency and suffer from frequency wearout.`
+                  )}
                 </div>
               </div>
             </div>
