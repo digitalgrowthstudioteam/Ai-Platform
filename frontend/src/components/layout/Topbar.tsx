@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Search, Bell, LogOut, RefreshCw, AlertTriangle } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useAdAccount } from "@/context/AdAccountContext";
@@ -18,6 +18,7 @@ export default function Topbar() {
 
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
+  const notificationRef = useRef<HTMLDivElement>(null);
 
   const fetchNotifications = async () => {
     try {
@@ -101,6 +102,18 @@ export default function Topbar() {
       return () => clearInterval(timer);
     }
   }, [user]);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
+        setShowNotifications(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   const [countdownText, setCountdownText] = useState<string>("");
 
@@ -218,7 +231,7 @@ export default function Topbar() {
         </div>
 
         {/* Notifications */}
-        <div className="relative">
+        <div className="relative" ref={notificationRef}>
           <button 
             onClick={() => setShowNotifications(!showNotifications)}
             className="topbar-notification relative" 
