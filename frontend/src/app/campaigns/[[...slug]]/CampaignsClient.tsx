@@ -2649,7 +2649,7 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
                   const whatsWorking = selectedCampaign.metrics.roas >= 1.0 
                     ? `Positive ROAS delivery observed (ROAS: ${selectedCampaign.metrics.roas.toFixed(2)}x).` 
                     : selectedCampaign.metrics.clicks > 0 
-                    ? `Traffic is flowing (CTR: ${(selectedCampaign.metrics.ctr * 100).toFixed(2)}%).` 
+                    ? `Traffic is flowing (CTR: ${formatPercent(selectedCampaign.metrics.ctr)}).` 
                     : "N/A";
                   
                   const whatsDeclining = firstRec ? firstRec.title : "N/A";
