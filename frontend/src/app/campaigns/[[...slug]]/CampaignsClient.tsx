@@ -937,7 +937,18 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
   // Find top and bottom performing ads in the campaign
   const getStrongestAndWeakestAds = () => {
     if (ads.length === 0) return { strongest: null, weakest: null };
-    const sorted = [...ads].sort((a, b) => b.metrics.roas - a.metrics.roas || b.metrics.ctr - a.metrics.ctr);
+    const isMsg = (selectedCampaign?.objective || "").toUpperCase().includes("ENGAGEMENT") ||
+                  (selectedCampaign?.objective || "").toUpperCase().includes("MESSAGING") ||
+                  (selectedCampaign?.name || "").toLowerCase().includes("cake");
+    const sorted = [...ads].sort((a, b) => {
+      if (isMsg) {
+        const convA = a.metrics.conversations || 0;
+        const convB = b.metrics.conversations || 0;
+        if (convB !== convA) return convB - convA;
+        return b.metrics.ctr - a.metrics.ctr;
+      }
+      return b.metrics.roas - a.metrics.roas || b.metrics.ctr - a.metrics.ctr;
+    });
     return {
       strongest: sorted[0],
       weakest: sorted.length > 1 ? sorted[sorted.length - 1] : null
@@ -2748,6 +2759,9 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
                     if (!strongest && !weakest) {
                       return <div className="text-center py-4 text-xs text-slate-400">No active ads.</div>;
                     }
+                    const isMsg = (selectedCampaign?.objective || "").toUpperCase().includes("ENGAGEMENT") ||
+                                  (selectedCampaign?.objective || "").toUpperCase().includes("MESSAGING") ||
+                                  (selectedCampaign?.name || "").toLowerCase().includes("cake");
                     return (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {strongest && (
@@ -2757,7 +2771,13 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
                                 <ThumbsUp size={12} /> Strongest Performer
                               </span>
                               <span className="text-[10px] text-green-600 bg-green-50 px-2 py-0.5 rounded font-black">
-                                {strongest.metrics.roas.toFixed(2)}x ROAS
+                                {isMsg 
+                                  ? (strongest.metrics.conversations > 0 
+                                      ? `${strongest.metrics.conversations} Chats` 
+                                      : `${formatPercent(strongest.metrics.ctr)} CTR`
+                                    ) 
+                                  : `${strongest.metrics.roas.toFixed(2)}x ROAS`
+                                }
                               </span>
                             </div>
                             <div className="flex items-center gap-3">
@@ -2781,7 +2801,13 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
                                 <ThumbsDown size={12} /> Weakest Performer
                               </span>
                               <span className="text-[10px] text-red-600 bg-red-50 px-2 py-0.5 rounded font-black">
-                                {weakest.metrics.roas.toFixed(2)}x ROAS
+                                {isMsg 
+                                  ? (weakest.metrics.conversations > 0 
+                                      ? `${weakest.metrics.conversations} Chats` 
+                                      : `${formatPercent(weakest.metrics.ctr)} CTR`
+                                    ) 
+                                  : `${weakest.metrics.roas.toFixed(2)}x ROAS`
+                                }
                               </span>
                             </div>
                             <div className="flex items-center gap-3">
