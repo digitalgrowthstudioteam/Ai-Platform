@@ -794,7 +794,10 @@ export default function LandingPage() {
             Find the Right Plan for Your Scale
           </h2>
           <p className="text-slate-500 text-sm max-w-xl mx-auto font-normal">
-            Choose the right intelligence level for your Meta advertising scale. Start with our 7-day free trial. Plan starts from ₹99/- Per Month.
+            Choose the right intelligence level for your Meta advertising scale. Start with our 7-day free trial.{" "}
+            <span className="font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-100/80 inline-block mt-1">
+              Plan starts from ₹99/- Per Month.
+            </span>
           </p>
         </div>
 
