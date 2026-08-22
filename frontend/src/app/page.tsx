@@ -1078,11 +1078,14 @@ export default function LandingPage() {
       <footer className="bg-slate-950 text-slate-400 py-12 px-6 border-t border-slate-900 text-xs">
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-8 mb-12">
           <div className="space-y-3">
-            <div className="flex items-center gap-2.5 text-white font-extrabold text-sm">
-              <div className="bg-blue-600 p-1.5 rounded-md text-white">
-                <Sparkles size={14} />
+            <div className="flex items-center gap-3 text-white font-extrabold text-sm">
+              <img src="/logo.jpg" alt="Digital Growth Studio Logo" className="w-8 h-8 rounded-lg object-cover" />
+              <div className="flex flex-col">
+                <span className="leading-none">Digital Growth Studio</span>
+                <span className="text-[9px] font-semibold text-blue-500 tracking-wider uppercase mt-0.5">
+                  AI Meta Ads Intelligence
+                </span>
               </div>
-              Digital Growth Studio
             </div>
             <p className="text-slate-500 leading-relaxed">
               AI-powered Meta Ads intelligence platform. Analyze campaigns, creatives, copy, and audiences with automated optimization tips.
