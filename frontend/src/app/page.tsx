@@ -806,10 +806,6 @@ export default function LandingPage() {
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Starter Tier</span>
                 <h3 className="text-xl font-bold text-slate-900 mt-1">Starter</h3>
                 <p className="text-xs text-slate-500 mt-1">Low-cost entry for advertisers</p>
-                <div className="mt-3 flex items-baseline text-slate-900">
-                  <span className="text-2xl font-extrabold tracking-tight">₹99</span>
-                  <span className="ml-1 text-xs font-semibold text-slate-500">/month</span>
-                </div>
               </div>
               <ul className="space-y-2.5 text-xs font-semibold text-slate-600 border-t border-slate-100 pt-4">
                 <li className="flex items-center gap-2">
@@ -865,10 +861,6 @@ export default function LandingPage() {
                 <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">Growth Tier</span>
                 <h3 className="text-xl font-bold text-slate-900 mt-1">Growth</h3>
                 <p className="text-xs text-slate-500 mt-1">For active scaling advertisers</p>
-                <div className="mt-3 flex items-baseline text-slate-900">
-                  <span className="text-2xl font-extrabold tracking-tight">₹999</span>
-                  <span className="ml-1 text-xs font-semibold text-slate-500">/month</span>
-                </div>
               </div>
               <ul className="space-y-2.5 text-xs font-semibold text-slate-600 border-t border-slate-100 pt-4">
                 <li className="flex items-center gap-2 font-bold text-blue-700">
@@ -925,10 +917,6 @@ export default function LandingPage() {
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Professional Tier</span>
                 <h3 className="text-xl font-bold text-slate-900 mt-1">Pro</h3>
                 <p className="text-xs text-slate-500 mt-1">For marketing teams & brands</p>
-                <div className="mt-3 flex items-baseline text-slate-900">
-                  <span className="text-2xl font-extrabold tracking-tight">₹2,999</span>
-                  <span className="ml-1 text-xs font-semibold text-slate-500">/month</span>
-                </div>
               </div>
               <ul className="space-y-2.5 text-xs font-semibold text-slate-600 border-t border-slate-100 pt-4">
                 <li className="flex items-center gap-2 font-bold text-indigo-700">
@@ -981,10 +969,6 @@ export default function LandingPage() {
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Enterprise Tier</span>
                 <h3 className="text-xl font-bold text-slate-900 mt-1">Agency</h3>
                 <p className="text-xs text-slate-500 mt-1">For agencies & portfolios</p>
-                <div className="mt-3 flex items-baseline text-slate-900">
-                  <span className="text-2xl font-extrabold tracking-tight">₹4,999</span>
-                  <span className="ml-1 text-xs font-semibold text-slate-500">/month</span>
-                </div>
               </div>
               <ul className="space-y-2.5 text-xs font-semibold text-slate-600 border-t border-slate-100 pt-4">
                 <li className="flex items-center gap-2 font-bold text-purple-700">
