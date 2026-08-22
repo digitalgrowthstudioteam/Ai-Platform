@@ -129,7 +129,7 @@ export default function CreativeAnalyzerPage() {
         revenue,
         roas,
         cpc: spend > 0 && clicks > 0 ? spend / clicks : item.cpc,
-        ctr: impressions > 0 ? (clicks / impressions) : item.ctr
+        ctr: impressions > 0 ? (clicks / impressions) * 100 : item.ctr
       };
     });
 
