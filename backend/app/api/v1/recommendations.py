@@ -465,7 +465,62 @@ async def get_decision_center_summary(
         .where(AIRecommendation.status.in_(["new", "viewed"]))
     )
     res = await db.execute(stmt)
-    recs = res.scalars().all()
+    recs = list(res.scalars().all())
+
+    # Filter to only active campaigns/ads with spend in last 7 days
+    from datetime import date, timedelta
+    from sqlalchemy import func
+    from app.models.campaign import Campaign, AdSet, Ad
+    from app.models.metrics import CampaignDailyMetrics, AdDailyMetrics
+
+    seven_days_ago = date.today() - timedelta(days=7)
+    
+    # Active Campaigns with spend in last 7 days
+    c_stmt = (
+        select(Campaign.id)
+        .join(CampaignDailyMetrics, CampaignDailyMetrics.campaign_id == Campaign.id)
+        .where(Campaign.ad_account_id == ad_acc.id)
+        .where(Campaign.status == "ACTIVE")
+        .where(CampaignDailyMetrics.date >= seven_days_ago)
+        .group_by(Campaign.id)
+        .having(func.sum(CampaignDailyMetrics.spend) > 0)
+    )
+    res_c = await db.execute(c_stmt)
+    spending_campaigns = set(res_c.scalars().all())
+
+    # Active Ads with spend in last 7 days
+    a_stmt = (
+        select(Ad.id)
+        .join(AdDailyMetrics, AdDailyMetrics.ad_id == Ad.id)
+        .join(AdSet, Ad.ad_set_id == AdSet.id)
+        .join(Campaign, AdSet.campaign_id == Campaign.id)
+        .where(Campaign.ad_account_id == ad_acc.id)
+        .where(Ad.status == "ACTIVE")
+        .where(AdSet.status == "ACTIVE")
+        .where(Campaign.status == "ACTIVE")
+        .where(AdDailyMetrics.date >= seven_days_ago)
+        .group_by(Ad.id)
+        .having(func.sum(AdDailyMetrics.spend) > 0)
+    )
+    res_a = await db.execute(a_stmt)
+    spending_ads = set(res_a.scalars().all())
+
+    # Filter recommendations
+    if spending_campaigns or spending_ads:
+        filtered_recs = []
+        for r in recs:
+            # Check Campaign association
+            if r.entity_type == "campaign" or r.campaign_id:
+                c_id = r.entity_id if r.entity_type == "campaign" else r.campaign_id
+                if c_id not in spending_campaigns:
+                    continue
+            # Check Ad association
+            elif r.entity_type == "ad" or r.ad_id:
+                a_id = r.entity_id if r.entity_type == "ad" else r.ad_id
+                if a_id not in spending_ads:
+                    continue
+            filtered_recs.append(r)
+        recs = filtered_recs
 
     total_count = len(recs)
     critical_count = sum(1 for r in recs if (r.priority or "").lower() == "critical")
