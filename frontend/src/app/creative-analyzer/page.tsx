@@ -1149,7 +1149,7 @@ export default function CreativeAnalyzerPage() {
 
           <div className="card border border-border bg-white shadow-sm rounded-lg p-6 space-y-4">
             <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">Creative Attribute Correlations Summary</h4>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs font-semibold text-slate-700">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs font-semibold text-slate-700">
               <div className="bg-slate-50 p-4 rounded-lg border border-border space-y-2">
                 <span className="text-slate-500 text-[10px] font-bold block uppercase">Creative count</span>
                 <span className="text-xl font-black text-slate-800">{filteredPerformance.length} Creatives Analyzed</span>
@@ -1168,10 +1168,6 @@ export default function CreativeAnalyzerPage() {
                     : `${filteredPerformance.reduce((acc, curr) => acc + (curr.purchases || 0), 0)} Purchases`
                   }
                 </span>
-              </div>
-              <div className="bg-slate-50 p-4 rounded-lg border border-border space-y-2">
-                <span className="text-slate-500 text-[10px] font-bold block uppercase">AI Model Confidence</span>
-                <span className="text-xl font-black text-green-600">94.8% Confidence</span>
               </div>
             </div>
           </div>
