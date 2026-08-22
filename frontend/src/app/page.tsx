@@ -84,7 +84,7 @@ export default function LandingPage() {
     },
     {
       q: "What is the Early Access pricing?",
-      a: "Our Early Access plan is currently locked in at just ₹99/month, including a free 3-day trial and all core features.",
+      a: "Our Early Access plan is currently locked in at just ₹99/month, including a free 7-day trial and all core features.",
     },
     {
       q: "Can I cancel my subscription anytime?",
@@ -119,9 +119,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-6 h-18 flex items-center justify-between">
           {/* Brand Logo */}
           <Link href="/" className="flex items-center gap-3 group">
-            <div className="bg-gradient-to-tr from-blue-700 to-blue-500 p-2.5 rounded-xl text-white shadow-md shadow-blue-500/20 group-hover:scale-105 transition-transform">
-              <Sparkles size={20} className="fill-white/20" />
-            </div>
+            <img src="/logo.jpg" alt="Digital Growth Studio Logo" className="w-10 h-10 rounded-xl object-cover shadow-md group-hover:scale-105 transition-transform" />
             <div className="flex flex-col">
               <span className="font-extrabold text-lg tracking-tight text-slate-900 leading-none">
                 Digital Growth Studio
@@ -244,10 +242,8 @@ export default function LandingPage() {
           <div className="w-72 bg-white h-full p-6 flex flex-col justify-between shadow-2xl border-l border-slate-200">
             <div className="space-y-6">
               <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-                <div className="flex items-center gap-2">
-                  <div className="bg-blue-600 p-1.5 rounded-md text-white">
-                    <Sparkles size={16} />
-                  </div>
+                <div className="flex items-center gap-2.5">
+                  <img src="/logo.jpg" alt="Logo" className="w-7 h-7 rounded-lg object-cover shadow-xs" />
                   <span className="font-extrabold text-sm text-slate-900">Digital Growth Studio</span>
                 </div>
                 <button
@@ -789,83 +785,247 @@ export default function LandingPage() {
       </section>
 
       {/* 8. PRICING SECTION */}
-      <section id="pricing" className="py-20 px-6 max-w-5xl mx-auto scroll-mt-12">
+      <section id="pricing" className="py-20 px-6 max-w-7xl mx-auto scroll-mt-12">
         <div className="text-center space-y-3 mb-14">
           <span className="text-xs font-bold text-blue-600 uppercase tracking-widest bg-blue-50 border border-blue-100 px-3 py-1 rounded-full">
             Transparent Pricing
           </span>
           <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-950">
-            Early Access Pricing — Limited Time Offer
+            Find the Right Plan for Your Scale
           </h2>
           <p className="text-slate-500 text-sm max-w-xl mx-auto font-normal">
-            Get full access to all Meta Ads intelligence tools for a fraction of agency costs.
+            Choose the right intelligence level for your Meta advertising scale. Start with our 7-day free trial. Plan starts from ₹99/- Per Month.
           </p>
         </div>
 
-        {starterAvailable ? (
-          <div className="max-w-md mx-auto bg-white border-2 border-blue-600 rounded-2xl p-8 shadow-xl relative">
-            <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-[11px] font-extrabold uppercase tracking-wider px-4 py-1 rounded-full shadow-xs">
-              🔥 Early Access Tier
-            </div>
-
-            <div className="text-center space-y-2">
-              <h3 className="text-xl font-bold text-slate-900">Starter Plan</h3>
-              <div className="flex items-baseline justify-center gap-1">
-                <span className="text-5xl font-extrabold text-slate-950 tracking-tight">₹99</span>
-                <span className="text-sm font-semibold text-slate-500">/ month</span>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {/* Card 1: Starter */}
+          <div className="bg-white border border-slate-205 rounded-2xl p-6 shadow-xs flex flex-col justify-between hover:border-slate-300 transition-all">
+            <div className="space-y-4">
+              <div>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Starter Tier</span>
+                <h3 className="text-xl font-bold text-slate-900 mt-1">Starter</h3>
+                <p className="text-xs text-slate-500 mt-1">Low-cost entry for advertisers</p>
+                <div className="mt-3 flex items-baseline text-slate-900">
+                  <span className="text-2xl font-extrabold tracking-tight">₹99</span>
+                  <span className="ml-1 text-xs font-semibold text-slate-500">/month</span>
+                </div>
               </div>
-              <p className="text-xs text-emerald-600 font-semibold bg-emerald-50 py-1 px-3 rounded-md inline-block">
-                Includes 7-Day Free Trial • Cancel Anytime
-              </p>
+              <ul className="space-y-2.5 text-xs font-semibold text-slate-600 border-t border-slate-100 pt-4">
+                <li className="flex items-center gap-2">
+                  <Check size={14} className="text-blue-600 shrink-0" />
+                  <span>1 Meta Ad Account</span>
+                </li>
+                <li className="flex items-center gap-2 font-bold text-emerald-600">
+                  <Check size={14} className="text-emerald-600 shrink-0" />
+                  <span>1 AI Optimization Campaign</span>
+                </li>
+
+                <li className="flex items-center gap-2">
+                  <Check size={14} className="text-blue-600 shrink-0" />
+                  <span>30 Days historical data</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check size={14} className="text-blue-600 shrink-0" />
+                  <span>Every 48 Hours data sync</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check size={14} className="text-blue-600 shrink-0" />
+                  <span>Full Ad & Creative Analysis</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check size={14} className="text-blue-600 shrink-0" />
+                  <span>Headline & Copy Analysis</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check size={14} className="text-blue-600 shrink-0" />
+                  <span>Account Health Score</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check size={14} className="text-blue-600 shrink-0" />
+                  <span>PDF/CSV Export</span>
+                </li>
+              </ul>
             </div>
-
-            <ul className="mt-8 space-y-3.5 text-xs font-semibold text-slate-700">
-              <li className="flex items-center gap-2.5">
-                <Check size={16} className="text-blue-600 shrink-0" />
-                <span>Full Meta Ad Accounts Sync</span>
-              </li>
-              <li className="flex items-center gap-2.5">
-                <Check size={16} className="text-blue-600 shrink-0" />
-                <span>Automated Campaign & Ad-Level Audit</span>
-              </li>
-              <li className="flex items-center gap-2.5">
-                <Check size={16} className="text-blue-600 shrink-0" />
-                <span>Creative Breakdown (Video vs Image vs Reels)</span>
-              </li>
-              <li className="flex items-center gap-2.5">
-                <Check size={16} className="text-blue-600 shrink-0" />
-                <span>Ad Copy & Headline Insights</span>
-              </li>
-              <li className="flex items-center gap-2.5">
-                <Check size={16} className="text-blue-600 shrink-0" />
-                <span>AI Recommendations & Budget Scaling Tips</span>
-              </li>
-              <li className="flex items-center gap-2.5">
-                <Check size={16} className="text-blue-600 shrink-0" />
-                <span>Read-Only Official OAuth Security</span>
-              </li>
-            </ul>
-
             <Link
               href="/signup"
-              className="mt-8 w-full block text-center bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm py-3.5 rounded-xl transition shadow-lg shadow-blue-500/25 active:scale-98"
+              className="mt-8 w-full block text-center bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-3 rounded-xl transition shadow-xs"
             >
               Start 7-Day Free Trial
             </Link>
           </div>
-        ) : (
-          <div className="max-w-md mx-auto bg-white border-2 border-slate-200 rounded-2xl p-8 shadow-md text-center space-y-4">
-            <div className="text-slate-400 font-bold text-sm uppercase tracking-wider">Early Access Tier</div>
-            <h3 className="text-2xl font-extrabold text-slate-950">SOLD OUT</h3>
-            <p className="text-slate-500 text-xs">
-              Our Pro Early Access tier has reached its maximum capacity of 100 active members.
-              Subscriptions are currently closed as we scale our optimization engines.
-            </p>
-            <div className="py-2.5 px-4 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold text-slate-600">
-              Stay tuned for our upcoming public release!
+
+          {/* Card 2: Growth */}
+          <div className="bg-white border-2 border-blue-600 rounded-2xl p-6 shadow-md flex flex-col justify-between relative hover:scale-102 transition-all">
+            <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-[9px] font-extrabold uppercase tracking-widest px-3.5 py-1 rounded-full shadow-xs">
+              ⭐ Recommended
             </div>
+            <div className="space-y-4">
+              <div>
+                <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">Growth Tier</span>
+                <h3 className="text-xl font-bold text-slate-900 mt-1">Growth</h3>
+                <p className="text-xs text-slate-500 mt-1">For active scaling advertisers</p>
+                <div className="mt-3 flex items-baseline text-slate-900">
+                  <span className="text-2xl font-extrabold tracking-tight">₹999</span>
+                  <span className="ml-1 text-xs font-semibold text-slate-500">/month</span>
+                </div>
+              </div>
+              <ul className="space-y-2.5 text-xs font-semibold text-slate-600 border-t border-slate-100 pt-4">
+                <li className="flex items-center gap-2 font-bold text-blue-700">
+                  <Check size={14} className="text-blue-600 shrink-0" />
+                  <span>3 Meta Ad Accounts</span>
+                </li>
+                <li className="flex items-center gap-2 font-bold text-emerald-600">
+                  <Check size={14} className="text-emerald-600 shrink-0" />
+                  <span>3 AI Optimization Campaigns</span>
+                </li>
+
+                <li className="flex items-center gap-2">
+                  <Check size={14} className="text-blue-600 shrink-0" />
+                  <span>90 Days historical data</span>
+                </li>
+                <li className="flex items-center gap-2 font-bold text-blue-700">
+                  <Check size={14} className="text-blue-600 shrink-0" />
+                  <span>Every 12 Hours data sync</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check size={14} className="text-blue-600 shrink-0" />
+                  <span>Advanced Creative Intelligence</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check size={14} className="text-blue-600 shrink-0" />
+                  <span>Demographic & Placement Analysis</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check size={14} className="text-blue-600 shrink-0" />
+                  <span>Campaign & Creative Comparison</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check size={14} className="text-blue-600 shrink-0" />
+                  <span>Fatigue & Anomaly Detection</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check size={14} className="text-blue-600 shrink-0" />
+                  <span>3 Team Members</span>
+                </li>
+              </ul>
+            </div>
+            <Link
+              href="/signup"
+              className="mt-8 w-full block text-center bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-3 rounded-xl transition shadow-md"
+            >
+              Start 7-Day Free Trial
+            </Link>
           </div>
-        )}
+
+          {/* Card 3: Pro */}
+          <div className="bg-white border border-slate-205 rounded-2xl p-6 shadow-xs flex flex-col justify-between hover:border-slate-300 transition-all">
+            <div className="space-y-4">
+              <div>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Professional Tier</span>
+                <h3 className="text-xl font-bold text-slate-900 mt-1">Pro</h3>
+                <p className="text-xs text-slate-500 mt-1">For marketing teams & brands</p>
+                <div className="mt-3 flex items-baseline text-slate-900">
+                  <span className="text-2xl font-extrabold tracking-tight">₹2,999</span>
+                  <span className="ml-1 text-xs font-semibold text-slate-500">/month</span>
+                </div>
+              </div>
+              <ul className="space-y-2.5 text-xs font-semibold text-slate-600 border-t border-slate-100 pt-4">
+                <li className="flex items-center gap-2 font-bold text-indigo-700">
+                  <Check size={14} className="text-indigo-600 shrink-0" />
+                  <span>10 Meta Ad Accounts</span>
+                </li>
+                <li className="flex items-center gap-2 font-bold text-emerald-600">
+                  <Check size={14} className="text-emerald-600 shrink-0" />
+                  <span>5 AI Optimization Campaigns</span>
+                </li>
+
+                <li className="flex items-center gap-2">
+                  <Check size={14} className="text-indigo-600 shrink-0" />
+                  <span>180 Days historical data</span>
+                </li>
+                <li className="flex items-center gap-2 font-bold text-indigo-700">
+                  <Check size={14} className="text-indigo-600 shrink-0" />
+                  <span>Every 6 Hours data sync</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check size={14} className="text-indigo-600 shrink-0" />
+                  <span>Cross-Account Analysis</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check size={14} className="text-indigo-600 shrink-0" />
+                  <span>Performance Forecasting</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check size={14} className="text-indigo-600 shrink-0" />
+                  <span>Industry Benchmarking</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check size={14} className="text-indigo-600 shrink-0" />
+                  <span>10 Team Members</span>
+                </li>
+              </ul>
+            </div>
+            <Link
+              href="/signup"
+              className="mt-8 w-full block text-center bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-3 rounded-xl transition shadow-xs"
+            >
+              Start 7-Day Free Trial
+            </Link>
+          </div>
+
+          {/* Card 4: Agency */}
+          <div className="bg-white border border-slate-205 rounded-2xl p-6 shadow-xs flex flex-col justify-between hover:border-slate-300 transition-all">
+            <div className="space-y-4">
+              <div>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Enterprise Tier</span>
+                <h3 className="text-xl font-bold text-slate-900 mt-1">Agency</h3>
+                <p className="text-xs text-slate-500 mt-1">For agencies & portfolios</p>
+                <div className="mt-3 flex items-baseline text-slate-900">
+                  <span className="text-2xl font-extrabold tracking-tight">₹4,999</span>
+                  <span className="ml-1 text-xs font-semibold text-slate-500">/month</span>
+                </div>
+              </div>
+              <ul className="space-y-2.5 text-xs font-semibold text-slate-600 border-t border-slate-100 pt-4">
+                <li className="flex items-center gap-2 font-bold text-purple-700">
+                  <Check size={14} className="text-purple-600 shrink-0" />
+                  <span>25 Meta Ad Accounts</span>
+                </li>
+                <li className="flex items-center gap-2 font-bold text-emerald-600">
+                  <Check size={14} className="text-emerald-600 shrink-0" />
+                  <span>10 AI Optimization Campaigns</span>
+                </li>
+
+                <li className="flex items-center gap-2">
+                  <Check size={14} className="text-purple-600 shrink-0" />
+                  <span>365 Days historical data</span>
+                </li>
+                <li className="flex items-center gap-2 font-bold text-purple-700">
+                  <Check size={14} className="text-purple-600 shrink-0" />
+                  <span>Every 6 Hours data sync</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check size={14} className="text-purple-600 shrink-0" />
+                  <span>White-Label Client Reports</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check size={14} className="text-purple-600 shrink-0" />
+                  <span>Cross-Client Portfolio Analytics</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check size={14} className="text-purple-600 shrink-0" />
+                  <span>25 Team Members</span>
+                </li>
+              </ul>
+            </div>
+            <Link
+              href="/signup"
+              className="mt-8 w-full block text-center bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-3 rounded-xl transition shadow-xs"
+            >
+              Start 7-Day Free Trial
+            </Link>
+          </div>
+        </div>
       </section>
 
       {/* 9. FAQ ACCORDION SECTION */}
@@ -921,7 +1081,7 @@ export default function LandingPage() {
               href="/signup"
               className="inline-flex items-center gap-2 bg-white text-blue-700 hover:bg-blue-50 font-bold text-sm px-9 py-4 rounded-xl transition shadow-2xl hover:scale-105 active:scale-95"
             >
-              Start Free 3-Day Trial <ArrowRight size={16} />
+              Start Free 7-Day Trial <ArrowRight size={16} />
             </Link>
           </div>
         </div>
@@ -966,8 +1126,10 @@ export default function LandingPage() {
             <div className="font-bold text-slate-200 mb-3">Legal & Security</div>
             <ul className="space-y-2 text-slate-400">
               <li><Link href="/privacy" className="hover:text-white transition">Privacy Policy</Link></li>
+              <li><Link href="/terms" className="hover:text-white transition">Terms of Service</Link></li>
+              <li><Link href="/security" className="hover:text-white transition">Security Info</Link></li>
+              <li><Link href="/meta-integration" className="hover:text-white transition">Meta Integration</Link></li>
               <li><Link href="/data-deletion" className="hover:text-white transition">Data Deletion Instructions</Link></li>
-              <li><span className="text-slate-500">Read-Only Meta OAuth</span></li>
             </ul>
           </div>
         </div>

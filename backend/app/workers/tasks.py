@@ -140,3 +140,50 @@ async def trigger_all_active_syncs_async():
                     asyncio.create_task(run_sync_inline(str(acc.id)))
 
 
+@celery_app.task(name="app.workers.tasks.force_sync_all_accounts_task")
+def force_sync_all_accounts_task():
+    """
+    Scheduled task that runs daily at 12:01 AM to force sync all active ad accounts.
+    Bypasses the subscription interval checks so that all accounts start the day with fresh data.
+    """
+    logger.info("force_sync_all_accounts_task_started")
+    try:
+        asyncio.run(force_sync_all_accounts_async())
+        logger.info("force_sync_all_accounts_task_completed")
+        return {"status": "success"}
+    except Exception as e:
+        logger.error("force_sync_all_accounts_task_failed", error=str(e))
+        return {"status": "failed", "error": str(e)}
+
+
+async def force_sync_all_accounts_async():
+    """
+    Asynchronous force runner for all active Meta ad accounts.
+    Syncs accounts regardless of last sync timestamp to ensure updated statistics at midnight.
+    """
+    from app.models.meta import MetaConnection
+    from app.api.v1.meta import run_sync_inline
+
+    async with async_session_factory() as db:
+        # Query only ad accounts with active connection and active account status
+        stmt = (
+            select(MetaAdAccount)
+            .join(MetaConnection, MetaAdAccount.meta_connection_id == MetaConnection.id)
+            .where(
+                MetaConnection.status == "connected",
+                MetaAdAccount.account_status == 1,  # 1 = ACTIVE
+            )
+        )
+        res = await db.execute(stmt)
+        accounts = res.scalars().all()
+        
+        logger.info("force_sync_active_ad_accounts_retrieved", count=len(accounts))
+        for acc in accounts:
+            logger.info("triggering_daily_force_sync", ad_account_id=acc.meta_account_id)
+            # A. Trigger Celery task as fallback
+            try:
+                sync_ad_account_task.delay(str(acc.id))
+            except Exception as e:
+                logger.error("triggering_force_sync_celery_failed", ad_account_id=acc.meta_account_id, error=str(e))
+            # B. Trigger inline sync in background thread as guaranteed fallback
+            asyncio.create_task(run_sync_inline(str(acc.id)))

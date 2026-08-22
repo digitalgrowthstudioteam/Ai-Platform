@@ -7,6 +7,8 @@
  * - Zero local storage — uses gtag.js loaded from Google CDN
  */
 
+import * as pixel from "./pixel";
+
 export const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID || "";
 
 // Safely reference window.gtag
@@ -42,11 +44,23 @@ export const event = (action: string, params?: Record<string, any>) => {
 /** Track user sign-up */
 export const trackSignUp = (method: string) => {
   event("sign_up", { method });
+  pixel.trackSignUp(method);
 };
 
 /** Track user login */
 export const trackLogin = (method: string) => {
   event("login", { method });
+  pixel.event("Login", { method });
+};
+
+/** Track checkout initiation */
+export const trackInitiateCheckout = (planId: string, amount: number, currency = "INR") => {
+  event("begin_checkout", {
+    value: amount,
+    currency,
+    items: [{ item_id: planId, item_name: planId.replace("_", " ").toUpperCase(), price: amount }],
+  });
+  pixel.trackInitiateCheckout(planId, amount, currency);
 };
 
 /** Track Razorpay purchase / plan upgrade */
@@ -57,6 +71,7 @@ export const trackPurchase = (planId: string, amount: number, currency = "INR") 
     currency,
     items: [{ item_id: planId, item_name: planId.replace("_", " ").toUpperCase(), price: amount }],
   });
+  pixel.trackPurchase(planId, amount, currency);
 };
 
 /** Track plan upgrade event */

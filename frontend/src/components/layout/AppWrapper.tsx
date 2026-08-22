@@ -15,7 +15,14 @@ interface AppWrapperProps {
 export default function AppWrapper({ children }: AppWrapperProps) {
   const pathname = usePathname();
   const cleanPath = pathname === "/" ? "/" : pathname.replace(/\/$/, "");
-  const isPublicRoute = ["/", "/privacy", "/data-deletion"].includes(cleanPath);
+  const isPublicRoute = [
+    "/",
+    "/privacy",
+    "/terms",
+    "/security",
+    "/meta-integration",
+    "/data-deletion"
+  ].includes(cleanPath);
   const isAuthRoute = ["/login", "/signup", "/reset-password"].includes(cleanPath);
 
   if (isPublicRoute || isAuthRoute) {

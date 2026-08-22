@@ -22,7 +22,7 @@ import {
   Building2,
   TrendingUp,
 } from "lucide-react";
-import { trackPurchase } from "@/lib/analytics";
+import { trackPurchase, trackInitiateCheckout } from "@/lib/analytics";
 
 export default function BillingPage() {
   const { user } = useAuth();
@@ -115,6 +115,7 @@ export default function BillingPage() {
       setNotification(null);
 
       const order = await api.createBillingOrder(planId);
+      trackInitiateCheckout(planId, order.amount / 100, order.currency || "INR");
       
       if (order.is_mock) {
         await api.verifyBillingPayment(
@@ -205,6 +206,7 @@ export default function BillingPage() {
 
       const qty = addonQuantities[addonId] || 1;
       const order = await api.createAddonBillingOrder(addonId, qty);
+      trackInitiateCheckout(addonId, order.amount / 100, order.currency || "INR");
       
       if (order.is_mock) {
         await api.verifyAddonBillingPayment(
@@ -496,10 +498,7 @@ export default function BillingPage() {
                         <Check size={13} className="text-emerald-600 shrink-0" />
                         <span>1 AI Optimization Campaign</span>
                       </div>
-                      <div className="flex items-center gap-1.5 font-bold text-emerald-600">
-                        <Check size={13} className="text-emerald-600 shrink-0" />
-                        <span>25 AI Assistant Credits / mo</span>
-                      </div>
+
                       <div className="flex items-center gap-1.5">
                         <Check size={13} className="text-blue-600 shrink-0" />
                         <span>30 Days historical data</span>
@@ -569,10 +568,7 @@ export default function BillingPage() {
                       <Check size={13} className="text-emerald-600 shrink-0" />
                       <span>3 AI Optimization Campaigns</span>
                     </div>
-                    <div className="flex items-center gap-1.5 font-bold text-emerald-600">
-                      <Check size={13} className="text-emerald-600 shrink-0" />
-                      <span>150 AI Assistant Credits / mo</span>
-                    </div>
+
                     <div className="flex items-center gap-1.5">
                       <Check size={13} className="text-blue-600 shrink-0" />
                       <span>90 Days historical data</span>
@@ -638,10 +634,7 @@ export default function BillingPage() {
                       <Check size={13} className="text-emerald-600 shrink-0" />
                       <span>5 AI Optimization Campaigns</span>
                     </div>
-                    <div className="flex items-center gap-1.5 font-bold text-emerald-600">
-                      <Check size={13} className="text-emerald-600 shrink-0" />
-                      <span>350 AI Assistant Credits / mo</span>
-                    </div>
+
                     <div className="flex items-center gap-1.5">
                       <Check size={13} className="text-indigo-600 shrink-0" />
                       <span>180 Days historical data</span>
@@ -703,10 +696,7 @@ export default function BillingPage() {
                       <Check size={13} className="text-emerald-600 shrink-0" />
                       <span>10 AI Optimization Campaigns</span>
                     </div>
-                    <div className="flex items-center gap-1.5 font-bold text-emerald-600">
-                      <Check size={13} className="text-emerald-600 shrink-0" />
-                      <span>500 AI Assistant Credits / mo</span>
-                    </div>
+
                     <div className="flex items-center gap-1.5">
                       <Check size={13} className="text-purple-600 shrink-0" />
                       <span>365 Days historical data</span>
@@ -984,40 +974,7 @@ export default function BillingPage() {
             </div>
           </div>
 
-          {/* SECTION 3: PURCHASE AI ASSISTANT CREDITS PACKS */}
-          <div className="space-y-4 pt-6 border-t border-slate-200">
-            <div>
-              <h2 className="text-lg font-extrabold text-slate-950">AI Assistant Credit Packs</h2>
-              <p className="text-xs text-slate-500 font-medium">Top up your AI Assistant credits. Packs never expire and are consumed after monthly included credits.</p>
-            </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-              {[
-                { id: "credit_pack_100", name: "100 Credits", price: "₹199", desc: "For occasional questions" },
-                { id: "credit_pack_500", name: "500 Credits", price: "₹949", desc: "Best value starter top-up" },
-                { id: "credit_pack_1000", name: "1,000 Credits", price: "₹1,899", desc: "For active day-to-day use" },
-                { id: "credit_pack_3000", name: "3,000 Credits", price: "₹5,799", desc: "Premium high-volume power pack" },
-                { id: "credit_pack_5000", name: "5,000 Credits", price: "₹8,999", desc: "Enterprise scale mass operations" },
-              ].map((pack) => (
-                <div key={pack.id} className="bg-white border border-slate-200 p-5 rounded-2xl shadow-xs space-y-4 flex flex-col justify-between text-center">
-                  <div className="space-y-1">
-                    <div className="text-[10px] font-extrabold text-blue-600 uppercase tracking-widest">Credit Pack</div>
-                    <h4 className="text-sm font-bold text-slate-950">{pack.name}</h4>
-                    <div className="text-lg font-black text-slate-900">{pack.price}</div>
-                    <p className="text-[10px] text-slate-400 font-medium leading-relaxed">{pack.desc}</p>
-                  </div>
-                  <button
-                    disabled={actionLoading === `addon_${pack.id}`}
-                    onClick={() => handleAddonCheckout(pack.id)}
-                    className="w-full py-2 rounded-xl font-bold text-[11px] bg-blue-600 hover:bg-blue-700 text-white transition flex items-center justify-center gap-1.5"
-                  >
-                    {actionLoading === `addon_${pack.id}` && <Loader2 size={10} className="animate-spin" />}
-                    Buy Pack
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
         </>
       )}
     </div>
