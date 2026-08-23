@@ -36,12 +36,16 @@ router = APIRouter(
 # ──────────────────────────────────────────────
 class RecommendationSubmitRequest(BaseModel):
     answers: Dict[str, Any]
+    contact_name: Optional[str] = None
+    contact_phone: Optional[str] = None
 
 class RecommendationResponseSchema(BaseModel):
     id: uuid.UUID
     answers: Dict[str, Any]
     score: int
     priorities: List[Dict[str, Any]]
+    contact_name: Optional[str] = None
+    contact_phone: Optional[str] = None
 
 class HealthAuditRequest(BaseModel):
     ad_account_id: str
@@ -81,7 +85,9 @@ async def submit_recommendation(
         user_id=user.id,
         answers=payload.answers,
         score=score,
-        priorities={"priorities": priorities}
+        priorities={"priorities": priorities},
+        contact_name=payload.contact_name or (user.name if user.name else None),
+        contact_phone=payload.contact_phone,
     )
     db.add(rec)
     
@@ -89,7 +95,7 @@ async def submit_recommendation(
     event = FunnelEvent(
         user_id=user.id,
         event_name="recommendation_completed",
-        payload={"score": score, "problem": payload.answers.get("q5")}
+        payload={"score": score, "problem": payload.answers.get("q5"), "contact_name": payload.contact_name, "contact_phone": payload.contact_phone}
     )
     db.add(event)
     
@@ -100,7 +106,9 @@ async def submit_recommendation(
         id=rec.id,
         answers=rec.answers,
         score=rec.score,
-        priorities=priorities
+        priorities=priorities,
+        contact_name=rec.contact_name,
+        contact_phone=rec.contact_phone,
     )
 
 
@@ -134,7 +142,9 @@ async def get_latest_recommendation(
         id=rec.id,
         answers=rec.answers,
         score=rec.score,
-        priorities=priorities
+        priorities=priorities,
+        contact_name=rec.contact_name,
+        contact_phone=rec.contact_phone,
     )
 
 
@@ -381,6 +391,57 @@ async def download_audit_pdf(
         with open(file_path, mode="rb") as f:
             yield from f
             
+    return StreamingResponse(
+        iterfile(),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
+@router.get("/recommendation/{rec_id}/pdf", summary="Download Strategy Readiness Report PDF")
+async def download_strategy_pdf(
+    rec_id: uuid.UUID,
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Generates and serves a Strategy Readiness Report PDF for the given recommendation.
+    """
+    user = await get_db_user_from_claims(claims, db)
+
+    stmt = select(FunnelRecommendation).where(FunnelRecommendation.id == rec_id)
+    res = await db.execute(stmt)
+    rec = res.scalar_one_or_none()
+
+    if not rec:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Strategy recommendation not found."
+        )
+
+    # Access control
+    if rec.user_id != user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to view this report."
+        )
+
+    priorities = rec.priorities.get("priorities", [])
+    user_name = rec.contact_name or user.name or user.email
+    contact_phone = rec.contact_phone or ""
+
+    pdf_buffer = PDFReportGenerator.generate_strategy_report(
+        user_name=user_name,
+        contact_phone=contact_phone,
+        score=rec.score,
+        priorities=priorities,
+    )
+
+    filename = f"Strategy_Readiness_Report_{rec.score}.pdf"
+
+    def iterfile():
+        yield pdf_buffer.getvalue()
+
     return StreamingResponse(
         iterfile(),
         media_type="application/pdf",

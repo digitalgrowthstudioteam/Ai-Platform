@@ -34,6 +34,14 @@ class FunnelRecommendation(BaseModel):
         JSON,
         nullable=False,
     )
+    contact_name: Mapped[Optional[str]] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+    contact_phone: Mapped[Optional[str]] = mapped_column(
+        String(30),
+        nullable=True,
+    )
 
     # Relationships
     user: Mapped["User"] = relationship(

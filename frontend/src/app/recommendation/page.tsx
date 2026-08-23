@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
@@ -17,6 +17,10 @@ import {
   Target,
   AlertTriangle,
   Lightbulb,
+  Download,
+  Loader2,
+  User,
+  Phone,
 } from "lucide-react";
 
 interface Question {
@@ -152,6 +156,8 @@ const QUESTIONS: Question[] = [
   },
 ];
 
+const STORAGE_KEY = "dgs_funnel_answers";
+
 export default function RecommendationPage() {
   const { user, loginWithGoogle, isAuthenticated } = useAuth();
   const [currentStep, setCurrentStep] = useState(0);
@@ -160,14 +166,128 @@ export default function RecommendationPage() {
   const [result, setResult] = useState<any>(null);
   const [authError, setAuthError] = useState("");
 
+  // Contact collection state (shown after Google login)
+  const [showContactForm, setShowContactForm] = useState(false);
+  const [contactName, setContactName] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
+  const [contactError, setContactError] = useState("");
+
+  // PDF download state
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [pdfDownloaded, setPdfDownloaded] = useState(false);
+
   // Log funnel event on mount
   useEffect(() => {
     api.logFunnelEvent("recommendation_started").catch(() => {});
   }, []);
 
+  // ──────────────────────────────────────────────
+  // FIX 1: Restore answers from localStorage on mount
+  // ──────────────────────────────────────────────
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === "object" && Object.keys(parsed).length > 0) {
+          setAnswers(parsed);
+          // If all questions were answered, jump to the end
+          const allAnswered = QUESTIONS.every(q => parsed[q.id] !== undefined && parsed[q.id] !== null);
+          if (allAnswered) {
+            setCurrentStep(QUESTIONS.length);
+          }
+        }
+      }
+    } catch (e) {
+      // Ignore parse errors
+    }
+  }, []);
+
+  // Persist answers to localStorage whenever they change
+  useEffect(() => {
+    if (Object.keys(answers).length > 0) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(answers));
+    }
+  }, [answers]);
+
+  // ──────────────────────────────────────────────
+  // FIX 2: After Google login + contact form, auto-submit
+  // ──────────────────────────────────────────────
+  useEffect(() => {
+    if (isAuthenticated && currentStep === QUESTIONS.length && !result && !submitting && !showContactForm) {
+      // Check if all questions answered
+      const allAnswered = QUESTIONS.every(q => answers[q.id] !== undefined && answers[q.id] !== null);
+      if (!allAnswered) return;
+
+      // Check if contact info already collected (returning user)
+      const savedContact = localStorage.getItem("dgs_funnel_contact");
+      if (savedContact) {
+        try {
+          const parsed = JSON.parse(savedContact);
+          if (parsed.name && parsed.phone) {
+            // Already collected — submit directly
+            submitWithContact(parsed.name, parsed.phone);
+            return;
+          }
+        } catch (e) {}
+      }
+      
+      // Show contact form
+      if (user?.displayName) {
+        setContactName(user.displayName);
+      }
+      setShowContactForm(true);
+    }
+  }, [isAuthenticated, currentStep, answers, result, submitting, showContactForm]);
+
+  const submitWithContact = async (name: string, phone: string) => {
+    setSubmitting(true);
+    try {
+      const res = await api.submitRecommendation(answers, name, phone);
+      setResult(res);
+      // Clear stored answers after successful submission
+      localStorage.removeItem(STORAGE_KEY);
+      // Save contact info to avoid re-asking
+      localStorage.setItem("dgs_funnel_contact", JSON.stringify({ name, phone }));
+    } catch (err) {
+      console.error("Failed to submit recommendations:", err);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // ──────────────────────────────────────────────
+  // FIX 3: Auto-download PDF when results load
+  // ──────────────────────────────────────────────
+  useEffect(() => {
+    if (result && result.id && !pdfDownloaded) {
+      downloadPdf(result.id);
+    }
+  }, [result]);
+
+  const downloadPdf = async (recId: string) => {
+    setDownloadingPdf(true);
+    try {
+      const blob = await api.getRecommendationPdf(recId);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `Strategy_Readiness_Report_${result?.score || 0}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      setPdfDownloaded(true);
+    } catch (err) {
+      console.error("Failed to download PDF:", err);
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
+
   // Listen to keyboard inputs for navigation
   useEffect(() => {
-    if (currentStep >= QUESTIONS.length || result) return;
+    if (currentStep >= QUESTIONS.length || result || showContactForm) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       const q = QUESTIONS[currentStep];
@@ -203,7 +323,7 @@ export default function RecommendationPage() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [currentStep, answers, result]);
+  }, [currentStep, answers, result, showContactForm]);
 
   const handleSelectSingle = (val: string) => {
     const q = QUESTIONS[currentStep];
@@ -254,7 +374,7 @@ export default function RecommendationPage() {
     }
   };
 
-  // Triggers Firebase Google Auth and submits answers post-login
+  // Triggers Firebase Google Auth
   const handleSaveAndSubmit = async () => {
     setAuthError("");
     setSubmitting(true);
@@ -267,25 +387,28 @@ export default function RecommendationPage() {
       setSubmitting(false);
       return;
     }
+    setSubmitting(false);
   };
 
-  // Trigger submission automatically when user authenticates
-  useEffect(() => {
-    if (isAuthenticated && currentStep === QUESTIONS.length && !result && !submitting) {
-      const submit = async () => {
-        setSubmitting(true);
-        try {
-          const res = await api.submitRecommendation(answers);
-          setResult(res);
-        } catch (err) {
-          console.error("Failed to submit recommendations:", err);
-        } finally {
-          setSubmitting(false);
-        }
-      };
-      submit();
+  // Contact form submission
+  const handleContactSubmit = () => {
+    setContactError("");
+    
+    if (!contactName.trim()) {
+      setContactError("Please enter your full name.");
+      return;
     }
-  }, [isAuthenticated, currentStep, answers, result, submitting]);
+    
+    // Validate phone: at least 10 digits
+    const digitsOnly = contactPhone.replace(/\D/g, "");
+    if (digitsOnly.length < 10) {
+      setContactError("Please enter a valid phone number (at least 10 digits).");
+      return;
+    }
+
+    setShowContactForm(false);
+    submitWithContact(contactName.trim(), contactPhone.trim());
+  };
 
   // Renders options index indicator
   const getIndexLabel = (idx: number) => {
@@ -378,6 +501,36 @@ export default function RecommendationPage() {
               </div>
             </div>
 
+            {/* PDF Download status / manual button */}
+            <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+                {downloadingPdf ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin text-blue-600" />
+                    <span>Downloading your PDF report...</span>
+                  </>
+                ) : pdfDownloaded ? (
+                  <>
+                    <CheckCircle size={14} className="text-emerald-600" />
+                    <span>PDF report downloaded successfully!</span>
+                  </>
+                ) : (
+                  <>
+                    <Download size={14} className="text-slate-400" />
+                    <span>Your PDF report is ready.</span>
+                  </>
+                )}
+              </div>
+              <button
+                onClick={() => { setPdfDownloaded(false); downloadPdf(result.id); }}
+                disabled={downloadingPdf}
+                className="text-xs font-bold text-blue-600 hover:text-blue-800 transition flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+              >
+                <Download size={13} />
+                <span>{pdfDownloaded ? "Download Again" : "Download PDF"}</span>
+              </button>
+            </div>
+
             {/* Call to action (Go to Health Check) */}
             <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="text-sm font-semibold text-slate-500 text-center sm:text-left">
@@ -391,6 +544,76 @@ export default function RecommendationPage() {
                 <ArrowRight size={14} />
               </Link>
             </div>
+          </div>
+        ) : showContactForm ? (
+          /* CONTACT COLLECTION FORM (after Google login, before results) */
+          <div className="bg-white border border-slate-200 rounded-3xl p-8 shadow-xl max-w-md mx-auto space-y-6 text-center animate-in fade-in zoom-in duration-200">
+            <div className="bg-blue-50 text-blue-600 p-3.5 rounded-full w-fit mx-auto border border-blue-100">
+              <User size={32} />
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-2xl font-bold text-slate-900">Complete Your Profile</h2>
+              <p className="text-sm text-slate-500 leading-relaxed">
+                Enter your details to receive your personalized Strategy Readiness Report with a downloadable PDF.
+              </p>
+            </div>
+
+            {contactError && (
+              <div className="bg-red-50 text-red-700 border border-red-200 text-xs px-3.5 py-2.5 rounded-lg font-semibold flex items-center gap-2">
+                <AlertTriangle size={14} />
+                <span>{contactError}</span>
+              </div>
+            )}
+
+            <div className="space-y-4 text-left">
+              {/* Name field */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                  <User size={12} /> Full Name
+                </label>
+                <input
+                  type="text"
+                  value={contactName}
+                  onChange={(e) => setContactName(e.target.value)}
+                  placeholder="e.g. Vikram Singh"
+                  className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-800 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                  autoFocus
+                />
+              </div>
+
+              {/* Phone field */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                  <Phone size={12} /> Phone Number
+                </label>
+                <input
+                  type="tel"
+                  value={contactPhone}
+                  onChange={(e) => setContactPhone(e.target.value)}
+                  placeholder="e.g. 9876543210"
+                  className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-800 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                  onKeyDown={(e) => { if (e.key === "Enter") handleContactSubmit(); }}
+                />
+              </div>
+            </div>
+
+            <button
+              onClick={handleContactSubmit}
+              disabled={submitting}
+              className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold py-3.5 rounded-xl transition flex items-center justify-center gap-2 text-sm shadow-md shadow-blue-500/10 cursor-pointer disabled:opacity-55"
+            >
+              {submitting ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>Generating your report...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles size={16} />
+                  <span>Get My Strategy Report</span>
+                </>
+              )}
+            </button>
           </div>
         ) : currentStep === QUESTIONS.length ? (
           /* MID-FLOW GOOGLE LOGIN GATE */
@@ -412,22 +635,23 @@ export default function RecommendationPage() {
               </div>
             )}
 
-            <button
-              onClick={handleSaveAndSubmit}
-              disabled={submitting}
-              className="w-full bg-slate-900 hover:bg-slate-950 text-white font-bold py-3.5 rounded-xl transition flex items-center justify-center gap-3 disabled:opacity-55 cursor-pointer shadow-md"
-            >
-              {submitting ? (
+            {submitting ? (
+              <div className="w-full bg-slate-200 text-slate-500 font-bold py-3.5 rounded-xl flex items-center justify-center gap-3">
+                <Loader2 size={18} className="animate-spin" />
                 <span>Generating recommendations...</span>
-              ) : (
-                <>
-                  <svg className="w-5 h-5 fill-white" viewBox="0 0 24 24">
-                    <path d="M12.24 10.285V14.4h6.887c-.648 2.41-2.519 4.114-6.887 4.114-4.808 0-8.73-3.83-8.73-8.519 0-4.69 3.922-8.519 8.73-8.519 2.062 0 3.93.753 5.4 2.191l3.203-3.21C18.66 1.83 15.65 0 12.24 0 5.48 0 0 5.373 0 12s5.48 12 12.24 12c6.26 0 11.24-4.337 11.24-11.114 0-.66-.06-1.3-.18-1.886H12.24z" />
-                  </svg>
-                  <span>Log In with Google</span>
-                </>
-              )}
-            </button>
+              </div>
+            ) : (
+              <button
+                onClick={handleSaveAndSubmit}
+                disabled={submitting}
+                className="w-full bg-slate-900 hover:bg-slate-950 text-white font-bold py-3.5 rounded-xl transition flex items-center justify-center gap-3 disabled:opacity-55 cursor-pointer shadow-md"
+              >
+                <svg className="w-5 h-5 fill-white" viewBox="0 0 24 24">
+                  <path d="M12.24 10.285V14.4h6.887c-.648 2.41-2.519 4.114-6.887 4.114-4.808 0-8.73-3.83-8.73-8.519 0-4.69 3.922-8.519 8.73-8.519 2.062 0 3.93.753 5.4 2.191l3.203-3.21C18.66 1.83 15.65 0 12.24 0 5.48 0 0 5.373 0 12s5.48 12 12.24 12c6.26 0 11.24-4.337 11.24-11.114 0-.66-.06-1.3-.18-1.886H12.24z" />
+                </svg>
+                <span>Log In with Google</span>
+              </button>
+            )}
             <button
               onClick={() => setCurrentStep(QUESTIONS.length - 1)}
               disabled={submitting}

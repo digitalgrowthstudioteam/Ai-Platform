@@ -195,6 +195,11 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
   const [regionsData, setRegionsData] = useState<any[]>([]);
   const [loadingBreakdowns, setLoadingBreakdowns] = useState<boolean>(false);
 
+  // Ad-level placement & demographic breakdowns
+  const [adPlacementsData, setAdPlacementsData] = useState<any[]>([]);
+  const [adDemographicsData, setAdDemographicsData] = useState<any[]>([]);
+  const [loadingAdBreakdowns, setLoadingAdBreakdowns] = useState<boolean>(false);
+
   useEffect(() => {
     const fetchBreakdowns = async () => {
       if (!selectedAccount || !selectedAdSet || adSetTab !== "breakdowns") return;
@@ -217,6 +222,29 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
     };
     fetchBreakdowns();
   }, [selectedAccount?.id, selectedAdSet?.id, adSetTab, datePreset, customStartDate, customEndDate]);
+
+  // Fetch ad-level breakdowns when an ad is selected
+  useEffect(() => {
+    const fetchAdBreakdowns = async () => {
+      if (!selectedAccount || !selectedAd || !selectedCampaign) return;
+      setLoadingAdBreakdowns(true);
+      try {
+        const { startStr, endStr } = getDates(datePreset, customStartDate, customEndDate);
+        const adSetIdForQuery = selectedAdSet?.id;
+        const [pRes, dRes] = await Promise.all([
+          api.getPlacements(selectedAccount.id, selectedCampaign?.id, adSetIdForQuery, startStr, endStr),
+          api.getDemographics(selectedAccount.id, selectedCampaign?.id, adSetIdForQuery, startStr, endStr)
+        ]);
+        setAdPlacementsData(pRes || []);
+        setAdDemographicsData(dRes || []);
+      } catch (err) {
+        console.error("Failed to fetch ad-level breakdown metrics:", err);
+      } finally {
+        setLoadingAdBreakdowns(false);
+      }
+    };
+    fetchAdBreakdowns();
+  }, [selectedAccount?.id, selectedAd?.id, selectedCampaign?.id, selectedAdSet?.id, datePreset, customStartDate, customEndDate]);
 
   const ageDistribution = useMemo(() => {
     const ageMap: Record<string, { spend: number; impressions: number; clicks: number; results: number; revenue: number }> = {};
@@ -667,8 +695,238 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
   const getCampaignRecommendations = (c: any) => {
     return recs.filter(r => 
       r.entity_id === c.id || 
+      r.campaign_id === c.id ||
       r.title.toLowerCase().includes(c.name.toLowerCase())
     );
+  };
+
+  // Get ad-level recommendations for the AI Diagnosis section
+  const getAdRecommendations = (ad: any) => {
+    return recs.filter(r =>
+      r.entity_id === ad.id ||
+      r.ad_id === ad.id ||
+      r.entity_type === "ad"
+    );
+  };
+
+  // Dynamic Creative Intelligence analyzer
+  const getCreativeIntelligence = (ad: any) => {
+    const creative = ad?.creative;
+    const metrics = ad?.metrics;
+    const insights: { label: string; value: string; sentiment: "good" | "neutral" | "warning" }[] = [];
+
+    if (!creative) return insights;
+
+    // 1. Copy Strength: Analyze headline length
+    const headline = creative.headline || "";
+    const headlineLen = headline.length;
+    if (headlineLen === 0) {
+      insights.push({ label: "Copy Strength", value: "No headline detected. Adding a headline can significantly improve CTR.", sentiment: "warning" });
+    } else if (headlineLen <= 40) {
+      insights.push({ label: "Copy Strength", value: `Concise headline (${headlineLen} chars). Optimal for mobile feeds — low truncation risk.`, sentiment: "good" });
+    } else if (headlineLen <= 65) {
+      insights.push({ label: "Copy Strength", value: `Moderate headline (${headlineLen} chars). May get truncated on some mobile placements.`, sentiment: "neutral" });
+    } else {
+      insights.push({ label: "Copy Strength", value: `Long headline (${headlineLen} chars). High truncation risk on mobile — consider shortening to under 40 characters.`, sentiment: "warning" });
+    }
+
+    // 2. Primary Text Analysis
+    const primaryText = creative.primary_text || "";
+    const primaryLen = primaryText.length;
+    if (primaryLen === 0) {
+      insights.push({ label: "Primary Text", value: "No primary text. Ads with primary text tend to have higher engagement rates.", sentiment: "warning" });
+    } else if (primaryLen <= 125) {
+      insights.push({ label: "Primary Text", value: `Short-form copy (${primaryLen} chars). Fully visible without 'See More' — good for direct response.`, sentiment: "good" });
+    } else if (primaryLen <= 280) {
+      insights.push({ label: "Primary Text", value: `Medium copy (${primaryLen} chars). First 125 characters visible before truncation — ensure hook is strong.`, sentiment: "neutral" });
+    } else {
+      insights.push({ label: "Primary Text", value: `Long-form copy (${primaryLen} chars). Truncated on feed — only users who click 'See More' will read the full text.`, sentiment: "neutral" });
+    }
+
+    // 3. CTA Analysis
+    const cta = creative.call_to_action || "";
+    if (!cta) {
+      insights.push({ label: "Call-to-Action", value: "No CTA button set. Adding a CTA typically improves conversion rate by 10-20%.", sentiment: "warning" });
+    } else {
+      const ctaLabel = cta.replace(/_/g, " ");
+      insights.push({ label: "Call-to-Action", value: `Using '${ctaLabel}' CTA. Ensure it aligns with your campaign objective.`, sentiment: "good" });
+    }
+
+    // 4. Media Type
+    const type = creative.creative_type || (creative.video_id ? "video" : creative.image_url ? "image" : "unknown");
+    if (type === "video" || creative.video_id) {
+      insights.push({ label: "Media Format", value: "Video creative detected. Video ads typically achieve 20-30% higher engagement than static images.", sentiment: "good" });
+    } else if (type === "image" || creative.image_url) {
+      insights.push({ label: "Media Format", value: "Static image creative. Consider testing a video or carousel variant for potentially higher engagement.", sentiment: "neutral" });
+    } else {
+      insights.push({ label: "Media Format", value: "No visual asset detected. Visual creatives are essential for ad performance.", sentiment: "warning" });
+    }
+
+    // 5. Performance-based readability
+    const ctr = metrics?.ctr || 0;
+    if (ctr >= 2.0) {
+      insights.push({ label: "Readability Score", value: `High engagement (${ctr.toFixed(2)}% CTR) suggests copy resonates well with the audience.`, sentiment: "good" });
+    } else if (ctr >= 1.0) {
+      insights.push({ label: "Readability Score", value: `Average engagement (${ctr.toFixed(2)}% CTR). Test alternative hooks or value propositions.`, sentiment: "neutral" });
+    } else if (ctr > 0) {
+      insights.push({ label: "Readability Score", value: `Low engagement (${ctr.toFixed(2)}% CTR). Consider rewriting copy with a stronger opening hook.`, sentiment: "warning" });
+    }
+
+    return insights;
+  };
+
+  // Generate dynamic campaign opportunity insights from real metrics
+  const getCampaignOpportunities = (c: any) => {
+    const opportunities: { type: "warning" | "opportunity"; title: string; description: string }[] = [];
+    const m = c.metrics;
+    const healthScore = getHealthScore(c);
+    const obj = (c.objective || "").toUpperCase();
+
+    // Budget pacing: high spend but poor results
+    if (m.spend > 50 && m.purchases === 0 && m.clicks > 0 && !obj.includes("AWARENESS") && !obj.includes("REACH")) {
+      opportunities.push({
+        type: "warning",
+        title: "Zero Conversions Despite Active Spend",
+        description: `This campaign has spent ${formatCurrency(m.spend)} with ${formatNumber(m.clicks)} clicks but zero conversions. Verify your Meta Pixel or Conversion API events are firing correctly, and ensure the landing page conversion flow is functional.`
+      });
+    }
+
+    // Low CTR warning
+    if (m.ctr > 0 && m.ctr < 0.8 && m.impressions > 1000) {
+      opportunities.push({
+        type: "warning",
+        title: "Below-Average Click-Through Rate",
+        description: `CTR is ${m.ctr.toFixed(2)}% which is below the typical ${obj.includes("AWARENESS") ? "awareness" : "performance"} benchmark. Consider refreshing ad creatives, testing new headlines, or narrowing audience targeting.`
+      });
+    }
+
+    // High frequency fatigue
+    if (m.frequency && m.frequency > 3.5) {
+      opportunities.push({
+        type: "warning",
+        title: "High Frequency — Audience Fatigue Risk",
+        description: `Average frequency is ${m.frequency.toFixed(1)}x. Audiences seeing your ad this many times may experience ad fatigue. Consider expanding the audience or introducing new creative variations.`
+      });
+    }
+
+    // Strong ROAS opportunity to scale
+    if (m.roas >= 3.0 && m.spend > 0) {
+      opportunities.push({
+        type: "opportunity",
+        title: "High ROAS — Scaling Opportunity",
+        description: `This campaign is achieving ${m.roas.toFixed(2)}x ROAS. Consider gradually increasing daily budget by 20-30% to capture additional profitable conversions while monitoring performance stability.`
+      });
+    }
+
+    // Low CPC opportunity
+    if (m.cpc > 0 && m.cpc < 0.50 && m.clicks > 100) {
+      opportunities.push({
+        type: "opportunity",
+        title: "Cost-Efficient Traffic Acquisition",
+        description: `CPC is ${formatCurrency(m.cpc)} — well below average. This audience segment is cost-efficient for traffic. Consider increasing budget allocation to capitalize on low acquisition costs.`
+      });
+    }
+
+    // Declining trends
+    if (m.roas_trend && m.roas_trend < -15) {
+      opportunities.push({
+        type: "warning",
+        title: "Declining ROAS Trend",
+        description: `ROAS has dropped ${Math.abs(m.roas_trend).toFixed(1)}% compared to the previous period. Investigate creative fatigue, audience saturation, or competitive pressure.`
+      });
+    }
+
+    // Limited ad variations
+    const campaignAds = ads.filter(ad => ad.campaign_name === c.name);
+    const activeAds = campaignAds.filter(ad => ad.status === "ACTIVE");
+    if (activeAds.length > 0 && activeAds.length <= 2) {
+      opportunities.push({
+        type: "opportunity",
+        title: "Develop Additional Creative Variations",
+        description: `Only ${activeAds.length} active ad${activeAds.length === 1 ? "" : "s"} in this campaign. Meta's algorithm performs best with 3-5 active variations for optimal delivery optimization.`
+      });
+    }
+
+    return opportunities;
+  };
+
+  // Generate dynamic AI diagnosis insights for an ad
+  const getAdAiDiagnosis = (ad: any, campaign: any, adSet: any) => {
+    const diagnosis: { type: "test" | "keep" | "warning"; label: string; description: string }[] = [];
+    const m = ad?.metrics;
+    const creative = ad?.creative;
+    if (!m) return diagnosis;
+
+    const campaignObj = (campaign?.objective || "").toUpperCase();
+    const isConversation = adSet?.optimization_goal?.toUpperCase().includes("CONVERSATION");
+
+    // Find sibling ads for comparison
+    const siblingAds = ads.filter(a => a.adset_name === ad.adset_name && a.id !== ad.id);
+    const avgSiblingCtr = siblingAds.length > 0 ? siblingAds.reduce((sum: number, a: any) => sum + (a.metrics?.ctr || 0), 0) / siblingAds.length : 0;
+    const avgSiblingRoas = siblingAds.length > 0 ? siblingAds.reduce((sum: number, a: any) => sum + (a.metrics?.roas || 0), 0) / siblingAds.length : 0;
+
+    // Recommended test based on creative analysis
+    if (creative?.headline && creative.headline.length > 0) {
+      const hasQuestion = creative.headline.includes("?");
+      if (!hasQuestion) {
+        diagnosis.push({
+          type: "test",
+          label: "Recommended Next Test",
+          description: `Test a question-oriented headline variant to compare against the current headline "${creative.headline.substring(0, 50)}${creative.headline.length > 50 ? '...' : ''}". Question-based headlines often drive 10-15% higher CTR.`
+        });
+      } else {
+        diagnosis.push({
+          type: "test",
+          label: "Recommended Next Test",
+          description: `Current headline uses a question hook. Test a benefit-led or statistic-driven headline as an alternative to find if direct value propositions outperform curiosity-based copy.`
+        });
+      }
+    } else if (m.ctr < 1.0 && m.impressions > 500) {
+      diagnosis.push({
+        type: "test",
+        label: "Recommended Next Test",
+        description: `Low CTR (${m.ctr.toFixed(2)}%) suggests the creative isn't capturing attention. Test a completely new visual concept with a stronger hook in the first 3 seconds for video or a bolder design for static.`
+      });
+    }
+
+    // Don't change recommendation for high performers
+    if (m.ctr > avgSiblingCtr && m.ctr > 1.0 && m.spend > 10) {
+      const contribution = siblingAds.length > 0 && m.roas > 0
+        ? Math.round((m.purchases / Math.max(1, m.purchases + siblingAds.reduce((s: number, a: any) => s + (a.metrics?.purchases || 0), 0))) * 100)
+        : null;
+      diagnosis.push({
+        type: "keep",
+        label: "Don't Change Recommendation",
+        description: `This ad's CTR (${m.ctr.toFixed(2)}%) outperforms sibling average${avgSiblingCtr > 0 ? ` (${avgSiblingCtr.toFixed(2)}%)` : ""}. ${contribution ? `It contributes approximately ${contribution}% of the ad set's conversions.` : "Keep it running to preserve delivery stability."} Do not alter the primary creative asset.`
+      });
+    } else if (m.roas > avgSiblingRoas && m.roas > 1.0) {
+      diagnosis.push({
+        type: "keep",
+        label: "Efficiency Leader",
+        description: `This ad achieves ${m.roas.toFixed(2)}x ROAS${avgSiblingRoas > 0 ? ` vs ${avgSiblingRoas.toFixed(2)}x sibling average` : ""}. Maintain current creative and audience configuration to preserve return efficiency.`
+      });
+    }
+
+    // Performance warning
+    if (m.spend > 20 && m.purchases === 0 && !isConversation && !campaignObj.includes("AWARENESS")) {
+      diagnosis.push({
+        type: "warning",
+        label: "Conversion Gap Alert",
+        description: `${formatCurrency(m.spend)} spent with zero conversions. Consider pausing this ad and reallocating budget to higher-performing variations within the ad set.`
+      });
+    }
+
+    // Add recommendation-engine insights if available
+    const adRecs = getAdRecommendations(ad);
+    adRecs.slice(0, 2).forEach(r => {
+      diagnosis.push({
+        type: r.priority === "critical" || r.priority === "high" ? "warning" : "test",
+        label: r.title,
+        description: r.description
+      });
+    });
+
+    return diagnosis;
   };
 
   const loadCampaignDetails = async (campaignName: string) => {
@@ -1451,14 +1709,19 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
                   <Sparkles size={14} className="text-primary" /> Creative Intelligence
                 </h4>
                 <div className="space-y-2 text-xs">
-                  <div className="border-b border-slate-50 pb-2">
-                    <span className="text-[10px] text-slate-400 font-bold uppercase block">Copy Strength</span>
-                    <div className="font-semibold text-slate-700 mt-0.5">Sufficiently concise, optimal headline character count.</div>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-400 font-bold uppercase block">readability score</span>
-                    <div className="font-semibold text-slate-700 mt-0.5">High (Grade 8 level, readable for mass markets).</div>
-                  </div>
+                  {getCreativeIntelligence(selectedAd).map((insight, idx) => (
+                    <div key={idx} className={`${idx < getCreativeIntelligence(selectedAd).length - 1 ? "border-b border-slate-50 pb-2" : ""}`}>
+                      <span className="text-[10px] text-slate-400 font-bold uppercase block">{insight.label}</span>
+                      <div className={`font-semibold mt-0.5 ${
+                        insight.sentiment === "good" ? "text-emerald-700" :
+                        insight.sentiment === "warning" ? "text-amber-700" :
+                        "text-slate-700"
+                      }`}>{insight.value}</div>
+                    </div>
+                  ))}
+                  {getCreativeIntelligence(selectedAd).length === 0 && (
+                    <div className="text-slate-400 italic">No creative data available for analysis.</div>
+                  )}
                 </div>
               </div>
             </div>
@@ -1513,19 +1776,30 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
                 <div className="card border border-border bg-white shadow-sm rounded-lg p-4 space-y-3">
                   <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Placement contribution</div>
                   <div className="space-y-2 text-xs">
-                    {[
-                      { name: "Instagram Stories", spend: 0.65, ctr: 2.34 },
-                      { name: "Facebook Feed", spend: 0.25, ctr: 1.55 },
-                      { name: "Messenger Feed", spend: 0.10, ctr: 0.85 }
-                    ].map((p, i) => (
-                      <div key={i} className="flex justify-between items-center bg-slate-50 p-2 rounded">
-                        <div>
-                          <span className="font-bold text-slate-700 block">{p.name}</span>
-                          <span className="text-[9px] text-slate-400 mt-0.5">CTR: {p.ctr}%</span>
-                        </div>
-                        <span className="font-semibold text-slate-600">{formatCurrency(selectedAd.metrics.spend * p.spend)}</span>
+                    {loadingAdBreakdowns ? (
+                      <div className="flex items-center gap-2 text-slate-400 py-2">
+                        <Loader2 size={12} className="animate-spin" /> Loading placements...
                       </div>
-                    ))}
+                    ) : adPlacementsData.length > 0 ? (
+                      (() => {
+                        const totalSpend = adPlacementsData.reduce((s: number, p: any) => s + (p.spend || 0), 0);
+                        return adPlacementsData.slice(0, 5).map((p: any, i: number) => {
+                          const pctSpend = totalSpend > 0 ? ((p.spend || 0) / totalSpend * 100) : 0;
+                          const pCtr = p.impressions > 0 ? ((p.clicks || 0) / p.impressions * 100) : 0;
+                          return (
+                            <div key={i} className="flex justify-between items-center bg-slate-50 p-2 rounded">
+                              <div>
+                                <span className="font-bold text-slate-700 block">{p.publisher_platform ? `${p.publisher_platform} ${p.platform_position || ''}`.trim() : p.placement || `Placement ${i + 1}`}</span>
+                                <span className="text-[9px] text-slate-400 mt-0.5">CTR: {pCtr.toFixed(2)}% · {pctSpend.toFixed(0)}% of spend</span>
+                              </div>
+                              <span className="font-semibold text-slate-600">{formatCurrency(p.spend || 0)}</span>
+                            </div>
+                          );
+                        });
+                      })()
+                    ) : (
+                      <div className="text-slate-400 italic py-1">No placement data available for this period.</div>
+                    )}
                   </div>
                 </div>
 
@@ -1533,19 +1807,41 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
                 <div className="card border border-border bg-white shadow-sm rounded-lg p-4 space-y-3">
                   <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Target Demographic Splits</div>
                   <div className="space-y-2 text-xs">
-                    {[
-                      { age: "25-34 Female", spend: 0.50, ctr: 2.45 },
-                      { age: "25-34 Male", spend: 0.30, ctr: 1.70 },
-                      { age: "35-44 Female", spend: 0.20, ctr: 2.10 }
-                    ].map((p, i) => (
-                      <div key={i} className="flex justify-between items-center bg-slate-50 p-2 rounded">
-                        <div>
-                          <span className="font-bold text-slate-700 block">{p.age}</span>
-                          <span className="text-[9px] text-slate-400 mt-0.5">CTR: {p.ctr}%</span>
-                        </div>
-                        <span className="font-semibold text-slate-600">{formatCurrency(selectedAd.metrics.spend * p.spend)}</span>
+                    {loadingAdBreakdowns ? (
+                      <div className="flex items-center gap-2 text-slate-400 py-2">
+                        <Loader2 size={12} className="animate-spin" /> Loading demographics...
                       </div>
-                    ))}
+                    ) : adDemographicsData.length > 0 ? (
+                      (() => {
+                        // Aggregate by age+gender combination
+                        const demoMap: Record<string, { spend: number; impressions: number; clicks: number }> = {};
+                        adDemographicsData.forEach((d: any) => {
+                          const key = `${d.age || 'Unknown'} ${d.gender || 'Unknown'}`;
+                          if (!demoMap[key]) demoMap[key] = { spend: 0, impressions: 0, clicks: 0 };
+                          demoMap[key].spend += d.spend || 0;
+                          demoMap[key].impressions += d.impressions || 0;
+                          demoMap[key].clicks += d.clicks || 0;
+                        });
+                        const sorted = Object.entries(demoMap)
+                          .map(([label, v]) => ({ label, ...v, ctr: v.impressions > 0 ? (v.clicks / v.impressions) * 100 : 0 }))
+                          .sort((a, b) => b.spend - a.spend);
+                        const totalSpend = sorted.reduce((s, d) => s + d.spend, 0);
+                        return sorted.slice(0, 5).map((d, i) => {
+                          const pctSpend = totalSpend > 0 ? (d.spend / totalSpend * 100) : 0;
+                          return (
+                            <div key={i} className="flex justify-between items-center bg-slate-50 p-2 rounded">
+                              <div>
+                                <span className="font-bold text-slate-700 block">{d.label}</span>
+                                <span className="text-[9px] text-slate-400 mt-0.5">CTR: {d.ctr.toFixed(2)}% · {pctSpend.toFixed(0)}% of spend</span>
+                              </div>
+                              <span className="font-semibold text-slate-600">{formatCurrency(d.spend)}</span>
+                            </div>
+                          );
+                        });
+                      })()
+                    ) : (
+                      <div className="text-slate-400 italic py-1">No demographic data available for this period.</div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1556,23 +1852,32 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
                   <Sparkles size={14} className="text-primary animate-pulse" />
                   AI Optimization Diagnosis
                 </h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Recommended next test */}
-                  <div className="border border-slate-100 rounded-lg p-4 bg-slate-50 space-y-1.5">
-                    <span className="text-[9px] font-bold text-blue-600 uppercase tracking-wider block">Recommended Next Test</span>
-                    <p className="text-xs text-slate-600 leading-relaxed font-semibold">
-                      Test a question-oriented headline variant (e.g. "Struggling to scale your ads?") to compare against the current winning headline layout.
-                    </p>
-                  </div>
-                  
-                  {/* Don't change recommendation */}
-                  <div className="border border-slate-100 rounded-lg p-4 bg-slate-50 space-y-1.5">
-                    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block">Don't Change Recommendation</span>
-                    <p className="text-xs text-slate-600 leading-relaxed font-semibold">
-                      Do not alter the primary mockup image asset. Its Click-Through Rate remains highly stable and contributes 75% of the overall conversions.
-                    </p>
-                  </div>
-                </div>
+                {(() => {
+                  const diagnosisItems = getAdAiDiagnosis(selectedAd, selectedCampaign, selectedAdSet);
+                  if (diagnosisItems.length === 0) {
+                    return (
+                      <div className="text-xs text-slate-400 italic py-2">Insufficient data to generate AI diagnosis. More impressions and spend are needed.</div>
+                    );
+                  }
+                  return (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {diagnosisItems.map((item, idx) => (
+                        <div key={idx} className={`border rounded-lg p-4 space-y-1.5 ${
+                          item.type === "warning" ? "border-amber-200 bg-amber-50/30" :
+                          item.type === "keep" ? "border-emerald-200 bg-emerald-50/20" :
+                          "border-slate-100 bg-slate-50"
+                        }`}>
+                          <span className={`text-[9px] font-bold uppercase tracking-wider block ${
+                            item.type === "warning" ? "text-amber-600" :
+                            item.type === "keep" ? "text-emerald-600" :
+                            "text-blue-600"
+                          }`}>{item.label}</span>
+                          <p className="text-xs text-slate-600 leading-relaxed font-semibold">{item.description}</p>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           </div>
@@ -2832,19 +3137,23 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
                 <div className="card border border-border bg-white shadow-sm rounded-lg p-5 space-y-4">
                   <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">6. Opportunities</h4>
                   <div className="space-y-3">
-                    {getHealthScore(selectedCampaign) < 85 && (
-                      <div className="flex items-start gap-3 border border-amber-200 bg-amber-50/20 p-3.5 rounded-lg">
-                        <AlertCircle className="text-amber-500 shrink-0 mt-0.5" size={16} />
+                    {getCampaignOpportunities(selectedCampaign).map((opp, i) => (
+                      <div key={`opp-${i}`} className={`flex items-start gap-3 border p-3.5 rounded-lg ${
+                        opp.type === "warning" ? "border-amber-200 bg-amber-50/20" : "border-blue-200 bg-blue-50/20"
+                      }`}>
+                        {opp.type === "warning" ? (
+                          <AlertCircle className="text-amber-500 shrink-0 mt-0.5" size={16} />
+                        ) : (
+                          <Zap className="text-blue-500 shrink-0 mt-0.5" size={16} />
+                        )}
                         <div>
-                          <div className="text-xs font-bold text-slate-800">Budget Pacing Warning</div>
-                          <p className="text-[11px] text-slate-500 leading-relaxed mt-0.5 border-b border-slate-50 pb-2">
-                            Underperforming copy components and low CTR metrics are impacting overall health. Swap visual creatives or re-distribute budget.
-                          </p>
+                          <div className="text-xs font-bold text-slate-800">{opp.title}</div>
+                          <p className="text-[11px] text-slate-500 leading-relaxed mt-0.5">{opp.description}</p>
                         </div>
                       </div>
-                    )}
+                    ))}
                     {getCampaignRecommendations(selectedCampaign).slice(0, 2).map((r, i) => (
-                      <div key={i} className="flex items-start gap-3 border border-slate-100 bg-slate-50 p-3.5 rounded-lg">
+                      <div key={`rec-${i}`} className="flex items-start gap-3 border border-slate-100 bg-slate-50 p-3.5 rounded-lg">
                         <Sparkles className="text-primary shrink-0 mt-0.5" size={16} />
                         <div>
                           <div className="text-xs font-bold text-slate-800">{r.title}</div>
@@ -2852,6 +3161,9 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
                         </div>
                       </div>
                     ))}
+                    {getCampaignOpportunities(selectedCampaign).length === 0 && getCampaignRecommendations(selectedCampaign).length === 0 && (
+                      <div className="text-xs text-slate-400 italic py-2">No opportunities detected — campaign metrics are within healthy ranges.</div>
+                    )}
                   </div>
                 </div>
               </div>

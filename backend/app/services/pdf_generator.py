@@ -363,3 +363,229 @@ class PDFReportGenerator:
         doc.build(story, canvasmaker=NumberedCanvas)
         buffer.seek(0)
         return buffer
+
+    @classmethod
+    def generate_strategy_report(cls, user_name: str, contact_phone: str, score: int, priorities: list) -> BytesIO:
+        """
+        Builds a Strategy Readiness Report PDF with score, priorities, and contact details.
+        """
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=letter,
+            rightMargin=54,
+            leftMargin=54,
+            topMargin=72,
+            bottomMargin=72
+        )
+
+        styles = getSampleStyleSheet()
+
+        # Brand colors
+        primary_color = colors.HexColor("#1D4ED8")
+        secondary_color = colors.HexColor("#1E293B")
+        accent_color = colors.HexColor("#0D9488")
+        bg_card_color = colors.HexColor("#F8FAFC")
+        border_color = colors.HexColor("#E2E8F0")
+        text_muted = colors.HexColor("#64748B")
+
+        # Custom styles
+        styles.add(ParagraphStyle(
+            name="StrategyCoverTitle",
+            parent=styles["Normal"],
+            fontName="Helvetica-Bold",
+            fontSize=28,
+            leading=34,
+            textColor=primary_color,
+            spaceAfter=6,
+        ))
+        styles.add(ParagraphStyle(
+            name="StrategySubtitle",
+            parent=styles["Normal"],
+            fontName="Helvetica",
+            fontSize=11,
+            leading=15,
+            textColor=text_muted,
+            spaceAfter=20,
+        ))
+        styles.add(ParagraphStyle(
+            name="StrategySection",
+            parent=styles["Normal"],
+            fontName="Helvetica-Bold",
+            fontSize=16,
+            leading=20,
+            textColor=secondary_color,
+            spaceBefore=20,
+            spaceAfter=10,
+        ))
+        styles.add(ParagraphStyle(
+            name="StrategyBody",
+            parent=styles["Normal"],
+            fontName="Helvetica",
+            fontSize=10,
+            leading=14,
+            textColor=colors.HexColor("#334155"),
+            spaceAfter=6,
+        ))
+        styles.add(ParagraphStyle(
+            name="StrategyMeta",
+            parent=styles["Normal"],
+            fontName="Helvetica",
+            fontSize=9,
+            leading=12,
+            textColor=text_muted,
+            spaceAfter=4,
+        ))
+
+        story = []
+
+        # ========== COVER ==========
+        story.append(Spacer(1, 60))
+        story.append(Paragraph("DIGITAL GROWTH STUDIO", ParagraphStyle(
+            name="StrategyCoverBrand",
+            parent=styles["Normal"],
+            fontName="Helvetica-Bold",
+            fontSize=10,
+            textColor=text_muted,
+            spaceAfter=20,
+        )))
+        story.append(Paragraph("Your Strategy<br/>Readiness Report", styles["StrategyCoverTitle"]))
+        story.append(Paragraph(
+            "Based on your campaign profile, we have calculated your conversion setup readiness score and key operational priorities.",
+            styles["StrategySubtitle"]
+        ))
+
+        # User info
+        info_data = [
+            ["Prepared For:", user_name or "—"],
+            ["Phone:", contact_phone or "—"],
+            ["Date:", datetime.now().strftime("%B %d, %Y")],
+        ]
+        info_table = Table(info_data, colWidths=[100, 350])
+        info_table.setStyle(TableStyle([
+            ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+            ("FONTNAME", (1, 0), (1, -1), "Helvetica"),
+            ("FONTSIZE", (0, 0), (-1, -1), 10),
+            ("TEXTCOLOR", (0, 0), (0, -1), text_muted),
+            ("TEXTCOLOR", (1, 0), (1, -1), secondary_color),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ("TOPPADDING", (0, 0), (-1, -1), 2),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ]))
+        story.append(info_table)
+        story.append(Spacer(1, 30))
+
+        # ========== SCORE ==========
+        score_label = "Conversion Ready" if score >= 80 else ("Requires Tuning" if score >= 60 else "Critical Optimization Needed")
+        score_color = colors.HexColor("#059669") if score >= 80 else (colors.HexColor("#D97706") if score >= 60 else colors.HexColor("#DC2626"))
+
+        score_data = [[
+            Paragraph(f'<font size="36" color="{primary_color.hexval()}">{score}</font>'
+                      f'<font size="12" color="#94A3B8"> / 100</font>', styles["Normal"]),
+        ]]
+        score_table = Table(score_data, colWidths=[450])
+        score_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), bg_card_color),
+            ("BOX", (0, 0), (-1, -1), 1, border_color),
+            ("TOPPADDING", (0, 0), (-1, -1), 20),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+            ("LEFTPADDING", (0, 0), (-1, -1), 20),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ]))
+        story.append(Paragraph("STRATEGY READINESS SCORE", ParagraphStyle(
+            name="ScoreLabel",
+            parent=styles["Normal"],
+            fontName="Helvetica-Bold",
+            fontSize=9,
+            textColor=text_muted,
+            alignment=1,
+            spaceAfter=8,
+        )))
+        story.append(score_table)
+        story.append(Spacer(1, 6))
+        story.append(Paragraph(
+            f'<font color="{score_color.hexval()}"><b>⚡ {score_label}</b></font>',
+            ParagraphStyle(name="ScoreStatus", parent=styles["Normal"], fontSize=10, alignment=1, spaceAfter=20)
+        ))
+
+        story.append(PageBreak())
+
+        # ========== PRIORITIES ==========
+        story.append(Paragraph("Your Core Strategic Priorities", styles["StrategySection"]))
+        story.append(Spacer(1, 8))
+
+        for idx, rec in enumerate(priorities):
+            priority_label = f"Priority {idx + 1}"
+            rec_type = (rec.get("type") or "optimization").replace("_", " ").upper()
+            priority_level = rec.get("priority", "MEDIUM")
+            title = rec.get("title", "Untitled")
+            recommendation = rec.get("recommendation", "")
+            expected_impact = rec.get("expected_impact", "")
+
+            p_color = colors.HexColor("#DC2626") if priority_level == "HIGH" else colors.HexColor("#D97706")
+
+            priority_flowables = []
+
+            # Header row
+            header_text = (
+                f'<font color="{primary_color.hexval()}"><b>{priority_label}</b></font>'
+                f'  <font color="#94A3B8" size="8">{rec_type}</font>'
+                f'  <font color="{p_color.hexval()}" size="8"><b>{priority_level}</b></font>'
+            )
+            priority_flowables.append(Paragraph(header_text, styles["StrategyBody"]))
+            priority_flowables.append(Spacer(1, 4))
+
+            # Title
+            priority_flowables.append(Paragraph(f"<b>{title}</b>", ParagraphStyle(
+                name=f"PriorityTitle{idx}",
+                parent=styles["Normal"],
+                fontName="Helvetica-Bold",
+                fontSize=12,
+                leading=16,
+                textColor=secondary_color,
+                spaceAfter=4,
+            )))
+
+            # Recommendation text
+            priority_flowables.append(Paragraph(recommendation, styles["StrategyBody"]))
+
+            # Expected impact
+            if expected_impact:
+                priority_flowables.append(Spacer(1, 4))
+                priority_flowables.append(Paragraph(
+                    f'<font color="#059669"><b>✓ Expected Outcome:</b> {expected_impact}</font>',
+                    styles["StrategyMeta"]
+                ))
+
+            # Wrap in a table for card-like styling
+            card_data = [[priority_flowables]]
+            card_table = Table(card_data, colWidths=[450])
+            card_table.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, -1), colors.white),
+                ("BOX", (0, 0), (-1, -1), 1, border_color),
+                ("TOPPADDING", (0, 0), (-1, -1), 14),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 14),
+                ("LEFTPADDING", (0, 0), (-1, -1), 14),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 14),
+            ]))
+            story.append(card_table)
+            story.append(Spacer(1, 12))
+
+        story.append(Spacer(1, 30))
+
+        # ========== FOOTER ==========
+        story.append(Paragraph(
+            "<b>Next Step:</b> Audit your actual campaign performance metrics with a free Ads Health Check.",
+            styles["StrategyBody"]
+        ))
+        story.append(Spacer(1, 20))
+        story.append(Paragraph(
+            "<b>Report compiled automatically by Digital Growth Studio.</b>",
+            styles["StrategyMeta"]
+        ))
+
+        # Build
+        doc.build(story, canvasmaker=NumberedCanvas)
+        buffer.seek(0)
+        return buffer
+

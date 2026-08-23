@@ -713,15 +713,34 @@ class ApiClient {
   }
 
   // Lead Funnel Endpoints
-  async submitRecommendation(answers: Record<string, any>) {
+  async submitRecommendation(answers: Record<string, any>, contactName?: string, contactPhone?: string) {
     return this.request<any>("/funnel/recommendation", {
       method: "POST",
-      body: { answers },
+      body: { answers, contact_name: contactName || null, contact_phone: contactPhone || null },
     });
   }
 
   async getLatestRecommendation() {
     return this.request<any>("/funnel/recommendation/latest");
+  }
+
+  async getRecommendationPdf(recId: string): Promise<Blob> {
+    const token = await this.getAuthToken();
+    const res = await fetch(`${this.baseUrl}/funnel/recommendation/${recId}/pdf`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    if (!res.ok) throw new Error("Failed to download PDF");
+    return res.blob();
+  }
+
+  private async getAuthToken(): Promise<string> {
+    // Get current Firebase user token
+    const { auth } = await import("@/lib/firebase");
+    const user = auth.currentUser;
+    if (!user) throw new Error("Not authenticated");
+    return user.getIdToken();
   }
 
   async runHealthCheckAudit(adAccountId: string) {

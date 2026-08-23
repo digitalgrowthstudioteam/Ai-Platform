@@ -1,0 +1,41 @@
+# Digital Growth Studio
+
+> AI-powered Meta Ads Analytics and Optimization Platform.
+
+Digital Growth Studio is a SaaS application designed for marketers, advertisers, and agencies to connect their Meta Ads accounts, analyze performance, and receive automated, data-driven campaign recommendation summaries.
+
+## Core Pages
+
+- [Home](https://digitalgrowthstudio.in/): Product overview, AI recommendations, creative analyser, copy analyser, pricing, and FAQs.
+- [Meta Integration Guide](https://digitalgrowthstudio.in/meta-integration): Complete guide on how our platform connects with Meta Ads API, security scopes used, and user authorization flows.
+- [Security](https://digitalgrowthstudio.in/security): Enterprise-grade security details, data encryption standards, and tenant isolation policies.
+- [Help & Documentation](https://digitalgrowthstudio.in/help): Support guides and general instructions on utilizing the platform.
+- [Privacy Policy](https://digitalgrowthstudio.in/privacy): Details on user authentication, Meta Ads read-only access scopes, and data retention policies.
+- [Terms of Service](https://digitalgrowthstudio.in/terms): Terms, usage policies, subscription parameters, and cancellation terms.
+- [Data Deletion](https://digitalgrowthstudio.in/data-deletion): Complete step-by-step documentation on how users can request or execute deletion of their connected Meta Ad account data.
+
+## Frequently Asked Questions (FAQ)
+
+### Is Digital Growth Studio an agency?
+No. Digital Growth Studio is an automated SaaS platform that connects directly to your Meta Ads account to provide instant performance analysis, creative breakdowns, and data-driven recommendations.
+
+### Does it automatically edit or pause live campaigns?
+No, the current version provides safe read-only analysis and clear optimization suggestions so you stay in total control. Automated execution options will be available in future releases.
+
+### Do I need to share my Meta login password?
+Never. You authenticate safely using Meta's official secure OAuth flow. We only request read-only access to campaign performance data.
+
+### Can it pinpoint which ad copy or creative variation performs best?
+Yes. Our system compares ad formats (Reels, Feed, Carousel), copy angles, and creative visual types to highlight top-performing components.
+
+### How does the AI generate recommendations?
+Our algorithm cross-analyzes ROAS, CPA, CTR, frequency, and conversion velocity against historical account baselines to flag ad fatigue, budget scaling opportunities, and waste.
+
+### What is the Early Access pricing?
+Our Early Access plan is currently locked in at just ₹99/month, including a free 7-day trial and all core features.
+
+### Can I cancel my subscription anytime?
+Yes, absolutely. You can manage or cancel your plan directly from your account settings with a single click.
+
+### Is my advertising data secure?
+Yes. All data is encrypted in transit and at rest. We use strict tenant isolation and enterprise-grade security standards.
