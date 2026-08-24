@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -19,9 +19,9 @@ import {
   Brain,
 } from "lucide-react";
 
-export default function AdminUserDetailPage() {
-  const params = useParams();
-  const userId = params.userId as string;
+function AdminUserDetailContent() {
+  const searchParams = useSearchParams();
+  const userId = searchParams.get("id") as string;
   const router = useRouter();
   const { user, loading: loadingAuth } = useAuth();
 
@@ -393,7 +393,7 @@ export default function AdminUserDetailPage() {
               </div>
 
               {userDetails.user.deletion_scheduled_at && (
-                <div className="p-2.5 bg-rose-50 border border-rose-100 text-rose-800 rounded-xl space-y-1">
+                <div className="p-2.5 bg-rose-50 border border-rose-100 text-rose-850 rounded-xl space-y-1">
                   <div className="font-bold text-[9px] uppercase tracking-wider flex items-center gap-1">
                     <ShieldAlert size={10} /> Deletion Scheduled
                   </div>
@@ -599,7 +599,7 @@ export default function AdminUserDetailPage() {
                 <div className="space-y-2">
                   {userDetails.connections.map((c: any) => (
                     <div key={c.id} className="p-3 bg-slate-50 border border-slate-150 rounded-xl space-y-1.5 text-xs">
-                      <div className="font-bold text-slate-800 truncate">{c.facebook_name || "Meta Profile"}</div>
+                      <div className="font-bold text-slate-805 truncate">{c.facebook_name || "Meta Profile"}</div>
                       <div className="text-[10px] text-slate-550 flex justify-between font-medium">
                         <span>Status: <span className="font-bold text-emerald-600 uppercase">{c.status}</span></span>
                         <span>Sync: <span className="font-bold uppercase">{c.last_sync_status || "None"}</span></span>
@@ -622,7 +622,7 @@ export default function AdminUserDetailPage() {
                   {userDetails.ad_accounts.map((acc: any) => (
                     <div key={acc.id} className="p-3 bg-slate-50 border border-slate-150 rounded-xl space-y-1 text-xs">
                       <div className="font-bold text-slate-850 truncate">{acc.account_name}</div>
-                      <div className="text-[10px] text-slate-450 font-mono">ID: {acc.meta_account_id}</div>
+                      <div className="text-[10px] text-slate-455 font-mono">ID: {acc.meta_account_id}</div>
                       <div className="flex justify-between text-[10px] text-slate-500 pt-1 font-semibold">
                         <span>Currency: <span className="font-bold text-slate-700">{acc.currency}</span></span>
                         <span>Industry: <span className="font-bold text-blue-650 bg-blue-50 px-1.5 py-0.5 rounded uppercase text-[8px]">{acc.industry || "Not Specified"}</span></span>
@@ -683,5 +683,17 @@ export default function AdminUserDetailPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function AdminUserDetailPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex h-screen items-center justify-center bg-slate-50">
+        <Loader2 className="animate-spin text-blue-600" size={32} />
+      </div>
+    }>
+      <AdminUserDetailContent />
+    </Suspense>
   );
 }

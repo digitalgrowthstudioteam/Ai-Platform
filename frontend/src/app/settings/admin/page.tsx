@@ -461,7 +461,7 @@ export default function AdminPage() {
                 {usersList.map((usr) => (
                   <tr 
                     key={usr.id} 
-                    onClick={() => router.push(`/settings/admin/users/${usr.id}`)}
+                    onClick={() => router.push(`/settings/admin/user?id=${usr.id}`)}
                     className="hover:bg-slate-50 transition cursor-pointer"
                   >
                     <td className="p-4">
