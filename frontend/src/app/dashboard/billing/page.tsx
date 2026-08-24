@@ -423,9 +423,10 @@ export default function BillingPage() {
                         {tx.items && tx.items.length > 0 ? (
                           <div className="space-y-2 text-[11px] font-medium leading-normal">
                             {tx.items.map((item, idx) => {
-                              const serviceName = item.service_name || item.description || "Ad Onboarding Service";
-                              const offerPrice = item.offer_price ?? item.offer_total ?? item.offer_unit_price ?? 0;
-                              const regularPrice = item.regular_price ?? item.regular_total ?? item.regular_unit_price ?? 0;
+                              const rawItem = item as any;
+                              const serviceName = rawItem.service_name || rawItem.description || "Ad Onboarding Service";
+                              const offerPrice = rawItem.offer_price ?? rawItem.offer_total ?? rawItem.offer_unit_price ?? 0;
+                              const regularPrice = rawItem.regular_price ?? rawItem.regular_total ?? rawItem.regular_unit_price ?? 0;
 
                               return (
                                 <div key={idx} className="flex justify-between items-start text-slate-600">
