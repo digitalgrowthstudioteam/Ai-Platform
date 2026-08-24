@@ -99,7 +99,7 @@ export default function BillingPage() {
           <p className="text-xs text-slate-500 font-semibold">View your complete payment and transaction history.</p>
         </div>
         <Link
-          href="/get-ads"
+          href="/get-ads?new=true"
           className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-5 py-3 rounded-xl transition shadow-md shadow-blue-500/10 inline-flex items-center gap-1.5"
         >
           Purchase More Ads <ArrowRight size={14} />
@@ -149,7 +149,7 @@ export default function BillingPage() {
           <Receipt className="mx-auto text-slate-300" size={48} />
           <p className="text-sm text-slate-400 font-semibold">No billing history yet.</p>
           <Link
-            href="/get-ads"
+            href="/get-ads?new=true"
             className="inline-flex bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-5 py-3.5 rounded-xl transition shadow-md shadow-blue-500/10 items-center gap-1.5"
           >
             Get Your First Ads <ArrowRight size={14} />

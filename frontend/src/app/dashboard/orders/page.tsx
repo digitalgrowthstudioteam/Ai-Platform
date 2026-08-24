@@ -37,6 +37,7 @@ interface Order {
   creative_required: boolean;
   whatsapp_number: string;
   created_at: string;
+  expires_at: string;
   pipeline: PipelineStep[];
 }
 
@@ -92,7 +93,7 @@ export default function OrdersPage() {
           <p className="text-xs text-slate-500 font-semibold">Track all your Meta Ads service orders and their progress.</p>
         </div>
         <Link
-          href="/get-ads"
+          href="/get-ads?new=true"
           className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-5 py-3 rounded-xl transition shadow-md shadow-blue-500/10 inline-flex items-center gap-1.5"
         >
           Purchase More Ads <ArrowRight size={14} />
@@ -104,7 +105,7 @@ export default function OrdersPage() {
           <ShoppingBag className="mx-auto text-slate-300" size={48} />
           <p className="text-sm text-slate-400 font-semibold">You haven't placed any orders yet.</p>
           <Link
-            href="/get-ads"
+            href="/get-ads?new=true"
             className="inline-flex bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-5 py-3.5 rounded-xl transition shadow-md shadow-blue-500/10 items-center gap-1.5"
           >
             Get Your First Ads <ArrowRight size={14} />
@@ -133,7 +134,7 @@ export default function OrdersPage() {
                     <div>
                       <h3 className="font-bold text-slate-900 text-sm">{order.advertised_product}</h3>
                       <p className="text-[11px] text-slate-450 font-medium mt-0.5">
-                        {order.business_name} · {order.number_of_ads} Ads · {new Date(order.created_at).toLocaleDateString()}
+                        {order.business_name} · Expires: {new Date(order.expires_at).toLocaleDateString()} · {new Date(order.created_at).toLocaleDateString()}
                       </p>
                     </div>
                   </div>

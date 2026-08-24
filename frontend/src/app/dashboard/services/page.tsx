@@ -88,7 +88,14 @@ export default function MyServicesPage() {
           </h1>
           <p className="text-xs text-slate-500 font-semibold">Manage your active Meta Ads management services and Ad Quantities.</p>
         </div>
-        {!hasActiveService && (
+        {hasActiveService ? (
+          <Link
+            href="/get-ads?new=true"
+            className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-5 py-3 rounded-xl transition shadow-md shadow-blue-500/10"
+          >
+            Purchase More Ads
+          </Link>
+        ) : (
           <Link
             href="/get-ads"
             className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-5 py-3 rounded-xl transition shadow-md shadow-blue-500/10"
@@ -145,7 +152,7 @@ export default function MyServicesPage() {
             ) : (
               <div className="text-center py-6 space-y-2">
                 <p className="text-xs font-semibold text-slate-400">No active Ad Quantities.</p>
-                <Link href="/get-ads" className="inline-block text-xs font-bold text-blue-600 hover:text-blue-800 transition">
+                <Link href="/get-ads?new=true" className="inline-block text-xs font-bold text-blue-600 hover:text-blue-800 transition">
                   Purchase More Ads →
                 </Link>
               </div>

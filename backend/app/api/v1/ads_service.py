@@ -111,9 +111,7 @@ async def create_service_request(
         .where(MetaAdServiceRequest.user_id == user.id)
         .where(MetaAdServiceRequest.status.in_([
             "draft", "submitted", "eligibility_review", "eligible",
-            "quotation_generated", "trial_started", "whatsapp_pending",
-            "whatsapp_connected", "partner_access_requested",
-            "partner_access_granted", "campaign_setup"
+            "quotation_generated"
         ]))
         .limit(1)
     )
@@ -567,34 +565,62 @@ async def get_user_orders(
 
     orders = []
     for r in requests:
-        # Build a pipeline status list for the stepper
-        pipeline = [
-            {"step": "Order Placed", "done": True},
-            {"step": "Team Connected on WhatsApp", "done": r.status in (
-                "whatsapp_connected", "partner_access_requested", "partner_access_granted",
-                "campaign_setup", "campaign_live", "completed"
-            )},
-            {"step": "Ads Initiated", "done": r.status in (
-                "campaign_setup", "campaign_live", "completed"
-            )},
-            {"step": "Completed", "done": r.status == "completed"},
-        ]
+        # Check associated AdPack
+        stmt_pack = select(AdPack).where(AdPack.service_request_id == r.id)
+        res_pack = await db.execute(stmt_pack)
+        pack = res_pack.scalar_one_or_none()
 
-        orders.append({
-            "id": str(r.id),
-            "business_name": r.business_name,
-            "advertised_product": r.advertised_product,
-            "campaign_objective": r.campaign_objective,
-            "number_of_ads": r.number_of_ads,
-            "daily_budget": r.daily_budget,
-            "status": r.status,
-            "partner_access_status": r.partner_access_status,
-            "additional_services": r.additional_services,
-            "creative_required": r.creative_required,
-            "whatsapp_number": r.whatsapp_number,
-            "created_at": r.created_at,
-            "pipeline": pipeline,
-        })
+        if pack:
+            total = pack.total_ad_credits
+            used = pack.used_ad_credits
+            expires_at = pack.expires_at
+        else:
+            total = r.number_of_ads
+            used = 0
+            # Fallback to user trial_ends_at or created_at + 30 days
+            stmt_user = select(User).where(User.id == r.user_id)
+            res_user = await db.execute(stmt_user)
+            db_user = res_user.scalar_one_or_none()
+            if db_user and db_user.trial_ends_at:
+                expires_at = db_user.trial_ends_at
+            else:
+                expires_at = r.created_at + timedelta(days=30)
+
+        for i in range(1, total + 1):
+            ad_status = "completed" if i <= used else r.status
+            # If the overall request status is completed but this ad isn't used, mark it active
+            if ad_status == "completed" and i > used:
+                ad_status = "whatsapp_pending"
+
+            # Build a pipeline status list for the stepper for this individual ad
+            pipeline = [
+                {"step": "Order Placed", "done": True},
+                {"step": "Team Connected on WhatsApp", "done": ad_status in (
+                    "whatsapp_connected", "partner_access_requested", "partner_access_granted",
+                    "campaign_setup", "campaign_live", "completed"
+                )},
+                {"step": "Ads Initiated", "done": ad_status in (
+                    "campaign_setup", "campaign_live", "completed"
+                )},
+                {"step": "Completed", "done": ad_status == "completed"},
+            ]
+
+            orders.append({
+                "id": f"{r.id}-{i}",
+                "business_name": r.business_name,
+                "advertised_product": f"{r.advertised_product} (Ad {i}/{total})",
+                "campaign_objective": r.campaign_objective,
+                "number_of_ads": 1,
+                "daily_budget": r.daily_budget,
+                "status": ad_status,
+                "partner_access_status": r.partner_access_status,
+                "additional_services": r.additional_services,
+                "creative_required": r.creative_required,
+                "whatsapp_number": r.whatsapp_number,
+                "created_at": r.created_at,
+                "expires_at": expires_at,
+                "pipeline": pipeline,
+            })
 
     return {"orders": orders}
 

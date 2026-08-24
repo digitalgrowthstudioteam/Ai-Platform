@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
 import {
@@ -237,6 +237,8 @@ const PRODUCT_OPTIONS_BY_INDUSTRY: Record<string, string[]> = {
 
 export default function GetAdsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isNew = searchParams.get("new") === "true";
   const { user, loginWithGoogle, isAuthenticated } = useAuth();
   const [currentStep, setCurrentStep] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -369,7 +371,7 @@ export default function GetAdsPage() {
           const latest = await api.getLatestAdsServiceRequest();
           setEligibleState(latest.user_eligibility || { eligible: true });
           
-          if (latest.request) {
+          if (latest.request && !isNew) {
             if (latest.request.status !== "draft" && latest.request.status !== "cancelled") {
               router.push("/dashboard/services");
               return;
