@@ -608,64 +608,191 @@ async def get_user_orders(
             if r.status == "trial_started" or has_pack:
                 requests.append(r)
 
+async def build_orders_for_request(r: MetaAdServiceRequest, db: AsyncSession) -> list:
+    # 1. Check associated AdPack
+    stmt_pack = select(AdPack).where(AdPack.service_request_id == r.id)
+    res_pack = await db.execute(stmt_pack)
+    pack = res_pack.scalar_one_or_none()
+
+    if pack:
+        total = pack.total_ad_credits
+        used = pack.used_ad_credits
+        expires_at = pack.expires_at
+    else:
+        total = r.number_of_ads or 1
+        used = 0
+        # Fallback to user trial_ends_at or created_at + 30 days
+        stmt_user = select(User).where(User.id == r.user_id)
+        res_user = await db.execute(stmt_user)
+        db_user = res_user.scalar_one_or_none()
+        if db_user and db_user.trial_ends_at:
+            expires_at = db_user.trial_ends_at
+        else:
+            expires_at = r.created_at + timedelta(days=30)
+
+    orders = []
+
+    # A. Individual Ads
+    for i in range(1, total + 1):
+        ad_status = "completed" if i <= used else r.status
+        if ad_status == "completed" and i > used:
+            ad_status = "whatsapp_pending"
+
+        pipeline = [
+            {"step": "Order Placed", "done": True},
+            {"step": "Team Connected on WhatsApp", "done": ad_status in (
+                "whatsapp_connected", "partner_access_requested", "partner_access_granted",
+                "campaign_setup", "campaign_live", "completed"
+            )},
+            {"step": "Ads Initiated", "done": ad_status in (
+                "campaign_setup", "campaign_live", "completed"
+            )},
+            {"step": "Completed", "done": ad_status == "completed"},
+        ]
+
+        orders.append({
+            "id": f"{r.id}-ad-{i}",
+            "parent_request_id": str(r.id),
+            "order_type": "ad",
+            "business_name": r.business_name,
+            "advertised_product": f"{r.advertised_product} (Ad {i}/{total})",
+            "campaign_objective": r.campaign_objective,
+            "number_of_ads": 1,
+            "daily_budget": r.daily_budget,
+            "status": ad_status,
+            "partner_access_status": r.partner_access_status,
+            "creative_required": r.creative_required,
+            "whatsapp_number": r.whatsapp_number,
+            "created_at": r.created_at,
+            "expires_at": expires_at,
+            "pipeline": pipeline,
+        })
+
+    # B. Add-on deliverables from paid quotations
+    stmt_q = select(ServiceQuotation).where(
+        ServiceQuotation.service_request_id == r.id,
+        ServiceQuotation.status == "paid"
+    ).limit(1)
+    res_q = await db.execute(stmt_q)
+    paid_quote = res_q.scalar_one_or_none()
+
+    has_setup = not r.meta_account_exists
+    has_creative = r.creative_required
+
+    # If there was a paid quotation, check its items
+    if paid_quote:
+        has_setup = any(item.get("service_type") == "account_setup" for item in paid_quote.items)
+        has_creative = any(item.get("service_type") == "creative_design" for item in paid_quote.items)
+
+    # 1) Account Setup Order Row
+    if has_setup:
+        setup_status = "completed" if r.partner_access_status == "granted" or r.status in (
+            "campaign_setup", "campaign_live", "completed"
+        ) else r.status
+        
+        setup_pipeline = [
+            {"step": "Order Placed", "done": True},
+            {"step": "WhatsApp Connected", "done": r.status not in ("trial_started", "whatsapp_pending")},
+            {"step": "Partner Access Granted", "done": r.partner_access_status == "granted" or r.status in (
+                "partner_access_granted", "campaign_setup", "campaign_live", "completed"
+            )},
+            {"step": "Completed", "done": r.partner_access_status == "granted" or r.status in (
+                "campaign_setup", "campaign_live", "completed"
+            )},
+        ]
+        
+        orders.append({
+            "id": f"{r.id}-setup",
+            "parent_request_id": str(r.id),
+            "order_type": "addon_setup",
+            "business_name": r.business_name,
+            "advertised_product": f"Meta Ad Account Setup — {r.business_name}",
+            "campaign_objective": "Setup & Business Verification",
+            "number_of_ads": 0,
+            "daily_budget": "—",
+            "status": setup_status,
+            "partner_access_status": r.partner_access_status,
+            "creative_required": False,
+            "whatsapp_number": r.whatsapp_number,
+            "created_at": r.created_at,
+            "expires_at": expires_at,
+            "pipeline": setup_pipeline,
+        })
+
+    # 2) Creative Design Order Row
+    if has_creative:
+        creative_status = "completed" if r.status in ("campaign_setup", "campaign_live", "completed") else r.status
+        
+        creative_pipeline = [
+            {"step": "Order Placed", "done": True},
+            {"step": "Brief Received", "done": True},
+            {"step": "Creatives Ready", "done": r.status in ("campaign_setup", "campaign_live", "completed")},
+            {"step": "Completed", "done": r.status in ("campaign_setup", "campaign_live", "completed")},
+        ]
+        
+        orders.append({
+            "id": f"{r.id}-creative",
+            "parent_request_id": str(r.id),
+            "order_type": "addon_creative",
+            "business_name": r.business_name,
+            "advertised_product": f"Creative Design & Copywriting — {r.business_name}",
+            "campaign_objective": "Ad Creatives & Formats",
+            "number_of_ads": 0,
+            "daily_budget": "—",
+            "status": creative_status,
+            "partner_access_status": r.partner_access_status,
+            "creative_required": True,
+            "whatsapp_number": r.whatsapp_number,
+            "created_at": r.created_at,
+            "expires_at": expires_at,
+            "pipeline": creative_pipeline,
+        })
+
+    return orders
+
+
+@router.get("/orders", summary="Get user's all Meta Ads service orders with status")
+async def get_user_orders(
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Returns all MetaAdServiceRequest records for the authenticated user,
+    with order status pipeline info.
+    """
+    user = await get_db_user_from_claims(claims, db)
+
+    stmt_reqs = select(MetaAdServiceRequest).where(
+        MetaAdServiceRequest.user_id == user.id
+    ).order_by(MetaAdServiceRequest.created_at.desc())
+    res_reqs = await db.execute(stmt_reqs)
+    all_requests = res_reqs.scalars().all()
+
+    requests = []
+    for r in all_requests:
+        # Check if there is an associated quotation
+        stmt_q = select(ServiceQuotation).where(ServiceQuotation.service_request_id == r.id)
+        res_q = await db.execute(stmt_q)
+        quotes = res_q.scalars().all()
+        
+        if quotes:
+            # If there are quotations, at least one must be 'paid'
+            if any(q.status == "paid" for q in quotes):
+                requests.append(r)
+        else:
+            # If there are no quotations, we check if the request is 'trial_started'
+            # or if it has an associated AdPack
+            stmt_ap = select(AdPack).where(AdPack.service_request_id == r.id)
+            res_ap = await db.execute(stmt_ap)
+            has_pack = res_ap.scalar_one_or_none() is not None
+            
+            if r.status == "trial_started" or has_pack:
+                requests.append(r)
+
     orders = []
     for r in requests:
-        # Check associated AdPack
-        stmt_pack = select(AdPack).where(AdPack.service_request_id == r.id)
-        res_pack = await db.execute(stmt_pack)
-        pack = res_pack.scalar_one_or_none()
-
-        if pack:
-            total = pack.total_ad_credits
-            used = pack.used_ad_credits
-            expires_at = pack.expires_at
-        else:
-            total = r.number_of_ads
-            used = 0
-            # Fallback to user trial_ends_at or created_at + 30 days
-            stmt_user = select(User).where(User.id == r.user_id)
-            res_user = await db.execute(stmt_user)
-            db_user = res_user.scalar_one_or_none()
-            if db_user and db_user.trial_ends_at:
-                expires_at = db_user.trial_ends_at
-            else:
-                expires_at = r.created_at + timedelta(days=30)
-
-        for i in range(1, total + 1):
-            ad_status = "completed" if i <= used else r.status
-            # If the overall request status is completed but this ad isn't used, mark it active
-            if ad_status == "completed" and i > used:
-                ad_status = "whatsapp_pending"
-
-            # Build a pipeline status list for the stepper for this individual ad
-            pipeline = [
-                {"step": "Order Placed", "done": True},
-                {"step": "Team Connected on WhatsApp", "done": ad_status in (
-                    "whatsapp_connected", "partner_access_requested", "partner_access_granted",
-                    "campaign_setup", "campaign_live", "completed"
-                )},
-                {"step": "Ads Initiated", "done": ad_status in (
-                    "campaign_setup", "campaign_live", "completed"
-                )},
-                {"step": "Completed", "done": ad_status == "completed"},
-            ]
-
-            orders.append({
-                "id": f"{r.id}-{i}",
-                "business_name": r.business_name,
-                "advertised_product": f"{r.advertised_product} (Ad {i}/{total})",
-                "campaign_objective": r.campaign_objective,
-                "number_of_ads": 1,
-                "daily_budget": r.daily_budget,
-                "status": ad_status,
-                "partner_access_status": r.partner_access_status,
-                "additional_services": r.additional_services,
-                "creative_required": r.creative_required,
-                "whatsapp_number": r.whatsapp_number,
-                "created_at": r.created_at,
-                "expires_at": expires_at,
-                "pipeline": pipeline,
-            })
+        req_orders = await build_orders_for_request(r, db)
+        orders.extend(req_orders)
 
     return {"orders": orders}
 
@@ -862,6 +989,69 @@ async def admin_list_requests(
         })
 
     return requests_data
+
+
+@router.get("/admin/orders", summary="Admin: List all service orders")
+async def admin_list_orders(
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Lists all split service orders (individual ads and add-on deliverables) for paid requests.
+    """
+    email = claims.get("email", "")
+    whitelisted_admins = {"flasshgames2026@gmail.com", "digitalgrowthstudioteam@gmail.com"}
+    if email not in whitelisted_admins:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied."
+        )
+
+    stmt = select(MetaAdServiceRequest).order_by(MetaAdServiceRequest.created_at.desc())
+    res = await db.execute(stmt)
+    all_requests = res.scalars().all()
+
+    requests = []
+    for r in all_requests:
+        # Check if there is an associated quotation
+        stmt_q = select(ServiceQuotation).where(ServiceQuotation.service_request_id == r.id)
+        res_q = await db.execute(stmt_q)
+        quotes = res_q.scalars().all()
+        
+        if quotes:
+            # If there are quotations, at least one must be 'paid'
+            if any(q.status == "paid" for q in quotes):
+                requests.append(r)
+        else:
+            # If there are no quotations, we check if the request is 'trial_started'
+            # or if it has an associated AdPack
+            stmt_ap = select(AdPack).where(AdPack.service_request_id == r.id)
+            res_ap = await db.execute(stmt_ap)
+            has_pack = res_ap.scalar_one_or_none() is not None
+            
+            if r.status == "trial_started" or has_pack:
+                requests.append(r)
+
+    all_orders = []
+    for r in requests:
+        # Fetch associated user profile
+        stmt_u = select(User).where(User.id == r.user_id)
+        res_u = await db.execute(stmt_u)
+        u = res_u.scalar_one_or_none()
+
+        req_orders = await build_orders_for_request(r, db)
+        for o in req_orders:
+            # Add user profile info
+            o["customer_name"] = r.full_name
+            o["customer_email"] = r.email
+            o["user_id"] = str(r.user_id)
+            o["user_eligibility"] = {
+                "eligible": u.ads_service_eligible if u else True,
+                "reason": u.restriction_reason if u else None
+            }
+            all_orders.append(o)
+
+    return all_orders
 
 
 @router.post("/admin/requests/{id}/update-status", summary="Admin: Update request parameters or record ad consumption")

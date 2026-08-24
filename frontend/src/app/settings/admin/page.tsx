@@ -32,21 +32,29 @@ export default function AdminPage() {
   const { user, loading: loadingAuth } = useAuth();
   const router = useRouter();
 
-  const [activeTab, setActiveTab] = useState<"overview" | "users" | "tickets" | "ads_services">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "users" | "tickets" | "ads_services" | "ads_orders">("overview");
   const [stats, setStats] = useState<any>(null);
   const [usersList, setUsersList] = useState<any[]>([]);
   const [ticketsList, setTicketsList] = useState<any[]>([]);
   const [adsRequestsList, setAdsRequestsList] = useState<any[]>([]);
+  const [adsOrdersList, setAdsOrdersList] = useState<any[]>([]);
 
   // Ads Service filter states
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+
+  // Ads Orders filter states
+  const [orderSearchQuery, setOrderSearchQuery] = useState("");
+  const [orderStatusFilter, setOrderStatusFilter] = useState("all");
 
   // Selected ads service request
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
   const [newRequestStatus, setNewRequestStatus] = useState("");
   const [newPartnerStatus, setNewPartnerStatus] = useState("");
   const [creditsToConsume, setCreditsToConsume] = useState(0);
+
+  // Selected ads order row
+  const [selectedOrderRowId, setSelectedOrderRowId] = useState<string | null>(null);
 
   // Ticket creation form from orders state
   const [showOrderTicketForm, setShowOrderTicketForm] = useState(false);
@@ -128,16 +136,18 @@ export default function AdminPage() {
     if (!isAdmin) return;
     try {
       setLoading(true);
-      const [statsRes, usersRes, ticketsRes, adsRes] = await Promise.all([
+      const [statsRes, usersRes, ticketsRes, adsRes, ordersRes] = await Promise.all([
         api.getAdminStats(),
         api.getAdminUsers(),
         api.getAdminTickets(),
         api.getAdminAdsServiceRequests(),
+        api.getAdminAdsServiceOrders(),
       ]);
       setStats(statsRes);
       setUsersList(usersRes);
       setTicketsList(ticketsRes);
       setAdsRequestsList(adsRes);
+      setAdsOrdersList(ordersRes);
     } catch (err) {
       console.error("Failed to load admin stats:", err);
     } finally {
@@ -293,13 +303,21 @@ export default function AdminPage() {
             </span>
           )}
         </button>
-        <button
+         <button
           onClick={() => setActiveTab("ads_services")}
           className={`pb-2.5 text-xs font-bold transition-all border-b-2 px-1 ${
             activeTab === "ads_services" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-400"
           }`}
         >
-          Meta Ads Services
+          Meta Ads Services (Quotations)
+        </button>
+        <button
+          onClick={() => setActiveTab("ads_orders")}
+          className={`pb-2.5 text-xs font-bold transition-all border-b-2 px-1 ${
+            activeTab === "ads_orders" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-400"
+          }`}
+        >
+          Meta Ads Orders (Paid/Allotted)
         </button>
       </div>
 
@@ -709,6 +727,9 @@ export default function AdminPage() {
       {/* TAB CONTENT: Meta Ads Services */}
       {activeTab === "ads_services" && (() => {
         const filteredAdsRequests = adsRequestsList.filter((r) => {
+          const isQuotation = ["submitted", "quotation_generated", "cancelled"].includes(r.status);
+          if (!isQuotation) return false;
+
           const matchSearch =
             r.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
             r.customer_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -716,21 +737,13 @@ export default function AdminPage() {
             r.business_name.toLowerCase().includes(searchQuery.toLowerCase());
 
           if (statusFilter === "pending") {
-            const pendingStatuses = [
-              "whatsapp_pending",
-              "whatsapp_connected",
-              "partner_access_requested",
-              "partner_access_granted",
-              "campaign_setup",
-              "campaign_live",
-            ];
-            return matchSearch && pendingStatuses.includes(r.status);
+            return matchSearch && r.status === "submitted";
           }
           if (statusFilter === "new") {
-            return matchSearch && (r.status === "submitted" || r.status === "trial_started");
+            return matchSearch && r.status === "quotation_generated";
           }
           if (statusFilter === "completed") {
-            return matchSearch && r.status === "completed";
+            return matchSearch && r.status === "cancelled";
           }
           return matchSearch;
         });
@@ -769,10 +782,10 @@ export default function AdminPage() {
                   onChange={(e) => setStatusFilter(e.target.value)}
                   className="px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold bg-white"
                 >
-                  <option value="all">All Statuses</option>
-                  <option value="new">New Requests (Unprocessed / Trial)</option>
-                  <option value="pending">Pending/Active Setup</option>
-                  <option value="completed">Completed Orders</option>
+                  <option value="all">All Quotations</option>
+                  <option value="new">Admin Generated (Pending Payment)</option>
+                  <option value="pending">User Submitted (Pending Payment)</option>
+                  <option value="completed">Cancelled Quotations</option>
                 </select>
               </div>
 
@@ -1003,6 +1016,349 @@ export default function AdminPage() {
                 })() : (
                   <div className="py-12 text-slate-400 text-xs italic text-center">
                     Select a service request to inspect details.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {activeTab === "ads_orders" && (() => {
+        const filteredAdsOrders = adsOrdersList.filter((o) => {
+          const matchSearch =
+            o.id.toLowerCase().includes(orderSearchQuery.toLowerCase()) ||
+            o.customer_name.toLowerCase().includes(orderSearchQuery.toLowerCase()) ||
+            o.customer_email.toLowerCase().includes(orderSearchQuery.toLowerCase()) ||
+            o.business_name.toLowerCase().includes(orderSearchQuery.toLowerCase()) ||
+            o.advertised_product.toLowerCase().includes(orderSearchQuery.toLowerCase());
+
+          if (orderStatusFilter === "trial") {
+            return matchSearch && o.status === "trial_started";
+          }
+          if (orderStatusFilter === "pending") {
+            return matchSearch && ["whatsapp_pending", "whatsapp_connected"].includes(o.status);
+          }
+          if (orderStatusFilter === "live") {
+            return matchSearch && ["campaign_setup", "campaign_live"].includes(o.status);
+          }
+          if (orderStatusFilter === "completed") {
+            return matchSearch && o.status === "completed";
+          }
+          return matchSearch;
+        });
+
+        const selectedOrder = adsOrdersList.find((o) => o.id === selectedOrderRowId);
+
+        return (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 font-sans text-left">
+            {/* Orders List */}
+            <div className="lg:col-span-2 bg-white border border-slate-150 rounded-2xl p-6 shadow-xs space-y-4">
+              <div className="flex justify-between items-center border-b border-slate-100 pb-3 flex-wrap gap-2">
+                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                  <Megaphone size={16} className="text-blue-600" /> Active Service Orders ({filteredAdsOrders.length})
+                </h3>
+              </div>
+
+              {/* Filters Row */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pb-2 border-b border-slate-100">
+                <input
+                  type="text"
+                  placeholder="Search by Order ID, Client, Product..."
+                  value={orderSearchQuery}
+                  onChange={(e) => setOrderSearchQuery(e.target.value)}
+                  className="px-3.5 py-2 border border-slate-200 rounded-xl text-xs font-semibold focus:ring-1 focus:ring-blue-500 bg-slate-50/20"
+                />
+                <select
+                  value={orderStatusFilter}
+                  onChange={(e) => setOrderStatusFilter(e.target.value)}
+                  className="px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold bg-white"
+                >
+                  <option value="all">All Orders</option>
+                  <option value="trial">Trial Active</option>
+                  <option value="pending">Pending Setup (WhatsApp/Access)</option>
+                  <option value="live">Live Campaigns</option>
+                  <option value="completed">Completed Deliverables</option>
+                </select>
+              </div>
+
+              {filteredAdsOrders.length === 0 ? (
+                <div className="py-12 text-center text-slate-400 text-xs italic">
+                  No active service orders found.
+                </div>
+              ) : (
+                <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
+                  {filteredAdsOrders.map((o) => {
+                    const isSetup = o.order_type === "addon_setup";
+                    const isCreative = o.order_type === "addon_creative";
+                    return (
+                      <div
+                        key={o.id}
+                        onClick={() => {
+                          setSelectedOrderRowId(o.id);
+                          setNewRequestStatus(o.status);
+                          setNewPartnerStatus(o.partner_access_status || "not_requested");
+                          setCreditsToConsume(0);
+                          setShowOrderTicketForm(false);
+                        }}
+                        className={`p-4 border rounded-xl hover:bg-slate-50/50 transition cursor-pointer text-left ${
+                          selectedOrderRowId === o.id ? "border-blue-500 bg-blue-50/5" : "border-slate-150 bg-white"
+                        }`}
+                      >
+                        <div className="flex justify-between items-start flex-wrap gap-2">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h4 className="font-extrabold text-xs text-slate-800">{o.business_name}</h4>
+                              <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-md ${
+                                isSetup ? "bg-purple-50 text-purple-700" : isCreative ? "bg-amber-50 text-amber-700" : "bg-blue-50 text-blue-700"
+                              }`}>
+                                {isSetup ? "Setup Service" : isCreative ? "Creative Service" : "Ad Campaign"}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-slate-650 font-extrabold mt-1">
+                              {o.advertised_product}
+                            </p>
+                            <p className="text-[10px] text-slate-450 font-bold mt-0.5">
+                              ID: <span className="font-mono text-[9px]">{o.id}</span>
+                            </p>
+                            <p className="text-[10px] text-slate-450 font-bold">
+                              Customer: {o.customer_name} ({o.customer_email}) | WhatsApp: {o.whatsapp_number}
+                            </p>
+                          </div>
+                          <span className={`text-[9px] font-bold px-2.5 py-0.5 rounded-full uppercase ${
+                            o.status === "completed" ? "bg-emerald-50 text-emerald-700" : "bg-blue-50 text-blue-700"
+                          }`}>
+                            {o.status.replace("_", " ")}
+                          </span>
+                        </div>
+                        <div className="mt-3 pt-2 border-t border-slate-100 flex justify-between text-[10px] text-slate-500 font-bold">
+                          <span>Partner Access: <b>{o.partner_access_status || "not_requested"}</b></span>
+                          {!isSetup && !isCreative && (
+                            <span>Credits remaining: <b>{o.number_of_ads}</b></span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Order Details Panel */}
+            <div className="bg-white border border-slate-150 rounded-2xl p-6 shadow-xs h-fit space-y-5">
+              <h3 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-3 flex items-center gap-1.5">
+                <ShieldAlert size={16} className="text-blue-600" /> Order Controls
+              </h3>
+
+              <div className="space-y-4">
+                {selectedOrder ? (() => {
+                  const isSetup = selectedOrder.order_type === "addon_setup";
+                  const isCreative = selectedOrder.order_type === "addon_creative";
+
+                  return (
+                    <div className="space-y-4 font-sans text-xs">
+                      <div>
+                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Selected Deliverable</div>
+                        <div className="font-extrabold text-slate-800 text-sm mt-1">{selectedOrder.advertised_product}</div>
+                        <div className="text-[10px] text-slate-450 font-bold mt-1">
+                          Client Profile: {selectedOrder.customer_name} ({selectedOrder.customer_email})
+                        </div>
+                      </div>
+
+                      <hr className="border-slate-100" />
+
+                      {/* Status Override */}
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-slate-550 uppercase block text-left">Update Parent Service Status</label>
+                        <select
+                          value={newRequestStatus}
+                          onChange={(e) => setNewRequestStatus(e.target.value)}
+                          className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold bg-white"
+                        >
+                          <option value="whatsapp_pending">WhatsApp Connected (Pending)</option>
+                          <option value="whatsapp_connected">WhatsApp Connected (Connected)</option>
+                          <option value="partner_access_requested">Partner Access Requested</option>
+                          <option value="partner_access_granted">Partner Access Granted</option>
+                          <option value="campaign_setup">Campaign Setup In-Progress</option>
+                          <option value="campaign_live">Campaign Live & Active</option>
+                          <option value="completed">All Deliverables Completed</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-slate-555 uppercase block text-left">Partner Access Override</label>
+                        <select
+                          value={newPartnerStatus}
+                          onChange={(e) => setNewPartnerStatus(e.target.value)}
+                          className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold bg-white"
+                        >
+                          <option value="not_requested">Not Requested</option>
+                          <option value="requested">Requested</option>
+                          <option value="granted">Granted</option>
+                        </select>
+                      </div>
+
+                      <button
+                        onClick={async () => {
+                          setActionLoading("update_order_status");
+                          try {
+                            await api.adminUpdateAdsServiceRequest(selectedOrder.parent_request_id, {
+                              status: newRequestStatus,
+                              partner_access_status: newPartnerStatus,
+                            });
+                            setNotification({
+                              type: "success",
+                              message: "Updated order delivery statuses successfully!",
+                            });
+                            // Reload stats & orders list
+                            const [ordersRes, requestsRes] = await Promise.all([
+                              api.getAdminAdsServiceOrders(),
+                              api.getAdminAdsServiceRequests(),
+                            ]);
+                            setAdsOrdersList(ordersRes);
+                            setAdsRequestsList(requestsRes);
+                          } catch (err: any) {
+                            setNotification({
+                              type: "error",
+                              message: err.message || "Failed to update statuses.",
+                            });
+                          } finally {
+                            setActionLoading(null);
+                          }
+                        }}
+                        disabled={actionLoading === "update_order_status"}
+                        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl transition text-[11px] uppercase tracking-wide cursor-pointer disabled:opacity-50"
+                      >
+                        {actionLoading === "update_order_status" ? "Saving..." : "Apply Status Updates"}
+                      </button>
+
+                      <hr className="border-slate-100" />
+
+                      {/* Consume AdPack Credits (only for active ad campaigns) */}
+                      {!isSetup && !isCreative && (
+                        <>
+                          <div className="space-y-2">
+                            <label className="text-[10px] font-bold text-slate-555 uppercase block text-left">Record Ad Credit Consumption</label>
+                            <p className="text-[10px] text-slate-450 font-bold text-left">
+                              Record when an ad from this package runs out or is completed. This consumes 1 credit.
+                            </p>
+                            <div className="flex gap-2 items-center">
+                              <input
+                                type="number"
+                                min={1}
+                                max={selectedOrder.number_of_ads}
+                                value={creditsToConsume}
+                                onChange={(e) => setCreditsToConsume(parseInt(e.target.value) || 0)}
+                                className="w-20 px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-bold"
+                              />
+                              <button
+                                onClick={async () => {
+                                  if (creditsToConsume <= 0) return;
+                                  setActionLoading("consume_order_credits");
+                                  try {
+                                    await api.adminUpdateAdsServiceRequest(selectedOrder.parent_request_id, {
+                                      consume_credits: creditsToConsume,
+                                    });
+                                    setNotification({
+                                      type: "success",
+                                      message: `Successfully recorded consumption of ${creditsToConsume} ad credits.`,
+                                    });
+                                    setCreditsToConsume(0);
+                                    // Reload
+                                    const [ordersRes, requestsRes] = await Promise.all([
+                                      api.getAdminAdsServiceOrders(),
+                                      api.getAdminAdsServiceRequests(),
+                                    ]);
+                                    setAdsOrdersList(ordersRes);
+                                    setAdsRequestsList(requestsRes);
+                                  } catch (err: any) {
+                                    setNotification({
+                                      type: "error",
+                                      message: err.message || "Failed to consume credits.",
+                                    });
+                                  } finally {
+                                    setActionLoading(null);
+                                  }
+                                }}
+                                disabled={actionLoading === "consume_order_credits" || creditsToConsume <= 0}
+                                className="flex-1 bg-amber-600 hover:bg-amber-700 text-white font-bold py-1.5 rounded-lg text-[10px] uppercase font-sans tracking-wide cursor-pointer disabled:opacity-50"
+                              >
+                                {actionLoading === "consume_order_credits" ? "Processing..." : "Consume Credits"}
+                              </button>
+                            </div>
+                          </div>
+                          <hr className="border-slate-100" />
+                        </>
+                      )}
+
+                      {/* Ticket Raising Section */}
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[10px] font-bold text-slate-550 uppercase">Support Communications</span>
+                          <button
+                            type="button"
+                            onClick={() => setShowOrderTicketForm(!showOrderTicketForm)}
+                            className="text-blue-600 hover:text-blue-700 font-extrabold text-[10px] uppercase"
+                          >
+                            {showOrderTicketForm ? "Cancel" : "Raise Support Ticket"}
+                          </button>
+                        </div>
+
+                        {showOrderTicketForm && (
+                          <div className="space-y-3 p-3 bg-slate-50 rounded-xl border border-slate-150 text-left">
+                            <div>
+                              <label className="text-[9px] font-bold text-slate-450 uppercase block mb-1">Ticket Subject</label>
+                              <input
+                                type="text"
+                                placeholder="e.g. Meta pixel integration required"
+                                value={orderTicketSubject}
+                                onChange={(e) => setOrderTicketSubject(e.target.value)}
+                                className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[10px] bg-white font-bold"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[9px] font-bold text-slate-450 uppercase block mb-1 font-sans">Detailed Issue Description</label>
+                              <textarea
+                                rows={3}
+                                placeholder="Describe details, next actions, or requirements..."
+                                value={orderTicketDescription}
+                                onChange={(e) => setOrderTicketDescription(e.target.value)}
+                                className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[10px] bg-white"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[9px] font-bold text-slate-450 uppercase block mb-1">Communication Category</label>
+                              <select
+                                value={orderTicketCategory}
+                                onChange={(e) => setOrderTicketCategory(e.target.value)}
+                                className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[10px] bg-white font-bold"
+                              >
+                                <option value="General Support">General Support</option>
+                                <option value="Billing Issue">Billing Issue</option>
+                                <option value="Meta Ads Sync">Meta Ads Sync</option>
+                                <option value="AI Recommendations">AI Recommendations</option>
+                              </select>
+                            </div>
+                            <button
+                              type="button"
+                              disabled={actionLoading === "raise_order_ticket" || !orderTicketSubject || !orderTicketDescription}
+                              onClick={() => {
+                                if (selectedOrder.user_id) {
+                                  handleRaiseTicketFromOrder(selectedOrder.user_id, selectedOrder.parent_request_id);
+                                }
+                              }}
+                              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-1.5 rounded-lg transition disabled:opacity-50 text-[10px] uppercase font-sans tracking-wide cursor-pointer"
+                            >
+                              {actionLoading === "raise_order_ticket" ? "Raising Ticket..." : "Submit Support Ticket"}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })() : (
+                  <div className="py-12 text-slate-400 text-xs italic text-center">
+                    Select a service order to inspect details.
                   </div>
                 )}
               </div>

@@ -291,3 +291,71 @@ async def test_lifetime_promo_limit_per_email(db: AsyncSession, cleanup_test_dat
     # Verify user does NOT get the promo because intro_offer_used is True
     has_promo = any(item.get("service_type") == "ad_management_promo" for item in quote_data["items"])
     assert has_promo is False
+
+
+@pytest.mark.anyio
+async def test_admin_split_orders(db: AsyncSession, cleanup_test_data):
+    from app.api.v1.ads_service import build_orders_for_request
+
+    # 1. Create a User
+    user = await get_db_user_from_claims(NEW_USER_CLAIMS, db)
+
+    # 2. Create a paid service request with 3 ads, requiring account setup and creative design
+    req = MetaAdServiceRequest(
+        user_id=user.id,
+        status="whatsapp_pending",
+        full_name="Vikram Wadkar",
+        business_name="Suvi Biz",
+        email=NEW_USER_EMAIL,
+        whatsapp_number="8237378119",
+        business_location="India",
+        industry="Technology",
+        advertised_product="Split Product Test",
+        campaign_objective="Leads",
+        daily_budget="1500",
+        number_of_ads=3,
+        meta_account_exists=False,  # Should generate Setup Add-on Order
+        creative_required=True,     # Should generate Creative Add-on Order
+    )
+    db.add(req)
+    await db.commit()
+    await db.refresh(req)
+
+    # 3. Create a paid quotation for this request to match the orders definition
+    quote = ServiceQuotation(
+        user_id=user.id,
+        service_request_id=req.id,
+        regular_total=1000,
+        discount_total=0,
+        final_total=1000,
+        items=[
+            {"service_type": "ad_management_standard", "price": 500},
+            {"service_type": "account_setup", "price": 250},
+            {"service_type": "creative_design", "price": 250}
+        ],
+        status="paid",
+        expires_at=datetime.utcnow() + timedelta(days=7)
+    )
+    db.add(quote)
+    await db.commit()
+
+    # 4. Generate split orders
+    orders = await build_orders_for_request(req, db)
+    
+    # We expect: 3 ad orders + 1 account setup order + 1 creative design order = 5 orders in total!
+    assert len(orders) == 5
+
+    ad_orders = [o for o in orders if o["order_type"] == "ad"]
+    setup_orders = [o for o in orders if o["order_type"] == "addon_setup"]
+    creative_orders = [o for o in orders if o["order_type"] == "addon_creative"]
+
+    assert len(ad_orders) == 3
+    assert len(setup_orders) == 1
+    assert len(creative_orders) == 1
+
+    # Verify ID structure and contents
+    assert ad_orders[0]["id"] == f"{req.id}-ad-1"
+    assert ad_orders[0]["business_name"] == "Suvi Biz"
+    assert setup_orders[0]["id"] == f"{req.id}-setup"
+    assert creative_orders[0]["id"] == f"{req.id}-creative"
+
