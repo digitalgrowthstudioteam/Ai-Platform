@@ -371,10 +371,13 @@ export default function GetAdsPage() {
           const latest = await api.getLatestAdsServiceRequest();
           setEligibleState(latest.user_eligibility || { eligible: true });
           
-          if (latest.request && !isNew) {
-            if (latest.request.status !== "draft" && latest.request.status !== "cancelled") {
+          if (latest.request) {
+            if (!isNew && latest.request.status !== "draft") {
               router.push("/dashboard/services");
               return;
+            }
+            if (isNew && latest.request.status !== "draft") {
+              setCurrentStep(5);
             }
             setActiveRequest(latest.request);
             setQuotation(latest.quotation);
@@ -581,7 +584,8 @@ export default function GetAdsPage() {
   };
 
   const handlePrevStep = () => {
-    if (currentStep > 0) {
+    const isRestrictedBack = isNew && activeRequest && activeRequest.status !== "draft" && currentStep <= 5;
+    if (currentStep > 0 && !isRestrictedBack) {
       setCurrentStep(currentStep - 1);
       setNotification(null);
     }
@@ -1559,7 +1563,7 @@ export default function GetAdsPage() {
             <div className="pt-6 border-t border-slate-100 flex justify-between items-center flex-wrap gap-4">
               <button
                 onClick={handlePrevStep}
-                disabled={currentStep === 0}
+                disabled={currentStep === 0 || (isNew && activeRequest && activeRequest.status !== "draft" && currentStep <= 5)}
                 className="inline-flex items-center gap-1 hover:text-slate-600 transition disabled:opacity-30 font-bold text-xs"
               >
                 <ArrowLeft size={13} /> Back
