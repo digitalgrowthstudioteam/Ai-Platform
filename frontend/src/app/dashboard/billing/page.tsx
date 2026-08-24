@@ -184,6 +184,29 @@ export default function BillingPage() {
     }
   };
 
+  const handleCancelQuotation = async (quotationId: string) => {
+    if (!confirm("Are you sure you want to cancel this quotation? This will also cancel the corresponding service request.")) {
+      return;
+    }
+    try {
+      setLoading(true);
+      await api.cancelQuotation(quotationId);
+      setNotification({
+        type: "success",
+        message: "Quotation cancelled successfully.",
+      });
+      await fetchBillingData();
+    } catch (err: any) {
+      console.error("Failed to cancel quotation:", err);
+      setNotification({
+        type: "error",
+        message: err.message || "Failed to cancel quotation.",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const typeIcons: Record<string, React.ReactNode> = {
     quotation: <FileText size={16} className="text-blue-600" />,
     ad_pack: <Megaphone size={16} className="text-emerald-600" />,
@@ -433,9 +456,16 @@ export default function BillingPage() {
                         )}
                       </div>
 
-                      {/* Pay Now Button */}
+                      {/* Pay Now & Cancel Buttons */}
                       {tx.status === "pending" && (
-                        <div className="flex justify-end pt-1">
+                        <div className="flex justify-end gap-3 pt-1">
+                          <button
+                            disabled={payingTxId === tx.id}
+                            onClick={() => handleCancelQuotation(tx.id)}
+                            className="border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold text-[11px] px-6 py-2.5 rounded-lg transition disabled:opacity-50 cursor-pointer uppercase tracking-wider"
+                          >
+                            Cancel Quotation
+                          </button>
                           <button
                             disabled={payingTxId === tx.id}
                             onClick={() => handlePayQuotation(tx)}

@@ -558,6 +558,7 @@ export default function GetAdsPage() {
           additional_services: selectedServices,
           meta_account_exists: metaAccountExists,
           meta_ad_account_id: selectedMetaAdAccountId,
+          status: "submitted",
         };
 
         await api.submitAdsServiceRequest(payload);
@@ -625,6 +626,7 @@ export default function GetAdsPage() {
         additional_services: selectedServices,
         meta_account_exists: metaAccountExists,
         meta_ad_account_id: selectedMetaAdAccountId,
+        status: "draft",
       };
 
       const res = await api.submitAdsServiceRequest(payload);
@@ -680,10 +682,7 @@ export default function GetAdsPage() {
       const savedRes = await api.submitAdsServiceRequest(payload);
       const reqId = savedRes.request_id;
 
-      // 2. Trigger Starter trial activation
-      await api.activateAdsServiceTrial(reqId);
-
-      // 3. Purchase pack checkout creation
+      // 2. Purchase pack checkout creation
       const order = await api.purchaseAdsServicePack(reqId);
 
       // If mock checkout, verify instantly
@@ -1533,7 +1532,7 @@ export default function GetAdsPage() {
                     </h3>
                     <p className="text-xs text-slate-600 leading-relaxed font-semibold">
                       This ads management service is active alongside our **Starter Plan** (₹99/month). 
-                      Your 7-day Starter Plan trial will be activated automatically when you proceed with checkout.
+                      Your Complementary Starter Plan is included in this and will be activated automatically upon successful checkout.
                     </p>
                   </div>
 
@@ -1594,7 +1593,7 @@ export default function GetAdsPage() {
                     ) : (
                       <>
                         <Sparkles size={14} />
-                        Checkout & Start Trial
+                        Pay & Activate Service
                       </>
                     )}
                   </button>

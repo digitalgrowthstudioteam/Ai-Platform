@@ -25,10 +25,21 @@ export default function LoginPage() {
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
   });
+
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const emailParam = params.get("email");
+      if (emailParam) {
+        setValue("email", emailParam);
+      }
+    }
+  }, [setValue]);
 
   const onSubmit = async (data: LoginFormData) => {
     setError(null);

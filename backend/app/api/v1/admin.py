@@ -901,6 +901,7 @@ async def override_intro_offer(
 
 
 class AdminRaiseQuotationPayload(BaseModel):
+    email: Optional[str] = None
     number_of_ads: int
     price_per_ad: int  # in Rupees
     validity_days: int
@@ -926,17 +927,52 @@ async def admin_raise_quotation(
     db: AsyncSession = Depends(get_db)
 ):
     verify_admin(claims)
-    stmt = select(User).where(User.id == user_id)
-    res = await db.execute(stmt)
-    user = res.scalar_one_or_none()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found.")
+    
+    target_user_id = user_id
+    target_email = ""
+    
+    # Check if user_id is the zero UUID
+    is_unregistered = str(user_id) == "00000000-0000-0000-0000-000000000000"
+    
+    if is_unregistered:
+        if not payload.email:
+            raise HTTPException(status_code=400, detail="Email is required for unregistered users.")
+        email_clean = payload.email.strip().lower()
+        
+        # Check if user already exists
+        stmt_u = select(User).where(User.email == email_clean)
+        res_u = await db.execute(stmt_u)
+        user = res_u.scalar_one_or_none()
+        
+        if not user:
+            # Create a placeholder user
+            user = User(
+                firebase_uid=f"placeholder_{email_clean}",
+                email=email_clean,
+                name=email_clean.split("@")[0],
+                status="active"
+            )
+            db.add(user)
+            await db.commit()
+            await db.refresh(user)
+            
+        target_user_id = user.id
+        target_email = user.email
+    else:
+        # Load user by user_id
+        stmt_u = select(User).where(User.id == user_id)
+        res_u = await db.execute(stmt_u)
+        user = res_u.scalar_one_or_none()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found.")
+        target_user_id = user.id
+        target_email = user.email
 
     from app.models.ads_service import MetaAdServiceRequest, ServiceQuotation
 
     # Check for existing unpaid request
     stmt_req = select(MetaAdServiceRequest).where(
-        MetaAdServiceRequest.user_id == user_id
+        MetaAdServiceRequest.user_id == target_user_id
     ).where(
         MetaAdServiceRequest.status.in_([
             "draft", "submitted", "eligibility_review", "eligible",
@@ -949,10 +985,10 @@ async def admin_raise_quotation(
     if not req:
         # Create placeholder onboarding request
         req = MetaAdServiceRequest(
-            user_id=user_id,
+            user_id=target_user_id,
             full_name=user.name or "Client",
             business_name=f"Campaign Setup — {user.name or 'Client'}",
-            email=user.email or "",
+            email=target_email or "",
             whatsapp_number="",
             business_location="India",
             industry="Ecommerce",
@@ -1026,7 +1062,7 @@ async def admin_raise_quotation(
 
     # Create new quotation
     quote = ServiceQuotation(
-        user_id=user_id,
+        user_id=target_user_id,
         service_request_id=req.id,
         regular_total=final_total_paise,
         discount_total=0,
@@ -1039,8 +1075,13 @@ async def admin_raise_quotation(
     db.add(quote)
     await db.commit()
 
-    logger.info("admin_quotation_raised", user_id=user_id, quote_id=quote.id, total=final_total_paise)
-    return {"status": "success", "message": "Quotation raised successfully.", "quotation_id": str(quote.id)}
+    logger.info("admin_quotation_raised", user_id=target_user_id, quote_id=quote.id, total=final_total_paise)
+    return {
+        "status": "success",
+        "message": "Quotation raised successfully.",
+        "quotation_id": str(quote.id),
+        "quotation_link": f"https://digitalgrowthstudio.in/login?email={target_email}"
+    }
 
 
 @router.post("/users/{user_id}/raise-ticket", summary="Admin: Raise a support ticket for a user")

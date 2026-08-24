@@ -68,6 +68,22 @@ async def get_db_user_from_claims(claims: dict, db: AsyncSession) -> User:
     user = result.scalar_one_or_none()
 
     if not user:
+        # Check if there is a placeholder user with this email (created by admin for quotation)
+        email = claims.get("email")
+        if email:
+            stmt_email = select(User).where(User.email == email)
+            res_email = await db.execute(stmt_email)
+            user = res_email.scalar_one_or_none()
+            if user:
+                # Link this user to the real firebase uid
+                user.firebase_uid = uid
+                if claims.get("name") and (not user.name or user.name == email.split("@")[0]):
+                    user.name = claims.get("name")
+                db.add(user)
+                await db.commit()
+                await db.refresh(user)
+
+    if not user:
         # Dynamic JIT Onboarding registration in DB
         user = User(
             firebase_uid=uid,

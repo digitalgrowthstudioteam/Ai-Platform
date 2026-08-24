@@ -50,6 +50,7 @@ class ServiceRequestCreate(BaseModel):
     meta_account_exists: bool
     meta_business_id: Optional[str] = None
     meta_ad_account_id: Optional[str] = None
+    status: Optional[str] = "submitted"
 
 class AdminUpdateServiceRequest(BaseModel):
     status: Optional[str] = None
@@ -121,20 +122,59 @@ async def create_service_request(
     if existing_request:
         # Update existing request instead of duplicating
         for field, val in payload.dict().items():
-            setattr(existing_request, field, val)
+            if field != "status":
+                setattr(existing_request, field, val)
+        if payload.status:
+            existing_request.status = payload.status
         existing_request.updated_at = datetime.utcnow()
         req = existing_request
     else:
         # Create new service request
         req = MetaAdServiceRequest(
             user_id=user.id,
-            status="submitted",
-            **payload.dict()
+            status=payload.status or "submitted",
+            **payload.dict(exclude={"status"})
         )
         db.add(req)
 
     await db.commit()
     await db.refresh(req)
+
+    # Automatically generate / update quotation if status is "submitted"
+    if req.status == "submitted":
+        from app.services.ads_service_eligibility import calculate_quotation
+        quote_data = await calculate_quotation(db, user, req)
+        
+        from app.models.ads_service import ServiceQuotation
+        stmt_quote = (
+            select(ServiceQuotation)
+            .where(ServiceQuotation.service_request_id == req.id)
+            .order_by(ServiceQuotation.created_at.desc())
+            .limit(1)
+        )
+        res_quote = await db.execute(stmt_quote)
+        db_quote = res_quote.scalar_one_or_none()
+
+        if not db_quote or db_quote.status == "pending":
+            if db_quote:
+                db_quote.regular_total = quote_data["regular_total"]
+                db_quote.discount_total = quote_data["discount_total"]
+                db_quote.final_total = quote_data["final_total"]
+                db_quote.items = quote_data["items"]
+                db_quote.expires_at = datetime.utcnow() + timedelta(days=7)
+            else:
+                db_quote = ServiceQuotation(
+                    user_id=user.id,
+                    service_request_id=req.id,
+                    regular_total=quote_data["regular_total"],
+                    discount_total=quote_data["discount_total"],
+                    final_total=quote_data["final_total"],
+                    items=quote_data["items"],
+                    status="pending",
+                    expires_at=datetime.utcnow() + timedelta(days=7)
+                )
+                db.add(db_quote)
+            await db.commit()
 
     return {
         "status": "success",
@@ -541,27 +581,32 @@ async def get_user_orders(
     """
     user = await get_db_user_from_claims(claims, db)
 
-    paid_statuses = [
-        "trial_started",
-        "whatsapp_pending",
-        "whatsapp_connected",
-        "partner_access_requested",
-        "partner_access_granted",
-        "campaign_setup",
-        "campaign_live",
-        "completed"
-    ]
-
-    stmt = select(MetaAdServiceRequest).where(
+    stmt_reqs = select(MetaAdServiceRequest).where(
         MetaAdServiceRequest.user_id == user.id
-    ).where(
-        (MetaAdServiceRequest.status.in_(paid_statuses)) |
-        (MetaAdServiceRequest.id.in_(
-            select(ServiceQuotation.service_request_id).where(ServiceQuotation.status == "paid")
-        ))
     ).order_by(MetaAdServiceRequest.created_at.desc())
-    res = await db.execute(stmt)
-    requests = res.scalars().all()
+    res_reqs = await db.execute(stmt_reqs)
+    all_requests = res_reqs.scalars().all()
+
+    requests = []
+    for r in all_requests:
+        # Check if there is an associated quotation
+        stmt_q = select(ServiceQuotation).where(ServiceQuotation.service_request_id == r.id)
+        res_q = await db.execute(stmt_q)
+        quotes = res_q.scalars().all()
+        
+        if quotes:
+            # If there are quotations, at least one must be 'paid'
+            if any(q.status == "paid" for q in quotes):
+                requests.append(r)
+        else:
+            # If there are no quotations, we check if the request is 'trial_started'
+            # or if it has an associated AdPack
+            stmt_ap = select(AdPack).where(AdPack.service_request_id == r.id)
+            res_ap = await db.execute(stmt_ap)
+            has_pack = res_ap.scalar_one_or_none() is not None
+            
+            if r.status == "trial_started" or has_pack:
+                requests.append(r)
 
     orders = []
     for r in requests:
@@ -723,6 +768,40 @@ async def get_user_billing_history(
     transactions.sort(key=lambda t: t["date"], reverse=True)
 
     return {"transactions": transactions}
+
+
+@router.post("/quotations/{id}/cancel", summary="Cancel a pending quotation")
+async def cancel_quotation(
+    id: uuid.UUID,
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    user = await get_db_user_from_claims(claims, db)
+    stmt = select(ServiceQuotation).where(
+        ServiceQuotation.id == id,
+        ServiceQuotation.user_id == user.id
+    )
+    res = await db.execute(stmt)
+    quote = res.scalar_one_or_none()
+    if not quote:
+        raise HTTPException(status_code=404, detail="Quotation not found.")
+        
+    if quote.status != "pending":
+        raise HTTPException(status_code=400, detail="Only pending quotations can be cancelled.")
+        
+    quote.status = "cancelled"
+    db.add(quote)
+    
+    # Also cancel the associated request if it is not already in an active/paid state
+    stmt_req = select(MetaAdServiceRequest).where(MetaAdServiceRequest.id == quote.service_request_id)
+    res_req = await db.execute(stmt_req)
+    req = res_req.scalar_one_or_none()
+    if req and req.status in ("draft", "submitted", "eligibility_review", "eligible", "quotation_generated"):
+        req.status = "cancelled"
+        db.add(req)
+        
+    await db.commit()
+    return {"status": "success", "message": "Quotation cancelled successfully."}
 
 
 # ──────────────────────────────────────────────

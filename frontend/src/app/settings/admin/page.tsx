@@ -54,6 +54,20 @@ export default function AdminPage() {
   const [orderTicketDescription, setOrderTicketDescription] = useState("");
   const [orderTicketCategory, setOrderTicketCategory] = useState("General Support");
 
+  // Email Quotation Modal State
+  const [showEmailQuoteModal, setShowEmailQuoteModal] = useState(false);
+  const [quoteEmail, setQuoteEmail] = useState("");
+  const [quoteAdQty, setQuoteAdQty] = useState(5);
+  const [quotePricePerAd, setQuotePricePerAd] = useState(799);
+  const [quoteIncludeSetup, setQuoteIncludeSetup] = useState(true);
+  const [quoteSetupPrice, setQuoteSetupPrice] = useState(1999);
+  const [quoteIncludeCreative, setQuoteIncludeCreative] = useState(true);
+  const [quoteCreativePrice, setQuoteCreativePrice] = useState(1499);
+  const [quoteCustomItemName, setQuoteCustomItemName] = useState("");
+  const [quoteCustomItemPrice, setQuoteCustomItemPrice] = useState(0);
+  const [quoteValidityDays, setQuoteValidityDays] = useState(7);
+  const [generatedQuoteLink, setGeneratedQuoteLink] = useState("");
+
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   
@@ -66,6 +80,46 @@ export default function AdminPage() {
     type: "success" | "error";
     message: string;
   } | null>(null);
+
+  const handleRaiseQuotationByEmail = async () => {
+    if (!quoteEmail) {
+      setNotification({ type: "error", message: "Client email is required." });
+      return;
+    }
+    try {
+      setActionLoading("raise_quote_email");
+      const res = await api.adminRaiseQuotation("00000000-0000-0000-0000-000000000000", {
+        email: quoteEmail,
+        number_of_ads: quoteAdQty,
+        price_per_ad: quotePricePerAd,
+        validity_days: quoteValidityDays,
+        include_setup: quoteIncludeSetup,
+        setup_price: quoteSetupPrice,
+        include_creative: quoteIncludeCreative,
+        creative_price: quoteCreativePrice,
+        custom_item_name: quoteCustomItemName || undefined,
+        custom_item_price: quoteCustomItemName ? quoteCustomItemPrice : undefined,
+      });
+
+      setNotification({
+        type: "success",
+        message: "Successfully generated quotation for the unregistered user!",
+      });
+      setGeneratedQuoteLink(res.quotation_link || "");
+      
+      // Reload request list to show the new request created
+      const adsRes = await api.getAdminAdsServiceRequests();
+      setAdsRequestsList(adsRes);
+    } catch (err: any) {
+      console.error(err);
+      setNotification({
+        type: "error",
+        message: err.message || "Failed to generate quotation.",
+      });
+    } finally {
+      setActionLoading(null);
+    }
+  };
 
   // Check admin role
   const isAdmin = user?.email === "flasshgames2026@gmail.com" || user?.email === "digitalgrowthstudioteam@gmail.com";
@@ -689,6 +743,16 @@ export default function AdminPage() {
                 <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
                   <Megaphone size={16} className="text-blue-600" /> Service Setup Requests ({filteredAdsRequests.length})
                 </h3>
+                <button
+                  onClick={() => {
+                    setGeneratedQuoteLink("");
+                    setQuoteEmail("");
+                    setShowEmailQuoteModal(true);
+                  }}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow-md shadow-blue-500/10"
+                >
+                  + Create Quotation by Email
+                </button>
               </div>
 
               {/* Filters Row */}
@@ -946,6 +1010,206 @@ export default function AdminPage() {
           </div>
         );
       })()}
+
+      {/* Create Quotation by Email Modal */}
+      {showEmailQuoteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="bg-white w-full max-w-lg rounded-2xl shadow-xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-205">
+            <div className="border-b border-slate-100 bg-slate-50 px-6 py-4 flex justify-between items-center">
+              <h3 className="font-bold text-slate-800 text-sm flex items-center gap-1.5">
+                <Sparkles size={16} className="text-blue-600" /> Raise Quotation by Email
+              </h3>
+              <button
+                onClick={() => setShowEmailQuoteModal(false)}
+                className="text-slate-400 hover:text-slate-600 font-bold text-sm"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-4 max-h-[80vh] overflow-y-auto text-xs font-sans text-left">
+              {!generatedQuoteLink ? (
+                <>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Client Email Address</label>
+                    <input
+                      type="email"
+                      required
+                      placeholder="e.g. client@example.com"
+                      value={quoteEmail}
+                      onChange={(e) => setQuoteEmail(e.target.value)}
+                      className="w-full border border-slate-200 rounded-xl px-3.5 py-2 text-xs bg-white font-bold text-slate-800"
+                    />
+                    <span className="text-[9px] text-slate-400 block font-medium">If the user is not registered, a placeholder account will be created. They must register/login with this exact email to see and pay the quotation.</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">Quantity of Ads</label>
+                      <input
+                        type="number"
+                        min={1}
+                        value={quoteAdQty}
+                        onChange={(e) => setQuoteAdQty(parseInt(e.target.value) || 1)}
+                        className="w-full border border-slate-200 rounded-xl px-3.5 py-2 text-xs bg-white font-bold text-slate-800"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">Price Per Ad (₹)</label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={quotePricePerAd}
+                        onChange={(e) => setQuotePricePerAd(parseInt(e.target.value) || 0)}
+                        className="w-full border border-slate-200 rounded-xl px-3.5 py-2 text-xs bg-white font-bold text-slate-800"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="border-t border-slate-100 pt-3 space-y-3">
+                    <label className="flex items-center gap-2 font-bold text-slate-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={quoteIncludeSetup}
+                        onChange={(e) => setQuoteIncludeSetup(e.target.checked)}
+                        className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      Include Ad Account Setup Services
+                    </label>
+
+                    {quoteIncludeSetup && (
+                      <div className="space-y-1 pl-6">
+                        <label className="text-[9px] font-bold text-slate-500 uppercase">Setup Services Price (₹)</label>
+                        <input
+                          type="number"
+                          min={0}
+                          value={quoteSetupPrice}
+                          onChange={(e) => setQuoteSetupPrice(parseInt(e.target.value) || 0)}
+                          className="w-full max-w-[200px] border border-slate-200 rounded-xl px-3.5 py-1.5 text-xs bg-white font-bold text-slate-800"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="border-t border-slate-100 pt-3 space-y-3">
+                    <label className="flex items-center gap-2 font-bold text-slate-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={quoteIncludeCreative}
+                        onChange={(e) => setQuoteIncludeCreative(e.target.checked)}
+                        className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      Include Creative Design Services
+                    </label>
+
+                    {quoteIncludeCreative && (
+                      <div className="space-y-1 pl-6">
+                        <label className="text-[9px] font-bold text-slate-500 uppercase">Creative Services Price (₹)</label>
+                        <input
+                          type="number"
+                          min={0}
+                          value={quoteCreativePrice}
+                          onChange={(e) => setQuoteCreativePrice(parseInt(e.target.value) || 0)}
+                          className="w-full max-w-[200px] border border-slate-200 rounded-xl px-3.5 py-1.5 text-xs bg-white font-bold text-slate-800"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="border-t border-slate-100 pt-3 grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">Custom Item Name (Optional)</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Extra Landing Page Design"
+                        value={quoteCustomItemName}
+                        onChange={(e) => setQuoteCustomItemName(e.target.value)}
+                        className="w-full border border-slate-200 rounded-xl px-3.5 py-2 text-xs bg-white font-bold text-slate-800"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">Custom Item Price (₹)</label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={quoteCustomItemPrice}
+                        onChange={(e) => setQuoteCustomItemPrice(parseInt(e.target.value) || 0)}
+                        className="w-full border border-slate-200 rounded-xl px-3.5 py-2 text-xs bg-white font-bold text-slate-800"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 border-t border-slate-100 pt-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">Quote Validity (Days)</label>
+                      <input
+                        type="number"
+                        min={1}
+                        value={quoteValidityDays}
+                        onChange={(e) => setQuoteValidityDays(parseInt(e.target.value) || 7)}
+                        className="w-full border border-slate-200 rounded-xl px-3.5 py-2 text-xs bg-white font-bold text-slate-800"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="border-t border-slate-100 pt-4 flex justify-end gap-3">
+                    <button
+                      onClick={() => setShowEmailQuoteModal(false)}
+                      className="border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold px-4 py-2 rounded-xl text-[11px] uppercase tracking-wide transition cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleRaiseQuotationByEmail}
+                      disabled={actionLoading === "raise_quote_email" || !quoteEmail}
+                      className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-2.5 rounded-xl text-[11px] uppercase tracking-wide transition disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+                    >
+                      {actionLoading === "raise_quote_email" && <Loader2 size={12} className="animate-spin" />}
+                      Generate Quotation
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className="space-y-4 py-3 text-center">
+                  <div className="w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center mx-auto text-emerald-600 border border-emerald-100 mb-2">
+                    <CheckCircle size={24} />
+                  </div>
+                  <h4 className="font-bold text-slate-800 text-sm">Quotation Raised Successfully!</h4>
+                  <p className="text-slate-500 text-xs">A pending quotation has been created in the database for <strong>{quoteEmail}</strong>.</p>
+                  
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-1.5 text-left">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Shareable Payment Link</span>
+                    <input
+                      type="text"
+                      readOnly
+                      value={generatedQuoteLink}
+                      className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-blue-600 font-bold outline-none select-all"
+                    />
+                  </div>
+
+                  <div className="flex justify-center gap-3 pt-3">
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(generatedQuoteLink);
+                        setNotification({ type: "success", message: "Quotation link copied to clipboard!" });
+                      }}
+                      className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2.5 rounded-xl text-[11px] uppercase tracking-wide transition cursor-pointer"
+                    >
+                      Copy Link
+                    </button>
+                    <button
+                      onClick={() => setShowEmailQuoteModal(false)}
+                      className="border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold px-4 py-2.5 rounded-xl text-[11px] uppercase tracking-wide transition cursor-pointer"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

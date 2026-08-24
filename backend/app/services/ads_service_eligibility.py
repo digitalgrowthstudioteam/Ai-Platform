@@ -116,9 +116,39 @@ async def calculate_quotation(
     # 1. Base Ad Management Fee
     # Check if first ad & user is eligible for ₹333 promo offer
     first_ad_offer = services_pricing.get("first_ad_offer", {})
+    
+    # Check if any user with this email has ever used the intro offer (lifetime check)
+    stmt_lifetime = select(User.intro_offer_used).where(
+        User.email == user.email,
+        User.intro_offer_used == True
+    )
+    res_lifetime = await db.execute(stmt_lifetime)
+    has_used_lifetime = res_lifetime.scalar() is not None
+
+    # Check if this user has any other pending quotation containing the promo item
+    stmt_pending_promo = select(ServiceQuotation).where(
+        ServiceQuotation.user_id == user.id,
+        ServiceQuotation.status == "pending"
+    )
+    res_pending_promo = await db.execute(stmt_pending_promo)
+    pending_quotes = res_pending_promo.scalars().all()
+    
+    has_pending_promo = False
+    for pq in pending_quotes:
+        if pq.service_request_id != req.id:
+            # Check if this pending quotation contains the promo item
+            for item in (pq.items or []):
+                if item.get("service_type") == "ad_management_promo":
+                    has_pending_promo = True
+                    break
+            if has_pending_promo:
+                break
+
     is_promo_eligible = (
         user.intro_offer_eligible 
         and not user.intro_offer_used 
+        and not has_used_lifetime
+        and not has_pending_promo
         and first_ad_offer.get("active", True)
     )
 

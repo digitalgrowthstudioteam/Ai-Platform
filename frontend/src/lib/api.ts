@@ -616,7 +616,7 @@ class ApiClient {
   }
 
   async adminRaiseQuotation(userId: string, payload: any) {
-    return this.request<{ status: string; message: string; quotation_id: string }>(`/admin/users/${userId}/raise-quotation`, {
+    return this.request<{ status: string; message: string; quotation_id: string; quotation_link?: string }>(`/admin/users/${userId}/raise-quotation`, {
       method: "POST",
       body: payload,
     });
@@ -856,6 +856,12 @@ class ApiClient {
 
   async getUserBillingHistory() {
     return this.request<any>("/ads-service/billing-history");
+  }
+
+  async cancelQuotation(quotationId: string) {
+    return this.request<any>(`/ads-service/quotations/${quotationId}/cancel`, {
+      method: "POST",
+    });
   }
 
   async getAdminAdsServiceRequests() {
