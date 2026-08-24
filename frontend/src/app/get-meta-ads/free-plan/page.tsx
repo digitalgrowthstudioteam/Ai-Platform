@@ -13,6 +13,7 @@ import {
   Loader2,
   CheckCircle2,
   AlertTriangle,
+  ArrowUpRight,
 } from "lucide-react";
 
 export default function FreePlanQuestionnairePage() {

@@ -915,6 +915,24 @@ class ApiClient {
     });
   }
 
+  async getPublicQuotation(quotationId: string) {
+    return this.request<any>(`/ads-service/public/quotations/${quotationId}`);
+  }
+
+  async publicQuotationCheckout(quotationId: string, payload: any) {
+    return this.request<any>(`/ads-service/public/quotations/${quotationId}/checkout`, {
+      method: "POST",
+      body: payload,
+    });
+  }
+
+  async publicVerifyQuotationPayment(quotationId: string, payload: any) {
+    return this.request<any>(`/ads-service/public/quotations/${quotationId}/verify-payment`, {
+      method: "POST",
+      body: payload,
+    });
+  }
+
 }
 
 export const api = new ApiClient(API_BASE_URL);

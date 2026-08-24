@@ -16,6 +16,10 @@
       {
         "source": "/dashboard/campaign-plans/**",
         "destination": "/dashboard/campaign-plans/placeholder.html"
+      },
+      {
+        "source": "/pay-quotation/**",
+        "destination": "/pay-quotation/placeholder.html"
       }
     ],
     "headers": [

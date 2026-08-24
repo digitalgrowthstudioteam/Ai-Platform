@@ -361,3 +361,102 @@ async def test_admin_split_orders(db: AsyncSession, cleanup_test_data):
     assert setup_orders[0]["id"] == f"{custom_id}-setup"
     assert creative_orders[0]["id"] == f"{custom_id}-creative"
 
+
+@pytest.mark.anyio
+async def test_public_quotation_checkout_and_payment_flow(db: AsyncSession, cleanup_test_data):
+    # 1. Create a placeholder MetaAdServiceRequest & ServiceQuotation
+    req = MetaAdServiceRequest(
+        user_id=uuid.uuid4(),  # temporary parent uuid
+        status="pending",
+        full_name="Suvi Guest",
+        business_name="Suvi Guest Studio",
+        email="suviguest@example.com",
+        whatsapp_number="8237378119",
+        business_location="India",
+        industry="Ecommerce",
+        advertised_product="Soap",
+        campaign_objective="Leads",
+        daily_budget="1000",
+        number_of_ads=1,
+        meta_account_exists=True,
+        creative_required=False,
+    )
+    db.add(req)
+    await db.commit()
+    await db.refresh(req)
+
+    quote = ServiceQuotation(
+        user_id=uuid.uuid4(),  # temporary parent uuid
+        service_request_id=req.id,
+        regular_total=50000,
+        discount_total=0,
+        final_total=50000,
+        items=[
+            {"service_name": "Meta Ads Management Promo", "service_type": "ad_management_promo", "offer_price": 50000}
+        ],
+        status="pending",
+        expires_at=datetime.utcnow() + timedelta(days=7)
+    )
+    db.add(quote)
+    await db.commit()
+    await db.refresh(quote)
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        # Step 2: Get quotation details publicly (without auth)
+        get_res = await ac.get(f"/api/v1/ads-service/public/quotations/{quote.id}")
+        assert get_res.status_code == 200
+        data = get_res.json()
+        assert data["amount"] == 50000
+        assert data["email"] == "suviguest@example.com"
+
+        # Step 3: Run guest checkout with a new email to create a new user account JIT
+        checkout_payload = {
+            "email": NEW_USER_EMAIL,
+            "name": "Suvi Paid User",
+            "phone": "9876543210"
+        }
+        chk_res = await ac.post(f"/api/v1/ads-service/public/quotations/{quote.id}/checkout", json=checkout_payload)
+        assert chk_res.status_code == 200
+        chk_data = chk_res.json()
+        assert chk_data["amount"] == 50000
+        assert "order_id" in chk_data
+        assert chk_data["is_mock"] is True
+
+        # Verify database changes: user should exist with the guest email
+        stmt_user = select(User).where(User.email == NEW_USER_EMAIL)
+        res_user = await db.execute(stmt_user)
+        new_user = res_user.scalar_one_or_none()
+        assert new_user is not None
+        assert new_user.name == "Suvi Paid User"
+
+        # Step 4: Verify Payment publicly
+        verify_payload = {
+            "razorpay_order_id": chk_data["order_id"],
+            "razorpay_payment_id": "pay_mock_test_123",
+            "razorpay_signature": "signature_mock_test_123",
+            "email": NEW_USER_EMAIL,
+            "name": "Suvi Paid User",
+            "phone": "9876543210"
+        }
+        v_res = await ac.post(f"/api/v1/ads-service/public/quotations/{quote.id}/verify-payment", json=verify_payload)
+        assert v_res.status_code == 200
+        v_data = v_res.json()
+        assert v_data["status"] == "success"
+
+        # Step 5: Check database side effects after payment
+        await db.refresh(quote)
+        await db.refresh(req)
+        await db.refresh(new_user)
+
+        assert quote.status == "paid"
+        assert quote.user_id == new_user.id
+        assert req.status == "whatsapp_pending"
+        assert req.user_id == new_user.id
+        assert new_user.intro_offer_used is True
+
+        # Clean up database
+        await db.delete(quote)
+        await db.delete(req)
+        await db.commit()
+
+

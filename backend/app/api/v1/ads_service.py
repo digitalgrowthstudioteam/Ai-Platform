@@ -156,6 +156,19 @@ class AdminUpdateOrderStatusPayload(BaseModel):
     status: str
     comment: Optional[str] = None
 
+class PublicCheckoutPayload(BaseModel):
+    email: str
+    name: Optional[str] = None
+    phone: Optional[str] = None
+
+class PublicPaymentVerificationRequest(BaseModel):
+    razorpay_order_id: str
+    razorpay_payment_id: str
+    razorpay_signature: str
+    email: str
+    name: Optional[str] = None
+    phone: Optional[str] = None
+
 # Helper to verify signature if Razorpay is loaded
 try:
     import razorpay
@@ -275,6 +288,224 @@ async def download_campaign_plan_pdf(
         media_type="application/pdf",
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
+
+
+# ──────────────────────────────────────────────
+# Public Quotation Endpoints
+# ──────────────────────────────────────────────
+
+@router.get("/public/quotations/{quotation_id}", summary="Public: Get quotation detail by ID")
+async def get_public_quotation(
+    quotation_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db)
+):
+    stmt = select(ServiceQuotation).where(ServiceQuotation.id == quotation_id)
+    res = await db.execute(stmt)
+    quote = res.scalar_one_or_none()
+    if not quote:
+        raise HTTPException(status_code=404, detail="Quotation not found.")
+        
+    stmt_req = select(MetaAdServiceRequest).where(MetaAdServiceRequest.id == quote.service_request_id)
+    res_req = await db.execute(stmt_req)
+    req = res_req.scalar_one_or_none()
+    
+    email = req.email if req else ""
+    name = req.full_name if req else ""
+    phone = req.whatsapp_number if req else ""
+    
+    return {
+        "id": str(quote.id),
+        "amount": quote.final_total,
+        "currency": quote.currency,
+        "status": quote.status,
+        "items": quote.items,
+        "email": email,
+        "name": name,
+        "phone": phone,
+        "service_request_id": str(quote.service_request_id) if req else None,
+    }
+
+
+@router.post("/public/quotations/{quotation_id}/checkout", summary="Public: Initialize quotation checkout")
+async def public_quotation_checkout(
+    quotation_id: uuid.UUID,
+    payload: PublicCheckoutPayload,
+    db: AsyncSession = Depends(get_db)
+):
+    stmt = select(ServiceQuotation).where(ServiceQuotation.id == quotation_id)
+    res = await db.execute(stmt)
+    quote = res.scalar_one_or_none()
+    if not quote:
+        raise HTTPException(status_code=404, detail="Quotation not found.")
+        
+    if quote.status != "pending":
+        raise HTTPException(status_code=400, detail="This quotation is no longer pending.")
+        
+    email = payload.email.strip().lower()
+    stmt_user = select(User).where(User.email == email)
+    res_user = await db.execute(stmt_user)
+    user = res_user.scalar_one_or_none()
+    
+    if not user:
+        user = User(
+            firebase_uid=f"placeholder_{uuid.uuid4().hex}",
+            email=email,
+            name=payload.name or email.split("@")[0],
+            status="active"
+        )
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+        
+    quote.user_id = user.id
+    db.add(quote)
+    
+    stmt_req = select(MetaAdServiceRequest).where(MetaAdServiceRequest.id == quote.service_request_id)
+    res_req = await db.execute(stmt_req)
+    req = res_req.scalar_one_or_none()
+    if req:
+        req.user_id = user.id
+        if payload.name and not req.full_name:
+            req.full_name = payload.name
+        if payload.phone and not req.whatsapp_number:
+            req.whatsapp_number = payload.phone
+        db.add(req)
+        
+    await db.commit()
+    
+    amount = quote.final_total
+    currency = quote.currency
+    
+    if settings.RAZORPAY_KEY_ID and settings.RAZORPAY_KEY_SECRET and razorpay:
+        try:
+            client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
+            order_data = {
+                "amount": amount,
+                "currency": currency,
+                "receipt": f"receipt_ads_{str(quote.id)[:10]}"
+            }
+            order = client.order.create(data=order_data)
+            return {
+                "order_id": order["id"],
+                "amount": order["amount"],
+                "currency": order["currency"],
+                "key_id": settings.RAZORPAY_KEY_ID,
+                "is_mock": False
+            }
+        except Exception as e:
+            logger.error("razorpay_public_order_generation_failed", error=str(e))
+            
+    return {
+        "order_id": f"order_mock_{uuid.uuid4().hex[:12]}",
+        "amount": amount,
+        "currency": currency,
+        "key_id": "mock_razorpay_key",
+        "is_mock": True
+    }
+
+
+@router.post("/public/quotations/{quotation_id}/verify-payment", summary="Public: Verify quotation payment")
+async def public_verify_quotation_payment(
+    quotation_id: uuid.UUID,
+    req: PublicPaymentVerificationRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    stmt = select(ServiceQuotation).where(ServiceQuotation.id == quotation_id)
+    res = await db.execute(stmt)
+    quote = res.scalar_one_or_none()
+    if not quote:
+        raise HTTPException(status_code=404, detail="Quotation not found.")
+        
+    stmt_req = select(MetaAdServiceRequest).where(MetaAdServiceRequest.id == quote.service_request_id)
+    res_req = await db.execute(stmt_req)
+    service_req = res_req.scalar_one_or_none()
+    if not service_req:
+        raise HTTPException(status_code=404, detail="Ads service request not found.")
+        
+    email = req.email.strip().lower()
+    stmt_user = select(User).where(User.email == email)
+    res_user = await db.execute(stmt_user)
+    user = res_user.scalar_one_or_none()
+    if not user:
+        user = User(
+            firebase_uid=f"placeholder_{uuid.uuid4().hex}",
+            email=email,
+            name=req.name or email.split("@")[0],
+            status="active"
+        )
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+
+    is_mock = req.razorpay_order_id.startswith("order_mock_")
+    if not is_mock and settings.RAZORPAY_KEY_ID and settings.RAZORPAY_KEY_SECRET and razorpay:
+        try:
+            client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
+            client.utility.verify_payment_signature({
+                "razorpay_order_id": req.razorpay_order_id,
+                "razorpay_payment_id": req.razorpay_payment_id,
+                "razorpay_signature": req.razorpay_signature,
+            })
+        except Exception as e:
+            logger.error("public_signature_verification_failed", error=str(e))
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Razorpay cryptographic signature check failed."
+            )
+            
+    quote.status = "paid"
+    quote.user_id = user.id
+    db.add(quote)
+    
+    is_promo = any(item.get("service_type") == "ad_management_promo" for item in quote.items)
+    ad_quantity = service_req.number_of_ads
+    
+    validity_days = 30
+    for item in quote.items:
+        if item.get("validity_days") and item.get("validity_days") > validity_days:
+            validity_days = item["validity_days"]
+            
+    pack = AdPack(
+        user_id=user.id,
+        service_request_id=service_req.id,
+        pack_type="promo_1_ad" if is_promo else f"pack_{ad_quantity}",
+        total_ad_credits=ad_quantity,
+        used_ad_credits=0,
+        remaining_ad_credits=ad_quantity,
+        price_paid=quote.final_total,
+        purchased_at=datetime.utcnow(),
+        expires_at=datetime.utcnow() + timedelta(days=validity_days),
+        status="active",
+        non_refundable_terms_accepted=True,
+        non_refundable_terms_accepted_at=datetime.utcnow()
+    )
+    db.add(pack)
+    
+    if is_promo:
+        user.intro_offer_used = True
+        user.intro_offer_used_at = datetime.utcnow()
+        user.intro_offer_service_request_id = service_req.id
+        db.add(user)
+        
+    service_req.status = "whatsapp_pending"
+    service_req.user_id = user.id
+    if req.name:
+        service_req.full_name = req.name
+    if req.phone:
+        service_req.whatsapp_number = req.phone
+    db.add(service_req)
+    
+    from app.services.subscription_bonus import grant_starter_plan_bonus
+    await grant_starter_plan_bonus(user, db, days=30)
+    
+    await db.commit()
+    await db.refresh(pack)
+    
+    return {
+        "status": "success",
+        "message": "Payment verified. Ad pack activated successfully.",
+        "pack_id": str(pack.id)
+    }
 
 
 # ──────────────────────────────────────────────
