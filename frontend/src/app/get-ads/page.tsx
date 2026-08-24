@@ -1177,9 +1177,31 @@ export default function GetAdsPage() {
                         <span className="text-sm font-bold text-slate-800 block">Choose Quantity</span>
                         <p className="text-[10px] text-slate-500 mt-0.5">Drag the slider to select your required quantity of ads.</p>
                       </div>
-                      <div className="bg-blue-600 text-white px-4 py-2 rounded-2xl flex items-center gap-1.5 shadow-sm">
-                        <span className="text-lg font-black font-sans">{adQuantity}</span>
-                        <span className="text-xs font-bold uppercase font-sans">{adQuantity === 1 ? "Ad" : "Ads"}</span>
+                      <div className="bg-blue-600 text-white px-3 py-1.5 rounded-2xl flex items-center gap-1.5 shadow-sm border border-blue-500">
+                        <input
+                          type="text"
+                          pattern="[0-9]*"
+                          inputMode="numeric"
+                          value={adQuantity || ""}
+                          onChange={(e) => {
+                            const raw = e.target.value;
+                            if (raw === "") {
+                              setAdQuantity(0);
+                            } else {
+                              const val = parseInt(raw, 10);
+                              if (!isNaN(val) && val >= 0) {
+                                setAdQuantity(Math.min(val, 200));
+                              }
+                            }
+                          }}
+                          onBlur={() => {
+                            if (!adQuantity || adQuantity < 1) {
+                              setAdQuantity(1);
+                            }
+                          }}
+                          className="w-10 bg-transparent text-white text-base font-black text-center focus:outline-none border-b border-blue-350 focus:border-white transition font-sans"
+                        />
+                        <span className="text-xs font-bold uppercase font-sans pr-1">{adQuantity === 1 ? "Ad" : "Ads"}</span>
                       </div>
                     </div>
 
@@ -1188,8 +1210,8 @@ export default function GetAdsPage() {
                       <input
                         type="range"
                         min="1"
-                        max="50"
-                        value={adQuantity}
+                        max={Math.max(50, adQuantity)}
+                        value={adQuantity || 1}
                         onChange={(e) => setAdQuantity(parseInt(e.target.value, 10))}
                         className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600 focus:outline-none"
                       />
@@ -1200,7 +1222,7 @@ export default function GetAdsPage() {
                         <span>20 Ads</span>
                         <span>30 Ads</span>
                         <span>40 Ads</span>
-                        <span>50+ Ads</span>
+                        <span>{Math.max(50, adQuantity)}+ Ads</span>
                       </div>
                     </div>
 
