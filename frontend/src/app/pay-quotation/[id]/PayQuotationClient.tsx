@@ -106,6 +106,10 @@ export default function PayQuotationClient() {
       alert("Please enter a valid email address.");
       return;
     }
+    if (!whatsapp) {
+      alert("Please enter your WhatsApp number.");
+      return;
+    }
 
     try {
       setPaying(true);
@@ -319,7 +323,9 @@ export default function PayQuotationClient() {
             <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Prefill Details</h3>
 
             <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Email Address</label>
+              <label className="block text-[11px] font-semibold text-slate-500 mb-1">
+                Email Address <span className="text-slate-400 font-bold">*</span>
+              </label>
               <input
                 type="email"
                 placeholder="email@example.com"
@@ -342,7 +348,9 @@ export default function PayQuotationClient() {
             </div>
 
             <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">WhatsApp Number</label>
+              <label className="block text-[11px] font-semibold text-slate-500 mb-1">
+                WhatsApp Number <span className="text-slate-400 font-bold">*</span>
+              </label>
               <input
                 type="text"
                 placeholder="WhatsApp Number"
