@@ -280,6 +280,42 @@ export default function GetAdsPage() {
   const [metaAccountExists, setMetaAccountExists] = useState(true);
   const [selectedMetaAdAccountId, setSelectedMetaAdAccountId] = useState("");
 
+  const getAdPricingDetails = (qty: number) => {
+    let unitPrice = 999;
+    if (qty === 1) {
+      if (eligibleState?.intro_offer_eligible) {
+        unitPrice = 333;
+      } else {
+        unitPrice = 999;
+      }
+    } else if (qty >= 2 && qty <= 5) {
+      unitPrice = 799;
+    } else if (qty >= 6 && qty <= 15) {
+      unitPrice = 699;
+    } else if (qty >= 16 && qty <= 30) {
+      unitPrice = 499;
+    } else {
+      unitPrice = 333;
+    }
+
+    let validity = 30;
+    if (qty <= 5) {
+      validity = 30;
+    } else if (qty <= 15) {
+      validity = 60;
+    } else {
+      validity = 90;
+    }
+
+    return {
+      unitPrice,
+      totalPrice: unitPrice * qty,
+      validity,
+    };
+  };
+
+  const { unitPrice: adPerUnitPrice, totalPrice: adTotalOfferPrice, validity: adValidityDays } = getAdPricingDetails(adQuantity);
+
   const [notification, setNotification] = useState<{ type: "success" | "error" | "warning"; message: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
@@ -1131,58 +1167,113 @@ export default function GetAdsPage() {
                 <div className="space-y-6 text-left">
                   <div className="space-y-1">
                     <h2 className="text-2xl font-black text-slate-900">Select Number of Ads</h2>
-                    <p className="text-xs text-slate-500">Pick your credits pack. Promotional offer ₹333 applies to the first ad only.</p>
+                    <p className="text-xs text-slate-500">Choose the exact quantity of ads you want us to manage. More ads grant higher wholesale discounts.</p>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* First Ad Offer */}
-                    <button
-                      onClick={() => setAdQuantity(1)}
-                      className={`border p-5 rounded-3xl text-left transition relative flex flex-col justify-between ${
-                        adQuantity === 1 ? "border-blue-600 bg-blue-50/20" : "border-slate-200 hover:border-blue-600"
-                      }`}
-                    >
-                      <span className="absolute top-2.5 right-2.5 bg-rose-500 text-white text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
-                        Offer
-                      </span>
+                  {/* Slider Control */}
+                  <div className="bg-slate-50 border border-slate-150 rounded-3xl p-6 space-y-6">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                       <div>
-                        <span className="text-xs font-bold text-slate-800 block">First Ad Introductory Offer</span>
-                        <p className="text-[10px] text-slate-500 mt-1 block">Starter promotional pricing for eligible new accounts.</p>
+                        <span className="text-sm font-bold text-slate-800 block">Choose Quantity</span>
+                        <p className="text-[10px] text-slate-500 mt-0.5">Drag the slider to select your required quantity of ads.</p>
                       </div>
-                      <div className="mt-4 flex items-baseline gap-1.5 flex-wrap">
-                        <span className="text-xs text-slate-400 line-through font-semibold">₹1,499</span>
-                        <span className="text-xl font-black text-slate-900">₹333</span>
-                        <span className="text-[10px] text-slate-500">
-                          / 1 Ad <span className="text-emerald-600 font-bold ml-1">(₹333/ad)</span>
+                      <div className="bg-blue-600 text-white px-4 py-2 rounded-2xl flex items-center gap-1.5 shadow-sm">
+                        <span className="text-lg font-black font-sans">{adQuantity}</span>
+                        <span className="text-xs font-bold uppercase font-sans">{adQuantity === 1 ? "Ad" : "Ads"}</span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      {/* Range Input with custom styles */}
+                      <input
+                        type="range"
+                        min="1"
+                        max="50"
+                        value={adQuantity}
+                        onChange={(e) => setAdQuantity(parseInt(e.target.value, 10))}
+                        className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600 focus:outline-none"
+                      />
+                      
+                      <div className="flex justify-between text-[9px] font-bold text-slate-450 uppercase px-1 font-sans">
+                        <span>1 Ad</span>
+                        <span>10 Ads</span>
+                        <span>20 Ads</span>
+                        <span>30 Ads</span>
+                        <span>40 Ads</span>
+                        <span>50+ Ads</span>
+                      </div>
+                    </div>
+
+                    {/* Calculated Prices for selected quantity */}
+                    <div className="border-t border-slate-200/60 pt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">Per-Ad Pricing Details</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg font-black text-slate-900 font-sans">₹{adPerUnitPrice}</span>
+                          <span className="text-[10px] font-bold text-slate-500 font-sans">/ ad</span>
+                          {/* Discount Chip */}
+                          <span className="bg-emerald-50 text-emerald-700 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider font-sans">
+                            {adQuantity === 1 && eligibleState?.intro_offer_eligible ? "Best Value" : `${Math.round(((1499 - adPerUnitPrice)/1499)*100)}% Off`}
+                          </span>
+                        </div>
+                        <span className="text-[9.5px] text-slate-500 block font-medium">
+                          Validity Period: <span className="font-bold text-slate-700 font-sans">{adValidityDays} Days</span>
                         </span>
                       </div>
-                    </button>
 
-                    {/* Additional Packs */}
-                    {config?.ad_packs.map((pack) => {
-                      const perAdCost = Math.round(pack.offer_price / pack.ad_quantity);
-                      return (
-                        <button
-                          key={pack.id}
-                          onClick={() => setAdQuantity(pack.ad_quantity)}
-                          className={`border p-5 rounded-3xl text-left transition flex flex-col justify-between ${
-                            adQuantity === pack.ad_quantity ? "border-blue-600 bg-blue-50/20" : "border-slate-200 hover:border-blue-600"
-                          }`}
-                        >
-                          <div>
-                            <span className="text-xs font-bold text-slate-800 block">{pack.pack_name}</span>
-                            <span className="text-[10px] text-slate-500 mt-0.5 block">Validity: {pack.validity_days} days</span>
-                          </div>
-                          <div className="mt-4 flex items-baseline gap-1.5 flex-wrap">
-                            <span className="text-xs text-slate-400 line-through font-semibold">₹{pack.regular_price}</span>
-                            <span className="text-xl font-black text-slate-900">₹{pack.offer_price}</span>
-                            <span className="text-[10px] text-slate-500">
-                              / {pack.ad_quantity} Ads <span className="text-emerald-600 font-bold ml-1">(₹{perAdCost}/ad)</span>
+                      <div className="space-y-1 md:text-right md:border-l md:border-slate-200/60 md:pl-6">
+                        <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">Total Service Charges</span>
+                        <div className="flex items-baseline md:justify-end gap-2 flex-wrap font-sans">
+                          <span className="text-xs text-slate-400 line-through font-semibold">₹{(1499 * adQuantity).toLocaleString()}</span>
+                          <span className="text-2xl font-black text-blue-600 font-sans">₹{adTotalOfferPrice.toLocaleString()}</span>
+                        </div>
+                        <span className="text-[10px] text-emerald-600 font-bold block font-sans">
+                          You save ₹{(1499 * adQuantity - adTotalOfferPrice).toLocaleString()}!
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Pricing Tiers Table */}
+                  <div className="bg-slate-50/50 border border-slate-150 rounded-3xl p-5 space-y-3">
+                    <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">Volume Discount Tiers</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                      {[
+                        { range: "1 Ad", price: "₹999", desc: "Standard" },
+                        { range: "2 - 5 Ads", price: "₹799", desc: "Volume Save" },
+                        { range: "6 - 15 Ads", price: "₹699", desc: "Pro Scaler" },
+                        { range: "16 - 30 Ads", price: "₹499", desc: "Growth Pack" },
+                        { range: "31+ Ads", price: "₹333", desc: "Wholesale" }
+                      ].map((tier, idx) => {
+                        const isCurrent = 
+                          (adQuantity === 1 && idx === 0) ||
+                          (adQuantity >= 2 && adQuantity <= 5 && idx === 1) ||
+                          (adQuantity >= 6 && adQuantity <= 15 && idx === 2) ||
+                          (adQuantity >= 16 && adQuantity <= 30 && idx === 3) ||
+                          (adQuantity >= 31 && idx === 4);
+                        
+                        return (
+                          <div 
+                            key={idx} 
+                            className={`p-2.5 rounded-2xl border text-center transition flex flex-col justify-between ${
+                              isCurrent 
+                                ? "border-blue-600 bg-white shadow-sm ring-1 ring-blue-600/30" 
+                                : "border-slate-150 bg-white/40"
+                            }`}
+                          >
+                            <span className={`text-[9px] font-black uppercase block ${isCurrent ? "text-blue-600" : "text-slate-400"}`}>
+                              {tier.range}
+                            </span>
+                            <span className="text-sm font-black text-slate-800 block mt-1 font-sans">
+                              {tier.range === "1 Ad" && eligibleState?.intro_offer_eligible ? "₹333" : tier.price}
+                            </span>
+                            <span className="text-[8px] text-slate-400 font-semibold block mt-0.5 uppercase">
+                              {tier.range === "1 Ad" && eligibleState?.intro_offer_eligible ? "Intro Offer" : tier.desc}
                             </span>
                           </div>
-                        </button>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
               )}

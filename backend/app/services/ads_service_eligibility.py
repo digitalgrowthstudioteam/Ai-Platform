@@ -163,45 +163,45 @@ async def calculate_quotation(
         regular_total_paise += reg_price
         final_total_paise += offer_price
     else:
-        # Additional Ad Packs / Normal quantity-based pricing
-        # Match quantity with closest configuration pack
-        matched_pack = None
-        for pack in ad_packs_pricing:
-            if pack.get("ad_quantity") == number_of_ads:
-                matched_pack = pack
-                break
-
-        if matched_pack:
-            reg_price = int(matched_pack.get("regular_price", 1499)) * 100
-            offer_price = int(matched_pack.get("total_price", 999)) * 100
-            items.append({
-                "service_type": "ad_pack",
-                "description": f"Meta Ad Management - {matched_pack.get('pack_name')}",
-                "quantity": 1,
-                "regular_unit_price": reg_price,
-                "offer_unit_price": offer_price,
-                "regular_total": reg_price,
-                "offer_total": offer_price,
-                "validity_days": matched_pack.get("validity_days", 30)
-            })
-            regular_total_paise += reg_price
-            final_total_paise += offer_price
-        else:
-            # Fallback per-ad unit calculation (₹999 / ad)
-            unit_reg = 1499 * 100
+        # Quantity-based pricing tiers
+        unit_reg = 1499 * 100
+        if number_of_ads == 1:
             unit_offer = 999 * 100
-            items.append({
-                "service_type": "ad_management_standard",
-                "description": f"Meta Ad Management - Standard Plan ({number_of_ads} Ads)",
-                "quantity": number_of_ads,
-                "regular_unit_price": unit_reg,
-                "offer_unit_price": unit_offer,
-                "regular_total": unit_reg * number_of_ads,
-                "offer_total": unit_offer * number_of_ads,
-                "validity_days": 30
-            })
-            regular_total_paise += unit_reg * number_of_ads
-            final_total_paise += unit_offer * number_of_ads
+        elif 2 <= number_of_ads <= 5:
+            unit_offer = 799 * 100
+        elif 6 <= number_of_ads <= 15:
+            unit_offer = 699 * 100
+        elif 16 <= number_of_ads <= 30:
+            unit_offer = 499 * 100
+        else: # 31+
+            unit_offer = 333 * 100
+
+        # Validity days assignment:
+        # 1-5 ads: 30 days
+        # 6-15 ads: 60 days
+        # 16+ ads: 90 days
+        if number_of_ads <= 5:
+            validity_days = 30
+        elif number_of_ads <= 15:
+            validity_days = 60
+        else:
+            validity_days = 90
+
+        total_reg = unit_reg * number_of_ads
+        total_offer = unit_offer * number_of_ads
+
+        items.append({
+            "service_type": "ad_management_standard",
+            "description": f"Meta Ad Management - Standard ({number_of_ads} Ads)",
+            "quantity": number_of_ads,
+            "regular_unit_price": unit_reg,
+            "offer_unit_price": unit_offer,
+            "regular_total": total_reg,
+            "offer_total": total_offer,
+            "validity_days": validity_days
+        })
+        regular_total_paise += total_reg
+        final_total_paise += total_offer
 
     # 2. Meta Ad Account Setup Fee (if setup required)
     if not req.meta_account_exists:
