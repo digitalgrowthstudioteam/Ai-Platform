@@ -144,11 +144,41 @@ async def calculate_quotation(
             if has_pending_promo:
                 break
 
+    # Check if this user has ever paid for any custom quotation
+    stmt_paid_quote = select(ServiceQuotation).where(
+        ServiceQuotation.user_id == user.id,
+        ServiceQuotation.status == "paid"
+    ).limit(1)
+    res_paid_quote = await db.execute(stmt_paid_quote)
+    has_paid_quote = res_paid_quote.scalar_one_or_none() is not None
+
+    # Check if this user has any active paid subscriptions (growth/scale plan)
+    from app.models.subscription import Subscription
+    stmt_paid_sub = select(Subscription).where(
+        Subscription.user_id == user.id,
+        Subscription.plan.in_(["growth", "scale"]),
+        Subscription.status == "active"
+    ).limit(1)
+    res_paid_sub = await db.execute(stmt_paid_sub)
+    has_paid_sub = res_paid_sub.scalar_one_or_none() is not None
+
+    # Check if this user has any active paid AdPack
+    from app.models.ads_service import AdPack
+    stmt_paid_pack = select(AdPack).where(
+        AdPack.user_id == user.id,
+        AdPack.status == "active"
+    ).limit(1)
+    res_paid_pack = await db.execute(stmt_paid_pack)
+    has_paid_pack = res_paid_pack.scalar_one_or_none() is not None
+
+    has_paid_anything = has_paid_quote or has_paid_sub or has_paid_pack
+
     is_promo_eligible = (
         user.intro_offer_eligible 
         and not user.intro_offer_used 
         and not has_used_lifetime
         and not has_pending_promo
+        and not has_paid_anything
         and first_ad_offer.get("active", True)
     )
 

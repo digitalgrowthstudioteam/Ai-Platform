@@ -523,11 +523,14 @@ async def public_verify_quotation_payment(
     )
     db.add(pack)
     
-    if is_promo:
-        user.intro_offer_used = True
+    # Always disable introductory offer eligibility upon any successful quotation payment
+    user.intro_offer_eligible = False
+    user.intro_offer_used = True
+    if not user.intro_offer_used_at:
         user.intro_offer_used_at = datetime.utcnow()
+    if is_promo:
         user.intro_offer_service_request_id = service_req.id
-        db.add(user)
+    db.add(user)
         
     service_req.status = "whatsapp_pending"
     service_req.user_id = user.id
@@ -975,12 +978,14 @@ async def verify_service_payment(
     )
     db.add(pack)
 
-    # 4. Burn Introductory Offer if promo pack was purchased
-    if is_promo:
-        user.intro_offer_used = True
+    # 4. Always disable introductory offer eligibility upon any successful quotation/ad payment
+    user.intro_offer_eligible = False
+    user.intro_offer_used = True
+    if not user.intro_offer_used_at:
         user.intro_offer_used_at = datetime.utcnow()
+    if is_promo:
         user.intro_offer_service_request_id = service_req.id
-        db.add(user)
+    db.add(user)
 
     # 5. Advance Service Request status
     service_req.status = "whatsapp_pending"

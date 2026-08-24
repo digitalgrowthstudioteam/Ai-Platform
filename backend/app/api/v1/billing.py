@@ -392,6 +392,13 @@ async def verify_billing_payment(
     if is_verified:
         now = datetime.now(timezone.utc)
         
+        # Disable intro offer eligibility upon any successful billing payment
+        user.intro_offer_eligible = False
+        user.intro_offer_used = True
+        if not user.intro_offer_used_at:
+            user.intro_offer_used_at = datetime.utcnow()
+        db.add(user)
+        
         # Grant Starter Plan 1-month bonus/extension for any successful billing payment
         from app.services.subscription_bonus import grant_starter_plan_bonus
         await grant_starter_plan_bonus(user, db, days=30)
