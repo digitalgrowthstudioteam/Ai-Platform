@@ -761,6 +761,60 @@ class ApiClient {
     });
   }
 
+  // Meta Ads Service Acquisition Endpoints
+  async getAdsServiceConfig() {
+    return this.request<any>("/ads-service/config");
+  }
+
+  async submitAdsServiceRequest(payload: any) {
+    return this.request<any>("/ads-service/request", {
+      method: "POST",
+      body: payload,
+    });
+  }
+
+  async getLatestAdsServiceRequest() {
+    return this.request<any>("/ads-service/request/latest");
+  }
+
+  async activateAdsServiceTrial(requestId: string) {
+    return this.request<any>(`/ads-service/request/${requestId}/activate-trial`, {
+      method: "POST",
+    });
+  }
+
+  async purchaseAdsServicePack(requestId: string) {
+    return this.request<any>(`/ads-service/request/${requestId}/purchase-pack`, {
+      method: "POST",
+    });
+  }
+
+  async verifyAdsServicePayment(requestId: string, orderId: string, paymentId: string, signature: string) {
+    return this.request<any>(`/ads-service/request/${requestId}/verify-payment`, {
+      method: "POST",
+      body: {
+        razorpay_order_id: orderId,
+        razorpay_payment_id: paymentId,
+        razorpay_signature: signature,
+      },
+    });
+  }
+
+  async getUserAdPacks() {
+    return this.request<any>("/ads-service/packs");
+  }
+
+  async getAdminAdsServiceRequests() {
+    return this.request<any>("/ads-service/admin/requests");
+  }
+
+  async adminUpdateAdsServiceRequest(requestId: string, payload: any) {
+    return this.request<any>(`/ads-service/admin/requests/${requestId}/update-status`, {
+      method: "POST",
+      body: payload,
+    });
+  }
+
 }
 
 export const api = new ApiClient(API_BASE_URL);

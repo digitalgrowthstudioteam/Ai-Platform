@@ -25,7 +25,97 @@ DEFAULT_CONFIGS = {
     "additional_campaign_pricing": {
         "price": 99,
         "addon_id": "additional_optimization_campaign"
-    }
+    },
+    "meta_ads_services_pricing": {
+        "first_ad_offer": {
+            "service_name": "Meta Ad Management (First Ad Promotional Offer)",
+            "regular_price": 1499,
+            "offer_price": 333,
+            "currency": "INR",
+            "validity_days": 30,
+            "active": True,
+            "start_date": "2026-08-23T00:00:00Z",
+            "end_date": "2026-12-31T23:59:59Z",
+            "new_customer_only": True,
+            "requires_starter": True,
+            "non_refundable": True
+        },
+        "account_setup_service": {
+            "service_name": "Meta Ad Account Setup Service",
+            "regular_price": 4999,
+            "offer_price": 2999,
+            "currency": "INR",
+            "active": True,
+            "non_refundable": True
+        },
+        "creative_design_service": {
+            "service_name": "Creative Design Service",
+            "regular_price": 1299,
+            "offer_price": 499,
+            "currency": "INR",
+            "active": True,
+            "non_refundable": True
+        }
+    },
+    "meta_ads_ad_packs": [
+        {
+            "id": "pack_1",
+            "pack_name": "1 Ad Pack",
+            "ad_quantity": 1,
+            "price_per_ad": 999,
+            "total_price": 999,
+            "validity_days": 30,
+            "regular_price": 1499,
+            "offer_price": 999,
+            "active": True
+        },
+        {
+            "id": "pack_3",
+            "pack_name": "3 Ads Pack",
+            "ad_quantity": 3,
+            "price_per_ad": 799,
+            "total_price": 2397,
+            "validity_days": 30,
+            "regular_price": 2997,
+            "offer_price": 2397,
+            "active": True
+        },
+        {
+            "id": "pack_15",
+            "pack_name": "15 Ads Pack",
+            "ad_quantity": 15,
+            "price_per_ad": 499,
+            "total_price": 7485,
+            "validity_days": 60,
+            "regular_price": 22485,
+            "offer_price": 7485,
+            "active": True
+        },
+        {
+            "id": "pack_30",
+            "pack_name": "30 Ads Pack",
+            "ad_quantity": 30,
+            "price_per_ad": 333,
+            "total_price": 9990,
+            "validity_days": 90,
+            "regular_price": 44970,
+            "offer_price": 9990,
+            "active": True
+        }
+    ],
+    "meta_ads_additional_services": [
+        {"id": "copywriting", "name": "Professional Copywriting", "regular_price": 999, "offer_price": 499, "instant": True, "active": True},
+        {"id": "creative_design", "name": "Creative Design (Banner/Image)", "regular_price": 1299, "offer_price": 499, "instant": True, "active": True},
+        {"id": "video_editing", "name": "Premium Video Editing (Reels/Shorts)", "regular_price": 4999, "offer_price": 2999, "instant": False, "active": True},
+        {"id": "pixel_setup", "name": "Meta Pixel Setup & Verification", "regular_price": 1999, "offer_price": 999, "instant": True, "active": True},
+        {"id": "conversion_api", "name": "Conversions API (CAPI) Integration", "regular_price": 2999, "offer_price": 1499, "instant": True, "active": True},
+        {"id": "catalog_setup", "name": "Commerce Catalog Setup", "regular_price": 2999, "offer_price": 1999, "instant": False, "active": True},
+        {"id": "product_feed", "name": "Dynamic Product Feed Integration", "regular_price": 3999, "offer_price": 2499, "instant": False, "active": True},
+        {"id": "landing_page", "name": "Custom Landing Page Design & Setup", "regular_price": 9999, "offer_price": 5999, "instant": False, "active": True},
+        {"id": "tracking_setup", "name": "Google Tag Manager & GA4 Tracking", "regular_price": 1999, "offer_price": 999, "instant": True, "active": True},
+        {"id": "whatsapp_integration", "name": "WhatsApp Business API CRM Setup", "regular_price": 2999, "offer_price": 1499, "instant": True, "active": True},
+        {"id": "lead_crm", "name": "Lead CRM Automation Integration", "regular_price": 3999, "offer_price": 2499, "instant": False, "active": True}
+    ]
 }
 
 

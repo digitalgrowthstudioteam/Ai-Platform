@@ -1,6 +1,7 @@
 """
 Digital Growth Studio — User Model
 """
+import uuid
 from datetime import datetime
 from sqlalchemy import String, DateTime, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -93,6 +94,31 @@ class User(BaseModel):
     )
     last_credits_reset_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True),
+        nullable=True,
+    )
+
+    # Meta Ads Service Eligibility & Introductory Offer Columns
+    ads_service_eligible: Mapped[Optional[bool]] = mapped_column(
+        nullable=True,
+        default=True,
+    )
+    restriction_reason: Mapped[Optional[str]] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+    intro_offer_eligible: Mapped[bool] = mapped_column(
+        nullable=False,
+        default=True,
+    )
+    intro_offer_used: Mapped[bool] = mapped_column(
+        nullable=False,
+        default=False,
+    )
+    intro_offer_used_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    intro_offer_service_request_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         nullable=True,
     )
 

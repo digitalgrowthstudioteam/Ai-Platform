@@ -51,6 +51,7 @@ const navigation: NavSection[] = [
       { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
       { label: "Today's Brief", href: "/briefs/daily", icon: Sparkles },
       { label: "Weekly Brief", href: "/briefs/weekly", icon: Zap },
+      { label: "🚀 Get Ads at ₹333", href: "/get-ads", icon: Sparkles },
     ],
   },
   {
@@ -98,6 +99,7 @@ export default function Sidebar() {
   const pathname = usePathname();
   const { user } = useAuth();
   const [sub, setSub] = useState<any>(null);
+  const [profile, setProfile] = useState<any>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -110,17 +112,21 @@ export default function Sidebar() {
       } catch (e) {}
     }
 
-    // Load fresh subscription live
-    async function loadSub() {
+    // Load fresh subscription and profile live
+    async function loadSubAndProfile() {
       try {
-        const res = await api.getSubscription();
-        setSub(res);
-        sessionStorage.setItem("dgs_cached_subscription", JSON.stringify(res));
+        const [subRes, profileRes] = await Promise.all([
+          api.getSubscription(),
+          api.getMyProfile()
+        ]);
+        setSub(subRes);
+        setProfile(profileRes);
+        sessionStorage.setItem("dgs_cached_subscription", JSON.stringify(subRes));
       } catch (e) {
-        console.error("Failed to load subscription in sidebar:", e);
+        console.error("Failed to load subscription/profile in sidebar:", e);
       }
     }
-    loadSub();
+    loadSubAndProfile();
   }, [user]);
 
   const isAdmin = user?.email === "flasshgames2026@gmail.com" || user?.email === "digitalgrowthstudioteam@gmail.com";
@@ -131,6 +137,11 @@ export default function Sidebar() {
     // Hide AI Assistant for non-admins
     if (!isAdmin) {
       items = items.filter((item) => item.label !== "AI Assistant");
+    }
+
+    // Hide Get Ads for restricted users
+    if (profile && profile.ads_service_eligible === false) {
+      items = items.filter((item) => !item.label.includes("Get Ads"));
     }
 
     if (section.label === "SETTINGS" && isAdmin) {
