@@ -38,15 +38,28 @@ export default function PayQuotationClient() {
     message: string;
   } | null>(null);
 
+  const getQuotationId = () => {
+    if (typeof window !== "undefined") {
+      const parts = window.location.pathname.split("/");
+      const lastSegment = parts[parts.length - 1];
+      if (lastSegment && lastSegment !== "placeholder" && lastSegment !== "pay-quotation") {
+        return lastSegment;
+      }
+    }
+    return (id as string) || "";
+  };
+
+  const quotationId = getQuotationId();
+
   useEffect(() => {
     async function loadQuotation() {
-      if (!id || id === "placeholder") {
+      if (!quotationId) {
         setLoading(false);
         return;
       }
       try {
         setLoading(true);
-        const res = await api.getPublicQuotation(id as string);
+        const res = await api.getPublicQuotation(quotationId);
         setQuotation(res);
         
         // Prefill from quotation meta-request data
@@ -99,7 +112,7 @@ export default function PayQuotationClient() {
       setNotification(null);
 
       // 1. Initialize checkout
-      const checkoutRes = await api.publicQuotationCheckout(id as string, {
+      const checkoutRes = await api.publicQuotationCheckout(quotationId, {
         email,
         name: fullName,
         phone: whatsapp,
@@ -107,7 +120,7 @@ export default function PayQuotationClient() {
 
       // 2. Mock payment trigger
       if (checkoutRes.is_mock) {
-        await api.publicVerifyQuotationPayment(id as string, {
+        await api.publicVerifyQuotationPayment(quotationId, {
           razorpay_order_id: checkoutRes.order_id,
           razorpay_payment_id: "pay_mock_quotation",
           razorpay_signature: "sig_mock_quotation",
@@ -139,7 +152,7 @@ export default function PayQuotationClient() {
         handler: async (response: any) => {
           try {
             setPaying(true);
-            await api.publicVerifyQuotationPayment(id as string, {
+            await api.publicVerifyQuotationPayment(quotationId, {
               razorpay_order_id: response.razorpay_order_id,
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_signature: response.razorpay_signature,
