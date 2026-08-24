@@ -218,6 +218,28 @@ async def save_campaign_plan(
 ):
     user = await get_db_user_from_claims(claims, db)
     
+    # 1. Check if the user has already joined (paid / used onboarding offer)
+    if user.intro_offer_used or user.intro_offer_eligible == False:
+        raise HTTPException(
+            status_code=400,
+            detail="You have already joined our Meta Ads management services. You cannot generate a free plan."
+        )
+
+    # 2. Auto-delete campaign plans older than 48 hours for clean database checks
+    cutoff = datetime.utcnow() - timedelta(hours=48)
+    from sqlalchemy import delete
+    await db.execute(delete(CampaignPlan).where(CampaignPlan.created_at < cutoff))
+    await db.commit()
+
+    # 3. Check if user already has an active generated campaign plan
+    stmt_check = select(CampaignPlan).where(CampaignPlan.user_id == user.id, CampaignPlan.created_at >= cutoff)
+    res_check = await db.execute(stmt_check)
+    if res_check.scalars().first():
+        raise HTTPException(
+            status_code=400,
+            detail="You have already generated a Campaign Plan. Only one plan is allowed per user."
+        )
+
     new_plan = CampaignPlan(
         user_id=user.id,
         business_name=payload.business_name,
@@ -239,6 +261,13 @@ async def list_campaign_plans(
     db: AsyncSession = Depends(get_db)
 ):
     user = await get_db_user_from_claims(claims, db)
+
+    # Auto delete campaign plans older than 48 hours
+    cutoff = datetime.utcnow() - timedelta(hours=48)
+    from sqlalchemy import delete
+    await db.execute(delete(CampaignPlan).where(CampaignPlan.created_at < cutoff))
+    await db.commit()
+
     stmt = select(CampaignPlan).where(CampaignPlan.user_id == user.id).order_by(CampaignPlan.created_at.desc())
     res = await db.execute(stmt)
     plans = res.scalars().all()
@@ -252,6 +281,13 @@ async def get_campaign_plan(
     db: AsyncSession = Depends(get_db)
 ):
     user = await get_db_user_from_claims(claims, db)
+
+    # Auto delete campaign plans older than 48 hours
+    cutoff = datetime.utcnow() - timedelta(hours=48)
+    from sqlalchemy import delete
+    await db.execute(delete(CampaignPlan).where(CampaignPlan.created_at < cutoff))
+    await db.commit()
+
     stmt = select(CampaignPlan).where(CampaignPlan.id == plan_id, CampaignPlan.user_id == user.id)
     res = await db.execute(stmt)
     plan = res.scalar_one_or_none()
@@ -265,6 +301,12 @@ async def download_campaign_plan_pdf(
     plan_id: uuid.UUID,
     db: AsyncSession = Depends(get_db)
 ):
+    # Auto delete campaign plans older than 48 hours
+    cutoff = datetime.utcnow() - timedelta(hours=48)
+    from sqlalchemy import delete
+    await db.execute(delete(CampaignPlan).where(CampaignPlan.created_at < cutoff))
+    await db.commit()
+
     stmt = select(CampaignPlan).where(CampaignPlan.id == plan_id)
     res = await db.execute(stmt)
     plan = res.scalar_one_or_none()

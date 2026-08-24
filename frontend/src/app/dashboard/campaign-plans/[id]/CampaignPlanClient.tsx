@@ -27,16 +27,38 @@ export default function CampaignPlanClient() {
   const [plan, setPlan] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
+  const getPlanId = () => {
+    if (typeof window !== "undefined") {
+      const parts = window.location.pathname.split("/");
+      const lastSegment = parts[parts.length - 1];
+      if (lastSegment && lastSegment !== "placeholder" && lastSegment !== "campaign-plans" && lastSegment !== "campaign_plans") {
+        return lastSegment;
+      }
+    }
+    return (id as string) || "";
+  };
+
+  const planId = getPlanId();
+
   useEffect(() => {
     async function loadPlan() {
+      if (!planId) {
+        setLoading(false);
+        return;
+      }
       try {
-        const res = await api.getCampaignPlan(id as string);
+        const res = await api.getCampaignPlan(planId);
         setPlan(res);
         
         // Auto PDF trigger if parameter specified
         if (downloadOnLoad) {
-          const url = `${api.baseUrl}/ads-service/campaign-plans/${id}/pdf`;
-          window.open(url, "_blank");
+          const url = `${api.baseUrl}/ads-service/campaign-plans/${planId}/pdf`;
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = `Campaign_Plan_${res.business_name.replace(/\s+/g, "_")}.pdf`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
         }
       } catch (e) {
         console.error("Failed to load campaign plan detail:", e);
@@ -44,15 +66,18 @@ export default function CampaignPlanClient() {
         setLoading(false);
       }
     }
-    if (id) {
-      loadPlan();
-    }
-  }, [id, downloadOnLoad]);
+    loadPlan();
+  }, [planId, downloadOnLoad]);
 
   const handleDownload = () => {
     if (plan) {
       const url = `${api.baseUrl}/ads-service/campaign-plans/${plan.id}/pdf`;
-      window.open(url, "_blank");
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `Campaign_Plan_${plan.business_name.replace(/\s+/g, "_")}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     }
   };
 

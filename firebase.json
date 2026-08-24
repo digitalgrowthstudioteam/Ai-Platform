@@ -18,6 +18,10 @@
         "destination": "/dashboard/campaign-plans/placeholder.html"
       },
       {
+        "source": "/dashboard/campaign_plans/**",
+        "destination": "/dashboard/campaign-plans/placeholder.html"
+      },
+      {
         "source": "/pay-quotation/**",
         "destination": "/pay-quotation/placeholder.html"
       }

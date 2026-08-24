@@ -25,6 +25,8 @@ export default function FreePlanQuestionnairePage() {
   const [restrictedReason, setRestrictedReason] = useState("");
   const [generating, setGenerating] = useState(false);
   const [submittingUser, setSubmittingUser] = useState(false);
+  const [hasPlan, setHasPlan] = useState(false);
+  const [alreadyJoined, setAlreadyJoined] = useState(false);
 
   // Form State
   const [businessName, setBusinessName] = useState("");
@@ -47,6 +49,28 @@ export default function FreePlanQuestionnairePage() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
+
+  // Check plan and status if logged in
+  useEffect(() => {
+    async function checkPlanAndStatus() {
+      if (isAuthenticated && user) {
+        try {
+          const profile = await api.getMyProfile();
+          if (profile && (profile.intro_offer_used || profile.intro_offer_eligible === false)) {
+            setAlreadyJoined(true);
+            return;
+          }
+          const plans = await api.listCampaignPlans();
+          if (plans && plans.length > 0) {
+            setHasPlan(true);
+          }
+        } catch (e) {
+          console.error("Failed to check plan eligibility status:", e);
+        }
+      }
+    }
+    checkPlanAndStatus();
+  }, [user, isAuthenticated]);
 
   // Pre-fill user name if logged in
   useEffect(() => {
@@ -431,6 +455,48 @@ export default function FreePlanQuestionnairePage() {
     }
   };
 
+  if (alreadyJoined) {
+    return (
+      <div className="min-h-screen bg-slate-50 text-slate-900 flex items-center justify-center p-6">
+        <div className="max-w-md w-full bg-white border border-slate-200 p-8 rounded-3xl text-center space-y-6 shadow-xl">
+          <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto border border-emerald-100">
+            <CheckCircle2 size={32} />
+          </div>
+          <h2 className="text-2xl font-extrabold text-slate-900">Welcome Onboard!</h2>
+          <p className="text-sm text-slate-500 leading-relaxed">
+            You are already an active client of Digital Growth Studio! You do not need to generate a free campaign plan.
+          </p>
+          <button
+            onClick={() => router.push("/dashboard")}
+            className="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold rounded-xl shadow-lg transition"
+          >
+            Access Client Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (hasPlan) {
+    return (
+      <div className="min-h-screen bg-slate-50 text-slate-900 flex items-center justify-center p-6">
+        <div className="max-w-md w-full bg-white border border-slate-200 p-8 rounded-3xl text-center space-y-6 shadow-xl animate-in fade-in zoom-in-95 duration-200">
+          <AlertTriangle size={48} className="text-blue-500 mx-auto animate-pulse" />
+          <h2 className="text-2xl font-extrabold text-slate-900">Plan Already Generated</h2>
+          <p className="text-sm text-slate-500 leading-relaxed">
+            You have already generated your free Meta Ads Campaign Plan! Each user is limited to one free plan.
+          </p>
+          <button
+            onClick={() => router.push("/dashboard/campaign-plans")}
+            className="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold rounded-xl shadow-lg transition"
+          >
+            View My Campaign Plan
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (restricted) {
     return (
       <div className="min-h-screen bg-slate-50 text-slate-900 flex items-center justify-center p-6">
@@ -498,7 +564,10 @@ export default function FreePlanQuestionnairePage() {
           {currentStep < 7 ? (
             <button
               onClick={handleNext}
-              className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-750 hover:from-blue-500 hover:to-blue-650 text-white font-bold rounded-xl shadow-md shadow-blue-500/10 hover:shadow-lg transition flex items-center gap-1.5 ml-auto"
+              className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white font-bold rounded-xl shadow-md shadow-blue-500/10 hover:shadow-lg transition flex items-center gap-1.5 ml-auto"
+              style={{
+                background: "linear-gradient(to right, #2563eb, #1d4ed8)",
+              }}
             >
               Continue <ArrowRight size={16} />
             </button>
