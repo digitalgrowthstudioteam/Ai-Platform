@@ -529,6 +529,133 @@ async def get_user_ad_packs(
 
 
 # ──────────────────────────────────────────────
+# User Orders & Billing History
+# ──────────────────────────────────────────────
+
+@router.get("/orders", summary="Get user's all Meta Ads service orders with status")
+async def get_user_orders(
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Returns all MetaAdServiceRequest records for the authenticated user,
+    with order status pipeline info.
+    """
+    user = await get_db_user_from_claims(claims, db)
+
+    stmt = select(MetaAdServiceRequest).where(
+        MetaAdServiceRequest.user_id == user.id
+    ).order_by(MetaAdServiceRequest.created_at.desc())
+    res = await db.execute(stmt)
+    requests = res.scalars().all()
+
+    orders = []
+    for r in requests:
+        # Build a pipeline status list for the stepper
+        pipeline = [
+            {"step": "Order Placed", "done": True},
+            {"step": "Team Connected on WhatsApp", "done": r.status in (
+                "whatsapp_connected", "partner_access_requested", "partner_access_granted",
+                "campaign_setup", "campaign_live", "completed"
+            )},
+            {"step": "Ads Initiated", "done": r.status in (
+                "campaign_setup", "campaign_live", "completed"
+            )},
+            {"step": "Completed", "done": r.status == "completed"},
+        ]
+
+        orders.append({
+            "id": str(r.id),
+            "business_name": r.business_name,
+            "advertised_product": r.advertised_product,
+            "campaign_objective": r.campaign_objective,
+            "number_of_ads": r.number_of_ads,
+            "daily_budget": r.daily_budget,
+            "status": r.status,
+            "partner_access_status": r.partner_access_status,
+            "additional_services": r.additional_services,
+            "creative_required": r.creative_required,
+            "whatsapp_number": r.whatsapp_number,
+            "created_at": r.created_at,
+            "pipeline": pipeline,
+        })
+
+    return {"orders": orders}
+
+
+@router.get("/billing-history", summary="Get user's billing/transaction history")
+async def get_user_billing_history(
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Returns a consolidated billing log combining:
+    - ServiceQuotation payments
+    - AdPack purchases (with price_paid > 0)
+    - Subscription billing events
+    """
+    user = await get_db_user_from_claims(claims, db)
+    transactions = []
+
+    # 1. Service Quotations
+    stmt_q = select(ServiceQuotation).where(
+        ServiceQuotation.user_id == user.id
+    ).order_by(ServiceQuotation.created_at.desc())
+    res_q = await db.execute(stmt_q)
+    quotations = res_q.scalars().all()
+    for q in quotations:
+        transactions.append({
+            "id": str(q.id),
+            "type": "quotation",
+            "description": f"Service Quotation — {q.currency} {q.final_total / 100:,.0f}",
+            "amount": q.final_total,
+            "currency": q.currency,
+            "status": q.status,
+            "date": q.created_at,
+        })
+
+    # 2. Ad Packs with price_paid > 0
+    stmt_p = select(AdPack).where(
+        AdPack.user_id == user.id,
+        AdPack.price_paid > 0,
+    ).order_by(AdPack.purchased_at.desc())
+    res_p = await db.execute(stmt_p)
+    packs = res_p.scalars().all()
+    for p in packs:
+        transactions.append({
+            "id": str(p.id),
+            "type": "ad_pack",
+            "description": f"{p.total_ad_credits} Ads — {p.pack_type.replace('_', ' ').title()}",
+            "amount": p.price_paid,
+            "currency": "INR",
+            "status": "paid",
+            "date": p.purchased_at,
+        })
+
+    # 3. Subscriptions
+    stmt_s = select(Subscription).where(
+        Subscription.user_id == user.id
+    ).order_by(Subscription.started_at.desc())
+    res_s = await db.execute(stmt_s)
+    subs = res_s.scalars().all()
+    for s in subs:
+        transactions.append({
+            "id": str(s.id),
+            "type": "subscription",
+            "description": f"{s.plan.title()} Plan Subscription",
+            "amount": 0,
+            "currency": "INR",
+            "status": s.status,
+            "date": s.started_at,
+        })
+
+    # Sort by date desc
+    transactions.sort(key=lambda t: t["date"], reverse=True)
+
+    return {"transactions": transactions}
+
+
+# ──────────────────────────────────────────────
 # Admin Management Routes
 # ──────────────────────────────────────────────
 

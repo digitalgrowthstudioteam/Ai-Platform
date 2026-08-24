@@ -28,6 +28,9 @@ import {
   ShieldAlert,
   Brain,
   Sparkles,
+  Rocket,
+  ShoppingBag,
+  Receipt,
 } from "lucide-react";
 
 interface NavItem {
@@ -82,6 +85,14 @@ const navigation: NavSection[] = [
           }
         }
       },
+    ],
+  },
+  {
+    label: "META ADS",
+    items: [
+      { label: "My Services", href: "/dashboard/services", icon: Rocket },
+      { label: "Orders", href: "/dashboard/orders", icon: ShoppingBag },
+      { label: "Billing", href: "/dashboard/billing", icon: Receipt },
     ],
   },
   {

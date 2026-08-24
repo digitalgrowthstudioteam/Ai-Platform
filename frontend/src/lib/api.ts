@@ -836,6 +836,14 @@ class ApiClient {
     return this.request<any>("/ads-service/packs");
   }
 
+  async getUserOrders() {
+    return this.request<any>("/ads-service/orders");
+  }
+
+  async getUserBillingHistory() {
+    return this.request<any>("/ads-service/billing-history");
+  }
+
   async getAdminAdsServiceRequests() {
     return this.request<any>("/ads-service/admin/requests");
   }

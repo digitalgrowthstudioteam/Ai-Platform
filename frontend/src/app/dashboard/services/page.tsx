@@ -86,7 +86,7 @@ export default function MyServicesPage() {
           <h1 className="text-3xl font-black text-slate-900 flex items-center gap-2">
             🚀 My Services
           </h1>
-          <p className="text-xs text-slate-500 font-semibold">Manage your active Meta Ads management services and Ad Pack credits.</p>
+          <p className="text-xs text-slate-500 font-semibold">Manage your active Meta Ads management services and Ad Quantities.</p>
         </div>
         {!hasActiveService && (
           <Link
@@ -104,7 +104,7 @@ export default function MyServicesPage() {
         <div className="lg:col-span-1 space-y-6">
           <div className="card border border-border bg-white shadow-sm rounded-2xl p-6 space-y-4">
             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-              <Coins size={14} className="text-blue-600" /> Ad Credit Wallet
+              <Coins size={14} className="text-blue-600" /> Ad Quantity Wallet
             </h3>
 
             {packsData && packsData.total_remaining_credits > 0 ? (
@@ -113,7 +113,7 @@ export default function MyServicesPage() {
                   <span className="text-5xl font-black text-blue-600">
                     {packsData.total_remaining_credits}
                   </span>
-                  <span className="text-xs font-bold text-slate-400 block">Remaining Ad Credits</span>
+                  <span className="text-xs font-bold text-slate-400 block">Remaining Ads</span>
                 </div>
 
                 {packsData.packs.filter((p: any) => p.status === "active").map((p: any, idx: number) => {
@@ -144,9 +144,9 @@ export default function MyServicesPage() {
               </div>
             ) : (
               <div className="text-center py-6 space-y-2">
-                <p className="text-xs font-semibold text-slate-400">No active Ad Pack credits.</p>
+                <p className="text-xs font-semibold text-slate-400">No active Ad Quantities.</p>
                 <Link href="/get-ads" className="inline-block text-xs font-bold text-blue-600 hover:text-blue-800 transition">
-                  Buy Ad Packs →
+                  Purchase More Ads →
                 </Link>
               </div>
             )}
