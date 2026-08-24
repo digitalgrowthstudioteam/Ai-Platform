@@ -200,13 +200,16 @@ function AdminUserDetailContent() {
     }
   };
 
-  const handleToggleIntroOffer = async (field: "eligible" | "used") => {
+  const handleToggleIntroOffer = async () => {
     try {
       setActionLoading("intro_offer");
-      if (field === "eligible") {
-        await api.updateUserIntroOffer(userId, !userDetails.user.intro_offer_eligible, undefined);
+      const isCurrentlyActive = userDetails.user.intro_offer_eligible && !userDetails.user.intro_offer_used;
+      if (isCurrentlyActive) {
+        // Turn OFF — disable eligibility
+        await api.updateUserIntroOffer(userId, false, undefined);
       } else {
-        await api.updateUserIntroOffer(userId, undefined, !userDetails.user.intro_offer_used);
+        // Turn ON — enable eligibility and reset used flag
+        await api.updateUserIntroOffer(userId, true, false);
       }
       setNotification({ type: "success", message: "₹333 promo offer status updated." });
       await fetchUserDetails();
@@ -496,51 +499,32 @@ function AdminUserDetailContent() {
             <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-3 text-blue-600">
               ₹333 Promo Offer Status
             </h3>
-            <div className="space-y-3">
-              <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-150 text-xs">
-                <div>
-                  <span className="font-bold text-slate-800 block">Eligible for ₹333 Offer</span>
-                  <span className="text-[10px] text-slate-450 block font-medium">User can redeem the first-ad introductory promo.</span>
-                </div>
-                <button
-                  disabled={actionLoading === "intro_offer"}
-                  onClick={() => handleToggleIntroOffer("eligible")}
-                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                    userDetails.user.intro_offer_eligible ? "bg-blue-600" : "bg-slate-200"
-                  } ${actionLoading === "intro_offer" ? "opacity-50 cursor-not-allowed" : ""}`}
-                >
-                  <span
-                    className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                      userDetails.user.intro_offer_eligible ? "translate-x-4" : "translate-x-0"
-                    }`}
-                  />
-                </button>
+            <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-150 text-xs">
+              <div>
+                <span className="font-bold text-slate-800 block">₹333 Introductory Offer</span>
+                {userDetails.user.intro_offer_eligible && !userDetails.user.intro_offer_used && (
+                  <span className="text-[10px] text-emerald-600 block font-semibold mt-0.5">Available — user can redeem this offer.</span>
+                )}
+                {userDetails.user.intro_offer_used && userDetails.user.intro_offer_used_at && (
+                  <span className="text-[10px] text-amber-600 block font-semibold mt-0.5">Redeemed on {new Date(userDetails.user.intro_offer_used_at).toLocaleString()} — offer is no longer available.</span>
+                )}
+                {!userDetails.user.intro_offer_eligible && !userDetails.user.intro_offer_used && (
+                  <span className="text-[10px] text-slate-450 block font-semibold mt-0.5">Disabled by admin — user cannot get this offer.</span>
+                )}
               </div>
-
-              <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-150 text-xs">
-                <div>
-                  <span className="font-bold text-slate-800 block">Promo Offer Already Used</span>
-                  {userDetails.user.intro_offer_used && userDetails.user.intro_offer_used_at && (
-                    <span className="text-[10px] text-slate-450 block font-medium">Used on: {new Date(userDetails.user.intro_offer_used_at).toLocaleString()}</span>
-                  )}
-                  {!userDetails.user.intro_offer_used && (
-                    <span className="text-[10px] text-slate-450 block font-medium">User has not redeemed the promo yet.</span>
-                  )}
-                </div>
-                <button
-                  disabled={actionLoading === "intro_offer"}
-                  onClick={() => handleToggleIntroOffer("used")}
-                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                    userDetails.user.intro_offer_used ? "bg-rose-500" : "bg-slate-200"
-                  } ${actionLoading === "intro_offer" ? "opacity-50 cursor-not-allowed" : ""}`}
-                >
-                  <span
-                    className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                      userDetails.user.intro_offer_used ? "translate-x-4" : "translate-x-0"
-                    }`}
-                  />
-                </button>
-              </div>
+              <button
+                disabled={actionLoading === "intro_offer"}
+                onClick={() => handleToggleIntroOffer()}
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                  userDetails.user.intro_offer_eligible && !userDetails.user.intro_offer_used ? "bg-blue-600" : "bg-slate-200"
+                } ${actionLoading === "intro_offer" ? "opacity-50 cursor-not-allowed" : ""}`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    userDetails.user.intro_offer_eligible && !userDetails.user.intro_offer_used ? "translate-x-4" : "translate-x-0"
+                  }`}
+                />
+              </button>
             </div>
           </div>
 
