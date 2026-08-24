@@ -634,6 +634,9 @@ async def get_user_details(
             "credits": user.credits,
             "created_at": user.created_at,
             "deletion_scheduled_at": user.deletion_scheduled_at,
+            "intro_offer_eligible": user.intro_offer_eligible,
+            "intro_offer_used": user.intro_offer_used,
+            "intro_offer_used_at": user.intro_offer_used_at,
         },
         "connections": [
             {
@@ -863,6 +866,38 @@ async def override_user_ad_packs(
     await db.commit()
     logger.info("admin_ad_pack_created", user_id=user_id, credits=req.total_ad_credits)
     return {"status": "success", "message": f"Successfully created {req.total_ad_credits} ad credits pack."}
+
+
+class AdminIntroOfferOverrideRequest(BaseModel):
+    intro_offer_eligible: Optional[bool] = None
+    intro_offer_used: Optional[bool] = None
+
+
+@router.post("/users/{user_id}/intro-offer", summary="Toggle ₹333 promo offer eligibility/used for a user")
+async def override_intro_offer(
+    user_id: uuid.UUID,
+    req: AdminIntroOfferOverrideRequest,
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    verify_admin(claims)
+    stmt = select(User).where(User.id == user_id)
+    res = await db.execute(stmt)
+    user = res.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    if req.intro_offer_eligible is not None:
+        user.intro_offer_eligible = req.intro_offer_eligible
+    if req.intro_offer_used is not None:
+        user.intro_offer_used = req.intro_offer_used
+        if req.intro_offer_used:
+            user.intro_offer_used_at = datetime.utcnow()
+        else:
+            user.intro_offer_used_at = None
+    await db.commit()
+    logger.info("admin_intro_offer_override", user_id=user_id, eligible=req.intro_offer_eligible, used=req.intro_offer_used)
+    return {"status": "success", "message": "Intro offer status updated successfully."}
 
 
 @router.post("/users/{user_id}/ad-service-requests/{request_id}", summary="Override user Meta Ads service request status or additional services")

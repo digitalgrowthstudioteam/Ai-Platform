@@ -32,6 +32,7 @@ function AdminUserDetailContent() {
     type: "success" | "error";
     message: string;
   } | null>(null);
+  const [addPackForm, setAddPackForm] = useState({ show: false, quantity: 1, validityDays: 30 });
 
   // Check admin role
   const isAdmin = user?.email === "flasshgames2026@gmail.com" || user?.email === "digitalgrowthstudioteam@gmail.com";
@@ -157,45 +158,61 @@ function AdminUserDetailContent() {
   };
 
   const handleAddAdPack = async () => {
+    if (addPackForm.quantity <= 0) return;
     try {
-      const packType = prompt("Enter pack type (e.g. promo_1_ad, pack_1, pack_3, pack_15, pack_30, manual):", "manual");
-      if (!packType) return;
-      const totalCreditsStr = prompt("Enter total ad credits:", "1");
-      if (!totalCreditsStr) return;
-      const totalCredits = parseInt(totalCreditsStr, 10);
-      if (isNaN(totalCredits) || totalCredits <= 0) {
-        alert("Please enter a valid positive number.");
-        return;
-      }
-
       setActionLoading("adpack");
-      await api.updateUserAdPacks(userId, packType, totalCredits, 0, totalCredits);
+      await api.updateUserAdPacks(
+        userId,
+        `manual_qty_${addPackForm.quantity}`,
+        addPackForm.quantity,
+        0,
+        addPackForm.quantity
+      );
       setNotification({
         type: "success",
-        message: `Successfully provisioned ${totalCredits} ad credits pack to user.`,
+        message: `Successfully provisioned ${addPackForm.quantity} ads to user.`,
       });
+      setAddPackForm({ show: false, quantity: 1, validityDays: 30 });
       await fetchUserDetails();
     } catch (err: any) {
       console.error("Failed to add ad pack:", err);
-      setNotification({ type: "error", message: err.message || "Failed to add ad pack." });
+      setNotification({ type: "error", message: err.message || "Failed to add ad quantity." });
     } finally {
       setActionLoading(null);
     }
   };
 
   const handleRemoveAdPacks = async () => {
-    if (!confirm("Are you sure you want to remove all active ad packs for this user?")) return;
+    if (!confirm("Are you sure you want to remove all active ad quantities for this user?")) return;
     try {
       setActionLoading("adpack");
       await api.updateUserAdPacks(userId, "remove", 0, 0, 0);
       setNotification({
         type: "success",
-        message: "Successfully removed user active ad packs.",
+        message: "Successfully removed all active ad quantities.",
       });
       await fetchUserDetails();
     } catch (err: any) {
       console.error("Failed to remove ad packs:", err);
-      setNotification({ type: "error", message: err.message || "Failed to remove ad packs." });
+      setNotification({ type: "error", message: err.message || "Failed to remove ad quantities." });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleToggleIntroOffer = async (field: "eligible" | "used") => {
+    try {
+      setActionLoading("intro_offer");
+      if (field === "eligible") {
+        await api.updateUserIntroOffer(userId, !userDetails.user.intro_offer_eligible, undefined);
+      } else {
+        await api.updateUserIntroOffer(userId, undefined, !userDetails.user.intro_offer_used);
+      }
+      setNotification({ type: "success", message: "₹333 promo offer status updated." });
+      await fetchUserDetails();
+    } catch (err: any) {
+      console.error("Failed to toggle intro offer:", err);
+      setNotification({ type: "error", message: err.message || "Failed to update promo offer." });
     } finally {
       setActionLoading(null);
     }
@@ -474,18 +491,71 @@ function AdminUserDetailContent() {
 
         {/* Right Column: Campaigns, Ad Packs, Onboarding, and Support tickets log */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Active Ad Credit Packs */}
+          {/* ₹333 Promo Offer Status */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-4">
+            <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-3 text-blue-600">
+              ₹333 Promo Offer Status
+            </h3>
+            <div className="space-y-3">
+              <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-150 text-xs">
+                <div>
+                  <span className="font-bold text-slate-800 block">Eligible for ₹333 Offer</span>
+                  <span className="text-[10px] text-slate-450 block font-medium">User can redeem the first-ad introductory promo.</span>
+                </div>
+                <button
+                  disabled={actionLoading === "intro_offer"}
+                  onClick={() => handleToggleIntroOffer("eligible")}
+                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    userDetails.user.intro_offer_eligible ? "bg-blue-600" : "bg-slate-200"
+                  } ${actionLoading === "intro_offer" ? "opacity-50 cursor-not-allowed" : ""}`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      userDetails.user.intro_offer_eligible ? "translate-x-4" : "translate-x-0"
+                    }`}
+                  />
+                </button>
+              </div>
+
+              <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-150 text-xs">
+                <div>
+                  <span className="font-bold text-slate-800 block">Promo Offer Already Used</span>
+                  {userDetails.user.intro_offer_used && userDetails.user.intro_offer_used_at && (
+                    <span className="text-[10px] text-slate-450 block font-medium">Used on: {new Date(userDetails.user.intro_offer_used_at).toLocaleString()}</span>
+                  )}
+                  {!userDetails.user.intro_offer_used && (
+                    <span className="text-[10px] text-slate-450 block font-medium">User has not redeemed the promo yet.</span>
+                  )}
+                </div>
+                <button
+                  disabled={actionLoading === "intro_offer"}
+                  onClick={() => handleToggleIntroOffer("used")}
+                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    userDetails.user.intro_offer_used ? "bg-rose-500" : "bg-slate-200"
+                  } ${actionLoading === "intro_offer" ? "opacity-50 cursor-not-allowed" : ""}`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      userDetails.user.intro_offer_used ? "translate-x-4" : "translate-x-0"
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Ad Quantity Management */}
           <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-4">
             <div className="flex justify-between items-center border-b border-slate-100 pb-3">
               <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider text-blue-600">
-                Active Ad Credits Packs
+                Ad Quantity Management
               </h3>
               <div className="flex gap-1.5">
                 <button
-                  onClick={handleAddAdPack}
+                  onClick={() => setAddPackForm(prev => ({ ...prev, show: !prev.show }))}
                   className="bg-blue-50 text-blue-700 hover:bg-blue-100 font-extrabold text-[9px] px-2.5 py-1 rounded cursor-pointer transition uppercase font-sans border border-blue-100"
                 >
-                  + Add Pack
+                  {addPackForm.show ? "Cancel" : "+ Add Ads"}
                 </button>
                 {userDetails.ad_packs && userDetails.ad_packs.length > 0 && (
                   <button
@@ -498,21 +568,109 @@ function AdminUserDetailContent() {
               </div>
             </div>
 
+            {/* Inline Add Ads Form */}
+            {addPackForm.show && (
+              <div className="p-4 bg-blue-50/40 border border-blue-100 rounded-xl space-y-3 animate-in slide-in-from-top duration-200">
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 space-y-1">
+                    <label className="text-[9px] font-bold text-slate-500 uppercase">Number of Ads</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={999}
+                      value={addPackForm.quantity}
+                      onChange={(e) => setAddPackForm(prev => ({ ...prev, quantity: Math.max(1, parseInt(e.target.value) || 1) }))}
+                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold text-slate-800 bg-white focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div className="flex-1 space-y-1">
+                    <label className="text-[9px] font-bold text-slate-500 uppercase">Validity (Days)</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={365}
+                      value={addPackForm.validityDays}
+                      onChange={(e) => setAddPackForm(prev => ({ ...prev, validityDays: Math.max(1, parseInt(e.target.value) || 30) }))}
+                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold text-slate-800 bg-white focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+                <button
+                  disabled={actionLoading === "adpack" || addPackForm.quantity <= 0}
+                  onClick={handleAddAdPack}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-[10px] px-4 py-2.5 rounded-lg transition disabled:opacity-50 cursor-pointer uppercase tracking-wider"
+                >
+                  {actionLoading === "adpack" ? "Provisioning..." : `Provision ${addPackForm.quantity} Ads`}
+                </button>
+              </div>
+            )}
+
+            {/* Summary Stats */}
+            {userDetails.ad_packs && userDetails.ad_packs.length > 0 && (
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-blue-50/50 p-3 rounded-xl border border-blue-100 text-center">
+                  <span className="block text-lg font-black text-blue-700">
+                    {userDetails.ad_packs.reduce((sum: number, p: any) => sum + p.total_ad_credits, 0)}
+                  </span>
+                  <span className="text-[9px] font-bold text-slate-500 uppercase">Total Ads</span>
+                </div>
+                <div className="bg-emerald-50/50 p-3 rounded-xl border border-emerald-100 text-center">
+                  <span className="block text-lg font-black text-emerald-700">
+                    {userDetails.ad_packs.reduce((sum: number, p: any) => sum + p.remaining_ad_credits, 0)}
+                  </span>
+                  <span className="text-[9px] font-bold text-slate-500 uppercase">Remaining</span>
+                </div>
+                <div className="bg-amber-50/50 p-3 rounded-xl border border-amber-100 text-center">
+                  <span className="block text-lg font-black text-amber-700">
+                    {userDetails.ad_packs.reduce((sum: number, p: any) => sum + p.used_ad_credits, 0)}
+                  </span>
+                  <span className="text-[9px] font-bold text-slate-500 uppercase">Used</span>
+                </div>
+              </div>
+            )}
+
             {!userDetails.ad_packs || userDetails.ad_packs.length === 0 ? (
               <div className="py-6 text-center text-slate-400 italic text-xs font-medium">
-                No active ad packs provisioned.
+                No active ad quantities provisioned.
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="space-y-2">
                 {userDetails.ad_packs.map((pack: any) => (
-                  <div key={pack.id} className="p-3 bg-slate-50 border border-slate-150 rounded-xl space-y-1.5 text-xs">
-                    <div className="flex justify-between font-bold text-slate-800">
-                      <span className="capitalize">{pack.pack_type.replace("_", " ")}</span>
-                      <span className="text-blue-600 font-extrabold">{pack.remaining_ad_credits} / {pack.total_ad_credits} Ads Left</span>
+                  <div key={pack.id} className="p-3.5 bg-slate-50 border border-slate-150 rounded-xl space-y-2 text-xs">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <span className="font-bold text-slate-800 text-[11px] block capitalize">
+                          {pack.pack_type.replace(/_/g, " ")}
+                        </span>
+                        <span className="text-[10px] text-slate-450 font-medium">
+                          Purchased: {new Date(pack.purchased_at).toLocaleDateString()} · Expires: {new Date(pack.expires_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <span className={`text-[9px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider ${
+                        pack.status === "active" ? "bg-green-50 text-green-700" :
+                        pack.status === "consumed" ? "bg-amber-50 text-amber-700" : "bg-slate-200 text-slate-600"
+                      }`}>{pack.status}</span>
                     </div>
-                    <div className="flex justify-between text-slate-450 text-[10px] font-semibold">
-                      <span>Status: <span className="font-extrabold uppercase text-slate-600">{pack.status}</span></span>
-                      <span>Expires: {new Date(pack.expires_at).toLocaleDateString()}</span>
+                    <div className="flex justify-between items-center bg-white p-2.5 rounded-lg border border-slate-100">
+                      <div className="flex items-center gap-4">
+                        <div className="text-center">
+                          <span className="block font-black text-blue-700 text-sm">{pack.remaining_ad_credits}</span>
+                          <span className="text-[8px] text-slate-400 font-bold uppercase">Remaining</span>
+                        </div>
+                        <span className="text-slate-300">/</span>
+                        <div className="text-center">
+                          <span className="block font-black text-slate-700 text-sm">{pack.total_ad_credits}</span>
+                          <span className="text-[8px] text-slate-400 font-bold uppercase">Total</span>
+                        </div>
+                        <span className="text-slate-300">·</span>
+                        <div className="text-center">
+                          <span className="block font-black text-amber-600 text-sm">{pack.used_ad_credits}</span>
+                          <span className="text-[8px] text-slate-400 font-bold uppercase">Used</span>
+                        </div>
+                      </div>
+                      {pack.price_paid > 0 && (
+                        <span className="text-[10px] font-bold text-slate-500">₹{(pack.price_paid / 100).toLocaleString()}</span>
+                      )}
                     </div>
                   </div>
                 ))}

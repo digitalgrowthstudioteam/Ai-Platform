@@ -640,6 +640,13 @@ class ApiClient {
     });
   }
 
+  async updateUserIntroOffer(userId: string, introOfferEligible?: boolean, introOfferUsed?: boolean) {
+    return this.request<{ status: string; message: string }>(`/admin/users/${userId}/intro-offer`, {
+      method: "POST",
+      body: { intro_offer_eligible: introOfferEligible, intro_offer_used: introOfferUsed },
+    });
+  }
+
   async updateUserOptimizationSlots(userId: string, slots: number) {
     return this.request<{ status: string; message: string }>(`/admin/users/${userId}/optimization-slots`, {
       method: "POST",
