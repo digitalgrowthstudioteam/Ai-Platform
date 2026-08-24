@@ -1104,33 +1104,40 @@ export default function GetAdsPage() {
                         <span className="text-xs font-bold text-slate-800 block">First Ad Introductory Offer</span>
                         <p className="text-[10px] text-slate-500 mt-1 block">Starter promotional pricing for eligible new accounts.</p>
                       </div>
-                      <div className="mt-4 flex items-baseline gap-1.5">
+                      <div className="mt-4 flex items-baseline gap-1.5 flex-wrap">
                         <span className="text-xs text-slate-400 line-through font-semibold">₹1,499</span>
                         <span className="text-xl font-black text-slate-900">₹333</span>
-                        <span className="text-[10px] text-slate-500">/ 1 Ad</span>
+                        <span className="text-[10px] text-slate-500">
+                          / 1 Ad <span className="text-emerald-600 font-bold ml-1">(₹333/ad)</span>
+                        </span>
                       </div>
                     </button>
 
                     {/* Additional Packs */}
-                    {config?.ad_packs.map((pack) => (
-                      <button
-                        key={pack.id}
-                        onClick={() => setAdQuantity(pack.ad_quantity)}
-                        className={`border p-5 rounded-3xl text-left transition flex flex-col justify-between ${
-                          adQuantity === pack.ad_quantity ? "border-blue-600 bg-blue-50/20" : "border-slate-200 hover:border-blue-600"
-                        }`}
-                      >
-                        <div>
-                          <span className="text-xs font-bold text-slate-800 block">{pack.pack_name}</span>
-                          <span className="text-[10px] text-slate-500 mt-0.5 block">Validity: {pack.validity_days} days</span>
-                        </div>
-                        <div className="mt-4 flex items-baseline gap-1.5">
-                          <span className="text-xs text-slate-400 line-through font-semibold">₹{pack.regular_price}</span>
-                          <span className="text-xl font-black text-slate-900">₹{pack.offer_price}</span>
-                          <span className="text-[10px] text-slate-500">/ {pack.ad_quantity} Ads</span>
-                        </div>
-                      </button>
-                    ))}
+                    {config?.ad_packs.map((pack) => {
+                      const perAdCost = Math.round(pack.offer_price / pack.ad_quantity);
+                      return (
+                        <button
+                          key={pack.id}
+                          onClick={() => setAdQuantity(pack.ad_quantity)}
+                          className={`border p-5 rounded-3xl text-left transition flex flex-col justify-between ${
+                            adQuantity === pack.ad_quantity ? "border-blue-600 bg-blue-50/20" : "border-slate-200 hover:border-blue-600"
+                          }`}
+                        >
+                          <div>
+                            <span className="text-xs font-bold text-slate-800 block">{pack.pack_name}</span>
+                            <span className="text-[10px] text-slate-500 mt-0.5 block">Validity: {pack.validity_days} days</span>
+                          </div>
+                          <div className="mt-4 flex items-baseline gap-1.5 flex-wrap">
+                            <span className="text-xs text-slate-400 line-through font-semibold">₹{pack.regular_price}</span>
+                            <span className="text-xl font-black text-slate-900">₹{pack.offer_price}</span>
+                            <span className="text-[10px] text-slate-500">
+                              / {pack.ad_quantity} Ads <span className="text-emerald-600 font-bold ml-1">(₹{perAdCost}/ad)</span>
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               )}
