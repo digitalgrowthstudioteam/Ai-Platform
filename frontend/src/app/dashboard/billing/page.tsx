@@ -422,29 +422,35 @@ export default function BillingPage() {
                         </div>
                         {tx.items && tx.items.length > 0 ? (
                           <div className="space-y-2 text-[11px] font-medium leading-normal">
-                            {tx.items.map((item, idx) => (
-                              <div key={idx} className="flex justify-between items-start text-slate-600">
-                                <div>
-                                  <span className="font-bold block text-slate-800">{item.service_name}</span>
-                                  {item.quantity && (
-                                    <span className="text-[9px] text-slate-450 font-bold">Qty: {item.quantity} ads</span>
-                                  )}
-                                  {item.validity_days && (
-                                    <span className="text-[9px] text-slate-450 font-bold ml-2">Validity: {item.validity_days} days</span>
-                                  )}
+                            {tx.items.map((item, idx) => {
+                              const serviceName = item.service_name || item.description || "Ad Onboarding Service";
+                              const offerPrice = item.offer_price ?? item.offer_total ?? item.offer_unit_price ?? 0;
+                              const regularPrice = item.regular_price ?? item.regular_total ?? item.regular_unit_price ?? 0;
+
+                              return (
+                                <div key={idx} className="flex justify-between items-start text-slate-600">
+                                  <div>
+                                    <span className="font-bold block text-slate-800">{serviceName}</span>
+                                    {item.quantity && (
+                                      <span className="text-[9px] text-slate-450 font-bold">Qty: {item.quantity} ads</span>
+                                    )}
+                                    {item.validity_days && (
+                                      <span className="text-[9px] text-slate-450 font-bold ml-2">Validity: {item.validity_days} days</span>
+                                    )}
+                                  </div>
+                                  <div className="text-right font-sans">
+                                    {offerPrice < regularPrice ? (
+                                      <>
+                                        <span className="line-through text-slate-400 mr-1.5">{formatCurrency(regularPrice)}</span>
+                                        <span className="font-bold text-slate-800">{formatCurrency(offerPrice)}</span>
+                                      </>
+                                    ) : (
+                                      <span className="font-bold text-slate-800">{formatCurrency(offerPrice)}</span>
+                                    )}
+                                  </div>
                                 </div>
-                                <div className="text-right font-sans">
-                                  {item.offer_price < item.regular_price ? (
-                                    <>
-                                      <span className="line-through text-slate-400 mr-1.5">{formatCurrency(item.regular_price)}</span>
-                                      <span className="font-bold text-slate-800">{formatCurrency(item.offer_price)}</span>
-                                    </>
-                                  ) : (
-                                    <span className="font-bold text-slate-800">{formatCurrency(item.offer_price)}</span>
-                                  )}
-                                </div>
-                              </div>
-                            ))}
+                              );
+                            })}
 
                             <div className="border-t border-slate-100 pt-3 flex justify-between items-center text-xs font-bold text-slate-800 font-sans">
                               <span>Total Amount</span>
