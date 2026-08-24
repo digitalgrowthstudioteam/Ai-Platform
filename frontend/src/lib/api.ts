@@ -615,6 +615,31 @@ class ApiClient {
     });
   }
 
+  async updateUserAdPacks(userId: string, packType: string, totalAdCredits: number, usedAdCredits: number, remainingAdCredits: number) {
+    return this.request<{ status: string; message: string }>(`/admin/users/${userId}/ad-packs`, {
+      method: "POST",
+      body: {
+        pack_type: packType,
+        total_ad_credits: totalAdCredits,
+        used_ad_credits: usedAdCredits,
+        remaining_ad_credits: remainingAdCredits,
+      },
+    });
+  }
+
+  async updateUserAdServiceRequest(userId: string, requestId: string, status?: string, additionalServices?: string[]) {
+    return this.request<{ status: string; message: string }>(`/admin/users/${userId}/ad-service-requests/${requestId}`, {
+      method: "POST",
+      body: { status, additional_services: additionalServices },
+    });
+  }
+
+  async deleteUserAdServiceRequest(userId: string, requestId: string) {
+    return this.request<{ status: string; message: string }>(`/admin/users/${userId}/ad-service-requests/${requestId}`, {
+      method: "DELETE",
+    });
+  }
+
   async updateUserOptimizationSlots(userId: string, slots: number) {
     return this.request<{ status: string; message: string }>(`/admin/users/${userId}/optimization-slots`, {
       method: "POST",

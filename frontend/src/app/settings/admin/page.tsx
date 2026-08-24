@@ -234,6 +234,105 @@ export default function AdminPage() {
     }
   };
 
+  const handleAddAdPack = async (targetUserId: string) => {
+    try {
+      const packType = prompt("Enter pack type (e.g. promo_1_ad, pack_1, pack_3, pack_15, pack_30, manual):", "manual");
+      if (!packType) return;
+      const totalCreditsStr = prompt("Enter total ad credits:", "1");
+      if (!totalCreditsStr) return;
+      const totalCredits = parseInt(totalCreditsStr, 10);
+      if (isNaN(totalCredits) || totalCredits <= 0) {
+        alert("Please enter a valid positive number.");
+        return;
+      }
+
+      setActionLoading(`adpack_${targetUserId}`);
+      await api.updateUserAdPacks(targetUserId, packType, totalCredits, 0, totalCredits);
+      setNotification({
+        type: "success",
+        message: `Successfully provisioned ${totalCredits} ad credits pack to user.`,
+      });
+
+      // Refresh details
+      const details = await api.getAdminUserDetails(targetUserId);
+      setUserDetails(details);
+    } catch (err: any) {
+      console.error("Failed to add ad pack:", err);
+      setNotification({ type: "error", message: err.message || "Failed to add ad pack." });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleRemoveAdPacks = async (targetUserId: string) => {
+    if (!confirm("Are you sure you want to remove all active ad packs for this user?")) return;
+    try {
+      setActionLoading(`adpack_${targetUserId}`);
+      await api.updateUserAdPacks(targetUserId, "remove", 0, 0, 0);
+      setNotification({
+        type: "success",
+        message: "Successfully removed user active ad packs.",
+      });
+
+      // Refresh details
+      const details = await api.getAdminUserDetails(targetUserId);
+      setUserDetails(details);
+    } catch (err: any) {
+      console.error("Failed to remove ad packs:", err);
+      setNotification({ type: "error", message: err.message || "Failed to remove ad packs." });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleUpdateAdServiceRequest = async (targetUserId: string, requestId: string, currentStatus: string, currentServices: string[]) => {
+    try {
+      const newStatus = prompt("Enter new request status (e.g. whatsapp_pending, campaign_setup, campaign_live, restricted, eligible, completed):", currentStatus);
+      if (newStatus === null) return;
+
+      const servicesStr = prompt("Enter comma-separated additional services to include:", currentServices.join(", "));
+      if (servicesStr === null) return;
+      const newServices = servicesStr.split(",").map(s => s.trim()).filter(s => s.length > 0);
+
+      setActionLoading(`req_${requestId}`);
+      await api.updateUserAdServiceRequest(targetUserId, requestId, newStatus || undefined, newServices);
+      setNotification({
+        type: "success",
+        message: "Successfully updated Meta Ads service request.",
+      });
+
+      // Refresh details
+      const details = await api.getAdminUserDetails(targetUserId);
+      setUserDetails(details);
+    } catch (err: any) {
+      console.error("Failed to update service request:", err);
+      setNotification({ type: "error", message: err.message || "Failed to update service request." });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleDeleteAdServiceRequest = async (targetUserId: string, requestId: string) => {
+    if (!confirm("Are you sure you want to delete this ad onboarding request?")) return;
+    try {
+      setActionLoading(`req_${requestId}`);
+      await api.deleteUserAdServiceRequest(targetUserId, requestId);
+      setNotification({
+        type: "success",
+        message: "Successfully deleted ads service request.",
+      });
+
+      // Refresh details
+      const details = await api.getAdminUserDetails(targetUserId);
+      setUserDetails(details);
+    } catch (err: any) {
+      console.error("Failed to delete service request:", err);
+      setNotification({ type: "error", message: err.message || "Failed to delete service request." });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
 
   const handleReplySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -859,6 +958,94 @@ export default function AdminPage() {
                           <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
                             camp.status === "ACTIVE" ? "bg-green-50 text-green-700" : "bg-slate-200 text-slate-600"
                           }`}>{camp.status}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* 5b. Meta Ad Packs (Ads Credits) */}
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center border-b border-slate-100 pb-1.5">
+                    <h4 className="font-bold text-slate-800 uppercase text-[10px] tracking-wider text-blue-600">Active Ad Credits Packs</h4>
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => handleAddAdPack(userDetails.user.id)}
+                        className="bg-blue-50 text-blue-700 hover:bg-blue-100 font-extrabold text-[9px] px-2 py-0.5 rounded cursor-pointer transition uppercase font-sans"
+                      >
+                        + Add Pack
+                      </button>
+                      {userDetails.ad_packs && userDetails.ad_packs.length > 0 && (
+                        <button
+                          onClick={() => handleRemoveAdPacks(userDetails.user.id)}
+                          className="bg-rose-50 text-rose-700 hover:bg-rose-100 font-extrabold text-[9px] px-2 py-0.5 rounded cursor-pointer transition uppercase font-sans"
+                        >
+                          Remove All
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  {!userDetails.ad_packs || userDetails.ad_packs.length === 0 ? (
+                    <div className="text-slate-400 italic font-medium">No active ad packs provisioned.</div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {userDetails.ad_packs.map((pack: any) => (
+                        <div key={pack.id} className="p-2 bg-slate-50 border border-slate-150 rounded-xl space-y-1 text-[10px]">
+                          <div className="flex justify-between font-bold text-slate-800">
+                            <span className="capitalize">{pack.pack_type.replace("_", " ")}</span>
+                            <span className="text-blue-650 font-extrabold">{pack.remaining_ad_credits} / {pack.total_ad_credits} Ads Left</span>
+                          </div>
+                          <div className="flex justify-between text-slate-450 text-[9px] font-medium">
+                            <span>Status: <span className="font-extrabold uppercase text-slate-600">{pack.status}</span></span>
+                            <span>Expires: {new Date(pack.expires_at).toLocaleDateString()}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* 5c. Meta Ads Onboarding Requests */}
+                <div className="space-y-2">
+                  <h4 className="font-bold text-slate-800 border-b border-slate-100 pb-1.5 uppercase text-[10px] tracking-wider text-blue-600">Meta Ads Onboarding Requests</h4>
+                  {!userDetails.ad_service_requests || userDetails.ad_service_requests.length === 0 ? (
+                    <div className="text-slate-400 italic font-medium">No custom onboarding requests found.</div>
+                  ) : (
+                    <div className="space-y-2">
+                      {userDetails.ad_service_requests.map((r: any) => (
+                        <div key={r.id} className="p-2.5 bg-slate-50 border border-slate-150 rounded-xl space-y-1.5 text-[10px]">
+                          <div className="flex justify-between font-bold">
+                            <span className="text-slate-850 truncate max-w-[120px]">{r.advertised_product}</span>
+                            <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
+                              r.status === "restricted" ? "bg-rose-50 text-rose-700" :
+                              r.status === "campaign_live" ? "bg-green-50 text-green-700" : "bg-blue-50 text-blue-700"
+                            }`}>{r.status.replace("_", " ")}</span>
+                          </div>
+                          <div className="text-[9px] text-slate-500 leading-normal font-medium">
+                            <div><strong>Objective:</strong> {r.campaign_objective}</div>
+                            <div><strong>Budget:</strong> {r.daily_budget}</div>
+                            <div><strong>Ad Quantity:</strong> {r.number_of_ads}</div>
+                            {r.additional_services && r.additional_services.length > 0 && (
+                              <div className="mt-1">
+                                <strong>Services:</strong>{" "}
+                                <span className="text-blue-650 font-bold">{r.additional_services.join(", ")}</span>
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex gap-1.5 pt-1">
+                            <button
+                              onClick={() => handleUpdateAdServiceRequest(userDetails.user.id, r.id, r.status, r.additional_services || [])}
+                              className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-[9px] font-bold px-2 py-0.5 rounded cursor-pointer transition uppercase font-sans"
+                            >
+                              Edit / Override
+                            </button>
+                            <button
+                              onClick={() => handleDeleteAdServiceRequest(userDetails.user.id, r.id)}
+                              className="bg-white border border-slate-200 text-rose-600 hover:bg-rose-55/50 text-[9px] font-bold px-2 py-0.5 rounded cursor-pointer transition uppercase font-sans"
+                            >
+                              Delete
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>

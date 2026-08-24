@@ -148,3 +148,105 @@ async def test_admin_user_suspension_override(mock_admin_auth, setup_admin_test_
         db_res = await db.execute(stmt)
         updated_user = db_res.scalar_one()
         assert updated_user.status == "suspended"
+
+
+@pytest.mark.asyncio
+async def test_admin_ad_packs_and_service_requests_override(mock_admin_auth, setup_admin_test_data, db: AsyncSession):
+    from app.models.ads_service import AdPack, MetaAdServiceRequest
+    data = setup_admin_test_data
+    target_user = data["target_user"]
+    user_id = target_user.id
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # 1. Add Ad Pack
+        ad_pack_payload = {
+            "pack_type": "pack_15",
+            "total_ad_credits": 15,
+            "used_ad_credits": 0,
+            "remaining_ad_credits": 15,
+            "expires_at_days": 60,
+            "price_paid": 748500,
+        }
+        res_pack = await client.post(
+            f"/api/v1/admin/users/{user_id}/ad-packs",
+            json=ad_pack_payload
+        )
+        assert res_pack.status_code == 200
+        assert res_pack.json()["status"] == "success"
+
+        # Verify pack created in DB
+        db.expire_all()
+        stmt = select(AdPack).where(AdPack.user_id == user_id)
+        res_db = await db.execute(stmt)
+        pack = res_db.scalar_one()
+        assert pack.pack_type == "pack_15"
+        assert pack.total_ad_credits == 15
+        assert pack.remaining_ad_credits == 15
+
+        # 2. Create ad onboarding request in DB first (so admin can edit/delete it)
+        req_obj = MetaAdServiceRequest(
+            user_id=user_id,
+            full_name="John Doe",
+            business_name="JD Store",
+            email="john@jd.com",
+            whatsapp_number="1234567890",
+            website="http://jd.com",
+            business_location="Mumbai",
+            industry="Retail",
+            industry_other="",
+            business_description="Retail selling",
+            advertised_product="Soap",
+            campaign_objective="Sales",
+            daily_budget="₹500/day",
+            number_of_ads=3,
+            creative_required=True,
+            additional_services=["pixel_setup"],
+            status="submitted",
+        )
+        db.add(req_obj)
+        await db.commit()
+        await db.refresh(req_obj)
+        req_id = req_obj.id
+
+        # 3. Override request status and services
+        override_payload = {
+            "status": "campaign_live",
+            "additional_services": ["pixel_setup", "conversions_api"],
+        }
+        res_override = await client.post(
+            f"/api/v1/admin/users/{user_id}/ad-service-requests/{req_id}",
+            json=override_payload
+        )
+        assert res_override.status_code == 200
+        assert res_override.json()["status"] == "success"
+
+        # Verify DB changes
+        db.expire(req_obj)
+        stmt_req = select(MetaAdServiceRequest).where(MetaAdServiceRequest.id == req_id)
+        res_req_db = await db.execute(stmt_req)
+        updated_req = res_req_db.scalar_one()
+        assert updated_req.status == "campaign_live"
+        assert "conversions_api" in updated_req.additional_services
+
+        # 4. Check user details payload contains these new tables
+        res_details = await client.get(f"/api/v1/admin/users/{user_id}/details")
+        assert res_details.status_code == 200
+        details = res_details.json()
+        assert "ad_packs" in details
+        assert "ad_service_requests" in details
+        assert len(details["ad_packs"]) == 1
+        assert len(details["ad_service_requests"]) == 1
+
+        # 5. Delete ad onboarding request
+        res_del = await client.delete(f"/api/v1/admin/users/{user_id}/ad-service-requests/{req_id}")
+        assert res_del.status_code == 200
+        assert res_del.json()["status"] == "success"
+
+        stmt_del = select(MetaAdServiceRequest).where(MetaAdServiceRequest.id == req_id)
+        res_del_db = await db.execute(stmt_del)
+        assert res_del_db.scalar_one_or_none() is None
+
+        # Cleanup created AdPack
+        await db.delete(pack)
+        await db.commit()

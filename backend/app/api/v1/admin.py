@@ -90,6 +90,20 @@ class AdminOptimizationSlotsOverrideRequest(BaseModel):
     slots: int
 
 
+class AdminAdPackOverrideRequest(BaseModel):
+    pack_type: str
+    total_ad_credits: int
+    used_ad_credits: int
+    remaining_ad_credits: int
+    expires_at_days: Optional[int] = 30
+    price_paid: Optional[int] = 0
+
+
+class AdminAdServiceRequestOverrideRequest(BaseModel):
+    status: Optional[str] = None
+    additional_services: Optional[list] = None
+
+
 # ──────────────────────────────────────────────
 # Helper: Verify Admin Role
 # ──────────────────────────────────────────────
@@ -591,7 +605,18 @@ async def get_user_details(
     res_tickets = await db.execute(stmt_tickets)
     tickets = res_tickets.scalars().all()
 
-    # 6. Fetch Campaigns for connected ad accounts
+    # 6. Fetch Ad packs
+    from app.models.ads_service import MetaAdServiceRequest, AdPack
+    stmt_packs = select(AdPack).where(AdPack.user_id == user_id).order_by(AdPack.purchased_at.desc())
+    res_packs = await db.execute(stmt_packs)
+    ad_packs = res_packs.scalars().all()
+
+    # 7. Fetch Ad service requests
+    stmt_reqs = select(MetaAdServiceRequest).where(MetaAdServiceRequest.user_id == user_id).order_by(MetaAdServiceRequest.created_at.desc())
+    res_reqs = await db.execute(stmt_reqs)
+    ad_service_requests = res_reqs.scalars().all()
+
+    # 8. Fetch Campaigns for connected ad accounts
     campaigns = []
     if ad_accounts:
         acc_ids = [acc.id for acc in ad_accounts]
@@ -664,6 +689,44 @@ async def get_user_details(
                 "daily_budget": float(camp.daily_budget) if camp.daily_budget is not None else None,
             }
             for camp in campaigns
+        ],
+        "ad_packs": [
+            {
+                "id": str(pack.id),
+                "pack_type": pack.pack_type,
+                "total_ad_credits": pack.total_ad_credits,
+                "used_ad_credits": pack.used_ad_credits,
+                "remaining_ad_credits": pack.remaining_ad_credits,
+                "price_paid": pack.price_paid,
+                "purchased_at": pack.purchased_at,
+                "expires_at": pack.expires_at,
+                "status": pack.status,
+            }
+            for pack in ad_packs
+        ],
+        "ad_service_requests": [
+            {
+                "id": str(r.id),
+                "full_name": r.full_name,
+                "business_name": r.business_name,
+                "email": r.email,
+                "whatsapp_number": r.whatsapp_number,
+                "website": r.website,
+                "business_location": r.business_location,
+                "industry": r.industry,
+                "industry_other": r.industry_other,
+                "business_description": r.business_description,
+                "advertised_product": r.advertised_product,
+                "campaign_objective": r.campaign_objective,
+                "daily_budget": r.daily_budget,
+                "number_of_ads": r.number_of_ads,
+                "creative_required": r.creative_required,
+                "additional_services": r.additional_services,
+                "status": r.status,
+                "partner_access_status": r.partner_access_status,
+                "created_at": r.created_at,
+            }
+            for r in ad_service_requests
         ]
     }
 
@@ -753,6 +816,110 @@ async def override_user_credits(
 
     logger.info("admin_credits_override_success", user_id=user_id, credits=req.credits)
     return {"status": "success", "message": f"Successfully updated user credits to {req.credits}."}
+
+
+@router.post("/users/{user_id}/ad-packs", summary="Give or remove user ad pack credits")
+async def override_user_ad_packs(
+    user_id: uuid.UUID,
+    req: AdminAdPackOverrideRequest,
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    verify_admin(claims)
+    stmt = select(User).where(User.id == user_id)
+    res = await db.execute(stmt)
+    user = res.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    from app.models.ads_service import AdPack
+    
+    if req.total_ad_credits <= 0:
+        # Delete active ad packs for user
+        stmt_del = select(AdPack).where(AdPack.user_id == user_id).where(AdPack.status == "active")
+        res_del = await db.execute(stmt_del)
+        active_packs = res_del.scalars().all()
+        for p in active_packs:
+            await db.delete(p)
+        await db.commit()
+        logger.info("admin_ad_packs_removed", user_id=user_id)
+        return {"status": "success", "message": "Successfully removed active ad packs."}
+
+    # Add new ad pack
+    new_pack = AdPack(
+        user_id=user_id,
+        pack_type=req.pack_type,
+        total_ad_credits=req.total_ad_credits,
+        used_ad_credits=req.used_ad_credits,
+        remaining_ad_credits=req.remaining_ad_credits,
+        price_paid=req.price_paid,
+        purchased_at=datetime.utcnow(),
+        expires_at=datetime.utcnow() + timedelta(days=req.expires_at_days),
+        status="active",
+        non_refundable_terms_accepted=True,
+        non_refundable_terms_accepted_at=datetime.utcnow()
+    )
+    db.add(new_pack)
+    await db.commit()
+    logger.info("admin_ad_pack_created", user_id=user_id, credits=req.total_ad_credits)
+    return {"status": "success", "message": f"Successfully created {req.total_ad_credits} ad credits pack."}
+
+
+@router.post("/users/{user_id}/ad-service-requests/{request_id}", summary="Override user Meta Ads service request status or additional services")
+async def override_user_ad_service_request(
+    user_id: uuid.UUID,
+    request_id: uuid.UUID,
+    req: AdminAdServiceRequestOverrideRequest,
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    verify_admin(claims)
+    from app.models.ads_service import MetaAdServiceRequest
+    stmt = (
+        select(MetaAdServiceRequest)
+        .where(MetaAdServiceRequest.id == request_id)
+        .where(MetaAdServiceRequest.user_id == user_id)
+    )
+    res = await db.execute(stmt)
+    service_req = res.scalar_one_or_none()
+    if not service_req:
+        raise HTTPException(status_code=404, detail="Ads service request not found.")
+
+    if req.status is not None:
+        service_req.status = req.status
+
+    if req.additional_services is not None:
+        service_req.additional_services = req.additional_services
+
+    db.add(service_req)
+    await db.commit()
+    logger.info("admin_ad_service_request_override", user_id=user_id, request_id=request_id)
+    return {"status": "success", "message": "Successfully updated ads service request."}
+
+
+@router.delete("/users/{user_id}/ad-service-requests/{request_id}", summary="Delete user Meta Ads service request")
+async def delete_user_ad_service_request(
+    user_id: uuid.UUID,
+    request_id: uuid.UUID,
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    verify_admin(claims)
+    from app.models.ads_service import MetaAdServiceRequest
+    stmt = (
+        select(MetaAdServiceRequest)
+        .where(MetaAdServiceRequest.id == request_id)
+        .where(MetaAdServiceRequest.user_id == user_id)
+    )
+    res = await db.execute(stmt)
+    service_req = res.scalar_one_or_none()
+    if not service_req:
+        raise HTTPException(status_code=404, detail="Ads service request not found.")
+
+    await db.delete(service_req)
+    await db.commit()
+    logger.info("admin_ad_service_request_deleted", user_id=user_id, request_id=request_id)
+    return {"status": "success", "message": "Successfully deleted ads service request."}
 
 
 # ──────────────────────────────────────────────
