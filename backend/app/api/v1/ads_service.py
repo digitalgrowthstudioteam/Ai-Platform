@@ -462,6 +462,10 @@ async def verify_service_payment(
     service_req.status = "whatsapp_pending"
     db.add(service_req)
 
+    # 6. Grant Starter Plan 1-month bonus
+    from app.services.subscription_bonus import grant_starter_plan_bonus
+    await grant_starter_plan_bonus(user, db, days=30)
+
     await db.commit()
     await db.refresh(pack)
 

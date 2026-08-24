@@ -392,6 +392,10 @@ async def verify_billing_payment(
     if is_verified:
         now = datetime.now(timezone.utc)
         
+        # Grant Starter Plan 1-month bonus/extension for any successful billing payment
+        from app.services.subscription_bonus import grant_starter_plan_bonus
+        await grant_starter_plan_bonus(user, db, days=30)
+        
         # Scenario A: User purchased an Add-On or Credit Pack
         if req.addon_id:
             if req.addon_id.startswith("credit_pack_"):

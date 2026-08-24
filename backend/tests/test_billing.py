@@ -124,9 +124,15 @@ async def test_payment_verification_and_plan_upgrade(mock_auth, setup_billing_da
         updated_user = db_res.scalar_one()
         assert updated_user.plan_id == "pro"
 
-        stmt_sub = select(Subscription).where(Subscription.user_id == user_id)
+        stmt_sub = select(Subscription).where(Subscription.user_id == user_id).where(Subscription.plan == "pro")
         db_sub_res = await db.execute(stmt_sub)
         sub = db_sub_res.scalar_one()
         assert sub.plan == "pro"
         assert sub.status == "active"
         assert sub.razorpay_subscription_id == "pay_mock_test_54321"
+
+        # Verify Starter bonus subscription is also created
+        stmt_sub_starter = select(Subscription).where(Subscription.user_id == user_id).where(Subscription.plan == "starter")
+        db_sub_starter_res = await db.execute(stmt_sub_starter)
+        sub_starter = db_sub_starter_res.scalar_one()
+        assert sub_starter.status == "active"

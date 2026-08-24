@@ -219,15 +219,23 @@ class EntitlementEngine:
         from app.models.subscription import Subscription
         from app.models.ai_assistant import AICreditTransaction
         
-        # 1. Fetch latest active subscription
+        # 1. Fetch active subscriptions and resolve the highest ranking one
         stmt = (
             select(Subscription)
             .where(Subscription.user_id == user.id)
             .where(Subscription.status == "active")
-            .order_by(Subscription.expires_at.desc())
         )
         res = await db.execute(stmt)
-        sub = res.scalar_one_or_none()
+        active_subs = res.scalars().all()
+        
+        sub = None
+        best_rank = -1
+        plan_rank = {"free": 0, "starter": 1, "growth": 2, "pro": 3, "agency": 4}
+        for s in active_subs:
+            rank = plan_rank.get(s.plan.lower(), 0)
+            if rank > best_rank:
+                best_rank = rank
+                sub = s
         
         if not sub:
             # Check trial credits init

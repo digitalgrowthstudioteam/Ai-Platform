@@ -54,3 +54,53 @@ async def test_evaluate_service_eligibility_restoration(db: AsyncSession):
     await db.refresh(user)
     assert user.ads_service_eligible is True
     assert user.restriction_reason is None
+
+
+@pytest.mark.asyncio
+async def test_grant_starter_plan_bonus(db: AsyncSession):
+    from sqlalchemy import select
+    from app.services.subscription_bonus import grant_starter_plan_bonus
+    from app.models.subscription import Subscription
+
+    # 1. Create a user
+    user = User(
+        firebase_uid="test-bonus-uid",
+        email="bonus@dgstudio.com",
+        name="Bonus User",
+        plan_id="free",
+        ads_service_eligible=True,
+    )
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+    
+    # Verify they have no active subscriptions
+    stmt = select(Subscription).where(Subscription.user_id == user.id)
+    res = await db.execute(stmt)
+    subs = res.scalars().all()
+    assert len(subs) == 0
+
+    # 2. Grant the starter plan bonus
+    await grant_starter_plan_bonus(user, db, days=30)
+    
+    # Verify a subscription is created and user plan_id is upgraded to starter
+    await db.refresh(user)
+    assert user.plan_id == "starter"
+    
+    stmt = select(Subscription).where(Subscription.user_id == user.id)
+    res = await db.execute(stmt)
+    subs = res.scalars().all()
+    assert len(subs) == 1
+    assert subs[0].plan == "starter"
+    assert subs[0].status == "active"
+    
+    expiry_1 = subs[0].expires_at
+    
+    # 3. Grant again to extend
+    await grant_starter_plan_bonus(user, db, days=30)
+    
+    db.expire(subs[0])
+    res2 = await db.execute(stmt)
+    subs2 = res2.scalars().all()
+    assert len(subs2) == 1
+    assert subs2[0].expires_at > expiry_1
