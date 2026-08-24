@@ -33,6 +33,24 @@ function AdminUserDetailContent() {
     message: string;
   } | null>(null);
   const [addPackForm, setAddPackForm] = useState({ show: false, quantity: 1, validityDays: 30 });
+  const [quoteForm, setQuoteForm] = useState({
+    show: false,
+    numberOfAds: 5,
+    pricePerAd: 799,
+    validityDays: 30,
+    includeSetup: false,
+    setupPrice: 1999,
+    includeCreative: false,
+    creativePrice: 1499,
+    customItemName: "",
+    customItemPrice: 0,
+  });
+  const [ticketForm, setTicketForm] = useState({
+    show: false,
+    subject: "",
+    description: "",
+    category: "General Support",
+  });
 
   // Check admin role
   const isAdmin = user?.email === "flasshgames2026@gmail.com" || user?.email === "digitalgrowthstudioteam@gmail.com";
@@ -216,6 +234,73 @@ function AdminUserDetailContent() {
     } catch (err: any) {
       console.error("Failed to toggle intro offer:", err);
       setNotification({ type: "error", message: err.message || "Failed to update promo offer." });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleRaiseQuotation = async () => {
+    try {
+      setActionLoading("raise_quote");
+      await api.adminRaiseQuotation(userId, {
+        number_of_ads: quoteForm.numberOfAds,
+        price_per_ad: quoteForm.pricePerAd,
+        validity_days: quoteForm.validityDays,
+        include_setup: quoteForm.includeSetup,
+        setup_price: quoteForm.setupPrice,
+        include_creative: quoteForm.includeCreative,
+        creative_price: quoteForm.creativePrice,
+        custom_item_name: quoteForm.customItemName || null,
+        custom_item_price: quoteForm.customItemName ? quoteForm.customItemPrice : null,
+      });
+      setNotification({
+        type: "success",
+        message: "Successfully generated and sent quotation to the user!",
+      });
+      setQuoteForm({
+        show: false,
+        numberOfAds: 5,
+        pricePerAd: 799,
+        validityDays: 30,
+        includeSetup: false,
+        setupPrice: 1999,
+        includeCreative: false,
+        creativePrice: 1499,
+        customItemName: "",
+        customItemPrice: 0,
+      });
+      await fetchUserDetails();
+    } catch (err: any) {
+      console.error("Failed to raise quote:", err);
+      setNotification({ type: "error", message: err.message || "Failed to raise quotation." });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleRaiseTicket = async () => {
+    if (!ticketForm.subject || !ticketForm.description) return;
+    try {
+      setActionLoading("raise_ticket");
+      await api.adminRaiseTicket(userId, {
+        subject: ticketForm.subject,
+        description: ticketForm.description,
+        category: ticketForm.category,
+      });
+      setNotification({
+        type: "success",
+        message: "Successfully raised support ticket for the user!",
+      });
+      setTicketForm({
+        show: false,
+        subject: "",
+        description: "",
+        category: "General Support",
+      });
+      await fetchUserDetails();
+    } catch (err: any) {
+      console.error("Failed to raise ticket:", err);
+      setNotification({ type: "error", message: err.message || "Failed to raise support ticket." });
     } finally {
       setActionLoading(null);
     }
@@ -662,7 +747,255 @@ function AdminUserDetailContent() {
             )}
           </div>
 
-          {/* Meta Ads Onboarding Requests */}
+          {/* Raise Custom Quotation */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-4">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+              <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider text-blue-600">
+                Raise Custom Quotation
+              </h3>
+              <button
+                onClick={() => setQuoteForm((prev) => ({ ...prev, show: !prev.show }))}
+                className="bg-blue-50 text-blue-700 hover:bg-blue-100 font-extrabold text-[9px] px-2.5 py-1 rounded cursor-pointer transition uppercase border border-blue-100 font-sans"
+              >
+                {quoteForm.show ? "Cancel" : "+ Raise Quote"}
+              </button>
+            </div>
+
+            {quoteForm.show && (
+              <div className="space-y-4 text-xs">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-bold text-slate-500 uppercase">Number of Ads</label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={quoteForm.numberOfAds}
+                      onChange={(e) =>
+                        setQuoteForm((prev) => ({
+                          ...prev,
+                          numberOfAds: Math.max(1, parseInt(e.target.value) || 1),
+                        }))
+                      }
+                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold text-slate-800 bg-white"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-bold text-slate-500 uppercase">Price per Ad (₹)</label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={quoteForm.pricePerAd}
+                      onChange={(e) =>
+                        setQuoteForm((prev) => ({
+                          ...prev,
+                          pricePerAd: Math.max(1, parseInt(e.target.value) || 1),
+                        }))
+                      }
+                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold text-slate-800 bg-white"
+                    />
+                  </div>
+                </div>
+
+                {/* Setup Option */}
+                <div className="p-3 bg-slate-50 border border-slate-150 rounded-xl space-y-2">
+                  <label className="flex items-center gap-2 font-bold text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={quoteForm.includeSetup}
+                      onChange={(e) =>
+                        setQuoteForm((prev) => ({ ...prev, includeSetup: e.target.checked }))
+                      }
+                      className="rounded border-slate-350 text-blue-600 focus:ring-blue-500"
+                    />
+                    Include Meta Ad Account Setup
+                  </label>
+                  {quoteForm.includeSetup && (
+                    <div className="space-y-1 pl-6">
+                      <label className="text-[9px] font-bold text-slate-500 uppercase">Setup Price (₹)</label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={quoteForm.setupPrice}
+                        onChange={(e) =>
+                          setQuoteForm((prev) => ({
+                            ...prev,
+                            setupPrice: Math.max(0, parseInt(e.target.value) || 0),
+                          }))
+                        }
+                        className="w-full max-w-[200px] border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-800 bg-white"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Creative Option */}
+                <div className="p-3 bg-slate-50 border border-slate-150 rounded-xl space-y-2">
+                  <label className="flex items-center gap-2 font-bold text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={quoteForm.includeCreative}
+                      onChange={(e) =>
+                        setQuoteForm((prev) => ({ ...prev, includeCreative: e.target.checked }))
+                      }
+                      className="rounded border-slate-350 text-blue-600 focus:ring-blue-500"
+                    />
+                    Include Creative Design Service
+                  </label>
+                  {quoteForm.includeCreative && (
+                    <div className="space-y-1 pl-6">
+                      <label className="text-[9px] font-bold text-slate-500 uppercase">Creative Price (₹)</label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={quoteForm.creativePrice}
+                        onChange={(e) =>
+                          setQuoteForm((prev) => ({
+                            ...prev,
+                            creativePrice: Math.max(0, parseInt(e.target.value) || 0),
+                          }))
+                        }
+                        className="w-full max-w-[200px] border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-800 bg-white"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Custom Item */}
+                <div className="p-3 bg-slate-50 border border-slate-150 rounded-xl space-y-3">
+                  <span className="font-bold text-slate-700 block">Add Custom Service Item (Optional)</span>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-bold text-slate-500 uppercase">Service Name</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Custom Video Production"
+                        value={quoteForm.customItemName}
+                        onChange={(e) =>
+                          setQuoteForm((prev) => ({ ...prev, customItemName: e.target.value }))
+                        }
+                        className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-800 bg-white"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-bold text-slate-500 uppercase">Price (₹)</label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={quoteForm.customItemPrice}
+                        onChange={(e) =>
+                          setQuoteForm((prev) => ({
+                            ...prev,
+                            customItemPrice: Math.max(0, parseInt(e.target.value) || 0),
+                          }))
+                        }
+                        className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-800 bg-white"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-bold text-slate-500 uppercase">Quote Validity (Days)</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={90}
+                      value={quoteForm.validityDays}
+                      onChange={(e) =>
+                        setQuoteForm((prev) => ({
+                          ...prev,
+                          validityDays: Math.max(1, parseInt(e.target.value) || 30),
+                        }))
+                      }
+                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold text-slate-800 bg-white"
+                    />
+                  </div>
+                  <div className="flex items-end">
+                    <button
+                      disabled={actionLoading === "raise_quote"}
+                      onClick={handleRaiseQuotation}
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-[10px] py-2.5 rounded-lg transition disabled:opacity-50 cursor-pointer uppercase tracking-wider shadow-sm font-sans"
+                    >
+                      {actionLoading === "raise_quote" ? "Sending Quote..." : "Send Quotation"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Raise Support Ticket */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-4">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+              <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider text-blue-600">
+                Raise Support Ticket
+              </h3>
+              <button
+                onClick={() => setTicketForm((prev) => ({ ...prev, show: !prev.show }))}
+                className="bg-blue-50 text-blue-700 hover:bg-blue-100 font-extrabold text-[9px] px-2.5 py-1 rounded cursor-pointer transition uppercase border border-blue-100 font-sans"
+              >
+                {ticketForm.show ? "Cancel" : "+ Raise Ticket"}
+              </button>
+            </div>
+
+            {ticketForm.show && (
+              <div className="space-y-3.5 text-xs">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-bold text-slate-500 uppercase">Subject</label>
+                  <input
+                    type="text"
+                    placeholder="Brief description of the problem"
+                    value={ticketForm.subject}
+                    onChange={(e) =>
+                      setTicketForm((prev) => ({ ...prev, subject: e.target.value }))
+                    }
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold text-slate-800 bg-white font-sans"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="col-span-2 space-y-1">
+                    <label className="text-[9px] font-bold text-slate-500 uppercase">Description / Details</label>
+                    <textarea
+                      rows={3}
+                      placeholder="Details about the issue or task"
+                      value={ticketForm.description}
+                      onChange={(e) =>
+                        setTicketForm((prev) => ({ ...prev, description: e.target.value }))
+                      }
+                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold text-slate-800 bg-white font-sans"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-bold text-slate-500 uppercase">Category</label>
+                    <select
+                      value={ticketForm.category}
+                      onChange={(e) =>
+                        setTicketForm((prev) => ({ ...prev, category: e.target.value }))
+                      }
+                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold text-slate-800 bg-white font-sans"
+                    >
+                      <option value="General Support font-sans">General Support</option>
+                      <option value="Billing Issue font-sans">Billing Issue</option>
+                      <option value="Meta Ads Sync font-sans">Meta Ads Sync</option>
+                      <option value="AI Recommendations font-sans">AI Recommendations</option>
+                    </select>
+                  </div>
+                  <div className="flex items-end">
+                    <button
+                      disabled={actionLoading === "raise_ticket" || !ticketForm.subject || !ticketForm.description}
+                      onClick={handleRaiseTicket}
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-[10px] py-2.5 rounded-lg transition disabled:opacity-50 cursor-pointer uppercase tracking-wider shadow-sm font-sans"
+                    >
+                      {actionLoading === "raise_ticket" ? "Raising Ticket..." : "Open Ticket"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
           <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-4">
             <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-3 text-blue-600">
               Meta Ads Onboarding Requests ({userDetails.ad_service_requests?.length || 0})

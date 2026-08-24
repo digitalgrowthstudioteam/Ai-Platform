@@ -38,11 +38,21 @@ export default function AdminPage() {
   const [ticketsList, setTicketsList] = useState<any[]>([]);
   const [adsRequestsList, setAdsRequestsList] = useState<any[]>([]);
 
+  // Ads Service filter states
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+
   // Selected ads service request
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
   const [newRequestStatus, setNewRequestStatus] = useState("");
   const [newPartnerStatus, setNewPartnerStatus] = useState("");
   const [creditsToConsume, setCreditsToConsume] = useState(0);
+
+  // Ticket creation form from orders state
+  const [showOrderTicketForm, setShowOrderTicketForm] = useState(false);
+  const [orderTicketSubject, setOrderTicketSubject] = useState("");
+  const [orderTicketDescription, setOrderTicketDescription] = useState("");
+  const [orderTicketCategory, setOrderTicketCategory] = useState("General Support");
 
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -113,6 +123,34 @@ export default function AdminPage() {
     } catch (err) {
       console.error("Failed to submit ticket reply:", err);
       setNotification({ type: "error", message: "Failed to send ticket response." });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleRaiseTicketFromOrder = async (userId: string, orderId: string) => {
+    if (!orderTicketSubject || !orderTicketDescription) return;
+    try {
+      setActionLoading("raise_order_ticket");
+      await api.adminRaiseTicket(userId, {
+        subject: orderTicketSubject,
+        description: orderTicketDescription,
+        category: orderTicketCategory,
+      });
+      setNotification({
+        type: "success",
+        message: `Successfully raised support ticket for this client (Order ID: ${orderId.slice(0, 8)})!`,
+      });
+      setOrderTicketSubject("");
+      setOrderTicketDescription("");
+      setOrderTicketCategory("General Support");
+      setShowOrderTicketForm(false);
+      // Refresh tickets
+      const updatedTickets = await api.getAdminTickets();
+      setTicketsList(updatedTickets);
+    } catch (err: any) {
+      console.error("Failed to raise support ticket:", err);
+      setNotification({ type: "error", message: err.message || "Failed to raise support ticket." });
     } finally {
       setActionLoading(null);
     }
@@ -615,174 +653,299 @@ export default function AdminPage() {
       )}
 
       {/* TAB CONTENT: Meta Ads Services */}
-      {activeTab === "ads_services" && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Requests List */}
-          <div className="lg:col-span-2 bg-white border border-slate-150 rounded-2xl p-6 shadow-xs space-y-4">
-            <h3 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-3 flex items-center gap-1.5">
-              <Megaphone size={16} className="text-blue-600" /> Service Setup Requests
-            </h3>
+      {activeTab === "ads_services" && (() => {
+        const filteredAdsRequests = adsRequestsList.filter((r) => {
+          const matchSearch =
+            r.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            r.customer_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            r.customer_email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            r.business_name.toLowerCase().includes(searchQuery.toLowerCase());
 
-            {adsRequestsList.length === 0 ? (
-              <div className="py-12 text-center text-slate-400 text-xs italic">
-                No custom Meta Ads service requests registered yet.
+          if (statusFilter === "pending") {
+            const pendingStatuses = [
+              "whatsapp_pending",
+              "whatsapp_connected",
+              "partner_access_requested",
+              "partner_access_granted",
+              "campaign_setup",
+              "campaign_live",
+            ];
+            return matchSearch && pendingStatuses.includes(r.status);
+          }
+          if (statusFilter === "new") {
+            return matchSearch && (r.status === "submitted" || r.status === "trial_started");
+          }
+          if (statusFilter === "completed") {
+            return matchSearch && r.status === "completed";
+          }
+          return matchSearch;
+        });
+
+        return (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 font-sans">
+            {/* Requests List */}
+            <div className="lg:col-span-2 bg-white border border-slate-150 rounded-2xl p-6 shadow-xs space-y-4">
+              <div className="flex justify-between items-center border-b border-slate-100 pb-3 flex-wrap gap-2">
+                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                  <Megaphone size={16} className="text-blue-600" /> Service Setup Requests ({filteredAdsRequests.length})
+                </h3>
               </div>
-            ) : (
-              <div className="space-y-3">
-                {adsRequestsList.map((r) => (
-                  <div 
-                    key={r.id}
-                    onClick={() => {
-                      setSelectedRequestId(r.id);
-                      setNewRequestStatus(r.status);
-                      setNewPartnerStatus(r.partner_access_status || "not_requested");
-                      setCreditsToConsume(0);
-                    }}
-                    className={`p-4 border rounded-xl hover:bg-slate-50 transition cursor-pointer text-left ${
-                      selectedRequestId === r.id ? "border-blue-500 bg-blue-50/5" : "border-slate-150 bg-white"
-                    }`}
-                  >
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h4 className="font-extrabold text-xs text-slate-800">{r.business_name}</h4>
-                        <p className="text-[10px] text-slate-400 font-semibold mt-0.5">
-                          Customer: {r.customer_name} ({r.customer_email}) | WhatsApp: {r.whatsapp_number}
-                        </p>
-                        <p className="text-[10px] text-slate-400 font-semibold">
-                          Industry: {r.industry === "Other" ? r.industry_other : r.industry}
-                        </p>
-                      </div>
-                      <span className={`text-[9px] font-bold px-2.5 py-0.5 rounded-full uppercase ${
-                        r.status === "restricted" ? "bg-red-50 text-red-700" : "bg-blue-50 text-blue-700"
-                      }`}>
-                        {r.status.replace("_", " ")}
-                      </span>
-                    </div>
-                    <div className="mt-3 pt-2 border-t border-slate-100 flex justify-between text-[10px] text-slate-500 font-semibold">
-                      <span>Partner Access: <b>{r.partner_access_status || "not_requested"}</b></span>
-                      <span>Active Credits: <b>{r.remaining_credits} remaining</b></span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
 
-          {/* Request Operations */}
-          <div>
-            <div className="bg-white border border-slate-150 rounded-2xl p-6 shadow-xs space-y-4">
-              <h3 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-3 flex items-center gap-1.5">
-                <Sliders size={16} className="text-blue-600" /> Service Settings
-              </h3>
-
-              {selectedRequestId && adsRequestsList.find((r) => r.id === selectedRequestId) ? (
-                <form 
-                  onSubmit={async (e) => {
-                    e.preventDefault();
-                    if (!selectedRequestId) return;
-                    setActionLoading(`update_${selectedRequestId}`);
-                    try {
-                      await api.adminUpdateAdsServiceRequest(selectedRequestId, {
-                        status: newRequestStatus,
-                        partner_access_status: newPartnerStatus,
-                        ad_credits_to_consume: creditsToConsume > 0 ? creditsToConsume : null,
-                      });
-                      setNotification({
-                        type: "success",
-                        message: "Service request parameters updated successfully.",
-                      });
-                      // Reload requests
-                      const adsRes = await api.getAdminAdsServiceRequests();
-                      setAdsRequestsList(adsRes);
-                      setSelectedRequestId(null);
-                    } catch (err: any) {
-                      setNotification({
-                        type: "error",
-                        message: err.message || "Failed to update service request parameters.",
-                      });
-                    } finally {
-                      setActionLoading(null);
-                    }
-                  }}
-                  className="space-y-4 text-left text-xs"
+              {/* Filters Row */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pb-2 border-b border-slate-100 font-sans">
+                <input
+                  type="text"
+                  placeholder="Search by Order ID, Client, Business..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="px-3.5 py-2 border border-slate-200 rounded-xl text-xs font-semibold focus:ring-1 focus:ring-blue-500 bg-slate-50/20"
+                />
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold bg-white"
                 >
-                  <div className="space-y-1">
-                    <span className="text-[9px] text-slate-400 font-bold block uppercase">Customer WhatsApp</span>
-                    <a 
-                      href={`https://wa.me/${adsRequestsList.find((r) => r.id === selectedRequestId)?.whatsapp_number.replace(/\D/g, "")}`} 
-                      target="_blank" 
-                      className="text-blue-600 font-bold hover:underline"
-                    >
-                      Message WhatsApp →
-                    </a>
-                  </div>
+                  <option value="all">All Statuses</option>
+                  <option value="new">New Requests (Unprocessed / Trial)</option>
+                  <option value="pending">Pending/Active Setup</option>
+                  <option value="completed">Completed Orders</option>
+                </select>
+              </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Operational Status</label>
-                    <select
-                      value={newRequestStatus}
-                      onChange={(e) => setNewRequestStatus(e.target.value)}
-                      className="w-full px-3 py-2 border rounded-xl bg-white"
-                    >
-                      <option value="submitted">Submitted (In Review)</option>
-                      <option value="restricted">Restricted (Ineligible)</option>
-                      <option value="whatsapp_pending">WhatsApp Contact Pending</option>
-                      <option value="whatsapp_connected">WhatsApp Connected</option>
-                      <option value="partner_access_requested">Partner Access Requested</option>
-                      <option value="partner_access_granted">Partner Access Granted</option>
-                      <option value="campaign_setup">Campaign Setup In Progress</option>
-                      <option value="campaign_live">Campaign Live (Active)</option>
-                      <option value="completed">Completed (Archived)</option>
-                      <option value="cancelled">Cancelled</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Partner Access Permission</label>
-                    <select
-                      value={newPartnerStatus}
-                      onChange={(e) => setNewPartnerStatus(e.target.value)}
-                      className="w-full px-3 py-2 border rounded-xl bg-white"
-                    >
-                      <option value="not_requested">Not Requested</option>
-                      <option value="requested">Requested</option>
-                      <option value="pending">Pending Customer Auth</option>
-                      <option value="granted">Partner Access Granted</option>
-                      <option value="rejected">Rejected by Client</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Deduct Ad Credits (Consumptions)</label>
-                    <input
-                      type="number"
-                      min={0}
-                      value={creditsToConsume}
-                      onChange={(e) => setCreditsToConsume(parseInt(e.target.value) || 0)}
-                      placeholder="e.g. 1"
-                      className="w-full border rounded-xl px-3 py-2 text-xs font-semibold text-slate-800"
-                    />
-                    <span className="text-[9px] text-slate-400 block font-semibold">Specify the number of ads successfully launched to deduct credits.</span>
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={actionLoading !== null}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl transition flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
-                  >
-                    {actionLoading === `update_${selectedRequestId}` && <Loader2 size={12} className="animate-spin" />}
-                    Save Service Settings
-                  </button>
-                </form>
+              {filteredAdsRequests.length === 0 ? (
+                <div className="py-12 text-center text-slate-400 text-xs italic">
+                  No matching service requests found.
+                </div>
               ) : (
-                <div className="py-12 text-slate-400 text-xs italic text-center">
-                  Select a service request to inspect details.
+                <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
+                  {filteredAdsRequests.map((r) => (
+                    <div 
+                      key={r.id}
+                      onClick={() => {
+                        setSelectedRequestId(r.id);
+                        setNewRequestStatus(r.status);
+                        setNewPartnerStatus(r.partner_access_status || "not_requested");
+                        setCreditsToConsume(0);
+                        setShowOrderTicketForm(false);
+                      }}
+                      className={`p-4 border rounded-xl hover:bg-slate-50/50 transition cursor-pointer text-left ${
+                        selectedRequestId === r.id ? "border-blue-500 bg-blue-50/5" : "border-slate-150 bg-white"
+                      }`}
+                    >
+                      <div className="flex justify-between items-start flex-wrap gap-2">
+                        <div>
+                          <h4 className="font-extrabold text-xs text-slate-800">{r.business_name}</h4>
+                          <p className="text-[10px] text-slate-450 font-bold mt-0.5">
+                            ID: <span className="font-mono text-[9px]">{r.id}</span>
+                          </p>
+                          <p className="text-[10px] text-slate-450 font-bold">
+                            Customer: {r.customer_name} ({r.customer_email}) | WhatsApp: {r.whatsapp_number}
+                          </p>
+                          <p className="text-[10px] text-slate-450 font-bold">
+                            Industry: {r.industry === "Other" ? r.industry_other : r.industry}
+                          </p>
+                        </div>
+                        <span className={`text-[9px] font-bold px-2.5 py-0.5 rounded-full uppercase ${
+                          r.status === "restricted" ? "bg-red-50 text-red-700" : "bg-blue-50 text-blue-700"
+                        }`}>
+                          {r.status.replace("_", " ")}
+                        </span>
+                      </div>
+                      <div className="mt-3 pt-2 border-t border-slate-100 flex justify-between text-[10px] text-slate-500 font-bold">
+                        <span>Partner Access: <b>{r.partner_access_status || "not_requested"}</b></span>
+                        <span>Active Credits: <b>{r.remaining_credits} remaining</b></span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
+
+            {/* Request Operations */}
+            <div>
+              <div className="bg-white border border-slate-150 rounded-2xl p-6 shadow-xs space-y-4">
+                <h3 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-3 flex items-center gap-1.5">
+                  <Sliders size={16} className="text-blue-600" /> Service Settings
+                </h3>
+
+                {selectedRequestId && adsRequestsList.find((r) => r.id === selectedRequestId) ? (() => {
+                  const r = adsRequestsList.find((x) => x.id === selectedRequestId)!;
+                  return (
+                    <div className="space-y-4">
+                      <form 
+                        onSubmit={async (e) => {
+                          e.preventDefault();
+                          if (!selectedRequestId) return;
+                          setActionLoading(`update_${selectedRequestId}`);
+                          try {
+                            await api.adminUpdateAdsServiceRequest(selectedRequestId, {
+                              status: newRequestStatus,
+                              partner_access_status: newPartnerStatus,
+                              ad_credits_to_consume: creditsToConsume > 0 ? creditsToConsume : null,
+                            });
+                            setNotification({
+                              type: "success",
+                              message: "Service request parameters updated successfully.",
+                            });
+                            // Reload requests
+                            const adsRes = await api.getAdminAdsServiceRequests();
+                            setAdsRequestsList(adsRes);
+                            setSelectedRequestId(null);
+                          } catch (err: any) {
+                            setNotification({
+                              type: "error",
+                              message: err.message || "Failed to update service request parameters.",
+                            });
+                          } finally {
+                            setActionLoading(null);
+                          }
+                        }}
+                        className="space-y-4 text-left text-xs"
+                      >
+                        <div className="space-y-1">
+                          <span className="text-[9px] text-slate-400 font-bold block uppercase">Customer WhatsApp</span>
+                          <a 
+                            href={`https://wa.me/${r.whatsapp_number.replace(/\D/g, "")}`} 
+                            target="_blank" 
+                            className="text-blue-600 font-bold hover:underline"
+                          >
+                            Message WhatsApp →
+                          </a>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold text-slate-500 uppercase">Operational Status</label>
+                          <select
+                            value={newRequestStatus}
+                            onChange={(e) => setNewRequestStatus(e.target.value)}
+                            className="w-full px-3 py-2 border rounded-xl bg-white font-bold"
+                          >
+                            <option value="submitted">Submitted (In Review)</option>
+                            <option value="restricted">Restricted (Ineligible)</option>
+                            <option value="whatsapp_pending">WhatsApp Contact Pending</option>
+                            <option value="whatsapp_connected">WhatsApp Connected</option>
+                            <option value="partner_access_requested">Partner Access Requested</option>
+                            <option value="partner_access_granted">Partner Access Granted</option>
+                            <option value="campaign_setup">Campaign Setup In Progress</option>
+                            <option value="campaign_live">Campaign Live (Active)</option>
+                            <option value="completed">Completed (Archived)</option>
+                            <option value="cancelled">Cancelled</option>
+                          </select>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold text-slate-500 uppercase">Partner Access Permission</label>
+                          <select
+                            value={newPartnerStatus}
+                            onChange={(e) => setNewPartnerStatus(e.target.value)}
+                            className="w-full px-3 py-2 border rounded-xl bg-white font-bold"
+                          >
+                            <option value="not_requested">Not Requested</option>
+                            <option value="requested">Requested</option>
+                            <option value="pending">Pending Customer Auth</option>
+                            <option value="granted">Partner Access Granted</option>
+                            <option value="rejected">Rejected by Client</option>
+                          </select>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold text-slate-500 uppercase">Deduct Ad Credits (Consumptions)</label>
+                          <input
+                            type="number"
+                            min={0}
+                            value={creditsToConsume}
+                            onChange={(e) => setCreditsToConsume(parseInt(e.target.value) || 0)}
+                            placeholder="e.g. 1"
+                            className="w-full border rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 bg-white"
+                          />
+                          <span className="text-[9px] text-slate-400 block font-semibold">Specify the number of ads successfully launched to deduct credits.</span>
+                        </div>
+
+                        <button
+                          type="submit"
+                          disabled={actionLoading !== null}
+                          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl transition flex items-center justify-center gap-1.5 shadow-sm cursor-pointer uppercase text-[10px]"
+                        >
+                          {actionLoading === `update_${selectedRequestId}` && <Loader2 size={12} className="animate-spin" />}
+                          Save Service Settings
+                        </button>
+                      </form>
+
+                      {/* Ticket Raising Section */}
+                      <div className="border-t border-slate-100 pt-4 mt-2 space-y-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[10px] font-bold text-slate-500 uppercase">Raise Ticket for Client</span>
+                          <button
+                            type="button"
+                            onClick={() => setShowOrderTicketForm(!showOrderTicketForm)}
+                            className="text-[9px] font-bold text-blue-600 hover:text-blue-800 transition uppercase"
+                          >
+                            {showOrderTicketForm ? "Cancel" : "+ Open Ticket"}
+                          </button>
+                        </div>
+
+                        {showOrderTicketForm && (
+                          <div className="space-y-3.5 bg-slate-50 p-3.5 rounded-xl border border-slate-150 animate-in slide-in-from-top duration-200 text-left text-xs font-sans">
+                            <div className="space-y-1">
+                              <label className="text-[9px] font-bold text-slate-500 uppercase">Subject</label>
+                              <input
+                                type="text"
+                                placeholder="Support topic..."
+                                value={orderTicketSubject}
+                                onChange={(e) => setOrderTicketSubject(e.target.value)}
+                                className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs bg-white font-bold"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[9px] font-bold text-slate-500 uppercase">Description</label>
+                              <textarea
+                                rows={3}
+                                placeholder="Detailed description of the issue..."
+                                value={orderTicketDescription}
+                                onChange={(e) => setOrderTicketDescription(e.target.value)}
+                                className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs bg-white font-medium font-sans"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[9px] font-bold text-slate-500 uppercase">Category</label>
+                              <select
+                                value={orderTicketCategory}
+                                onChange={(e) => setOrderTicketCategory(e.target.value)}
+                                className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs bg-white font-bold"
+                              >
+                                <option value="General Support">General Support</option>
+                                <option value="Billing Issue">Billing Issue</option>
+                                <option value="Meta Ads Sync">Meta Ads Sync</option>
+                                <option value="AI Recommendations">AI Recommendations</option>
+                              </select>
+                            </div>
+                            <button
+                              type="button"
+                              disabled={actionLoading === "raise_order_ticket" || !orderTicketSubject || !orderTicketDescription}
+                              onClick={() => {
+                                if (r.user_id) {
+                                  handleRaiseTicketFromOrder(r.user_id, r.id);
+                                }
+                              }}
+                              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-1.5 rounded-lg transition disabled:opacity-50 text-[10px] uppercase font-sans tracking-wide cursor-pointer"
+                            >
+                              {actionLoading === "raise_order_ticket" ? "Raising Ticket..." : "Submit Support Ticket"}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })() : (
+                  <div className="py-12 text-slate-400 text-xs italic text-center">
+                    Select a service request to inspect details.
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

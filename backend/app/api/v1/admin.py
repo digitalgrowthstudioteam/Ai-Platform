@@ -900,6 +900,179 @@ async def override_intro_offer(
     return {"status": "success", "message": "Intro offer status updated successfully."}
 
 
+class AdminRaiseQuotationPayload(BaseModel):
+    number_of_ads: int
+    price_per_ad: int  # in Rupees
+    validity_days: int
+    include_setup: bool
+    setup_price: int  # in Rupees
+    include_creative: bool
+    creative_price: int  # in Rupees
+    custom_item_name: Optional[str] = None
+    custom_item_price: Optional[int] = None  # in Rupees
+
+
+class AdminRaiseTicketRequest(BaseModel):
+    subject: str
+    description: str
+    category: str = "General Support"
+
+
+@router.post("/users/{user_id}/raise-quotation", summary="Admin: Generate and send a custom service quotation to a user")
+async def admin_raise_quotation(
+    user_id: uuid.UUID,
+    payload: AdminRaiseQuotationPayload,
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    verify_admin(claims)
+    stmt = select(User).where(User.id == user_id)
+    res = await db.execute(stmt)
+    user = res.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    from app.models.ads_service import MetaAdServiceRequest, ServiceQuotation
+
+    # Check for existing unpaid request
+    stmt_req = select(MetaAdServiceRequest).where(
+        MetaAdServiceRequest.user_id == user_id
+    ).where(
+        MetaAdServiceRequest.status.in_([
+            "draft", "submitted", "eligibility_review", "eligible",
+            "quotation_generated"
+        ])
+    ).limit(1)
+    res_req = await db.execute(stmt_req)
+    req = res_req.scalar_one_or_none()
+
+    if not req:
+        # Create placeholder onboarding request
+        req = MetaAdServiceRequest(
+            user_id=user_id,
+            full_name=user.name or "Client",
+            business_name=f"Campaign Setup — {user.name or 'Client'}",
+            email=user.email or "",
+            whatsapp_number="",
+            business_location="India",
+            industry="Ecommerce",
+            advertised_product="Custom Ad Campaign",
+            campaign_objective="Generate Leads",
+            daily_budget="₹500–₹1,000/day",
+            number_of_ads=payload.number_of_ads,
+            creative_required=payload.include_creative,
+            status="quotation_generated"
+        )
+        db.add(req)
+        await db.commit()
+        await db.refresh(req)
+    else:
+        req.number_of_ads = payload.number_of_ads
+        req.creative_required = payload.include_creative
+        req.status = "quotation_generated"
+        db.add(req)
+
+    # Cancel any existing pending quotations for this request
+    stmt_cancel_old = select(ServiceQuotation).where(
+        ServiceQuotation.service_request_id == req.id
+    ).where(
+        ServiceQuotation.status == "pending"
+    )
+    res_cancel_old = await db.execute(stmt_cancel_old)
+    old_quotes = res_cancel_old.scalars().all()
+    for oq in old_quotes:
+        oq.status = "cancelled"
+        db.add(oq)
+
+    # Build line items list (prices in Paise)
+    line_items = []
+    ad_total_paise = payload.number_of_ads * payload.price_per_ad * 100
+    line_items.append({
+        "service_name": f"{payload.number_of_ads} Meta Ads Campaign Management",
+        "regular_price": ad_total_paise,
+        "offer_price": ad_total_paise,
+        "quantity": payload.number_of_ads,
+        "service_type": "ad_management"
+    })
+
+    if payload.include_setup:
+        setup_paise = payload.setup_price * 100
+        line_items.append({
+            "service_name": "Meta Ad Account & Business Setup",
+            "regular_price": setup_paise,
+            "offer_price": setup_paise,
+            "service_type": "account_setup"
+        })
+
+    if payload.include_creative:
+        creative_paise = payload.creative_price * 100
+        line_items.append({
+            "service_name": "Creative Design & Copywriting Service",
+            "regular_price": creative_paise,
+            "offer_price": creative_paise,
+            "service_type": "creative_design"
+        })
+
+    if payload.custom_item_name and payload.custom_item_price is not None:
+        custom_paise = payload.custom_item_price * 100
+        line_items.append({
+            "service_name": payload.custom_item_name,
+            "regular_price": custom_paise,
+            "offer_price": custom_paise,
+            "service_type": "custom"
+        })
+
+    final_total_paise = sum(item["offer_price"] for item in line_items)
+
+    # Create new quotation
+    quote = ServiceQuotation(
+        user_id=user_id,
+        service_request_id=req.id,
+        regular_total=final_total_paise,
+        discount_total=0,
+        final_total=final_total_paise,
+        currency="INR",
+        status="pending",
+        items=line_items,
+        expires_at=datetime.utcnow() + timedelta(days=payload.validity_days)
+    )
+    db.add(quote)
+    await db.commit()
+
+    logger.info("admin_quotation_raised", user_id=user_id, quote_id=quote.id, total=final_total_paise)
+    return {"status": "success", "message": "Quotation raised successfully.", "quotation_id": str(quote.id)}
+
+
+@router.post("/users/{user_id}/raise-ticket", summary="Admin: Raise a support ticket for a user")
+async def admin_raise_ticket(
+    user_id: uuid.UUID,
+    payload: AdminRaiseTicketRequest,
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    verify_admin(claims)
+    stmt = select(User).where(User.id == user_id)
+    res = await db.execute(stmt)
+    user = res.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    from app.models.ticket import SupportTicket
+
+    ticket = SupportTicket(
+        user_id=user_id,
+        subject=payload.subject,
+        description=payload.description,
+        category=payload.category,
+        status="open"
+    )
+    db.add(ticket)
+    await db.commit()
+
+    logger.info("admin_ticket_raised_for_user", user_id=user_id, ticket_id=ticket.id)
+    return {"status": "success", "message": "Support ticket raised successfully.", "ticket_id": str(ticket.id)}
+
+
 @router.post("/users/{user_id}/ad-service-requests/{request_id}", summary="Override user Meta Ads service request status or additional services")
 async def override_user_ad_service_request(
     user_id: uuid.UUID,

@@ -615,6 +615,20 @@ class ApiClient {
     });
   }
 
+  async adminRaiseQuotation(userId: string, payload: any) {
+    return this.request<{ status: string; message: string; quotation_id: string }>(`/admin/users/${userId}/raise-quotation`, {
+      method: "POST",
+      body: payload,
+    });
+  }
+
+  async adminRaiseTicket(userId: string, payload: any) {
+    return this.request<{ status: string; message: string; ticket_id: string }>(`/admin/users/${userId}/raise-ticket`, {
+      method: "POST",
+      body: payload,
+    });
+  }
+
   async updateUserAdPacks(userId: string, packType: string, totalAdCredits: number, usedAdCredits: number, remainingAdCredits: number) {
     return this.request<{ status: string; message: string }>(`/admin/users/${userId}/ad-packs`, {
       method: "POST",

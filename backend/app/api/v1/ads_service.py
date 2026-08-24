@@ -765,6 +765,7 @@ async def admin_list_requests(
 
         requests_data.append({
             "id": str(r.id),
+            "user_id": str(r.user_id),
             "customer_name": r.full_name,
             "customer_email": r.email,
             "business_name": r.business_name,
