@@ -12,6 +12,10 @@
       {
         "source": "/campaigns/**",
         "destination": "/campaigns.html"
+      },
+      {
+        "source": "/dashboard/campaign-plans/**",
+        "destination": "/dashboard/campaign-plans/placeholder.html"
       }
     ],
     "headers": [

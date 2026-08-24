@@ -14,11 +14,16 @@ from app.database import get_db
 from app.dependencies import get_current_user
 from app.api.v1.meta import get_db_user_from_claims
 from app.models.user import User
-from app.models.ads_service import MetaAdServiceRequest, AdPack, ServiceQuotation
+from app.models.ads_service import MetaAdServiceRequest, AdPack, ServiceQuotation, CampaignPlan
 from app.models.subscription import Subscription
+from app.models.notification import Notification
 from app.services.config_seeder import get_admin_config_value
 from app.services.ads_service_eligibility import evaluate_service_eligibility, calculate_quotation
+from app.services.email_service import EmailService
+from app.services.campaign_plan_service import CampaignPlanService
+from app.services.pdf_generator import PDFReportGenerator
 from app.config import get_settings
+from fastapi.responses import StreamingResponse
 
 settings = get_settings()
 
@@ -29,9 +34,74 @@ router = APIRouter(
 )
 
 # ──────────────────────────────────────────────
+# Order ID Generation Helpers (YYMMDDHHMMSSXXXX)
+# ──────────────────────────────────────────────
+async def get_custom_id_for_request(r: MetaAdServiceRequest, db: AsyncSession) -> str:
+    dt = r.created_at
+    timestamp = dt.strftime("%y%m%d%H%M%S")
+    today_start = datetime(dt.year, dt.month, dt.day, tzinfo=dt.tzinfo)
+    stmt = select(func.count(MetaAdServiceRequest.id)).where(
+        MetaAdServiceRequest.created_at >= today_start,
+        MetaAdServiceRequest.created_at < dt
+    )
+    res = await db.execute(stmt)
+    count = res.scalar() or 0
+    return f"{timestamp}{count + 1:04d}"
+
+async def get_custom_id_for_pack(p: AdPack, db: AsyncSession) -> str:
+    dt = p.purchased_at
+    timestamp = dt.strftime("%y%m%d%H%M%S")
+    today_start = datetime(dt.year, dt.month, dt.day, tzinfo=dt.tzinfo)
+    stmt = select(func.count(AdPack.id)).where(
+        AdPack.service_request_id == None,
+        AdPack.purchased_at >= today_start,
+        AdPack.purchased_at < dt
+    )
+    res = await db.execute(stmt)
+    count = res.scalar() or 0
+    return f"{timestamp}{count + 1:04d}"
+
+async def resolve_custom_id(custom_id: str, db: AsyncSession):
+    if len(custom_id) < 16:
+        return None, None
+    timestamp = custom_id[:12]
+    try:
+        dt = datetime.strptime(timestamp, "%y%m%d%H%M%S")
+        dt = dt.replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None, None
+
+    stmt = select(MetaAdServiceRequest).where(
+        MetaAdServiceRequest.created_at >= dt - timedelta(seconds=1),
+        MetaAdServiceRequest.created_at <= dt + timedelta(seconds=1)
+    )
+    res = await db.execute(stmt)
+    reqs = res.scalars().all()
+    for r in reqs:
+        cid = await get_custom_id_for_request(r, db)
+        if cid == custom_id:
+            return r, None
+
+    stmt = select(AdPack).where(
+        AdPack.service_request_id == None,
+        AdPack.purchased_at >= dt - timedelta(seconds=1),
+        AdPack.purchased_at <= dt + timedelta(seconds=1)
+    )
+    res = await db.execute(stmt)
+    packs = res.scalars().all()
+    for p in packs:
+        cid = await get_custom_id_for_pack(p, db)
+        if cid == custom_id:
+            return None, p
+
+    return None, None
+
+
+# ──────────────────────────────────────────────
 # Pydantic Schemas
 # ──────────────────────────────────────────────
 class ServiceRequestCreate(BaseModel):
+    campaign_plan_id: Optional[uuid.UUID] = None
     full_name: str
     business_name: str
     email: str
@@ -52,16 +122,159 @@ class ServiceRequestCreate(BaseModel):
     meta_ad_account_id: Optional[str] = None
     status: Optional[str] = "submitted"
 
+
+class CampaignPlanCreate(BaseModel):
+    business_name: str
+    industry: str
+    industry_other: Optional[str] = None
+    product_or_service: str
+    campaign_objective: str
+    conversion_location: str
+    target_location: str
+    target_customer: str
+    budget: str
+    duration: str
+    creative_availability: str
+    website: Optional[str] = None
+    offer: Optional[str] = None
+    previous_ads_experience: str
+    main_challenge: str
+
+
+class CampaignPlanSavePayload(BaseModel):
+    business_name: str
+    campaign_profile: dict
+    report_data: dict
+    readiness_score: int
+
 class AdminUpdateServiceRequest(BaseModel):
     status: Optional[str] = None
     partner_access_status: Optional[str] = None
     ad_credits_to_consume: Optional[int] = None
+
+class AdminUpdateOrderStatusPayload(BaseModel):
+    status: str
+    comment: Optional[str] = None
 
 # Helper to verify signature if Razorpay is loaded
 try:
     import razorpay
 except ImportError:
     razorpay = None
+
+
+# ──────────────────────────────────────────────
+# Campaign Plan Endpoints
+# ──────────────────────────────────────────────
+
+@router.post("/campaign-plans/generate", summary="Generate a dynamic campaign plan")
+async def generate_campaign_plan(
+    payload: CampaignPlanCreate,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Open endpoint to generate a plan for guest or logged in users.
+    Validates restricted industry list.
+    """
+    profile = payload.dict()
+    
+    # Restriction validation logic
+    full_desc = f"{profile.get('industry')} {profile.get('industry_other') or ''} {profile.get('product_or_service')} {profile.get('main_challenge')}".lower()
+    restricted_keywords = [
+        "gambling", "betting", "casino", "weapons", "gun", "ammunition", 
+        "sexual", "erotic", "adult toy", "counterfeit", "fake brand", 
+        "illegal drug", "recreational drug", "marijuana", "weed", "cocaine",
+        "financial scheme", "ponzi", "pyramid scheme"
+    ]
+    for kw in restricted_keywords:
+        if kw in full_desc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Unfortunately, our Meta Ads management service is currently unavailable for this business category."
+            )
+            
+    plan = await CampaignPlanService.generate_plan(profile)
+    return plan
+
+
+@router.post("/campaign-plans/save", summary="Saves generated campaign plan")
+async def save_campaign_plan(
+    payload: CampaignPlanSavePayload,
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    user = await get_db_user_from_claims(claims, db)
+    
+    new_plan = CampaignPlan(
+        user_id=user.id,
+        business_name=payload.business_name,
+        campaign_profile=payload.campaign_profile,
+        report_data=payload.report_data,
+        readiness_score=payload.readiness_score,
+        status="generated"
+    )
+    db.add(new_plan)
+    await db.commit()
+    await db.refresh(new_plan)
+    
+    return {"status": "success", "plan_id": str(new_plan.id)}
+
+
+@router.get("/campaign-plans", summary="List user's generated campaign plans")
+async def list_campaign_plans(
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    user = await get_db_user_from_claims(claims, db)
+    stmt = select(CampaignPlan).where(CampaignPlan.user_id == user.id).order_by(CampaignPlan.created_at.desc())
+    res = await db.execute(stmt)
+    plans = res.scalars().all()
+    return plans
+
+
+@router.get("/campaign-plans/{plan_id}", summary="Get campaign plan detail")
+async def get_campaign_plan(
+    plan_id: uuid.UUID,
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    user = await get_db_user_from_claims(claims, db)
+    stmt = select(CampaignPlan).where(CampaignPlan.id == plan_id, CampaignPlan.user_id == user.id)
+    res = await db.execute(stmt)
+    plan = res.scalar_one_or_none()
+    if not plan:
+        raise HTTPException(status_code=404, detail="Campaign plan not found.")
+    return plan
+
+
+@router.get("/campaign-plans/{plan_id}/pdf", summary="Download Campaign Plan PDF")
+async def download_campaign_plan_pdf(
+    plan_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db)
+):
+    stmt = select(CampaignPlan).where(CampaignPlan.id == plan_id)
+    res = await db.execute(stmt)
+    plan = res.scalar_one_or_none()
+    if not plan:
+        raise HTTPException(status_code=404, detail="Campaign plan not found.")
+
+    stmt_user = select(User).where(User.id == plan.user_id)
+    res_user = await db.execute(stmt_user)
+    user = res_user.scalar_one_or_none()
+    user_name = user.name if user and user.name else "DGS Member"
+
+    pdf_buffer = PDFReportGenerator.generate_campaign_plan_report(
+        user_name=user_name,
+        business_name=plan.business_name,
+        plan_data=plan.report_data
+    )
+    
+    filename = f"Campaign_Plan_{plan.business_name.replace(' ', '_')}.pdf"
+    return StreamingResponse(
+        pdf_buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
 
 
 # ──────────────────────────────────────────────
@@ -573,6 +786,9 @@ async def get_user_ad_packs(
 
 
 async def build_orders_for_request(r: MetaAdServiceRequest, db: AsyncSession) -> list:
+    # Get custom base order ID in format YYMMDDHHMMSSXXXX
+    custom_id = await get_custom_id_for_request(r, db)
+
     # 1. Check associated AdPack
     stmt_pack = select(AdPack).where(AdPack.service_request_id == r.id)
     res_pack = await db.execute(stmt_pack)
@@ -582,9 +798,11 @@ async def build_orders_for_request(r: MetaAdServiceRequest, db: AsyncSession) ->
         total = pack.total_ad_credits
         used = pack.used_ad_credits
         expires_at = pack.expires_at
+        order_statuses = pack.order_statuses or {}
     else:
         total = r.number_of_ads or 1
         used = 0
+        order_statuses = {}
         # Fallback to user trial_ends_at or created_at + 30 days
         stmt_user = select(User).where(User.id == r.user_id)
         res_user = await db.execute(stmt_user)
@@ -598,24 +816,36 @@ async def build_orders_for_request(r: MetaAdServiceRequest, db: AsyncSession) ->
 
     # A. Individual Ads
     for i in range(1, total + 1):
-        ad_status = "completed" if i <= used else r.status
-        if ad_status == "completed" and i > used:
-            ad_status = "whatsapp_pending"
+        order_id = f"{custom_id}-ad-{i}"
+        legacy_id = f"{r.id}-ad-{i}"
+        
+        # Check custom override status/comment/history (support both custom ID and legacy UUID keys)
+        target_id = order_id if order_id in order_statuses else (legacy_id if legacy_id in order_statuses else None)
+        if target_id:
+            ad_status = order_statuses[target_id]["status"]
+            comment = order_statuses[target_id].get("comment", "")
+            history = order_statuses[target_id].get("history", [])
+        else:
+            ad_status = "completed" if i <= used else r.status
+            if ad_status == "completed" and i > used:
+                ad_status = "whatsapp_pending"
+            comment = ""
+            history = []
 
         pipeline = [
             {"step": "Order Placed", "done": True},
             {"step": "Team Connected on WhatsApp", "done": ad_status in (
                 "whatsapp_connected", "partner_access_requested", "partner_access_granted",
-                "campaign_setup", "campaign_live", "completed"
+                "campaign_setup", "campaign_live", "completed", "ready_for_setup", "ads_initiated"
             )},
             {"step": "Ads Initiated", "done": ad_status in (
-                "campaign_setup", "campaign_live", "completed"
+                "campaign_setup", "campaign_live", "completed", "ads_initiated"
             )},
             {"step": "Completed", "done": ad_status == "completed"},
         ]
 
         orders.append({
-            "id": f"{r.id}-ad-{i}",
+            "id": order_id,
             "parent_request_id": str(r.id),
             "order_type": "ad",
             "business_name": r.business_name,
@@ -624,6 +854,8 @@ async def build_orders_for_request(r: MetaAdServiceRequest, db: AsyncSession) ->
             "number_of_ads": 1,
             "daily_budget": r.daily_budget,
             "status": ad_status,
+            "comment": comment,
+            "history": history,
             "partner_access_status": r.partner_access_status,
             "creative_required": r.creative_required,
             "whatsapp_number": r.whatsapp_number,
@@ -650,23 +882,34 @@ async def build_orders_for_request(r: MetaAdServiceRequest, db: AsyncSession) ->
 
     # 1) Account Setup Order Row
     if has_setup:
-        setup_status = "completed" if r.partner_access_status == "granted" or r.status in (
-            "campaign_setup", "campaign_live", "completed"
-        ) else r.status
+        order_id = f"{custom_id}-setup"
+        legacy_id = f"{r.id}-setup"
+        target_id = order_id if order_id in order_statuses else (legacy_id if legacy_id in order_statuses else None)
+        
+        if target_id:
+            setup_status = order_statuses[target_id]["status"]
+            comment = order_statuses[target_id].get("comment", "")
+            history = order_statuses[target_id].get("history", [])
+        else:
+            setup_status = "completed" if r.partner_access_status == "granted" or r.status in (
+                "campaign_setup", "campaign_live", "completed"
+            ) else r.status
+            comment = ""
+            history = []
         
         setup_pipeline = [
             {"step": "Order Placed", "done": True},
-            {"step": "WhatsApp Connected", "done": r.status not in ("trial_started", "whatsapp_pending")},
-            {"step": "Partner Access Granted", "done": r.partner_access_status == "granted" or r.status in (
-                "partner_access_granted", "campaign_setup", "campaign_live", "completed"
+            {"step": "WhatsApp Connected", "done": setup_status not in ("trial_started", "whatsapp_pending")},
+            {"step": "Partner Access Granted", "done": r.partner_access_status == "granted" or setup_status in (
+                "partner_access_granted", "campaign_setup", "campaign_live", "completed", "ready_for_setup", "ads_initiated"
             )},
-            {"step": "Completed", "done": r.partner_access_status == "granted" or r.status in (
+            {"step": "Completed", "done": r.partner_access_status == "granted" or setup_status in (
                 "campaign_setup", "campaign_live", "completed"
             )},
         ]
         
         orders.append({
-            "id": f"{r.id}-setup",
+            "id": order_id,
             "parent_request_id": str(r.id),
             "order_type": "addon_setup",
             "business_name": r.business_name,
@@ -675,6 +918,8 @@ async def build_orders_for_request(r: MetaAdServiceRequest, db: AsyncSession) ->
             "number_of_ads": 0,
             "daily_budget": "—",
             "status": setup_status,
+            "comment": comment,
+            "history": history,
             "partner_access_status": r.partner_access_status,
             "creative_required": False,
             "whatsapp_number": r.whatsapp_number,
@@ -685,17 +930,28 @@ async def build_orders_for_request(r: MetaAdServiceRequest, db: AsyncSession) ->
 
     # 2) Creative Design Order Row
     if has_creative:
-        creative_status = "completed" if r.status in ("campaign_setup", "campaign_live", "completed") else r.status
+        order_id = f"{custom_id}-creative"
+        legacy_id = f"{r.id}-creative"
+        target_id = order_id if order_id in order_statuses else (legacy_id if legacy_id in order_statuses else None)
+        
+        if target_id:
+            creative_status = order_statuses[target_id]["status"]
+            comment = order_statuses[target_id].get("comment", "")
+            history = order_statuses[target_id].get("history", [])
+        else:
+            creative_status = "completed" if r.status in ("campaign_setup", "campaign_live", "completed") else r.status
+            comment = ""
+            history = []
         
         creative_pipeline = [
             {"step": "Order Placed", "done": True},
             {"step": "Brief Received", "done": True},
-            {"step": "Creatives Ready", "done": r.status in ("campaign_setup", "campaign_live", "completed")},
-            {"step": "Completed", "done": r.status in ("campaign_setup", "campaign_live", "completed")},
+            {"step": "Creatives Ready", "done": creative_status in ("campaign_setup", "campaign_live", "completed", "ads_initiated")},
+            {"step": "Completed", "done": creative_status in ("campaign_setup", "campaign_live", "completed")},
         ]
         
         orders.append({
-            "id": f"{r.id}-creative",
+            "id": order_id,
             "parent_request_id": str(r.id),
             "order_type": "addon_creative",
             "business_name": r.business_name,
@@ -704,6 +960,8 @@ async def build_orders_for_request(r: MetaAdServiceRequest, db: AsyncSession) ->
             "number_of_ads": 0,
             "daily_budget": "—",
             "status": creative_status,
+            "comment": comment,
+            "history": history,
             "partner_access_status": r.partner_access_status,
             "creative_required": True,
             "whatsapp_number": r.whatsapp_number,
@@ -767,22 +1025,35 @@ async def get_user_orders(
     manual_packs = res_manual_packs.scalars().all()
 
     for p in manual_packs:
+        custom_id = await get_custom_id_for_pack(p, db)
         total = p.total_ad_credits
         used = p.used_ad_credits
+        order_statuses = p.order_statuses or {}
         status = "completed" if p.status in ("consumed", "expired") else "whatsapp_pending"
 
         for i in range(1, total + 1):
-            ad_status = "completed" if i <= used else status
+            order_id = f"{custom_id}-ad-{i}"
+            legacy_id = f"manual-{p.id}-ad-{i}"
+            
+            target_id = order_id if order_id in order_statuses else (legacy_id if legacy_id in order_statuses else None)
+            if target_id:
+                ad_status = order_statuses[target_id]["status"]
+                comment = order_statuses[target_id].get("comment", "")
+                history = order_statuses[target_id].get("history", [])
+            else:
+                ad_status = "completed" if i <= used else status
+                comment = ""
+                history = []
             
             pipeline = [
                 {"step": "Allotted by Admin", "done": True},
-                {"step": "Ready for Setup", "done": True},
-                {"step": "Ads Initiated", "done": i <= used or p.status in ("consumed", "expired")},
+                {"step": "Ready for Setup", "done": ad_status in ("ready_for_setup", "ads_initiated", "completed")},
+                {"step": "Ads Initiated", "done": ad_status in ("ads_initiated", "completed") or i <= used or p.status in ("consumed", "expired")},
                 {"step": "Completed", "done": ad_status == "completed"},
             ]
 
             orders.append({
-                "id": f"manual-{p.id}-ad-{i}",
+                "id": order_id,
                 "parent_request_id": None,
                 "order_type": "manual_ad",
                 "business_name": "Allotted Ads",
@@ -791,6 +1062,8 @@ async def get_user_orders(
                 "number_of_ads": 1,
                 "daily_budget": "Custom",
                 "status": ad_status,
+                "comment": comment,
+                "history": history,
                 "partner_access_status": "granted",
                 "creative_required": False,
                 "whatsapp_number": "—",
@@ -1064,6 +1337,7 @@ async def admin_list_orders(
     manual_packs = res_manual_packs.scalars().all()
 
     for p in manual_packs:
+        custom_id = await get_custom_id_for_pack(p, db)
         # Fetch associated user profile
         stmt_u = select(User).where(User.id == p.user_id)
         res_u = await db.execute(stmt_u)
@@ -1071,20 +1345,32 @@ async def admin_list_orders(
 
         total = p.total_ad_credits
         used = p.used_ad_credits
+        order_statuses = p.order_statuses or {}
         status = "completed" if p.status in ("consumed", "expired") else "whatsapp_pending"
 
         for i in range(1, total + 1):
-            ad_status = "completed" if i <= used else status
+            order_id = f"{custom_id}-ad-{i}"
+            legacy_id = f"manual-{p.id}-ad-{i}"
+            
+            target_id = order_id if order_id in order_statuses else (legacy_id if legacy_id in order_statuses else None)
+            if target_id:
+                ad_status = order_statuses[target_id]["status"]
+                comment = order_statuses[target_id].get("comment", "")
+                history = order_statuses[target_id].get("history", [])
+            else:
+                ad_status = "completed" if i <= used else status
+                comment = ""
+                history = []
             
             pipeline = [
                 {"step": "Allotted by Admin", "done": True},
-                {"step": "Ready for Setup", "done": True},
-                {"step": "Ads Initiated", "done": i <= used or p.status in ("consumed", "expired")},
+                {"step": "Ready for Setup", "done": ad_status in ("ready_for_setup", "ads_initiated", "completed")},
+                {"step": "Ads Initiated", "done": ad_status in ("ads_initiated", "completed") or i <= used or p.status in ("consumed", "expired")},
                 {"step": "Completed", "done": ad_status == "completed"},
             ]
 
             all_orders.append({
-                "id": f"manual-{p.id}-ad-{i}",
+                "id": order_id,
                 "parent_request_id": None,
                 "order_type": "manual_ad",
                 "business_name": "Allotted Ads",
@@ -1093,6 +1379,8 @@ async def admin_list_orders(
                 "number_of_ads": 1,
                 "daily_budget": "Custom",
                 "status": ad_status,
+                "comment": comment,
+                "history": history,
                 "partner_access_status": "granted",
                 "creative_required": False,
                 "whatsapp_number": "—",
@@ -1179,3 +1467,179 @@ async def admin_update_request(
 
     await db.commit()
     return {"status": "success", "message": "Service request parameters updated successfully."}
+
+
+@router.post("/admin/orders/{order_id}/status", summary="Admin: Update status, comment and log history of an individual lead/order")
+async def admin_update_order_status(
+    order_id: str,
+    payload: AdminUpdateOrderStatusPayload,
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    email = claims.get("email", "")
+    whitelisted_admins = {"flasshgames2026@gmail.com", "digitalgrowthstudioteam@gmail.com"}
+    if email not in whitelisted_admins:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied."
+        )
+
+    pack = None
+    
+    # 1. Parse base custom ID
+    custom_id = None
+    if "-ad-" in order_id:
+        custom_id = order_id[:order_id.find("-ad-")]
+    elif "-setup" in order_id:
+        custom_id = order_id[:order_id.find("-setup")]
+    elif "-creative" in order_id:
+        custom_id = order_id[:order_id.find("-creative")]
+        
+    is_custom = custom_id and len(custom_id) == 16 and custom_id.isdigit()
+    
+    if is_custom:
+        req, resolved_pack = await resolve_custom_id(custom_id, db)
+        if req:
+            stmt = select(AdPack).where(AdPack.service_request_id == req.id)
+            res = await db.execute(stmt)
+            pack = res.scalar_one_or_none()
+            
+            if not pack:
+                # Lazily create an AdPack for this request
+                pack = AdPack(
+                    user_id=req.user_id,
+                    service_request_id=req.id,
+                    pack_type=f"pack_{req.number_of_ads}",
+                    total_ad_credits=req.number_of_ads or 1,
+                    used_ad_credits=0,
+                    remaining_ad_credits=req.number_of_ads or 1,
+                    price_paid=0,
+                    expires_at=datetime.utcnow() + timedelta(days=30),
+                    status="active",
+                    non_refundable_terms_accepted=True,
+                    non_refundable_terms_accepted_at=datetime.utcnow()
+                )
+                db.add(pack)
+                await db.commit()
+                await db.refresh(pack)
+        elif resolved_pack:
+            pack = resolved_pack
+    else:
+        # Legacy UUID fallback
+        is_manual = order_id.startswith("manual-")
+        if is_manual:
+            # manual-{uuid}-ad-{i}
+            ad_idx = order_id.rfind("-ad-")
+            if ad_idx != -1:
+                try:
+                    uuid_str = order_id[7:ad_idx]
+                    pack_id = uuid.UUID(uuid_str)
+                    stmt = select(AdPack).where(AdPack.id == pack_id)
+                    res = await db.execute(stmt)
+                    pack = res.scalar_one_or_none()
+                except ValueError:
+                    pass
+        else:
+            # {r.id}-ad-{i} or {r.id}-setup or {r.id}-creative
+            req_id_str = None
+            if "-ad-" in order_id:
+                req_id_str = order_id[:order_id.find("-ad-")]
+            elif "-setup" in order_id:
+                req_id_str = order_id[:order_id.find("-setup")]
+            elif "-creative" in order_id:
+                req_id_str = order_id[:order_id.find("-creative")]
+                
+            if req_id_str:
+                try:
+                    req_id = uuid.UUID(req_id_str)
+                    stmt = select(AdPack).where(AdPack.service_request_id == req_id)
+                    res = await db.execute(stmt)
+                    pack = res.scalar_one_or_none()
+                    
+                    if not pack:
+                        # Lazily create an AdPack for this request
+                        stmt_req = select(MetaAdServiceRequest).where(MetaAdServiceRequest.id == req_id)
+                        res_req = await db.execute(stmt_req)
+                        req = res_req.scalar_one_or_none()
+                        if req:
+                            pack = AdPack(
+                                user_id=req.user_id,
+                                service_request_id=req.id,
+                                pack_type=f"pack_{req.number_of_ads}",
+                                total_ad_credits=req.number_of_ads or 1,
+                                used_ad_credits=0,
+                                remaining_ad_credits=req.number_of_ads or 1,
+                                price_paid=0,
+                                expires_at=datetime.utcnow() + timedelta(days=30),
+                                status="active",
+                                non_refundable_terms_accepted=True,
+                                non_refundable_terms_accepted_at=datetime.utcnow()
+                            )
+                            db.add(pack)
+                            await db.commit()
+                            await db.refresh(pack)
+                except ValueError:
+                    pass
+
+    if not pack:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Order or corresponding AdPack not found."
+        )
+
+    # Initialize order_statuses if needed
+    order_statuses = pack.order_statuses
+    if order_statuses is None:
+        order_statuses = {}
+
+    existing_record = order_statuses.get(order_id, {})
+    old_status = existing_record.get("status")
+    new_status = payload.status
+
+    # Synchronize credit consumption if status changes to/from completed for ad orders
+    is_ad_order = "-ad-" in order_id
+    if is_ad_order:
+        if new_status == "completed" and old_status != "completed":
+            if pack.remaining_ad_credits > 0:
+                pack.remaining_ad_credits -= 1
+                pack.used_ad_credits += 1
+                if pack.remaining_ad_credits == 0:
+                    pack.status = "consumed"
+        elif old_status == "completed" and new_status != "completed":
+            pack.used_ad_credits = max(0, pack.used_ad_credits - 1)
+            pack.remaining_ad_credits = min(pack.total_ad_credits, pack.remaining_ad_credits + 1)
+            if pack.remaining_ad_credits > 0 and pack.status == "consumed":
+                pack.status = "active"
+
+    # Append to history
+    history = existing_record.get("history", [])
+    history_entry = {
+        "status": new_status,
+        "comment": payload.comment or "",
+        "updated_at": datetime.utcnow().isoformat(),
+        "updated_by": email
+    }
+    history.append(history_entry)
+
+    # Update order statuses
+    order_statuses[order_id] = {
+        "status": new_status,
+        "comment": payload.comment or "",
+        "history": history
+    }
+
+    # Set and flag as modified
+    from sqlalchemy.orm.attributes import flag_modified
+    pack.order_statuses = {**order_statuses}
+    flag_modified(pack, "order_statuses")
+    
+    db.add(pack)
+    await db.commit()
+
+    return {
+        "status": "success",
+        "message": f"Successfully updated status for order {order_id}.",
+        "order_status": new_status,
+        "comment": payload.comment or "",
+        "history": history
+    }

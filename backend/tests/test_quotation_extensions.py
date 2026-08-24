@@ -354,8 +354,10 @@ async def test_admin_split_orders(db: AsyncSession, cleanup_test_data):
     assert len(creative_orders) == 1
 
     # Verify ID structure and contents
-    assert ad_orders[0]["id"] == f"{req.id}-ad-1"
+    from app.api.v1.ads_service import get_custom_id_for_request
+    custom_id = await get_custom_id_for_request(req, db)
+    assert ad_orders[0]["id"] == f"{custom_id}-ad-1"
     assert ad_orders[0]["business_name"] == "Suvi Biz"
-    assert setup_orders[0]["id"] == f"{req.id}-setup"
-    assert creative_orders[0]["id"] == f"{req.id}-creative"
+    assert setup_orders[0]["id"] == f"{custom_id}-setup"
+    assert creative_orders[0]["id"] == f"{custom_id}-creative"
 

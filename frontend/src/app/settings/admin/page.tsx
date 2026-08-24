@@ -55,6 +55,8 @@ export default function AdminPage() {
 
   // Selected ads order row
   const [selectedOrderRowId, setSelectedOrderRowId] = useState<string | null>(null);
+  const [leadStatus, setLeadStatus] = useState("");
+  const [leadComment, setLeadComment] = useState("");
 
   // Ticket creation form from orders state
   const [showOrderTicketForm, setShowOrderTicketForm] = useState(false);
@@ -1098,6 +1100,8 @@ export default function AdminPage() {
                           setSelectedOrderRowId(o.id);
                           setNewRequestStatus(o.status);
                           setNewPartnerStatus(o.partner_access_status || "not_requested");
+                          setLeadStatus(o.status);
+                          setLeadComment("");
                           setCreditsToConsume(0);
                           setShowOrderTicketForm(false);
                         }}
@@ -1174,10 +1178,108 @@ export default function AdminPage() {
                           <p className="text-[10px] leading-relaxed text-slate-500">
                             This order represents a manual ad credit allotment raised directly by the Super Admin.
                           </p>
-                          <p className="text-[10px] leading-relaxed text-slate-500">
-                            To adjust quantities, record consumption, or add/remove credits for this user, please use the <strong>Users Management & Lookup</strong> tab.
-                          </p>
                         </div>
+
+                        {/* Individual Lead Status Updates */}
+                        <div className="space-y-3.5 pt-4 border-t border-slate-100 text-left">
+                          <label className="text-[10.5px] font-bold text-slate-550 uppercase tracking-wide block">
+                            Individual Lead Status Management
+                          </label>
+                          <p className="text-[10px] text-slate-450 font-bold leading-relaxed">
+                            Update the operational progress for this specific ad order/deliverable. This status is visible to the customer.
+                          </p>
+                          
+                          <div className="space-y-2">
+                            <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Lead Status</label>
+                            <select
+                              value={leadStatus}
+                              onChange={(e) => setLeadStatus(e.target.value)}
+                              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold bg-white"
+                            >
+                              <option value="whatsapp_pending">WhatsApp Pending</option>
+                              <option value="ready_for_setup">Ready for Setup</option>
+                              <option value="ads_initiated">Ads Initiated</option>
+                              <option value="completed">Completed</option>
+                            </select>
+                          </div>
+
+                          <div className="space-y-2">
+                            <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Status Comment</label>
+                            <textarea
+                              rows={2}
+                              placeholder="Add a log comment for the customer..."
+                              value={leadComment}
+                              onChange={(e) => setLeadComment(e.target.value)}
+                              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-slate-50/10 font-bold focus:ring-1 focus:ring-blue-500"
+                            />
+                          </div>
+
+                          <button
+                            onClick={async () => {
+                              if (!leadStatus) return;
+                              setActionLoading("update_lead_status");
+                              try {
+                                await api.updateIndividualOrderStatus(selectedOrder.id, leadStatus, leadComment);
+                                setNotification({
+                                  type: "success",
+                                  message: "Updated individual lead status and comment successfully!",
+                                });
+                                setLeadComment("");
+                                // Reload
+                                const [ordersRes, requestsRes] = await Promise.all([
+                                  api.getAdminAdsServiceOrders(),
+                                  api.getAdminAdsServiceRequests(),
+                                ]);
+                                setAdsOrdersList(ordersRes);
+                                setAdsRequestsList(requestsRes);
+                              } catch (err: any) {
+                                setNotification({
+                                  type: "error",
+                                  message: err.message || "Failed to update lead status.",
+                                });
+                              } finally {
+                                setActionLoading(null);
+                              }
+                            }}
+                            disabled={actionLoading === "update_lead_status"}
+                            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl transition text-[11px] uppercase tracking-wide cursor-pointer disabled:opacity-50"
+                          >
+                            {actionLoading === "update_lead_status" ? "Saving..." : "Update Lead Status"}
+                          </button>
+                        </div>
+
+                        {/* Timeline/History Logs */}
+                        {selectedOrder.history && selectedOrder.history.length > 0 && (
+                          <div className="pt-4 border-t border-slate-100 text-left space-y-3">
+                            <label className="text-[10px] font-bold text-slate-550 uppercase tracking-wide block">
+                              Lead Status History Log
+                            </label>
+                            <div className="space-y-3 max-h-[180px] overflow-y-auto pr-1">
+                              {selectedOrder.history.map((h: any, idx: number) => (
+                                <div key={idx} className="flex gap-2.5 items-start text-[11px] leading-relaxed text-slate-600 border-l-2 border-blue-500 pl-3">
+                                  <div className="space-y-0.5">
+                                    <div className="flex gap-2 items-center flex-wrap">
+                                      <span className="font-extrabold text-[10px] text-blue-600 uppercase">
+                                        {h.status.replace(/_/g, " ")}
+                                      </span>
+                                      <span className="text-[9px] text-slate-400 font-bold">
+                                        {new Date(h.updated_at).toLocaleString()}
+                                      </span>
+                                    </div>
+                                    {h.comment && (
+                                      <p className="text-[10.5px] font-medium text-slate-700 italic">
+                                        "{h.comment}"
+                                      </p>
+                                    )}
+                                    <p className="text-[9px] text-slate-400 font-medium">
+                                      By: {h.updated_by}
+                                    </p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   }
@@ -1317,6 +1419,109 @@ export default function AdminPage() {
                           <hr className="border-slate-100" />
                         </>
                       )}
+
+                      {/* Individual Lead Status Updates */}
+                      <div className="space-y-3.5 pt-4 border-t border-slate-100 text-left">
+                        <label className="text-[10.5px] font-bold text-slate-550 uppercase tracking-wide block">
+                          Individual Lead Status Management
+                        </label>
+                        <p className="text-[10px] text-slate-450 font-bold leading-relaxed">
+                          Update the operational progress for this specific ad order/deliverable. This status is visible to the customer.
+                        </p>
+                        
+                        <div className="space-y-2">
+                          <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Lead Status</label>
+                          <select
+                            value={leadStatus}
+                            onChange={(e) => setLeadStatus(e.target.value)}
+                            className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold bg-white"
+                          >
+                            <option value="whatsapp_pending">WhatsApp Pending</option>
+                            <option value="ready_for_setup">Ready for Setup</option>
+                            <option value="ads_initiated">Ads Initiated</option>
+                            <option value="completed">Completed</option>
+                          </select>
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Status Comment</label>
+                          <textarea
+                            rows={2}
+                            placeholder="Add a log comment for the customer..."
+                            value={leadComment}
+                            onChange={(e) => setLeadComment(e.target.value)}
+                            className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-slate-50/10 font-bold focus:ring-1 focus:ring-blue-500"
+                          />
+                        </div>
+
+                        <button
+                          onClick={async () => {
+                            if (!leadStatus) return;
+                            setActionLoading("update_lead_status");
+                            try {
+                              await api.updateIndividualOrderStatus(selectedOrder.id, leadStatus, leadComment);
+                              setNotification({
+                                type: "success",
+                                message: "Updated individual lead status and comment successfully!",
+                              });
+                              setLeadComment("");
+                              // Reload
+                              const [ordersRes, requestsRes] = await Promise.all([
+                                api.getAdminAdsServiceOrders(),
+                                api.getAdminAdsServiceRequests(),
+                              ]);
+                              setAdsOrdersList(ordersRes);
+                              setAdsRequestsList(requestsRes);
+                            } catch (err: any) {
+                              setNotification({
+                                type: "error",
+                                message: err.message || "Failed to update lead status.",
+                              });
+                            } finally {
+                              setActionLoading(null);
+                            }
+                          }}
+                          disabled={actionLoading === "update_lead_status"}
+                          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl transition text-[11px] uppercase tracking-wide cursor-pointer disabled:opacity-50"
+                        >
+                          {actionLoading === "update_lead_status" ? "Saving..." : "Update Lead Status"}
+                        </button>
+                      </div>
+
+                      {/* Timeline/History Logs */}
+                      {selectedOrder.history && selectedOrder.history.length > 0 && (
+                        <div className="pt-4 border-t border-slate-100 text-left space-y-3">
+                          <label className="text-[10px] font-bold text-slate-550 uppercase tracking-wide block">
+                            Lead Status History Log
+                          </label>
+                          <div className="space-y-3 max-h-[180px] overflow-y-auto pr-1">
+                            {selectedOrder.history.map((h: any, idx: number) => (
+                              <div key={idx} className="flex gap-2.5 items-start text-[11px] leading-relaxed text-slate-600 border-l-2 border-blue-500 pl-3">
+                                <div className="space-y-0.5">
+                                  <div className="flex gap-2 items-center flex-wrap">
+                                    <span className="font-extrabold text-[10px] text-blue-600 uppercase">
+                                      {h.status.replace(/_/g, " ")}
+                                    </span>
+                                    <span className="text-[9px] text-slate-400 font-bold">
+                                      {new Date(h.updated_at).toLocaleString()}
+                                    </span>
+                                  </div>
+                                  {h.comment && (
+                                    <p className="text-[10.5px] font-medium text-slate-700 italic">
+                                      "{h.comment}"
+                                    </p>
+                                  )}
+                                  <p className="text-[9px] text-slate-400 font-medium">
+                                    By: {h.updated_by}
+                                  </p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      <hr className="border-slate-100" />
 
                       {/* Ticket Raising Section */}
                       <div className="space-y-3">

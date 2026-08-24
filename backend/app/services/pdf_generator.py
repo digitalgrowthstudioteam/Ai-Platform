@@ -589,3 +589,211 @@ class PDFReportGenerator:
         buffer.seek(0)
         return buffer
 
+
+    @classmethod
+    def generate_campaign_plan_report(cls, user_name: str, business_name: str, plan_data: dict) -> BytesIO:
+        """
+        Generates a premium, styled PDF campaign plan report.
+        """
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=letter,
+            rightMargin=54,
+            leftMargin=54,
+            topMargin=72,
+            bottomMargin=72
+        )
+
+        styles = getSampleStyleSheet()
+        
+        primary_color = colors.HexColor("#1D4ED8") # blue-700
+        secondary_color = colors.HexColor("#1E293B") # slate-800
+        border_color = colors.HexColor("#E2E8F0") # slate-200
+        text_muted = colors.HexColor("#64748B") # slate-500
+
+        plan_title_style = ParagraphStyle(
+            name="PlanTitle",
+            parent=styles["Normal"],
+            fontName="Helvetica-Bold",
+            fontSize=28,
+            leading=34,
+            textColor=primary_color,
+            spaceAfter=10
+        )
+        plan_heading_style = ParagraphStyle(
+            name="PlanHeading",
+            parent=styles["Heading1"],
+            fontName="Helvetica-Bold",
+            fontSize=14,
+            leading=18,
+            textColor=secondary_color,
+            spaceBefore=14,
+            spaceAfter=8,
+            keepWithNext=True
+        )
+        plan_body_style = ParagraphStyle(
+            name="PlanBody",
+            parent=styles["Normal"],
+            fontName="Helvetica",
+            fontSize=9.5,
+            leading=13.5,
+            textColor=secondary_color,
+            spaceAfter=6
+        )
+        plan_bold_body_style = ParagraphStyle(
+            name="PlanBoldBody",
+            parent=plan_body_style,
+            fontName="Helvetica-Bold"
+        )
+        plan_meta_style = ParagraphStyle(
+            name="PlanMeta",
+            parent=styles["Normal"],
+            fontName="Helvetica",
+            fontSize=8.5,
+            leading=12,
+            textColor=text_muted
+        )
+
+        story = []
+
+        # ==========================================
+        # COVER PAGE
+        # ==========================================
+        story.append(Spacer(1, 100))
+        story.append(Paragraph("META ADS CAMPAIGN PLAN", plan_title_style))
+        story.append(Paragraph(f"Strategic Marketing Plan for {business_name}", ParagraphStyle(
+            name="PlanSubtitle", parent=styles["Normal"], fontName="Helvetica", fontSize=14, leading=18, textColor=text_muted, spaceAfter=40
+        )))
+        story.append(Spacer(1, 120))
+        
+        meta_html = f"""
+        <b>PREPARED FOR:</b> {user_name}<br/>
+        <b>BUSINESS:</b> {business_name}<br/>
+        <b>DATE GENERATED:</b> {datetime.now().strftime('%B %d, %Y')}<br/>
+        <b>POWERED BY:</b> Digital Growth Studio Campaign Architect
+        """
+        story.append(Paragraph(meta_html, plan_body_style))
+        
+        story.append(PageBreak())
+
+        # ==========================================
+        # PLAN CONTENT
+        # ==========================================
+        
+        # 1. Summary
+        story.append(Paragraph("1. Business Summary", plan_heading_style))
+        story.append(Paragraph(plan_data.get("business_summary", ""), plan_body_style))
+        story.append(Spacer(1, 10))
+
+        # 2. Objective
+        story.append(Paragraph("2. Campaign Objective", plan_heading_style))
+        story.append(Paragraph(f"<b>Recommended Objective:</b> {plan_data.get('recommended_objective', 'Sales')}", plan_bold_body_style))
+        story.append(Paragraph(plan_data.get("objective_reasoning", ""), plan_body_style))
+        story.append(Spacer(1, 10))
+
+        # 3. Structure
+        story.append(Paragraph("3. Recommended Campaign Structure", plan_heading_style))
+        story.append(Paragraph(plan_data.get("recommended_structure", ""), plan_body_style))
+        story.append(Spacer(1, 10))
+
+        # 4. Audience
+        aud = plan_data.get("audience_strategy", {})
+        story.append(Paragraph("4. Audience Strategy", plan_heading_style))
+        story.append(Paragraph(f"<b>Primary Audience:</b> {aud.get('primary_audience', '')}", plan_bold_body_style))
+        if aud.get("secondary_audience"):
+            story.append(Paragraph(f"<b>Secondary Audience:</b> {aud.get('secondary_audience', '')}", plan_bold_body_style))
+        story.append(Paragraph(f"<b>Targeting details:</b> {aud.get('targeting_details', '')}", plan_body_style))
+        story.append(Paragraph(f"<b>Rationale:</b> {aud.get('reasoning', '')}", plan_body_style))
+        story.append(Spacer(1, 10))
+
+        story.append(PageBreak())
+
+        # 5. Budget
+        bud = plan_data.get("budget_strategy", {})
+        story.append(Paragraph("5. Budget Strategy", plan_heading_style))
+        story.append(Paragraph(f"<b>Daily Budget:</b> {bud.get('daily_budget', '')}", plan_bold_body_style))
+        story.append(Paragraph(f"<b>Monthly Budget:</b> {bud.get('monthly_budget', '')}", plan_bold_body_style))
+        story.append(Paragraph(f"<b>Allocation:</b> {bud.get('allocation', '')}", plan_body_style))
+        story.append(Paragraph(f"<b>Scaling triggers:</b> {bud.get('scaling', '')}", plan_body_style))
+        story.append(Spacer(1, 10))
+
+        # 6. Creative
+        story.append(Paragraph("6. Creative & Ad Strategy", plan_heading_style))
+        story.append(Paragraph(plan_data.get("creative_strategy", ""), plan_body_style))
+        
+        # Concepts
+        story.append(Paragraph("<b>Recommended Ad Concepts:</b>", plan_bold_body_style))
+        for concept in plan_data.get("sample_concepts", []):
+            story.append(Paragraph(f"• <b>[{concept.get('format', '')}]</b> {concept.get('concept', '')} (Angle: {concept.get('angle', '')})", plan_body_style))
+        
+        # Copy examples
+        story.append(Paragraph("<b>Sample Ad Copies under test:</b>", plan_bold_body_style))
+        for idx, copy in enumerate(plan_data.get("sample_copy", []), 1):
+            story.append(Paragraph(f"<b>Sample Ad Copy #{idx}:</b>", plan_bold_body_style))
+            story.append(Paragraph(f"<i>Headline:</i> {copy.get('headline', '')}", plan_body_style))
+            story.append(Paragraph(f"<i>Primary Text:</i> {copy.get('primary_text', '')}", plan_body_style))
+        story.append(Spacer(1, 10))
+
+        # 7. Tracking & Destinations
+        story.append(Paragraph("7. Tracking Requirements", plan_heading_style))
+        story.append(Paragraph("To optimize Meta's machine learning, the following tracking events are recommended:", plan_body_style))
+        for item in plan_data.get("tracking_requirements", []):
+            story.append(Paragraph(f"✓ {item}", plan_bold_body_style))
+        story.append(Spacer(1, 10))
+
+        story.append(PageBreak())
+
+        # 8. Testing & Readiness Score
+        story.append(Paragraph("8. Campaign Readiness & Testing Strategy", plan_heading_style))
+        story.append(Paragraph(f"<b>Testing strategy:</b> {plan_data.get('testing_strategy', '')}", plan_body_style))
+        story.append(Spacer(1, 10))
+
+        # Readiness Score Table
+        score = plan_data.get("readiness_score", 70)
+        score_color = colors.HexColor("#059669") if score >= 80 else (colors.HexColor("#D97706") if score >= 60 else colors.HexColor("#DC2626"))
+        
+        score_data = [
+            [
+                Paragraph(f'<font size="24" color="{score_color.hexval()}"><b>{score}/100</b></font>', ParagraphStyle(name="ScoreV", parent=styles["Normal"], alignment=1)),
+                Paragraph(f'<b>CAMPAIGN READINESS SCORE</b><br/><font size="8" color="#64748B">Defined scoring parameters from questionnaire parameters.</font>', plan_body_style)
+            ]
+        ]
+        score_table = Table(score_data, colWidths=[120, 330])
+        score_table.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F8FAFC")),
+            ("BOX", (0, 0), (-1, -1), 1, border_color),
+            ("PADDING", (0, 0), (-1, -1), 12),
+        ]))
+        story.append(score_table)
+        story.append(Spacer(1, 15))
+
+        # Readiness Breakdown
+        breakdown = plan_data.get("readiness_breakdown", {})
+        if breakdown.get("ready"):
+            story.append(Paragraph("<b>✅ Ready for Launch:</b>", plan_bold_body_style))
+            for item in breakdown["ready"]:
+                story.append(Paragraph(f"• {item}", plan_body_style))
+        if breakdown.get("attention_needed"):
+            story.append(Paragraph("<b>⚠️ Needs Attention:</b>", plan_bold_body_style))
+            for item in breakdown["attention_needed"]:
+                story.append(Paragraph(f"• {item}", plan_body_style))
+        if breakdown.get("priority_before_launch"):
+            story.append(Paragraph("<b>🔴 Priority Before Launch:</b>", plan_bold_body_style))
+            for item in breakdown["priority_before_launch"]:
+                story.append(Paragraph(f"• {item}", plan_body_style))
+        
+        story.append(Spacer(1, 30))
+
+        # CTA Promotion
+        story.append(Paragraph("<b>Ready to launch your campaign?</b>", plan_bold_body_style))
+        story.append(Paragraph("Let our team set up, optimize and manage your Meta Ads directly from your own Meta Ad Account. Start with your first campaign for just <b>₹333</b> introductory price.", plan_body_style))
+        story.append(Spacer(1, 15))
+        story.append(Paragraph("Digital Growth Studio — digitalgrowthstudio.in", plan_meta_style))
+
+        # Build Document
+        doc.build(story, canvasmaker=NumberedCanvas)
+        buffer.seek(0)
+        return buffer
+

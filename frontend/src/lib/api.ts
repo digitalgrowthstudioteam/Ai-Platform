@@ -879,6 +879,42 @@ class ApiClient {
     });
   }
 
+  async updateIndividualOrderStatus(orderId: string, status: string, comment?: string) {
+    return this.request<any>(`/ads-service/admin/orders/${orderId}/status`, {
+      method: "POST",
+      body: { status, comment },
+    });
+  }
+
+  async generateCampaignPlan(payload: any) {
+    return this.request<any>("/ads-service/campaign-plans/generate", {
+      method: "POST",
+      body: payload,
+    });
+  }
+
+  async saveCampaignPlan(payload: any) {
+    return this.request<any>("/ads-service/campaign-plans/save", {
+      method: "POST",
+      body: payload,
+    });
+  }
+
+  async getCampaignPlans() {
+    return this.request<any[]>("/ads-service/campaign-plans");
+  }
+
+  async getCampaignPlan(planId: string) {
+    return this.request<any>(`/ads-service/campaign-plans/${planId}`);
+  }
+
+  async updateProfile(payload: any) {
+    return this.request<any>("/users/profile", {
+      method: "PUT",
+      body: payload,
+    });
+  }
+
 }
 
 export const api = new ApiClient(API_BASE_URL);

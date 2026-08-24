@@ -39,6 +39,13 @@ interface Order {
   created_at: string;
   expires_at: string;
   pipeline: PipelineStep[];
+  comment?: string;
+  history?: Array<{
+    status: string;
+    comment: string;
+    updated_at: string;
+    updated_by: string;
+  }>;
 }
 
 export default function OrdersPage() {
@@ -71,7 +78,9 @@ export default function OrdersPage() {
     campaign_setup: "bg-blue-50 text-blue-700",
     campaign_live: "bg-emerald-50 text-emerald-700",
     completed: "bg-emerald-50 text-emerald-700",
-    cancelled: "bg-slate-100 text-slate-500",
+    cancelled: "bg-slate-150 text-slate-500",
+    ready_for_setup: "bg-purple-50 text-purple-700",
+    ads_initiated: "bg-indigo-50 text-indigo-705",
   };
 
   if (loading) {
@@ -239,6 +248,42 @@ export default function OrdersPage() {
                         </div>
                       )}
                     </div>
+
+                    {/* Latest Comment */}
+                    {order.comment && (
+                      <div className="p-4 bg-slate-50 border border-slate-200/60 rounded-2xl text-left space-y-1.5 mt-2">
+                        <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider block">Latest Status Comment</span>
+                        <p className="text-slate-700 font-medium italic text-xs">"{order.comment}"</p>
+                      </div>
+                    )}
+
+                    {/* Timeline/History Log */}
+                    {order.history && order.history.length > 0 && (
+                      <div className="space-y-3 pt-3 border-t border-slate-100 text-left mt-2">
+                        <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider block">Order Progress History Log</span>
+                        <div className="space-y-3 max-h-44 overflow-y-auto pr-1">
+                          {order.history.map((h: any, idx: number) => (
+                            <div key={idx} className="flex gap-2.5 items-start text-xs text-slate-500 border-l-2 border-blue-500 pl-3">
+                              <div className="space-y-0.5">
+                                <div className="flex gap-2 items-center flex-wrap">
+                                  <span className="font-extrabold text-[10px] text-blue-600 uppercase">
+                                    {h.status.replace(/_/g, " ")}
+                                  </span>
+                                  <span className="text-[9px] text-slate-400 font-bold">
+                                    {new Date(h.updated_at).toLocaleString()}
+                                  </span>
+                                </div>
+                                {h.comment && (
+                                  <p className="text-slate-700 italic text-[11px]">
+                                    "{h.comment}"
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

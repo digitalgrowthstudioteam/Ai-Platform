@@ -31,7 +31,7 @@ from app.models.ai_assistant import AIChatConversation, AIChatMessage, AICreditT
 from app.models.admin_config import AdminConfig
 from app.models.ai_usage import AIUsageRecord
 from app.models.funnel import FunnelRecommendation, FunnelAudit, FunnelEvent
-from app.models.ads_service import MetaAdServiceRequest, AdPack, ServiceQuotation
+from app.models.ads_service import MetaAdServiceRequest, AdPack, ServiceQuotation, CampaignPlan
 
 __all__ = [
     "BaseModel",
@@ -74,4 +74,5 @@ __all__ = [
     "MetaAdServiceRequest",
     "AdPack",
     "ServiceQuotation",
+    "CampaignPlan",
 ]

@@ -342,6 +342,36 @@ export default function GetAdsPage() {
   const [termsAccepted, setTermsAccepted] = useState(false);
 
   // Load initial configs & latest requests
+  // Pre-fill from Campaign Plan if plan_id query parameter is present
+  useEffect(() => {
+    async function loadCampaignPlan() {
+      const planId = searchParams.get("plan_id");
+      if (planId) {
+        try {
+          const plan = await api.getCampaignPlan(planId);
+          if (plan) {
+            setBusinessName(plan.business_name || "");
+            const profile = plan.campaign_profile || {};
+            setIndustry(profile.industry || "Ecommerce");
+            setIndustryOther(profile.industry_other || "");
+            setCampaignObjective(profile.campaign_objective || "Generate Leads");
+            setExpectedBudget(profile.budget || "₹500–₹1,000/day");
+            setWebsite(profile.website || "");
+            setAdvertisedProduct(profile.product_or_service || "");
+            setLocation(profile.target_location || "");
+            
+            setDescription("Other business model / custom operation");
+            setDescriptionOther(profile.main_challenge || "");
+          }
+        } catch (e) {
+          console.error("Failed to load campaign plan for pre-fill:", e);
+        }
+      }
+    }
+    loadCampaignPlan();
+  }, [searchParams]);
+
+  // Load initial configs & latest requests
   useEffect(() => {
     async function loadData() {
       try {
@@ -350,24 +380,27 @@ export default function GetAdsPage() {
         const cfg = await api.getAdsServiceConfig();
         setConfig(cfg);
 
-        // Load connected meta account from backend
-        try {
-          const accounts = await api.getMetaAccounts();
-          if (accounts && accounts.length > 0) {
-            setMetaAdAccounts(accounts);
-            // Default to first account
-            setConnectedMetaAccount(accounts[0]);
-            setSelectedMetaAdAccountId(accounts[0].id);
-            setMetaAccountExists(true);
-          } else {
+        if (isAuthenticated && user) {
+          // Pre-populate user contact info if logged in
+          setFullName((prev) => prev || user.displayName || "");
+          setEmail((prev) => prev || user.email || "");
+
+          // Load connected meta account from backend
+          try {
+            const accounts = await api.getMetaAccounts();
+            if (accounts && accounts.length > 0) {
+              setMetaAdAccounts(accounts);
+              setConnectedMetaAccount(accounts[0]);
+              setSelectedMetaAdAccountId(accounts[0].id);
+              setMetaAccountExists(true);
+            } else {
+              setMetaAccountExists(false);
+            }
+          } catch (e) {
             setMetaAccountExists(false);
           }
-        } catch (e) {
-          setMetaAccountExists(false);
-        }
 
-        // Load latest requests
-        if (isAuthenticated) {
+          // Load latest requests
           const latest = await api.getLatestAdsServiceRequest();
           setEligibleState(latest.user_eligibility || { eligible: true });
           
@@ -426,6 +459,40 @@ export default function GetAdsPage() {
             setSelectedServices(latest.request.additional_services || []);
             setMetaAccountExists(latest.request.meta_account_exists);
             setSelectedMetaAdAccountId(latest.request.meta_ad_account_id || "");
+          } else if (businessName) {
+            // Auto submit draft on login if questionnaire was started
+            try {
+              const actualDescription = description === "Other business model / custom operation" ? descriptionOther : description;
+              const actualAdvertisedProduct = advertisedProduct === "Other Custom Product/Service" ? advertisedProductOther : advertisedProduct;
+              
+              const payload = {
+                campaign_plan_id: searchParams.get("plan_id") || undefined,
+                full_name: fullName || user?.displayName || "",
+                business_name: businessName,
+                email: email || user?.email || "",
+                whatsapp_number: whatsapp,
+                website,
+                business_location: location,
+                industry,
+                industry_other: industryOther,
+                business_description: actualDescription,
+                advertised_product: actualAdvertisedProduct,
+                campaign_objective: campaignObjective,
+                daily_budget: expectedBudget,
+                number_of_ads: adQuantity,
+                creative_required: creativeRequired,
+                additional_services: selectedServices,
+                meta_account_exists: metaAccountExists,
+                meta_ad_account_id: selectedMetaAdAccountId,
+                status: "draft",
+              };
+              await api.submitAdsServiceRequest(payload);
+              const reloadedLatest = await api.getLatestAdsServiceRequest();
+              setActiveRequest(reloadedLatest.request);
+              setQuotation(reloadedLatest.quotation);
+            } catch (e) {
+              console.error("Failed to auto-submit guest draft request on login:", e);
+            }
           }
         }
       } catch (err) {
@@ -435,7 +502,7 @@ export default function GetAdsPage() {
       }
     }
     loadData();
-  }, [isAuthenticated]);
+  }, [isAuthenticated, user]);
 
   // Load Razorpay Script
   const loadRazorpayScript = () => {
@@ -1473,88 +1540,110 @@ export default function GetAdsPage() {
               )}
 
               {/* STEP 7: QUOTATION & PAYMENT */}
-              {currentStep === 7 && quotation && (
-                <div className="space-y-6 text-left">
-                  <div className="space-y-1">
-                    <h2 className="text-2xl font-black text-slate-900 flex items-center gap-2">
-                      <Sparkles className="text-blue-600" size={24} /> Service Quotation
-                    </h2>
-                    <p className="text-xs text-slate-500">Review your dynamic quotation breakdown below before starting the checkout.</p>
-                  </div>
-
-                  <div className="border border-slate-200 rounded-2xl overflow-hidden text-xs bg-slate-50/50">
-                    <table className="w-full text-left border-collapse">
-                      <thead>
-                        <tr className="bg-slate-100 border-b border-slate-200 font-bold text-slate-500 text-[10px] uppercase">
-                          <th className="p-3">Description</th>
-                          <th className="p-3 text-right">Regular Value</th>
-                          <th className="p-3 text-right">Final Price</th>
-                        </tr>
-                      </thead>
-                      <tbody className="font-semibold text-slate-700">
-                        {quotation.items.map((item: any, idx: number) => (
-                          <tr key={idx} className="border-b border-slate-100">
-                            <td className="p-3">
-                              {item.description}
-                              {item.custom_quote_required && (
-                                <span className="ml-1.5 inline-block bg-amber-50 text-amber-700 text-[8px] px-1.5 py-0.5 rounded font-black uppercase">
-                                  Custom Quote Req.
-                                </span>
-                              )}
-                            </td>
-                            <td className="p-3 text-right text-slate-400 line-through">{formatCurrency(item.regular_total)}</td>
-                            <td className="p-3 text-right font-bold text-slate-900">
-                              {item.custom_quote_required ? "Manual Quote" : formatCurrency(item.offer_total)}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                    
-                    {/* Grand Totals */}
-                    <div className="p-4 bg-blue-50/20 border-t border-slate-200 space-y-2 text-right">
-                      <div className="text-xs text-slate-500">
-                        Total Regular Value: <span className="line-through">{formatCurrency(quotation.regular_total)}</span>
-                      </div>
-                      <div className="text-xs text-emerald-600 font-bold">
-                        You Save: {formatCurrency(quotation.discount_total)}
-                      </div>
-                      <div className="text-base font-black text-slate-900">
-                        Payable Amount: {formatCurrency(quotation.final_total)}
-                      </div>
+              {currentStep === 7 && (
+                !isAuthenticated ? (
+                  <div className="space-y-6 text-center py-6">
+                    <div className="bg-blue-50 text-blue-600 p-4 rounded-full w-fit mx-auto border border-blue-100">
+                      <Lock size={32} />
                     </div>
-                  </div>
-
-                  {/* Starter Plan details */}
-                  <div className="border border-blue-100 bg-blue-50/20 rounded-2xl p-5 space-y-3.5">
-                    <h3 className="text-xs font-bold text-blue-700 uppercase flex items-center gap-1.5">
-                      <Lock size={14} /> Starter Plan Required
-                    </h3>
-                    <p className="text-xs text-slate-600 leading-relaxed font-semibold">
-                      This ads management service is active alongside our **Starter Plan** (₹99/month). 
-                      Your Complementary Starter Plan is included in this and will be activated automatically upon successful checkout.
+                    <h3 className="text-xl font-extrabold text-slate-900">Authenticate Your Session</h3>
+                    <p className="text-slate-500 text-xs max-w-sm mx-auto leading-relaxed">
+                      Please login with Google to register your campaign requirements, view your special quotation, and start your 7-day Starter trial.
                     </p>
-                  </div>
-
-                  {/* Checkout policies & terms */}
-                  <div className="space-y-4">
-                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-amber-50/50 p-3 rounded-lg border border-amber-200 text-amber-800 leading-normal">
-                      ⚠ All Ad Pack purchases are non-refundable. Unused ads automatically expire after their stated validity period (e.g. 30/60/90 days) and cannot be carried forward.
+                    <div className="pt-4">
+                      <button
+                        onClick={loginWithGoogle}
+                        className="px-6 py-3.5 bg-slate-900 hover:bg-slate-950 text-white font-bold rounded-xl shadow-lg transition flex items-center justify-center gap-2 mx-auto text-xs"
+                      >
+                        Continue with Google <ArrowRight size={14} />
+                      </button>
                     </div>
-
-                    <label className="flex items-center gap-2.5 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={termsAccepted}
-                        onChange={(e) => setTermsAccepted(e.target.checked)}
-                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4.5 h-4.5"
-                      />
-                      <span className="text-[11px] font-bold text-slate-700">
-                        I accept the non-refundable terms policy and agree to automatically expire unused ad credits.
-                      </span>
-                    </label>
                   </div>
-                </div>
+                ) : (
+                  quotation && (
+                    <div className="space-y-6 text-left">
+                      <div className="space-y-1">
+                        <h2 className="text-2xl font-black text-slate-900 flex items-center gap-2">
+                          <Sparkles className="text-blue-600" size={24} /> Service Quotation
+                        </h2>
+                        <p className="text-xs text-slate-500">Review your dynamic quotation breakdown below before starting the checkout.</p>
+                      </div>
+
+                      <div className="border border-slate-200 rounded-2xl overflow-hidden text-xs bg-slate-50/50">
+                        <table className="w-full text-left border-collapse">
+                          <thead>
+                            <tr className="bg-slate-100 border-b border-slate-200 font-bold text-slate-500 text-[10px] uppercase">
+                              <th className="p-3">Description</th>
+                              <th className="p-3 text-right">Regular Value</th>
+                              <th className="p-3 text-right">Final Price</th>
+                            </tr>
+                          </thead>
+                          <tbody className="font-semibold text-slate-700">
+                            {quotation.items.map((item: any, idx: number) => (
+                              <tr key={idx} className="border-b border-slate-100">
+                                <td className="p-3">
+                                  {item.description}
+                                  {item.custom_quote_required && (
+                                    <span className="ml-1.5 inline-block bg-amber-50 text-amber-700 text-[8px] px-1.5 py-0.5 rounded font-black uppercase">
+                                      Custom Quote Req.
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="p-3 text-right text-slate-400 line-through">{formatCurrency(item.regular_total)}</td>
+                                <td className="p-3 text-right font-bold text-slate-900">
+                                  {item.custom_quote_required ? "Manual Quote" : formatCurrency(item.offer_total)}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                        
+                        {/* Grand Totals */}
+                        <div className="p-4 bg-blue-50/20 border-t border-slate-200 space-y-2 text-right">
+                          <div className="text-xs text-slate-500">
+                            Total Regular Value: <span className="line-through">{formatCurrency(quotation.regular_total)}</span>
+                          </div>
+                          <div className="text-xs text-emerald-600 font-bold">
+                            You Save: {formatCurrency(quotation.discount_total)}
+                          </div>
+                          <div className="text-base font-black text-slate-900">
+                            Payable Amount: {formatCurrency(quotation.final_total)}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Starter Plan details */}
+                      <div className="border border-blue-100 bg-blue-50/20 rounded-2xl p-5 space-y-3.5">
+                        <h3 className="text-xs font-bold text-blue-700 uppercase flex items-center gap-1.5">
+                          <Lock size={14} /> Starter Plan Required
+                        </h3>
+                        <p className="text-xs text-slate-600 leading-relaxed font-semibold">
+                          This ads management service is active alongside our **Starter Plan** (₹99/month). 
+                          Your Complementary Starter Plan is included in this and will be activated automatically upon successful checkout.
+                        </p>
+                      </div>
+
+                      {/* Checkout policies & terms */}
+                      <div className="space-y-4">
+                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-amber-50/50 p-3 rounded-lg border border-amber-200 text-amber-800 leading-normal">
+                          ⚠ All Ad Pack purchases are non-refundable. Unused ads automatically expire after their stated validity period (e.g. 30/60/90 days) and cannot be carried forward.
+                        </div>
+
+                        <label className="flex items-center gap-2.5 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={termsAccepted}
+                            onChange={(e) => setTermsAccepted(e.target.checked)}
+                            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4.5 h-4.5"
+                          />
+                          <span className="text-[11px] font-bold text-slate-700">
+                            I accept the non-refundable terms policy and agree to automatically expire unused ad credits.
+                          </span>
+                        </label>
+                      </div>
+                    </div>
+                  )
+                )
               )}
             </div>
 
@@ -1580,23 +1669,32 @@ export default function GetAdsPage() {
                 )}
 
                 {currentStep === STEPS.length - 1 ? (
-                  <button
-                    onClick={handleCheckout}
-                    disabled={submitting || !termsAccepted}
-                    className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold text-xs px-6 py-3.5 rounded-xl transition shadow-md shadow-blue-500/10 flex items-center gap-2 disabled:opacity-50 cursor-pointer"
-                  >
-                    {submitting ? (
-                      <>
-                        <Loader2 size={14} className="animate-spin" />
-                        Checking out...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles size={14} />
-                        Pay & Activate Service
-                      </>
-                    )}
-                  </button>
+                  isAuthenticated ? (
+                    <button
+                      onClick={handleCheckout}
+                      disabled={submitting || !termsAccepted}
+                      className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold text-xs px-6 py-3.5 rounded-xl transition shadow-md shadow-blue-500/10 flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+                    >
+                      {submitting ? (
+                        <>
+                          <Loader2 size={14} className="animate-spin" />
+                          Checking out...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles size={14} />
+                          Pay & Activate Service
+                        </>
+                      )}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={loginWithGoogle}
+                      className="bg-slate-900 hover:bg-slate-950 text-white font-bold text-xs px-6 py-3.5 rounded-xl transition shadow-md flex items-center gap-2 cursor-pointer"
+                    >
+                      Login to Pay <ArrowRight size={14} />
+                    </button>
+                  )
                 ) : (
                   <button
                     onClick={handleNextStep}

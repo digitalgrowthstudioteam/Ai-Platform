@@ -21,6 +21,10 @@ class MetaAdServiceRequest(BaseModel):
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
     )
+    campaign_plan_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("campaign_plans.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     full_name: Mapped[str] = mapped_column(
         String(255),
         nullable=False,
@@ -186,6 +190,11 @@ class AdPack(BaseModel):
         DateTime(timezone=True),
         nullable=True,
     )
+    order_statuses: Mapped[Optional[dict]] = mapped_column(
+        JSON,
+        nullable=True,
+        default=dict,
+    )
 
     # Relationships
     user: Mapped["User"] = relationship(
@@ -256,4 +265,51 @@ class ServiceQuotation(BaseModel):
     service_request: Mapped["MetaAdServiceRequest"] = relationship(
         "MetaAdServiceRequest",
         back_populates="quotations",
+    )
+
+
+class CampaignPlan(BaseModel):
+    """
+    CampaignPlan model.
+    Stores dynamically generated Meta Ads campaign plans and readiness scores.
+    """
+    __tablename__ = "campaign_plans"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    business_name: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+    )
+    campaign_profile: Mapped[dict] = mapped_column(
+        JSON,
+        nullable=False,
+        default=dict,
+    )
+    report_data: Mapped[dict] = mapped_column(
+        JSON,
+        nullable=False,
+        default=dict,
+    )
+    readiness_score: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+    )
+    status: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        default="generated",  # generated, converted
+    )
+    pdf_path: Mapped[Optional[str]] = mapped_column(
+        String(512),
+        nullable=True,
+    )
+
+    # Relationships
+    user: Mapped["User"] = relationship(
+        "User",
+        foreign_keys=[user_id],
     )
