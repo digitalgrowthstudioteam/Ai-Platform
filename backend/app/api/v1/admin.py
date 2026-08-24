@@ -1080,7 +1080,7 @@ async def admin_raise_quotation(
         "status": "success",
         "message": "Quotation raised successfully.",
         "quotation_id": str(quote.id),
-        "quotation_link": f"https://digitalgrowthstudio.in/login?email={target_email}"
+        "quotation_link": f"https://digitalgrowthstudio.in/pay-quotation/{str(quote.id)}"
     }
 
 

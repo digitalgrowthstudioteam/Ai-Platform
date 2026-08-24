@@ -63,8 +63,8 @@ async def test_raise_quotation_for_unregistered_email(db: AsyncSession, cleanup_
     res_data = response.json()
     assert res_data["status"] == "success"
     assert "quotation_id" in res_data
-    assert "quotation_link" in res_data
-    assert NEW_USER_EMAIL in res_data["quotation_link"]
+    assert res_data["quotation_id"] in res_data["quotation_link"]
+    assert "/pay-quotation/" in res_data["quotation_link"]
 
     # Verify placeholder user and quotation exist in database
     stmt = select(User).where(User.email == NEW_USER_EMAIL)
