@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
+import Link from "next/link";
 import {
   Sparkles,
   ArrowRight,
@@ -161,13 +162,13 @@ export default function FreePlanQuestionnairePage() {
       case 0:
         return (
           <div className="space-y-6">
-            <h3 className="text-xl font-bold text-white">Let's get started. What's your business or brand name?</h3>
+            <h3 className="text-xl font-bold text-slate-900">Let's get started. What's your business or brand name?</h3>
             <input
               type="text"
               placeholder="e.g. Acme Cosmetics"
               value={businessName}
               onChange={(e) => setBusinessName(e.target.value)}
-              className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-blue-500 transition text-lg"
+              className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-blue-500 transition text-lg"
             />
           </div>
         );
@@ -175,11 +176,11 @@ export default function FreePlanQuestionnairePage() {
         return (
           <div className="space-y-6">
             <div>
-              <label className="block text-sm font-semibold text-slate-300 mb-2">What industry is your business in?</label>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">What industry is your business in?</label>
               <select
                 value={industry}
                 onChange={(e) => setIndustry(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-blue-500"
+                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-blue-500"
               >
                 <option value="Ecommerce">Ecommerce</option>
                 <option value="Fashion & Apparel">Fashion & Apparel</option>
@@ -201,24 +202,24 @@ export default function FreePlanQuestionnairePage() {
             </div>
             {industry === "Other" && (
               <div>
-                <label className="block text-sm font-semibold text-slate-300 mb-2">Please specify industry</label>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Please specify industry</label>
                 <input
                   type="text"
                   placeholder="Your industry details"
                   value={industryOther}
                   onChange={(e) => setIndustryOther(e.target.value)}
-                  className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-white"
+                  className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-blue-500"
                 />
               </div>
             )}
             <div>
-              <label className="block text-sm font-semibold text-slate-300 mb-2">What specific product or service do you sell?</label>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">What specific product or service do you sell?</label>
               <input
                 type="text"
                 placeholder="e.g. Organic anti-aging skin serum"
                 value={productOrService}
                 onChange={(e) => setProductOrService(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-blue-500"
+                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-blue-500"
               />
             </div>
           </div>
@@ -227,11 +228,11 @@ export default function FreePlanQuestionnairePage() {
         return (
           <div className="space-y-6">
             <div>
-              <label className="block text-sm font-semibold text-slate-300 mb-2">What is your primary marketing goal?</label>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">What is your primary marketing goal?</label>
               <select
                 value={campaignObjective}
                 onChange={(e) => setCampaignObjective(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-white"
+                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-blue-500"
               >
                 <option value="Leads">Generate Leads / Signups</option>
                 <option value="WhatsApp Enquiries">WhatsApp Enquiries</option>
@@ -242,17 +243,17 @@ export default function FreePlanQuestionnairePage() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-semibold text-slate-300 mb-2">Where do customers convert or buy?</label>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">Where do customers convert or buy?</label>
               <select
                 value={conversionLocation}
                 onChange={(e) => setConversionLocation(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-white"
+                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-blue-500"
               >
-                <option value="Website">On My Website / Landing Page</option>
-                <option value="WhatsApp">Chat directly on WhatsApp</option>
-                <option value="Lead Form">Native Facebook Lead Form</option>
-                <option value="Phone Call">Direct Phone Call</option>
-                <option value="App">Mobile App Store</option>
+                <option value="Website">My website / landing page</option>
+                <option value="WhatsApp">Directly on WhatsApp</option>
+                <option value="Facebook/Instagram DM">Meta Messenger / Instagram DMs</option>
+                <option value="On-platform lead form">Facebook native lead generation forms</option>
+                <option value="Phone Call">Direct phone call</option>
               </select>
             </div>
           </div>
@@ -261,22 +262,22 @@ export default function FreePlanQuestionnairePage() {
         return (
           <div className="space-y-6">
             <div>
-              <label className="block text-sm font-semibold text-slate-300 mb-2">Where is your target location?</label>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">Where is your target audience located?</label>
               <input
                 type="text"
-                placeholder="e.g. India, Mumbai, United States"
+                placeholder="e.g. India, USA, or Maharashtra/Mumbai"
                 value={targetLocation}
                 onChange={(e) => setTargetLocation(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-blue-500"
+                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-blue-500"
               />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-slate-300 mb-2">Describe your ideal customer profile</label>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">Describe your ideal customer (optional)</label>
               <textarea
-                placeholder="e.g. Working women aged 25-45 interested in clean beauty and vegan lifestyles."
+                placeholder="e.g. Women aged 25-45 interested in organic wellness and skincare"
                 value={targetCustomer}
                 onChange={(e) => setTargetCustomer(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-blue-500 h-24"
+                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-blue-500 h-24 resize-none"
               />
             </div>
           </div>
@@ -285,31 +286,30 @@ export default function FreePlanQuestionnairePage() {
         return (
           <div className="space-y-6">
             <div>
-              <label className="block text-sm font-semibold text-slate-300 mb-2">What is your expected daily Meta Ads budget?</label>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">What is your planned daily/monthly budget?</label>
               <select
                 value={budget}
                 onChange={(e) => setBudget(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-white"
+                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-blue-500"
               >
-                <option value="₹300–₹500/day">₹300–₹500/day</option>
-                <option value="₹500–₹1,000/day">₹500–₹1,000/day</option>
-                <option value="₹1,000–₹2,500/day">₹1,000–₹2,500/day</option>
-                <option value="₹2,500–₹5,000/day">₹2,500–₹5,000/day</option>
-                <option value="₹5,000+/day">₹5,000+/day</option>
-                <option value="Not sure">Not sure / Help me decide</option>
+                <option value="₹300–₹500/day">₹300 – ₹500 / day</option>
+                <option value="₹500–₹1,000/day">₹500 – ₹1,000 / day</option>
+                <option value="₹1,000–₹3,000/day">₹1,000 – ₹3,000 / day</option>
+                <option value="₹3,000–₹10,000/day">₹3,000 – ₹10,000 / day</option>
+                <option value="₹10,000+/day">₹10,000+ / day</option>
               </select>
             </div>
             <div>
-              <label className="block text-sm font-semibold text-slate-300 mb-2">How long do you plan to run the campaign?</label>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">How long do you plan to run the campaign?</label>
               <select
                 value={duration}
                 onChange={(e) => setDuration(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-white"
+                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-blue-500"
               >
-                <option value="7 Days">7 Days (Short Test)</option>
-                <option value="14 Days">14 Days (Standard Test)</option>
+                <option value="7 Days">7 Days (Testing Phase)</option>
+                <option value="14 Days">14 Days</option>
                 <option value="30 Days">30 Days (Recommended)</option>
-                <option value="Ongoing">Ongoing Monthly Optimization</option>
+                <option value="Ongoing">Ongoing / Continuous</option>
               </select>
             </div>
           </div>
@@ -318,23 +318,23 @@ export default function FreePlanQuestionnairePage() {
         return (
           <div className="space-y-6">
             <div>
-              <label className="block text-sm font-semibold text-slate-300 mb-2">Website or Landing Page URL (Optional)</label>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">What is your website or landing page URL? (optional)</label>
               <input
-                type="text"
-                placeholder="https://yourwebsite.com"
+                type="url"
+                placeholder="e.g. https://mybusiness.com"
                 value={website}
                 onChange={(e) => setWebsite(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-blue-500"
+                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-blue-500"
               />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-slate-300 mb-2">What is your current promotional offer? (Optional)</label>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">What is the main offer, discount, or deal?</label>
               <input
                 type="text"
-                placeholder="e.g. Buy 1 Get 1 Free, 20% off first order"
+                placeholder="e.g. Get 20% off your first order + free shipping"
                 value={offer}
                 onChange={(e) => setOffer(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-blue-500"
+                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-blue-500"
               />
             </div>
           </div>
@@ -343,39 +343,25 @@ export default function FreePlanQuestionnairePage() {
         return (
           <div className="space-y-6">
             <div>
-              <label className="block text-sm font-semibold text-slate-300 mb-2">Ad Creative Availability</label>
-              <select
-                value={creativeAvailability}
-                onChange={(e) => setCreativeAvailability(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-white"
-              >
-                <option value="I have finished creatives ready">I have finished creatives ready</option>
-                <option value="I need static creatives">I need static banner/image creatives</option>
-                <option value="I need video creatives">I need video reels/shorts editing</option>
-                <option value="I have assets but need them structured">I have product photos but need ad layouts</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-slate-300 mb-2">Prior Meta Ads Platform Experience</label>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">What is your experience running Meta Ads?</label>
               <select
                 value={previousAdsExperience}
                 onChange={(e) => setPreviousAdsExperience(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-white"
+                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-blue-500"
               >
-                <option value="None">None (First time advertiser)</option>
-                <option value="Beginner">Beginner (Spent under ₹10,000 total)</option>
-                <option value="Intermediate">Intermediate (Manage monthly campaigns)</option>
-                <option value="Expert">Expert (Advanced scaling & conversion tracking)</option>
+                <option value="None">None (Total Beginner)</option>
+                <option value="Basic">Basic (Boosted posts, tried a few ads)</option>
+                <option value="Intermediate">Intermediate (Managed account in Ads Manager, set up pixels)</option>
+                <option value="Advanced">Advanced (Managed high budget campaigns, scaling custom audiences)</option>
               </select>
             </div>
             <div>
-              <label className="block text-sm font-semibold text-slate-300 mb-2">What is your biggest Meta Ads challenge?</label>
-              <input
-                type="text"
-                placeholder="e.g. High Cost Per Lead, Ad fatigue, mapping Pixel tracking"
+              <label className="block text-sm font-semibold text-slate-700 mb-2">What is your main challenge with Meta Ads?</label>
+              <textarea
+                placeholder="e.g. Getting clicks but no conversions, high CPA, not sure how to structure my campaigns..."
                 value={mainChallenge}
                 onChange={(e) => setMainChallenge(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-blue-500"
+                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-blue-500 h-24 resize-none"
               />
             </div>
           </div>
@@ -385,18 +371,18 @@ export default function FreePlanQuestionnairePage() {
         if (!isAuthenticated) {
           return (
             <div className="space-y-6 text-center">
-              <h3 className="text-2xl font-extrabold text-white">Your Free Campaign Plan Is Ready 🎉</h3>
-              <p className="text-slate-400">We've generated your custom targeting parameters and strategic recommendations. Secure your copy by logging in.</p>
+              <h3 className="text-2xl font-extrabold text-slate-900">Your Free Campaign Plan Is Ready 🎉</h3>
+              <p className="text-slate-500">We've generated your custom targeting parameters and strategic recommendations. Secure your copy by logging in.</p>
               
               <div className="py-8">
                 <button
                   onClick={loginWithGoogle}
-                  className="px-8 py-4 bg-white hover:bg-slate-100 text-slate-900 font-bold rounded-xl shadow-lg transition flex items-center justify-center gap-2 mx-auto"
+                  className="px-8 py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl shadow-lg transition flex items-center justify-center gap-2 mx-auto"
                 >
                   Continue with Google <ArrowRight size={18} />
                 </button>
               </div>
-              <span className="text-xs text-slate-500 flex items-center justify-center gap-1"><Lock size={12} /> Secure login powered by Firebase Authentication</span>
+              <span className="text-xs text-slate-400 flex items-center justify-center gap-1"><Lock size={12} /> Secure login powered by Firebase Authentication</span>
             </div>
           );
         }
@@ -404,37 +390,37 @@ export default function FreePlanQuestionnairePage() {
         // Collecting User contact information after login
         return (
           <div className="space-y-6">
-            <h3 className="text-xl font-bold text-white">Almost there! Complete your profile to download your PDF plan:</h3>
+            <h3 className="text-xl font-bold text-slate-900">Almost there! Complete your profile to download your PDF plan:</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-semibold text-slate-300 mb-2">First Name</label>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">First Name</label>
                 <input
                   type="text"
                   placeholder="First Name"
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
-                  className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-blue-500"
+                  className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-blue-500"
                 />
               </div>
               <div>
-                <label className="block text-sm font-semibold text-slate-300 mb-2">Last Name</label>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Last Name</label>
                 <input
                   type="text"
                   placeholder="Last Name"
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
-                  className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-blue-500"
+                  className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-blue-500"
                 />
               </div>
             </div>
             <div>
-              <label className="block text-sm font-semibold text-slate-300 mb-2">WhatsApp Number</label>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">WhatsApp Number</label>
               <input
                 type="text"
                 placeholder="e.g. +91 9876543210"
                 value={whatsapp}
                 onChange={(e) => setWhatsapp(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-blue-500"
+                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-blue-500"
               />
             </div>
           </div>
@@ -446,14 +432,14 @@ export default function FreePlanQuestionnairePage() {
 
   if (restricted) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6">
-        <div className="max-w-md w-full bg-slate-900 border border-slate-800/80 p-8 rounded-3xl text-center space-y-6 shadow-2xl">
-          <AlertTriangle size={48} className="text-red-500 mx-auto" />
-          <h2 className="text-2xl font-extrabold text-white">We're unable to provide this service</h2>
-          <p className="text-sm text-slate-400 leading-relaxed">{restrictedReason}</p>
+      <div className="min-h-screen bg-slate-50 text-slate-900 flex items-center justify-center p-6">
+        <div className="max-w-md w-full bg-white border border-slate-200 p-8 rounded-3xl text-center space-y-6 shadow-xl">
+          <AlertTriangle size={48} className="text-red-500 mx-auto animate-bounce" />
+          <h2 className="text-2xl font-extrabold text-slate-900">We're unable to provide this service</h2>
+          <p className="text-sm text-slate-500 leading-relaxed">{restrictedReason}</p>
           <button
             onClick={() => router.push("/get-meta-ads")}
-            className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white font-semibold rounded-xl transition"
+            className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold rounded-xl border border-slate-200 transition"
           >
             Back to Landing Page
           </button>
@@ -466,30 +452,41 @@ export default function FreePlanQuestionnairePage() {
   const progressPercent = Math.round((currentStep / (stepsLength - 1)) * 100);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between py-12 px-6">
-      <div className="max-w-xl w-full mx-auto bg-slate-900/50 border border-slate-850 p-8 rounded-3xl shadow-2xl space-y-8 relative overflow-hidden">
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col justify-between py-12 px-6">
+      {/* Mini Brand Logo Header */}
+      <div className="max-w-xl w-full mx-auto mb-6 flex items-center justify-between">
+        <Link href="/get-meta-ads" className="flex items-center gap-2 group">
+          <img src="/logo.jpg" alt="Logo" className="w-8 h-8 rounded-lg object-cover shadow-sm group-hover:scale-105 transition-transform" />
+          <span className="font-extrabold text-sm text-slate-900 leading-none">Digital Growth Studio</span>
+        </Link>
+        <Link href="/get-meta-ads" className="text-xs font-semibold text-slate-500 hover:text-slate-900 flex items-center gap-1 transition">
+          Exit Questionnaire <ArrowUpRight size={12} />
+        </Link>
+      </div>
+
+      <div className="max-w-xl w-full mx-auto bg-white border border-slate-200/80 p-8 rounded-3xl shadow-xl space-y-8 relative overflow-hidden">
         {/* Progress Bar */}
-        <div className="absolute top-0 left-0 w-full h-1.5 bg-slate-850">
-          <div className="h-full bg-blue-600 transition-all duration-300" style={{ width: `${progressPercent}%` }}></div>
+        <div className="absolute top-0 left-0 w-full h-1.5 bg-slate-100">
+          <div className="h-full bg-gradient-to-r from-blue-600 to-indigo-600 transition-all duration-300" style={{ width: `${progressPercent}%` }}></div>
         </div>
 
         {/* Heading */}
         <div className="flex items-center justify-between">
-          <span className="text-xs font-bold text-blue-400 uppercase tracking-wider">Free Meta Ads Campaign Plan</span>
-          <span className="text-xs font-semibold text-slate-500">Step {currentStep + 1} of {stepsLength}</span>
+          <span className="text-xs font-bold text-blue-700 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full uppercase tracking-wider">Free Campaign Plan</span>
+          <span className="text-xs font-semibold text-slate-400">Step {currentStep + 1} of {stepsLength}</span>
         </div>
 
         {/* Content */}
-        <div>
+        <div className="min-h-[220px] flex flex-col justify-center">
           {renderStepContent()}
         </div>
 
         {/* Buttons */}
-        <div className="flex items-center justify-between pt-4 border-t border-slate-800/40">
+        <div className="flex items-center justify-between pt-6 border-t border-slate-100">
           {currentStep > 0 && currentStep < 7 ? (
             <button
               onClick={handleBack}
-              className="flex items-center gap-1.5 text-sm font-semibold text-slate-400 hover:text-white transition"
+              className="flex items-center gap-1.5 text-sm font-semibold text-slate-500 hover:text-slate-900 transition"
             >
               <ArrowLeft size={16} /> Back
             </button>
@@ -500,7 +497,7 @@ export default function FreePlanQuestionnairePage() {
           {currentStep < 7 ? (
             <button
               onClick={handleNext}
-              className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl shadow-lg transition flex items-center gap-1.5 ml-auto"
+              className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-750 hover:from-blue-500 hover:to-blue-650 text-white font-bold rounded-xl shadow-md shadow-blue-500/10 hover:shadow-lg transition flex items-center gap-1.5 ml-auto"
             >
               Continue <ArrowRight size={16} />
             </button>
@@ -508,7 +505,7 @@ export default function FreePlanQuestionnairePage() {
             <button
               onClick={handleGenerate}
               disabled={generating}
-              className="px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold rounded-xl shadow-xl transition flex items-center gap-2 ml-auto"
+              className="px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold rounded-xl shadow-md shadow-blue-500/10 hover:shadow-lg transition flex items-center gap-2 ml-auto"
             >
               {generating ? (
                 <>
@@ -524,7 +521,7 @@ export default function FreePlanQuestionnairePage() {
         </div>
       </div>
 
-      <div className="text-center text-xs text-slate-600 mt-8">
+      <div className="text-center text-xs text-slate-400 mt-8">
         Digital Growth Studio © {new Date().getFullYear()} • Safe & Secure Onboarding
       </div>
     </div>
