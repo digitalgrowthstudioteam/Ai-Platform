@@ -60,7 +60,7 @@ export default function FreePlanQuestionnairePage() {
             setAlreadyJoined(true);
             return;
           }
-          const plans = await api.listCampaignPlans();
+          const plans = await api.getCampaignPlans();
           if (plans && plans.length > 0) {
             setHasPlan(true);
           }
