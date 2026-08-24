@@ -79,6 +79,7 @@ interface ServicePricing {
 }
 
 const STEPS = [
+  "How It Works",
   "Business Details",
   "Industry",
   "Meta Account",
@@ -442,7 +443,7 @@ export default function GetAdsPage() {
 
   const handleNextStep = async () => {
     // Basic step validation
-    if (currentStep === 0) {
+    if (currentStep === 1) {
       if (!fullName || !businessName || !email || !whatsapp || !location) {
         setNotification({ type: "warning", message: "Please fill in all required fields." });
         return;
@@ -455,7 +456,7 @@ export default function GetAdsPage() {
       }
     }
 
-    if (currentStep === 1) {
+    if (currentStep === 2) {
       const actualDescription = description === "Other business model / custom operation"
         ? descriptionOther
         : description;
@@ -510,14 +511,14 @@ export default function GetAdsPage() {
       }
     }
 
-    if (currentStep === 2) {
+    if (currentStep === 3) {
       if (!metaAccountExists && !setupConfirmed) {
         setNotification({ type: "warning", message: "Please confirm understanding of the setup service charge." });
         return;
       }
     }
 
-    if (currentStep === 5) {
+    if (currentStep === 6) {
       try {
         setSubmitting(true);
         const actualDescription = description === "Other business model / custom operation"
@@ -860,8 +861,70 @@ export default function GetAdsPage() {
             )}
 
             <div className="min-h-[300px] py-2">
-              {/* STEP 1: BUSINESS DETAILS */}
+              {/* STEP 0: HOW THE SERVICE WORKS */}
               {currentStep === 0 && (
+                <div className="space-y-6 text-left animate-fade-in">
+                  <div className="space-y-1">
+                    <h2 className="text-2xl font-black text-slate-900 font-sans flex items-center gap-2">
+                      <Sparkles className="text-blue-600 animate-pulse" size={24} /> How The Service Works
+                    </h2>
+                    <p className="text-xs text-slate-500 font-medium">Please review these details carefully before proceeding to submit your requirements.</p>
+                  </div>
+
+                  <div className="bg-white border border-slate-200 shadow-xs rounded-3xl p-6 space-y-6">
+                    <div className="space-y-2">
+                      <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider text-blue-600 font-sans">
+                        What happens after you submit?
+                      </h3>
+                      <p className="text-xs text-slate-650 leading-relaxed font-semibold">
+                        Once you complete this form, our team will review your requirements and connect with you on WhatsApp.
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="p-4 bg-slate-50/60 rounded-2xl border border-slate-150 space-y-1">
+                        <span className="text-xs font-bold text-slate-800 block font-sans">Own Meta Ad Account</span>
+                        <span className="text-[11px] text-slate-600 font-medium block leading-relaxed font-semibold">
+                          Your ads will be created and run directly from your own Meta Ad Account. We do not run your ads from our own advertising account.
+                        </span>
+                      </div>
+
+                      <div className="p-4 bg-slate-50/60 rounded-2xl border border-slate-150 space-y-1">
+                        <span className="text-xs font-bold text-slate-800 block font-sans">Partner Access Control</span>
+                        <span className="text-[11px] text-slate-600 font-medium block leading-relaxed font-semibold">
+                          Our team will help you set up your Meta advertising assets and request the required Partner Access to your Meta Business/Ad Account.
+                        </span>
+                      </div>
+
+                      <div className="p-4 bg-slate-50/60 rounded-2xl border border-slate-150 space-y-1">
+                        <span className="text-xs font-bold text-slate-800 block font-sans">Ad Management</span>
+                        <span className="text-[11px] text-slate-600 font-medium block leading-relaxed font-semibold">
+                          Once access is provided, our team will set up, launch and manage your Meta Ads directly from your account.
+                        </span>
+                      </div>
+
+                      <div className="p-4 bg-slate-50/60 rounded-2xl border border-slate-150 space-y-1">
+                        <span className="text-xs font-bold text-slate-800 block font-sans">Direct Billing to Meta</span>
+                        <span className="text-[11px] text-slate-600 font-medium block leading-relaxed font-semibold">
+                          Your Meta advertising budget is paid directly to Meta and is separate from our service charges.
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="p-4 bg-blue-50/30 border border-blue-100 rounded-2xl">
+                      <span className="text-xs font-black text-blue-700 block uppercase tracking-wider font-sans">
+                        Business Protection Guarantee
+                      </span>
+                      <p className="text-xs text-slate-700 font-semibold mt-1 leading-normal">
+                        Your Meta Business ownership remains with you.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 1: BUSINESS DETAILS */}
+              {currentStep === 1 && (
                 <div className="space-y-6">
                   <div className="space-y-1">
                     <h2 className="text-2xl font-black text-slate-900 flex items-center gap-2">
@@ -937,7 +1000,7 @@ export default function GetAdsPage() {
               )}
 
               {/* STEP 2: INDUSTRY & ELIGIBILITY */}
-              {currentStep === 1 && (
+              {currentStep === 2 && (
                 <div className="space-y-6 text-left">
                   <div className="space-y-1">
                     <h2 className="text-2xl font-black text-slate-900">Industry & Product Offering</h2>
@@ -1027,7 +1090,7 @@ export default function GetAdsPage() {
               )}
 
               {/* STEP 3: META ACCOUNT CHECK */}
-              {currentStep === 2 && (
+              {currentStep === 3 && (
                 <div className="space-y-6 text-left">
                   <div className="space-y-1">
                     <h2 className="text-2xl font-black text-slate-900">Meta Ad Account Connection</h2>
@@ -1129,7 +1192,7 @@ export default function GetAdsPage() {
               )}
 
               {/* STEP 4: CAMPAIGN OBJECTIVE */}
-              {currentStep === 3 && (
+              {currentStep === 4 && (
                 <div className="space-y-6 text-left">
                   <div className="space-y-1">
                     <h2 className="text-2xl font-black text-slate-900">Campaign Objectives</h2>
@@ -1179,7 +1242,7 @@ export default function GetAdsPage() {
               )}
 
               {/* STEP 5: NUMBER OF ADS */}
-              {currentStep === 4 && (
+              {currentStep === 5 && (
                 <div className="space-y-6 text-left">
                   <div className="space-y-1">
                     <h2 className="text-2xl font-black text-slate-900">Select Number of Ads</h2>
@@ -1330,7 +1393,7 @@ export default function GetAdsPage() {
               )}
 
               {/* STEP 6: CREATIVE & ADDITIONAL SERVICES */}
-              {currentStep === 5 && (
+              {currentStep === 6 && (
                 <div className="space-y-6 text-left">
                   <div className="space-y-1">
                     <h2 className="text-2xl font-black text-slate-900">Creative & Additional Services</h2>
@@ -1397,7 +1460,7 @@ export default function GetAdsPage() {
               )}
 
               {/* STEP 7: QUOTATION & PAYMENT */}
-              {currentStep === 6 && quotation && (
+              {currentStep === 7 && quotation && (
                 <div className="space-y-6 text-left">
                   <div className="space-y-1">
                     <h2 className="text-2xl font-black text-slate-900 flex items-center gap-2">
