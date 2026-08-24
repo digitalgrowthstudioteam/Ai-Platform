@@ -570,43 +570,7 @@ async def get_user_ad_packs(
 # User Orders & Billing History
 # ──────────────────────────────────────────────
 
-@router.get("/orders", summary="Get user's all Meta Ads service orders with status")
-async def get_user_orders(
-    claims: dict = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """
-    Returns all MetaAdServiceRequest records for the authenticated user,
-    with order status pipeline info.
-    """
-    user = await get_db_user_from_claims(claims, db)
 
-    stmt_reqs = select(MetaAdServiceRequest).where(
-        MetaAdServiceRequest.user_id == user.id
-    ).order_by(MetaAdServiceRequest.created_at.desc())
-    res_reqs = await db.execute(stmt_reqs)
-    all_requests = res_reqs.scalars().all()
-
-    requests = []
-    for r in all_requests:
-        # Check if there is an associated quotation
-        stmt_q = select(ServiceQuotation).where(ServiceQuotation.service_request_id == r.id)
-        res_q = await db.execute(stmt_q)
-        quotes = res_q.scalars().all()
-        
-        if quotes:
-            # If there are quotations, at least one must be 'paid'
-            if any(q.status == "paid" for q in quotes):
-                requests.append(r)
-        else:
-            # If there are no quotations, we check if the request is 'trial_started'
-            # or if it has an associated AdPack
-            stmt_ap = select(AdPack).where(AdPack.service_request_id == r.id)
-            res_ap = await db.execute(stmt_ap)
-            has_pack = res_ap.scalar_one_or_none() is not None
-            
-            if r.status == "trial_started" or has_pack:
-                requests.append(r)
 
 async def build_orders_for_request(r: MetaAdServiceRequest, db: AsyncSession) -> list:
     # 1. Check associated AdPack
@@ -793,6 +757,47 @@ async def get_user_orders(
     for r in requests:
         req_orders = await build_orders_for_request(r, db)
         orders.extend(req_orders)
+
+    # Fetch manually allotted AdPacks (where service_request_id is NULL)
+    stmt_manual_packs = select(AdPack).where(
+        AdPack.user_id == user.id,
+        AdPack.service_request_id == None
+    ).order_by(AdPack.purchased_at.desc())
+    res_manual_packs = await db.execute(stmt_manual_packs)
+    manual_packs = res_manual_packs.scalars().all()
+
+    for p in manual_packs:
+        total = p.total_ad_credits
+        used = p.used_ad_credits
+        status = "completed" if p.status in ("consumed", "expired") else "whatsapp_pending"
+
+        for i in range(1, total + 1):
+            ad_status = "completed" if i <= used else status
+            
+            pipeline = [
+                {"step": "Allotted by Admin", "done": True},
+                {"step": "Ready for Setup", "done": True},
+                {"step": "Ads Initiated", "done": i <= used or p.status in ("consumed", "expired")},
+                {"step": "Completed", "done": ad_status == "completed"},
+            ]
+
+            orders.append({
+                "id": f"manual-{p.id}-ad-{i}",
+                "parent_request_id": None,
+                "order_type": "manual_ad",
+                "business_name": "Allotted Ads",
+                "advertised_product": f"Meta Ads Allotted by Admin (Ad {i}/{total})",
+                "campaign_objective": "Manual Allotment",
+                "number_of_ads": 1,
+                "daily_budget": "Custom",
+                "status": ad_status,
+                "partner_access_status": "granted",
+                "creative_required": False,
+                "whatsapp_number": "—",
+                "created_at": p.purchased_at,
+                "expires_at": p.expires_at,
+                "pipeline": pipeline,
+            })
 
     return {"orders": orders}
 
@@ -1050,6 +1055,58 @@ async def admin_list_orders(
                 "reason": u.restriction_reason if u else None
             }
             all_orders.append(o)
+
+    # Fetch all manually allotted AdPacks
+    stmt_manual_packs = select(AdPack).where(
+        AdPack.service_request_id == None
+    ).order_by(AdPack.purchased_at.desc())
+    res_manual_packs = await db.execute(stmt_manual_packs)
+    manual_packs = res_manual_packs.scalars().all()
+
+    for p in manual_packs:
+        # Fetch associated user profile
+        stmt_u = select(User).where(User.id == p.user_id)
+        res_u = await db.execute(stmt_u)
+        u = res_u.scalar_one_or_none()
+
+        total = p.total_ad_credits
+        used = p.used_ad_credits
+        status = "completed" if p.status in ("consumed", "expired") else "whatsapp_pending"
+
+        for i in range(1, total + 1):
+            ad_status = "completed" if i <= used else status
+            
+            pipeline = [
+                {"step": "Allotted by Admin", "done": True},
+                {"step": "Ready for Setup", "done": True},
+                {"step": "Ads Initiated", "done": i <= used or p.status in ("consumed", "expired")},
+                {"step": "Completed", "done": ad_status == "completed"},
+            ]
+
+            all_orders.append({
+                "id": f"manual-{p.id}-ad-{i}",
+                "parent_request_id": None,
+                "order_type": "manual_ad",
+                "business_name": "Allotted Ads",
+                "advertised_product": f"Meta Ads Allotted by Admin (Ad {i}/{total})",
+                "campaign_objective": "Manual Allotment",
+                "number_of_ads": 1,
+                "daily_budget": "Custom",
+                "status": ad_status,
+                "partner_access_status": "granted",
+                "creative_required": False,
+                "whatsapp_number": "—",
+                "created_at": p.purchased_at,
+                "expires_at": p.expires_at,
+                "pipeline": pipeline,
+                "customer_name": u.name if (u and u.name) else (u.email if u else "Manual User"),
+                "customer_email": u.email if u else "unknown@example.com",
+                "user_id": str(p.user_id),
+                "user_eligibility": {
+                    "eligible": u.ads_service_eligible if u else True,
+                    "reason": u.restriction_reason if u else None
+                }
+            })
 
     return all_orders
 

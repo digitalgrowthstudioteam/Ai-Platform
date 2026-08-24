@@ -1154,6 +1154,33 @@ export default function AdminPage() {
                 {selectedOrder ? (() => {
                   const isSetup = selectedOrder.order_type === "addon_setup";
                   const isCreative = selectedOrder.order_type === "addon_creative";
+                  const isManual = selectedOrder.order_type === "manual_ad";
+
+                  if (isManual) {
+                    return (
+                      <div className="space-y-4 font-sans text-xs text-left">
+                        <div>
+                          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Selected Deliverable</div>
+                          <div className="font-extrabold text-slate-800 text-sm mt-1">{selectedOrder.advertised_product}</div>
+                          <div className="text-[10px] text-slate-450 font-bold mt-1">
+                            Client: {selectedOrder.customer_email}
+                          </div>
+                        </div>
+
+                        <hr className="border-slate-100" />
+
+                        <div className="p-4 bg-blue-50/20 border border-blue-100 rounded-xl space-y-2 text-slate-600">
+                          <p className="font-bold text-[10.5px] text-blue-800">Manual Allotment Order</p>
+                          <p className="text-[10px] leading-relaxed text-slate-500">
+                            This order represents a manual ad credit allotment raised directly by the Super Admin.
+                          </p>
+                          <p className="text-[10px] leading-relaxed text-slate-500">
+                            To adjust quantities, record consumption, or add/remove credits for this user, please use the <strong>Users Management & Lookup</strong> tab.
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  }
 
                   return (
                     <div className="space-y-4 font-sans text-xs">
@@ -1239,8 +1266,8 @@ export default function AdminPage() {
                         <>
                           <div className="space-y-2">
                             <label className="text-[10px] font-bold text-slate-555 uppercase block text-left">Record Ad Credit Consumption</label>
-                            <p className="text-[10px] text-slate-450 font-bold text-left">
-                              Record when an ad from this package runs out or is completed. This consumes 1 credit.
+                            <p className="text-[10px] text-slate-440 font-bold text-left mt-1">
+                              Record when an ad from this allotment runs out or is completed. This consumes 1 credit.
                             </p>
                             <div className="flex gap-2 items-center">
                               <input
