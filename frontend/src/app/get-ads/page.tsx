@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
 import {
@@ -235,6 +236,7 @@ const PRODUCT_OPTIONS_BY_INDUSTRY: Record<string, string[]> = {
 };
 
 export default function GetAdsPage() {
+  const router = useRouter();
   const { user, loginWithGoogle, isAuthenticated } = useAuth();
   const [currentStep, setCurrentStep] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -368,6 +370,10 @@ export default function GetAdsPage() {
           setEligibleState(latest.user_eligibility || { eligible: true });
           
           if (latest.request) {
+            if (latest.request.status !== "draft" && latest.request.status !== "cancelled") {
+              router.push("/dashboard/services");
+              return;
+            }
             setActiveRequest(latest.request);
             setQuotation(latest.quotation);
 
@@ -682,6 +688,7 @@ export default function GetAdsPage() {
         setActiveRequest(latest.request);
         setQuotation(latest.quotation);
         setSubmitting(false);
+        router.push("/dashboard/services");
         return;
       }
 
@@ -713,6 +720,7 @@ export default function GetAdsPage() {
             const latest = await api.getLatestAdsServiceRequest();
             setActiveRequest(latest.request);
             setQuotation(latest.quotation);
+            router.push("/dashboard/services");
           } catch (err: any) {
             setNotification({ type: "error", message: "Payment verification failed. Please contact WhatsApp support." });
           } finally {

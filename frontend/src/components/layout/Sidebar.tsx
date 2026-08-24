@@ -54,7 +54,6 @@ const navigation: NavSection[] = [
       { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
       { label: "Today's Brief", href: "/briefs/daily", icon: Sparkles },
       { label: "Weekly Brief", href: "/briefs/weekly", icon: Zap },
-      { label: "🚀 Get Ads at ₹333", href: "/get-ads", icon: Sparkles },
     ],
   },
   {
@@ -90,6 +89,7 @@ const navigation: NavSection[] = [
   {
     label: "META ADS",
     items: [
+      { label: "🚀 Get Ads at ₹333", href: "/get-ads", icon: Sparkles },
       { label: "My Services", href: "/dashboard/services", icon: Rocket },
       { label: "Orders", href: "/dashboard/orders", icon: ShoppingBag },
       { label: "Billing", href: "/dashboard/billing", icon: Receipt },
