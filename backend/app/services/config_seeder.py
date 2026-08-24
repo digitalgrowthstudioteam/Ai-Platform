@@ -104,17 +104,17 @@ DEFAULT_CONFIGS = {
         }
     ],
     "meta_ads_additional_services": [
-        {"id": "copywriting", "name": "Professional Copywriting", "regular_price": 999, "offer_price": 499, "instant": True, "active": True},
-        {"id": "creative_design", "name": "Creative Design (Banner/Image)", "regular_price": 1299, "offer_price": 499, "instant": True, "active": True},
+        {"id": "copywriting", "name": "Professional Copywriting", "regular_price": 1999, "offer_price": 999, "instant": True, "active": True},
+        {"id": "creative_design", "name": "Creative Design AI (Banner/Image) with 2 Adaptations", "regular_price": 999, "offer_price": 499, "instant": True, "active": True},
         {"id": "video_editing", "name": "Premium Video Editing (Reels/Shorts)", "regular_price": 4999, "offer_price": 2999, "instant": False, "active": True},
-        {"id": "pixel_setup", "name": "Meta Pixel Setup & Verification", "regular_price": 1999, "offer_price": 999, "instant": True, "active": True},
-        {"id": "conversion_api", "name": "Conversions API (CAPI) Integration", "regular_price": 2999, "offer_price": 1499, "instant": True, "active": True},
-        {"id": "catalog_setup", "name": "Commerce Catalog Setup", "regular_price": 2999, "offer_price": 1999, "instant": False, "active": True},
-        {"id": "product_feed", "name": "Dynamic Product Feed Integration", "regular_price": 3999, "offer_price": 2499, "instant": False, "active": True},
-        {"id": "landing_page", "name": "Custom Landing Page Design & Setup", "regular_price": 9999, "offer_price": 5999, "instant": False, "active": True},
-        {"id": "tracking_setup", "name": "Google Tag Manager & GA4 Tracking", "regular_price": 1999, "offer_price": 999, "instant": True, "active": True},
-        {"id": "whatsapp_integration", "name": "WhatsApp Business API CRM Setup", "regular_price": 2999, "offer_price": 1499, "instant": True, "active": True},
-        {"id": "lead_crm", "name": "Lead CRM Automation Integration", "regular_price": 3999, "offer_price": 2499, "instant": False, "active": True}
+        {"id": "pixel_setup", "name": "Meta Pixel Setup & Verification", "regular_price": 2999, "offer_price": 1999, "instant": True, "active": True},
+        {"id": "conversion_api", "name": "Conversions API (CAPI) Integration", "regular_price": 3999, "offer_price": 2499, "instant": True, "active": True},
+        {"id": "catalog_setup", "name": "Commerce Catalog Setup (Depends on products)", "regular_price": 2999, "offer_price": 1999, "instant": False, "active": True},
+        {"id": "tracking_setup", "name": "Google Tag Manager & GA4 Tracking", "regular_price": 6999, "offer_price": 4999, "instant": True, "active": True},
+        {"id": "whatsapp_integration", "name": "WhatsApp Business API CRM Setup", "regular_price": 3999, "offer_price": 2499, "instant": True, "active": True},
+        {"id": "lead_crm", "name": "Lead CRM Automation Integration", "regular_price": 3999, "offer_price": 2499, "instant": False, "active": True},
+        {"id": "product_feed", "name": "Dynamic Product Feed Integration", "regular_price": 3999, "offer_price": 2499, "instant": False, "active": False},
+        {"id": "landing_page", "name": "Custom Landing Page Design & Setup", "regular_price": 9999, "offer_price": 5999, "instant": False, "active": False}
     ]
 }
 

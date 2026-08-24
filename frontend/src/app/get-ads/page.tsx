@@ -1183,7 +1183,7 @@ export default function GetAdsPage() {
                     <div className="space-y-2.5">
                       <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Additional services to include</label>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {config?.additional_services.map((svc) => {
+                        {config?.additional_services.filter((svc: any) => svc.active !== false).map((svc) => {
                           const isSelected = selectedServices.includes(svc.id);
                           return (
                             <button
