@@ -543,8 +543,24 @@ async def get_user_orders(
     """
     user = await get_db_user_from_claims(claims, db)
 
+    paid_statuses = [
+        "trial_started",
+        "whatsapp_pending",
+        "whatsapp_connected",
+        "partner_access_requested",
+        "partner_access_granted",
+        "campaign_setup",
+        "campaign_live",
+        "completed"
+    ]
+
     stmt = select(MetaAdServiceRequest).where(
         MetaAdServiceRequest.user_id == user.id
+    ).where(
+        (MetaAdServiceRequest.status.in_(paid_statuses)) |
+        (MetaAdServiceRequest.id.in_(
+            select(ServiceQuotation.service_request_id).where(ServiceQuotation.status == "paid")
+        ))
     ).order_by(MetaAdServiceRequest.created_at.desc())
     res = await db.execute(stmt)
     requests = res.scalars().all()
