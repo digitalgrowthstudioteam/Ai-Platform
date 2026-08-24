@@ -465,6 +465,51 @@ export default function GetAdsPage() {
       }
     }
 
+    if (currentStep === 5) {
+      try {
+        setSubmitting(true);
+        const actualDescription = description === "Other business model / custom operation"
+          ? descriptionOther
+          : description;
+        
+        const actualAdvertisedProduct = advertisedProduct === "Other Custom Product/Service"
+          ? advertisedProductOther
+          : advertisedProduct;
+
+        const payload = {
+          full_name: fullName,
+          business_name: businessName,
+          email,
+          whatsapp_number: whatsapp,
+          website,
+          business_location: location,
+          industry,
+          industry_other: industryOther,
+          business_description: actualDescription,
+          advertised_product: actualAdvertisedProduct,
+          campaign_objective: campaignObjective,
+          daily_budget: expectedBudget,
+          number_of_ads: adQuantity,
+          creative_required: creativeRequired,
+          additional_services: selectedServices,
+          meta_account_exists: metaAccountExists,
+          meta_ad_account_id: selectedMetaAdAccountId,
+        };
+
+        await api.submitAdsServiceRequest(payload);
+        
+        // Reload quote
+        const latest = await api.getLatestAdsServiceRequest();
+        setActiveRequest(latest.request);
+        setQuotation(latest.quotation);
+      } catch (err: any) {
+        setNotification({ type: "error", message: err.message || "Failed to update quotation." });
+        return;
+      } finally {
+        setSubmitting(false);
+      }
+    }
+
     if (currentStep === STEPS.length - 1) {
       // Last step -> Quote and Payment
       return;
