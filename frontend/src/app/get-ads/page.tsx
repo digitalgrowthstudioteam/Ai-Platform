@@ -281,40 +281,56 @@ export default function GetAdsPage() {
   const [selectedMetaAdAccountId, setSelectedMetaAdAccountId] = useState("");
 
   const getAdPricingDetails = (qty: number) => {
+    const servicesPricing = config?.services_pricing;
+    const firstAdOffer = servicesPricing?.first_ad_offer;
+
     let unitPrice = 999;
-    if (qty === 1) {
-      if (eligibleState?.intro_offer_eligible) {
-        unitPrice = 333;
-      } else {
-        unitPrice = 999;
-      }
-    } else if (qty >= 2 && qty <= 5) {
-      unitPrice = 799;
-    } else if (qty >= 6 && qty <= 15) {
-      unitPrice = 699;
-    } else if (qty >= 16 && qty <= 30) {
-      unitPrice = 499;
-    } else {
-      unitPrice = 333;
+    let validity = 30;
+    let matchedPackId = "";
+
+    // 1. If qty is 1 and intro offer is active & eligible
+    if (qty === 1 && eligibleState?.intro_offer_eligible && firstAdOffer?.active) {
+      unitPrice = firstAdOffer.offer_price || 333;
+      validity = firstAdOffer.validity_days || 30;
+      return {
+        unitPrice,
+        totalPrice: unitPrice,
+        validity,
+        matchedPackId: "first_ad_offer",
+      };
     }
 
-    let validity = 30;
-    if (qty <= 5) {
-      validity = 30;
-    } else if (qty <= 15) {
-      validity = 60;
+    // 2. Lookup standard dynamic packs
+    const packs = config?.ad_packs || [];
+    const sortedPacks = [...packs].sort((a: any, b: any) => a.ad_quantity - b.ad_quantity);
+    const matchedPack = sortedPacks.find((p: any) => p.active && qty <= p.ad_quantity);
+
+    if (matchedPack) {
+      unitPrice = matchedPack.price_per_ad || matchedPack.offer_price || 999;
+      validity = matchedPack.validity_days || 30;
+      matchedPackId = matchedPack.id;
     } else {
-      validity = 90;
+      const highestPack = sortedPacks.filter((p: any) => p.active).pop();
+      if (highestPack) {
+        unitPrice = highestPack.price_per_ad || highestPack.offer_price || 999;
+        validity = highestPack.validity_days || 90;
+        matchedPackId = highestPack.id;
+      } else {
+        unitPrice = 999;
+        validity = 30;
+        matchedPackId = "pack_1";
+      }
     }
 
     return {
       unitPrice,
       totalPrice: unitPrice * qty,
       validity,
+      matchedPackId,
     };
   };
 
-  const { unitPrice: adPerUnitPrice, totalPrice: adTotalOfferPrice, validity: adValidityDays } = getAdPricingDetails(adQuantity);
+  const { unitPrice: adPerUnitPrice, totalPrice: adTotalOfferPrice, validity: adValidityDays, matchedPackId } = getAdPricingDetails(adQuantity);
 
   const [notification, setNotification] = useState<{ type: "success" | "error" | "warning"; message: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -1260,41 +1276,54 @@ export default function GetAdsPage() {
                   <div className="bg-slate-50/50 border border-slate-150 rounded-3xl p-5 space-y-3">
                     <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">Volume Discount Tiers</h3>
                     <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                      {[
-                        { range: "1 Ad", price: "₹999", desc: "Standard" },
-                        { range: "2 - 5 Ads", price: "₹799", desc: "Volume Save" },
-                        { range: "6 - 15 Ads", price: "₹699", desc: "Pro Scaler" },
-                        { range: "16 - 30 Ads", price: "₹499", desc: "Growth Pack" },
-                        { range: "31+ Ads", price: "₹333", desc: "Wholesale" }
-                      ].map((tier, idx) => {
-                        const isCurrent = 
-                          (adQuantity === 1 && idx === 0) ||
-                          (adQuantity >= 2 && adQuantity <= 5 && idx === 1) ||
-                          (adQuantity >= 6 && adQuantity <= 15 && idx === 2) ||
-                          (adQuantity >= 16 && adQuantity <= 30 && idx === 3) ||
-                          (adQuantity >= 31 && idx === 4);
-                        
-                        return (
-                          <div 
-                            key={idx} 
-                            className={`p-2.5 rounded-2xl border text-center transition flex flex-col justify-between ${
-                              isCurrent 
-                                ? "border-blue-600 bg-white shadow-sm ring-1 ring-blue-600/30" 
-                                : "border-slate-150 bg-white/40"
-                            }`}
-                          >
-                            <span className={`text-[9px] font-black uppercase block ${isCurrent ? "text-blue-600" : "text-slate-400"}`}>
-                              {tier.range}
-                            </span>
-                            <span className="text-sm font-black text-slate-800 block mt-1 font-sans">
-                              {tier.range === "1 Ad" && eligibleState?.intro_offer_eligible ? "₹333" : tier.price}
-                            </span>
-                            <span className="text-[8px] text-slate-400 font-semibold block mt-0.5 uppercase">
-                              {tier.range === "1 Ad" && eligibleState?.intro_offer_eligible ? "Intro Offer" : tier.desc}
-                            </span>
-                          </div>
-                        );
-                      })}
+                      {(() => {
+                        const packs = config?.ad_packs || [];
+                        const sortedPacks = [...packs]
+                          .filter((p: any) => p.active)
+                          .sort((a: any, b: any) => a.ad_quantity - b.ad_quantity);
+
+                        return sortedPacks.map((pack: any, idx) => {
+                          let range = `${pack.ad_quantity} Ad${pack.ad_quantity > 1 ? "s" : ""}`;
+                          let desc = "Standard";
+                          if (pack.ad_quantity === 1) desc = "Standard";
+                          else if (pack.ad_quantity === 5) desc = "Volume Save";
+                          else if (pack.ad_quantity === 15) desc = "Pro Scaler";
+                          else if (pack.ad_quantity === 30) desc = "Growth Pack";
+                          else desc = "Wholesale";
+
+                          if (idx > 0) {
+                            const prevQty = sortedPacks[idx - 1].ad_quantity;
+                            if (pack.ad_quantity === 9999) {
+                              range = `${prevQty + 1}+ Ads`;
+                            } else {
+                              range = `${prevQty + 1} - ${pack.ad_quantity} Ads`;
+                            }
+                          }
+
+                          const isCurrent = matchedPackId === pack.id;
+
+                          return (
+                            <div 
+                              key={pack.id || idx} 
+                              className={`p-2.5 rounded-2xl border text-center transition flex flex-col justify-between ${
+                                isCurrent 
+                                  ? "border-blue-600 bg-white shadow-sm ring-1 ring-blue-600/30" 
+                                  : "border-slate-150 bg-white/40"
+                              }`}
+                            >
+                              <span className={`text-[9px] font-black uppercase block ${isCurrent ? "text-blue-600" : "text-slate-400"}`}>
+                                {range}
+                              </span>
+                              <span className="text-sm font-black text-slate-800 block mt-1 font-sans">
+                                {pack.ad_quantity === 1 && eligibleState?.intro_offer_eligible ? "₹333" : `₹${pack.price_per_ad || pack.offer_price}`}
+                              </span>
+                              <span className="text-[8px] text-slate-400 font-semibold block mt-0.5 uppercase">
+                                {pack.ad_quantity === 1 && eligibleState?.intro_offer_eligible ? "Intro Offer" : desc}
+                              </span>
+                            </div>
+                          );
+                        });
+                      })()}
                     </div>
                   </div>
                 </div>
@@ -1330,7 +1359,7 @@ export default function GetAdsPage() {
                         >
                           <div className="flex justify-between items-baseline">
                             <span className="text-xs font-bold text-slate-800">I need creative design</span>
-                            <span className="text-xs font-extrabold text-blue-600">₹499 extra</span>
+                            <span className="text-xs font-extrabold text-blue-600">₹{config?.services_pricing?.creative_design_service?.offer_price || 499} extra</span>
                           </div>
                           <span className="text-[10px] text-slate-500 mt-0.5 block">Includes banner design matching Meta guidelines.</span>
                         </button>

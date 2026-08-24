@@ -163,29 +163,40 @@ async def calculate_quotation(
         regular_total_paise += reg_price
         final_total_paise += offer_price
     else:
-        # Quantity-based pricing tiers
-        unit_reg = 1499 * 100
-        if number_of_ads == 1:
-            unit_offer = 999 * 100
-        elif 2 <= number_of_ads <= 5:
-            unit_offer = 799 * 100
-        elif 6 <= number_of_ads <= 15:
-            unit_offer = 699 * 100
-        elif 16 <= number_of_ads <= 30:
-            unit_offer = 499 * 100
-        else: # 31+
-            unit_offer = 333 * 100
+        # Quantity-based pricing tiers matching database configuration
+        # Sort ad packs by quantity ascending
+        sorted_packs = sorted(ad_packs_pricing, key=lambda x: x.get("ad_quantity", 0))
+        
+        matched_pack = None
+        for pack in sorted_packs:
+            if pack.get("active", True) and number_of_ads <= pack.get("ad_quantity", 0):
+                matched_pack = pack
+                break
 
-        # Validity days assignment:
-        # 1-5 ads: 30 days
-        # 6-15 ads: 60 days
-        # 16+ ads: 90 days
-        if number_of_ads <= 5:
-            validity_days = 30
-        elif number_of_ads <= 15:
-            validity_days = 60
+        if not matched_pack:
+            # Fallback to the highest active pack
+            active_packs = [p for p in sorted_packs if p.get("active", True)]
+            if active_packs:
+                matched_pack = active_packs[-1]
+
+        if matched_pack:
+            unit_offer = int(matched_pack.get("price_per_ad", matched_pack.get("offer_price", matched_pack.get("price", 999)))) * 100
+            
+            pack_qty = matched_pack.get("ad_quantity", 1)
+            reg_price_val = matched_pack.get("regular_price")
+            if reg_price_val is not None:
+                if pack_qty > 0 and matched_pack.get("id") != "pack_5":
+                    unit_reg = int(int(reg_price_val) / pack_qty) * 100
+                else:
+                    unit_reg = int(reg_price_val) * 100
+            else:
+                unit_reg = 1499 * 100
+
+            validity_days = matched_pack.get("validity_days", 30)
         else:
-            validity_days = 90
+            unit_reg = 1499 * 100
+            unit_offer = 999 * 100
+            validity_days = 30
 
         total_reg = unit_reg * number_of_ads
         total_offer = unit_offer * number_of_ads
