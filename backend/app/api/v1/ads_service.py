@@ -646,14 +646,42 @@ async def get_user_billing_history(
     res_q = await db.execute(stmt_q)
     quotations = res_q.scalars().all()
     for q in quotations:
+        # Load related request details to check status and load prefill details
+        stmt_req = select(MetaAdServiceRequest).where(MetaAdServiceRequest.id == q.service_request_id)
+        res_req = await db.execute(stmt_req)
+        req = res_req.scalar_one_or_none()
+
+        # Check 2-day expiry
+        if q.status == "pending":
+            now = datetime.now(timezone.utc)
+            created = q.created_at
+            if created.tzinfo is None:
+                created = created.replace(tzinfo=timezone.utc)
+            if now - created > timedelta(days=2):
+                q.status = "cancelled"
+                db.add(q)
+                if req and req.status in ("quotation_generated", "submitted", "eligibility_review", "eligible"):
+                    req.status = "cancelled"
+                    db.add(req)
+                await db.commit()
+
+        email = req.email if req else user.email
+        name = req.full_name if req else (user.name or "")
+        phone = req.whatsapp_number if req else ""
+
         transactions.append({
             "id": str(q.id),
             "type": "quotation",
-            "description": f"Service Quotation — {q.currency} {q.final_total / 100:,.0f}",
+            "description": f"Service Quotation",
             "amount": q.final_total,
             "currency": q.currency,
             "status": q.status,
             "date": q.created_at,
+            "service_request_id": str(q.service_request_id) if req else None,
+            "items": q.items,
+            "email": email,
+            "name": name,
+            "phone": phone
         })
 
     # 2. Ad Packs with price_paid > 0
