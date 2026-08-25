@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import { trackInitiateCheckout, trackPurchase } from "@/lib/analytics";
 import {
   Receipt,
   Loader2,
@@ -150,6 +151,7 @@ export default function BillingPage() {
               type: "success",
               message: "Payment verified successfully! Onboarding activated.",
             });
+            trackPurchase("quotation_" + tx.id, order.amount / 100, order.currency || "INR");
             await fetchBillingData();
             router.push("/dashboard/services");
           } catch (err: any) {
@@ -172,6 +174,7 @@ export default function BillingPage() {
       };
 
       const rzp = new (window as any).Razorpay(options);
+      trackInitiateCheckout("quotation_" + tx.id, order.amount / 100, order.currency || "INR");
       rzp.open();
     } catch (err: any) {
       console.error("Quotation payment failed:", err);

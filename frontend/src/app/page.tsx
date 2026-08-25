@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
+import { event as trackGAEvent } from "@/lib/analytics";
 import {
   Sparkles,
   Zap,
@@ -388,6 +389,8 @@ export default function LandingPage() {
               </div>
               <Link
                 href="/health-check"
+                id="btn-run-free-health-audit"
+                onClick={() => trackGAEvent("cta_click_health_audit")}
                 className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold text-xs py-3.5 px-5 rounded-xl transition shadow-md shadow-blue-500/10 flex items-center justify-center gap-2 active:scale-98"
               >
                 <span>Run Free Health Audit</span>
@@ -409,6 +412,8 @@ export default function LandingPage() {
               </div>
               <Link
                 href="/recommendation"
+                id="btn-get-campaign-strategy"
+                onClick={() => trackGAEvent("cta_click_campaign_strategy")}
                 className="w-full bg-slate-900 hover:bg-slate-950 text-white font-bold text-xs py-3.5 px-5 rounded-xl transition shadow-md flex items-center justify-center gap-2 active:scale-98"
               >
                 <span>Get Campaign Strategy</span>

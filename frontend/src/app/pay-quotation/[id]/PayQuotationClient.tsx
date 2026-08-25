@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import { trackInitiateCheckout, trackPurchase } from "@/lib/analytics";
 import {
   Sparkles,
   CreditCard,
@@ -165,6 +166,7 @@ export default function PayQuotationClient() {
               phone: whatsapp,
             });
             setSuccess(true);
+            trackPurchase("quotation_" + quotationId, checkoutRes.amount / 100, checkoutRes.currency || "INR");
           } catch (verifyErr: any) {
             setNotification({
               type: "error",
@@ -185,6 +187,7 @@ export default function PayQuotationClient() {
       };
 
       const rzp = new (window as any).Razorpay(options);
+      trackInitiateCheckout("quotation_" + quotationId, checkoutRes.amount / 100, checkoutRes.currency || "INR");
       rzp.open();
     } catch (err: any) {
       console.error("Payment failed:", err);

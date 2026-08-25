@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { event as trackGAEvent } from "@/lib/analytics";
 import {
   Sparkles,
   ArrowRight,
@@ -259,12 +260,16 @@ export default function MetaAdsLandingPage() {
         <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4 max-w-lg mx-auto">
           <Link
             href="/get-ads"
+            id="btn-get-campaign-333-hero"
+            onClick={() => trackGAEvent("cta_click_get_campaign_333_hero")}
             className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold rounded-xl shadow-lg shadow-blue-500/20 hover:shadow-xl hover:shadow-blue-500/30 hover:scale-[1.02] active:scale-[0.98] transition flex items-center justify-center gap-2 group"
           >
             Get a Campaign at ₹333 <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
           </Link>
           <Link
             href="/get-meta-ads/free-plan"
+            id="btn-get-free-campaign-plan-hero"
+            onClick={() => trackGAEvent("cta_click_free_campaign_plan_hero")}
             className="w-full sm:w-auto px-8 py-4 bg-white hover:bg-slate-50 text-slate-800 font-semibold rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition flex items-center justify-center gap-2"
           >
             Get a Free Campaign Plan →
@@ -543,12 +548,16 @@ export default function MetaAdsLandingPage() {
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4 max-w-md mx-auto">
             <Link
               href="/get-ads"
+              id="btn-get-campaign-333-bottom"
+              onClick={() => trackGAEvent("cta_click_get_campaign_333_bottom")}
               className="w-full sm:w-auto inline-flex items-center gap-2 bg-white text-blue-700 hover:bg-blue-50 font-bold text-sm px-9 py-4 rounded-xl transition shadow-2xl hover:scale-105 active:scale-95"
             >
               Get a Campaign at ₹333 <ArrowRight size={16} />
             </Link>
             <Link
               href="/get-meta-ads/free-plan"
+              id="btn-get-free-campaign-plan-bottom"
+              onClick={() => trackGAEvent("cta_click_free_campaign_plan_bottom")}
               className="w-full sm:w-auto px-8 py-4 bg-white/10 hover:bg-white/20 backdrop-blur text-white font-semibold rounded-xl border border-white/20 transition text-sm text-center"
             >
               Get My Free Campaign Plan →

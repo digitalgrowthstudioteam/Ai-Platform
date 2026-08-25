@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
+import { trackInitiateCheckout, trackPurchase } from "@/lib/analytics";
 import {
   Sparkles,
   ArrowRight,
@@ -789,6 +790,7 @@ export default function GetAdsPage() {
               response.razorpay_signature
             );
             setNotification({ type: "success", message: "Payment verified successfully. Onboarding activated!" });
+            trackPurchase("get_ads_service", order.amount / 100, order.currency || "INR");
             const latest = await api.getLatestAdsServiceRequest();
             setActiveRequest(latest.request);
             setQuotation(latest.quotation);
@@ -810,6 +812,7 @@ export default function GetAdsPage() {
       };
 
       const rzp = new (window as any).Razorpay(options);
+      trackInitiateCheckout("get_ads_service", order.amount / 100, order.currency || "INR");
       rzp.open();
 
     } catch (err: any) {

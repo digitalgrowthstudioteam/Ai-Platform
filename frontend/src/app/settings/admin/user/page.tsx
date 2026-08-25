@@ -1022,19 +1022,35 @@ function AdminUserDetailContent() {
                       }`}>{r.status.replace("_", " ")}</span>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-slate-500 leading-normal font-medium bg-white p-3 rounded-lg border border-slate-100">
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[11px] text-slate-500 leading-normal font-medium bg-white p-3 rounded-lg border border-slate-100">
                       <div><strong>Objective:</strong> {r.campaign_objective}</div>
                       <div><strong>Daily Budget:</strong> {r.daily_budget}</div>
                       <div><strong>Ad Quantity:</strong> {r.number_of_ads}</div>
+                      <div><strong>Creative Required:</strong> {r.creative_required ? "Yes" : "No"}</div>
                       <div><strong>Whatsapp:</strong> {r.whatsapp_number}</div>
-                      <div className="col-span-2 mt-1">
+                      <div><strong>Request Email:</strong> {r.email}</div>
+                      <div><strong>Location:</strong> {r.business_location}</div>
+                      <div><strong>Meta Account Exists:</strong> {r.meta_account_exists ? "Yes" : "No"}</div>
+                      <div><strong>Meta Business ID:</strong> {r.meta_business_id || "None"}</div>
+                      <div><strong>Meta Ad Account ID:</strong> {r.meta_ad_account_id || "None"}</div>
+                      <div><strong>Partner Access Status:</strong> {r.partner_access_status || "not_requested"}</div>
+                      <div className="col-span-2">
                         <strong>Website:</strong>{" "}
-                        <a href={r.website} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">
-                          {r.website}
-                        </a>
+                        {r.website ? (
+                          <a href={r.website} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">
+                            {r.website}
+                          </a>
+                        ) : (
+                          "None"
+                        )}
                       </div>
+                      {r.business_description && (
+                        <div className="col-span-2">
+                          <strong>Business Description:</strong> {r.business_description}
+                        </div>
+                      )}
                       {r.additional_services && r.additional_services.length > 0 && (
-                        <div className="col-span-2 mt-1">
+                        <div className="col-span-2">
                           <strong>Services Checklist:</strong>{" "}
                           <span className="text-blue-600 font-extrabold">{r.additional_services.join(", ")}</span>
                         </div>
