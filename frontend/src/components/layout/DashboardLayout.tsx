@@ -32,6 +32,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   };
 
   useEffect(() => {
+    if (typeof document !== "undefined") {
+      document.body.classList.remove("sidebar-open");
+    }
     fetchSubscription();
   }, [pathname]);
 

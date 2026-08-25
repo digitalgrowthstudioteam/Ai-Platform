@@ -172,8 +172,14 @@ export default function Sidebar() {
     };
   });
 
+  const handleNavClick = () => {
+    if (typeof document !== "undefined") {
+      document.body.classList.remove("sidebar-open");
+    }
+  };
+
   return (
-    <aside className="sidebar" id="sidebar">
+    <aside className="sidebar" id="sidebar" onClick={handleNavClick}>
       {/* Logo */}
       <div className="sidebar-logo">
         <img src="/logo.jpg" alt="Digital Growth Studio" className="w-8 h-8 rounded-lg object-contain" />

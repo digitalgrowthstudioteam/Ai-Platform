@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { Search, Bell, LogOut, RefreshCw, AlertTriangle } from "lucide-react";
+import { Search, Bell, LogOut, RefreshCw, AlertTriangle, Menu } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useAdAccount } from "@/context/AdAccountContext";
 import { api } from "@/lib/api";
@@ -174,6 +174,20 @@ export default function Topbar() {
 
   return (
     <header className="topbar" id="topbar">
+      {/* Mobile Toggle Button */}
+      <button
+        type="button"
+        onClick={() => {
+          if (typeof document !== "undefined") {
+            document.body.classList.toggle("sidebar-open");
+          }
+        }}
+        className="lg:hidden p-2 rounded-lg text-slate-500 hover:bg-slate-100 mr-1.5 focus:outline-none"
+        aria-label="Toggle Navigation Sidebar"
+      >
+        <Menu size={20} />
+      </button>
+
       {/* Account Selector Dropdown */}
       <div className="topbar-account" id="account-selector">
         <div className="topbar-account-label">Ad Account</div>

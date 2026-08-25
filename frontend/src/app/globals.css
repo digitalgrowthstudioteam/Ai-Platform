@@ -1209,3 +1209,66 @@ body {
     @apply font-sans;
   }
 }
+
+/* ── Mobile & Responsive Sidebar Overrides ────────────────── */
+@media (max-width: 1024px) {
+  .sidebar {
+    transform: translateX(-100%);
+    box-shadow: none;
+    z-index: 50; /* Above topbar and content */
+  }
+
+  body.sidebar-open .sidebar {
+    transform: translateX(0);
+    box-shadow: 4px 0 24px rgba(15, 23, 42, 0.25);
+  }
+
+  .dashboard-main {
+    margin-left: 0 !important;
+  }
+
+  /* Blur overlay when sidebar is open */
+  body.sidebar-open::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.4);
+    backdrop-filter: blur(4px);
+    z-index: 45; /* Below sidebar, above topbar/main */
+    animation: fadeIn var(--transition-fast) ease-out;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+}
+
+@media (max-width: 768px) {
+  .topbar {
+    padding: 0 16px;
+    gap: 8px;
+  }
+
+  .topbar-account {
+    min-width: unset;
+    flex: 1;
+    padding: 4px 8px;
+  }
+
+  .topbar-search {
+    display: none !important; /* Hide search input on mobile */
+  }
+
+  .topbar-profile-info {
+    display: none !important; /* Hide profile name text on mobile */
+  }
+
+  .topbar-sync {
+    display: none !important; /* Hide sync status text on smaller devices to save space */
+  }
+
+  .dashboard-content {
+    padding: 16px;
+  }
+}
