@@ -118,11 +118,42 @@ export default function MetaAdsLandingPage() {
           {/* Desktop Navigation Links */}
           <nav className="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-600">
             <a href="#how-it-works" className="hover:text-slate-950 transition">How It Works</a>
+
+            {/* Services Dropdown */}
+            <div className="relative group">
+              <button className="hover:text-slate-950 transition flex items-center gap-1.5 py-2">
+                Services <ChevronDown size={14} className="text-slate-400 group-hover:text-slate-700 transition-transform group-hover:rotate-180" />
+              </button>
+              <div className="absolute top-full -left-4 mt-1 w-64 bg-white border border-slate-200/90 rounded-xl p-2 shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 space-y-1">
+                <Link
+                  href="/get-meta-ads"
+                  className="flex items-start gap-3 p-2.5 rounded-lg hover:bg-slate-50 transition group/item"
+                >
+                  <div className="p-2 bg-blue-50 text-blue-600 rounded-md group-hover/item:bg-blue-600 group-hover/item:text-white transition">
+                    <Sparkles size={16} />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-slate-900">Get Meta Ads at ₹333</div>
+                    <div className="text-[11px] text-slate-500 font-normal">Introductory ad setup runs</div>
+                  </div>
+                </Link>
+                <Link
+                  href="/get-meta-ads/free-plan"
+                  className="flex items-start gap-3 p-2.5 rounded-lg hover:bg-slate-50 transition group/item"
+                >
+                  <div className="p-2 bg-purple-50 text-purple-600 rounded-md group-hover/item:bg-purple-600 group-hover/item:text-white transition">
+                    <Sparkles size={16} />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-slate-900">Free Campaign Planner</div>
+                    <div className="text-[11px] text-slate-500 font-normal">Design campaign outlines for free</div>
+                  </div>
+                </Link>
+              </div>
+            </div>
+
             <a href="#pricing" className="hover:text-slate-950 transition">Pricing</a>
             <a href="#faq" className="hover:text-slate-950 transition">FAQ</a>
-            <Link href="/get-meta-ads/free-plan" className="hover:text-blue-600 transition flex items-center gap-1">
-              Free Campaign Plan <Sparkles size={14} className="text-blue-500" />
-            </Link>
           </nav>
 
           {/* Desktop Auth Action Buttons */}
@@ -172,8 +203,13 @@ export default function MetaAdsLandingPage() {
                 <a href="#how-it-works" onClick={() => setMobileMenuOpen(false)} className="py-2 hover:text-blue-600">How It Works</a>
                 <a href="#pricing" onClick={() => setMobileMenuOpen(false)} className="py-2 hover:text-blue-600">Pricing</a>
                 <a href="#faq" onClick={() => setMobileMenuOpen(false)} className="py-2 hover:text-blue-600">FAQ</a>
+
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-4">Services</div>
+                <Link href="/get-meta-ads" onClick={() => setMobileMenuOpen(false)} className="py-2 hover:text-blue-600 flex items-center gap-1.5">
+                  <Sparkles size={14} className="text-blue-600" /> Get Meta Ads at ₹333
+                </Link>
                 <Link href="/get-meta-ads/free-plan" onClick={() => setMobileMenuOpen(false)} className="py-2 hover:text-blue-600 flex items-center gap-1.5">
-                  Free Campaign Plan <Sparkles size={14} className="text-blue-500" />
+                  Free Campaign Planner
                 </Link>
               </div>
             </div>
