@@ -1431,7 +1431,7 @@ export default function GetAdsPage() {
                           if (pack.ad_quantity === 1) desc = "Standard";
                           else if (pack.ad_quantity === 5) desc = "Volume Save";
                           else if (pack.ad_quantity === 15) desc = "Pro Scaler";
-                          else if (pack.ad_quantity === 30) desc = "Growth Pack";
+                          else if (pack.ad_quantity === 30) desc = "Growth Tier";
                           else desc = "Wholesale";
 
                           if (idx > 0) {
@@ -1626,7 +1626,7 @@ export default function GetAdsPage() {
                       {/* Checkout policies & terms */}
                       <div className="space-y-4">
                         <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-amber-50/50 p-3 rounded-lg border border-amber-200 text-amber-800 leading-normal">
-                          ⚠ All Ad Pack purchases are non-refundable. Unused ads automatically expire after their stated validity period (e.g. 30/60/90 days) and cannot be carried forward.
+                          ⚠ All ad purchases are non-refundable. Unused ads automatically expire after their stated validity period (e.g. 30/60/90 days) and cannot be carried forward.
                         </div>
 
                         <label className="flex items-center gap-2.5 cursor-pointer">

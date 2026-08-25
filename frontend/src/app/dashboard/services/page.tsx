@@ -131,7 +131,7 @@ export default function MyServicesPage() {
                       showWarning ? "border-amber-200 bg-amber-50/20" : "border-slate-100 bg-slate-50/50"
                     }`}>
                       <div className="flex justify-between items-center font-bold">
-                        <span className="text-slate-700">{p.total} Ads Pack</span>
+                        <span className="text-slate-700">{p.total} Ads</span>
                         <span className="text-slate-500">{p.remaining} left</span>
                       </div>
                       <div className="flex justify-between items-center text-[10px] text-slate-400">
@@ -142,7 +142,7 @@ export default function MyServicesPage() {
                       </div>
                       {showWarning && (
                         <div className="text-[9px] font-bold text-amber-700 pt-1 flex items-center gap-1">
-                          <AlertTriangle size={10} /> ⚠️ Your Ad Pack expires in {daysLeft} days.
+                          <AlertTriangle size={10} /> ⚠️ Your ads expire in {daysLeft} days.
                         </div>
                       )}
                     </div>

@@ -45,7 +45,7 @@ export default function MetaAdsLandingPage() {
   const faqs = [
     {
       q: "Is ₹333 the price for every ad?",
-      a: "No. ₹333 is the limited-time introductory price for the first eligible ad. Additional ads use the applicable Ad Pack pricing."
+      a: "No. ₹333 is the limited-time introductory price for the first eligible ad. Additional ads use the applicable volume quantity pricing."
     },
     {
       q: "Is the Meta advertising budget included?",
@@ -68,8 +68,8 @@ export default function MetaAdsLandingPage() {
       a: "No. It is a limited-time introductory offer and can be disabled or expired by Digital Growth Studio at any time."
     },
     {
-      q: "Are Ad Packs refundable?",
-      a: "No. Ad Packs are non-refundable and expire automatically after their stated validity period."
+      q: "Are purchased ads refundable?",
+      a: "No. Purchased ads are non-refundable and expire automatically after their stated validity period."
     },
     {
       q: "What happens to unused ads?",
@@ -393,11 +393,11 @@ export default function MetaAdsLandingPage() {
               Simple & Transparent Pricing
             </h2>
             <p className="mt-4 text-slate-500">
-              Introductory pricing to get you started, plus flexible packs as you scale.
+              Introductory pricing to get you started, plus flexible quantity options as you scale.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
             {/* Promo Card */}
             <div className="bg-white border-2 border-blue-500 p-8 rounded-3xl relative flex flex-col justify-between shadow-xl shadow-blue-500/10">
               <div className="absolute top-0 right-6 -translate-y-1/2 px-3 py-1 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-[11px] font-bold rounded-full uppercase tracking-wider shadow-md">
@@ -428,61 +428,6 @@ export default function MetaAdsLandingPage() {
                   Get Started for ₹333
                 </Link>
                 <span className="text-[10px] text-slate-400 mt-2 text-center block">Available for the first eligible ad only.</span>
-              </div>
-            </div>
-
-            {/* Ad Packs Card */}
-            <div className="bg-white border border-slate-200 p-8 rounded-3xl flex flex-col justify-between shadow-sm hover:shadow-md transition">
-              <div>
-                <h4 className="text-lg font-bold text-slate-900">Need More Ads?</h4>
-                <p className="mt-2 text-xs text-slate-500">Purchase additional ad allocations as needed.</p>
-
-                <div className="mt-6 space-y-4">
-                  <div className="flex justify-between items-center pb-3 border-b border-slate-100">
-                    <div>
-                      <span className="text-sm font-bold text-slate-900">1 Ad Pack</span>
-                      <span className="text-[10px] text-slate-400 block">Valid: 30 Days</span>
-                    </div>
-                    <span className="text-base font-extrabold text-slate-900">₹999</span>
-                  </div>
-
-                  <div className="flex justify-between items-center pb-3 border-b border-slate-100">
-                    <div>
-                      <span className="text-sm font-bold text-slate-900">3 Ads Pack</span>
-                      <span className="text-[10px] text-slate-400 block">Valid: 30 Days (₹799/ad)</span>
-                    </div>
-                    <span className="text-base font-extrabold text-slate-900">₹2,397</span>
-                  </div>
-
-                  <div className="flex justify-between items-center pb-3 border-b border-slate-100">
-                    <div>
-                      <span className="text-sm font-bold text-blue-700">15 Ads Pack</span>
-                      <span className="text-[10px] text-slate-400 block">Valid: 60 Days (₹499/ad)</span>
-                    </div>
-                    <span className="text-base font-extrabold text-blue-700">₹7,485</span>
-                  </div>
-
-                  <div className="flex justify-between items-center relative">
-                    <div>
-                      <span className="text-sm font-bold text-indigo-700">30 Ads Pack <span className="text-[9px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-full font-extrabold uppercase">Best Value</span></span>
-                      <span className="text-[10px] text-slate-400 block">Valid: 90 Days (₹333/ad)</span>
-                    </div>
-                    <span className="text-base font-extrabold text-indigo-700">₹9,990</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-8">
-                <Link
-                  href="/get-ads"
-                  className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold rounded-xl border border-slate-200 text-center block text-sm transition"
-                >
-                  Buy Ad Packs
-                </Link>
-                <div className="text-[9px] text-slate-400 mt-2 space-y-1">
-                  <p>• Ad Packs are non-refundable.</p>
-                  <p>• Unused ads expire automatically after validity period.</p>
-                </div>
               </div>
             </div>
 

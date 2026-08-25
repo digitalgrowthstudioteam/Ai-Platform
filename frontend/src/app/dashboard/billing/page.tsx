@@ -215,7 +215,7 @@ export default function BillingPage() {
 
   const typeLabels: Record<string, string> = {
     quotation: "Quotation",
-    ad_pack: "Ad Pack",
+    ad_pack: "Ad Order",
     subscription: "Subscription",
   };
 
@@ -309,7 +309,7 @@ export default function BillingPage() {
               <Megaphone className="text-amber-600" size={18} />
             </div>
             <div>
-              <span className="text-[9px] text-slate-400 font-bold uppercase block">Ad Packs Purchased</span>
+              <span className="text-[9px] text-slate-400 font-bold uppercase block">Ads Purchased</span>
               <span className="text-xl font-black text-slate-900 font-sans">{adPackCount}</span>
             </div>
           </div>
