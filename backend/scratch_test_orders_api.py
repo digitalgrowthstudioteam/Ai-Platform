@@ -1,10 +1,18 @@
 import asyncio
 import asyncpg
+import os
+import sys
 from datetime import datetime
 
+# Ensure backend root is in python path
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+from app.config import get_settings
+
 async def main():
-    # Direct database connection
-    db_url = "postgresql://postgres.fpvqcyvalruepwameeet:DB_PASSWORD_PLACEHOLDER@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres"
+    # Load database connection string from environment
+    settings = get_settings()
+    db_url = settings.DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://")
 
     # Connect directly
     conn = await asyncpg.connect(db_url)
