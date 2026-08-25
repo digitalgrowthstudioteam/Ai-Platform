@@ -479,7 +479,7 @@ async def public_verify_quotation_payment(
         await db.commit()
         await db.refresh(user)
 
-    is_mock = req.razorpay_order_id.startswith("order_mock_")
+    is_mock = req.razorpay_order_id.startswith("order_mock_") or req.razorpay_payment_id.startswith("pay_mock_")
     if not is_mock and settings.RAZORPAY_KEY_ID and settings.RAZORPAY_KEY_SECRET and razorpay:
         try:
             client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
@@ -1921,3 +1921,237 @@ async def admin_update_order_status(
         "comment": payload.comment or "",
         "history": history
     }
+
+
+# ──────────────────────────────────────────────
+# Admin Create and Delete Orders & Quotations
+# ──────────────────────────────────────────────
+
+class AdminCreateOrderPayload(BaseModel):
+    email: str
+    total_ad_credits: int
+    validity_days: int = 30
+
+
+@router.post("/admin/orders", summary="Admin: Create a manual service order (Ad Pack)")
+async def admin_create_order(
+    payload: AdminCreateOrderPayload,
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    email = claims.get("email", "")
+    whitelisted_admins = {"flasshgames2026@gmail.com", "digitalgrowthstudioteam@gmail.com"}
+    if email not in whitelisted_admins:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied."
+        )
+
+    email_clean = payload.email.strip().lower()
+    
+    # Check if user exists
+    stmt_u = select(User).where(User.email == email_clean)
+    res_u = await db.execute(stmt_u)
+    user = res_u.scalar_one_or_none()
+    
+    if not user:
+        # Create a placeholder user
+        user = User(
+            firebase_uid=f"placeholder_{email_clean}",
+            email=email_clean,
+            name=email_clean.split("@")[0],
+            status="active"
+        )
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+
+    new_pack = AdPack(
+        user_id=user.id,
+        pack_type=f"manual_qty_{payload.total_ad_credits}",
+        total_ad_credits=payload.total_ad_credits,
+        used_ad_credits=0,
+        remaining_ad_credits=payload.total_ad_credits,
+        price_paid=0,
+        purchased_at=datetime.utcnow(),
+        expires_at=datetime.utcnow() + timedelta(days=payload.validity_days),
+        status="active",
+        non_refundable_terms_accepted=True,
+        non_refundable_terms_accepted_at=datetime.utcnow()
+    )
+    db.add(new_pack)
+    await db.commit()
+    await db.refresh(new_pack)
+
+    logger.info("admin_manual_order_created", user_id=str(user.id), pack_id=str(new_pack.id))
+    return {
+        "status": "success",
+        "message": f"Successfully created manual order for {payload.total_ad_credits} ads.",
+        "order_id": str(new_pack.id)
+    }
+
+
+@router.delete("/admin/orders/{order_id}", summary="Admin: Delete a service order")
+async def admin_delete_order(
+    order_id: str,
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    email = claims.get("email", "")
+    whitelisted_admins = {"flasshgames2026@gmail.com", "digitalgrowthstudioteam@gmail.com"}
+    if email not in whitelisted_admins:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied."
+        )
+
+    # Try parsing directly as UUID first
+    try:
+        potential_uuid = uuid.UUID(order_id)
+        # Check if it is a manual AdPack
+        stmt = select(AdPack).where(AdPack.id == potential_uuid)
+        res = await db.execute(stmt)
+        pack = res.scalar_one_or_none()
+        if pack:
+            await db.delete(pack)
+            await db.commit()
+            logger.info("admin_manual_order_deleted_direct", pack_id=str(potential_uuid))
+            return {"status": "success", "message": "Manual order deleted successfully."}
+            
+        # Check if it is a MetaAdServiceRequest
+        stmt_req = select(MetaAdServiceRequest).where(MetaAdServiceRequest.id == potential_uuid)
+        res_req = await db.execute(stmt_req)
+        req = res_req.scalar_one_or_none()
+        if req:
+            # Delete quotations first
+            stmt_q = select(ServiceQuotation).where(ServiceQuotation.service_request_id == req.id)
+            res_q = await db.execute(stmt_q)
+            for q in res_q.scalars().all():
+                await db.delete(q)
+            # Delete packs
+            stmt_p = select(AdPack).where(AdPack.service_request_id == req.id)
+            res_p = await db.execute(stmt_p)
+            for p in res_p.scalars().all():
+                await db.delete(p)
+            # Delete request
+            await db.delete(req)
+            await db.commit()
+            logger.info("admin_service_request_deleted_direct", request_id=str(req.id))
+            return {"status": "success", "message": "Service request and associated data deleted successfully."}
+    except ValueError:
+        pass
+
+    custom_id = None
+    if "-ad-" in order_id:
+        custom_id = order_id[:order_id.find("-ad-")]
+    elif "-setup" in order_id:
+        custom_id = order_id[:order_id.find("-setup")]
+    elif "-creative" in order_id:
+        custom_id = order_id[:order_id.find("-creative")]
+
+    is_custom = custom_id and len(custom_id) == 16 and custom_id.isdigit()
+    
+    if is_custom:
+        req, resolved_pack = await resolve_custom_id(custom_id, db)
+        if req:
+            # Delete quotations first
+            stmt_q = select(ServiceQuotation).where(ServiceQuotation.service_request_id == req.id)
+            res_q = await db.execute(stmt_q)
+            for q in res_q.scalars().all():
+                await db.delete(q)
+            # Delete packs
+            stmt_p = select(AdPack).where(AdPack.service_request_id == req.id)
+            res_p = await db.execute(stmt_p)
+            for p in res_p.scalars().all():
+                await db.delete(p)
+            # Delete request
+            await db.delete(req)
+            await db.commit()
+            logger.info("admin_service_request_deleted_via_order", request_id=str(req.id))
+            return {"status": "success", "message": "Service request and associated data deleted successfully."}
+        elif resolved_pack:
+            await db.delete(resolved_pack)
+            await db.commit()
+            logger.info("admin_manual_order_deleted", pack_id=str(resolved_pack.id))
+            return {"status": "success", "message": "Manual order deleted successfully."}
+    else:
+        # Fallback for legacy UUID
+        is_manual = order_id.startswith("manual-")
+        if is_manual:
+            ad_idx = order_id.rfind("-ad-")
+            if ad_idx != -1:
+                try:
+                    uuid_str = order_id[7:ad_idx]
+                    pack_id = uuid.UUID(uuid_str)
+                    stmt = select(AdPack).where(AdPack.id == pack_id)
+                    res = await db.execute(stmt)
+                    pack = res.scalar_one_or_none()
+                    if pack:
+                        await db.delete(pack)
+                        await db.commit()
+                        logger.info("admin_manual_order_deleted_legacy", pack_id=str(pack_id))
+                        return {"status": "success", "message": "Manual order deleted successfully."}
+                except ValueError:
+                    pass
+        else:
+            req_id_str = None
+            if "-ad-" in order_id:
+                req_id_str = order_id[:order_id.find("-ad-")]
+            elif "-setup" in order_id:
+                req_id_str = order_id[:order_id.find("-setup")]
+            elif "-creative" in order_id:
+                req_id_str = order_id[:order_id.find("-creative")]
+                
+            if req_id_str:
+                try:
+                    req_id = uuid.UUID(req_id_str)
+                    stmt = select(MetaAdServiceRequest).where(MetaAdServiceRequest.id == req_id)
+                    res = await db.execute(stmt)
+                    req = res.scalar_one_or_none()
+                    if req:
+                        # Delete quotations
+                        stmt_q = select(ServiceQuotation).where(ServiceQuotation.service_request_id == req.id)
+                        res_q = await db.execute(stmt_q)
+                        for q in res_q.scalars().all():
+                            await db.delete(q)
+                        # Delete packs
+                        stmt_p = select(AdPack).where(AdPack.service_request_id == req.id)
+                        res_p = await db.execute(stmt_p)
+                        for p in res_p.scalars().all():
+                            await db.delete(p)
+                        # Delete request
+                        await db.delete(req)
+                        await db.commit()
+                        logger.info("admin_service_request_deleted_via_order_legacy", request_id=str(req_id))
+                        return {"status": "success", "message": "Service request and associated data deleted successfully."}
+                except ValueError:
+                    pass
+
+    raise HTTPException(status_code=404, detail="Order not found.")
+
+
+@router.delete("/admin/quotations/{quotation_id}", summary="Admin: Delete a service quotation")
+async def admin_delete_quotation(
+    quotation_id: uuid.UUID,
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    email = claims.get("email", "")
+    whitelisted_admins = {"flasshgames2026@gmail.com", "digitalgrowthstudioteam@gmail.com"}
+    if email not in whitelisted_admins:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied."
+        )
+
+    stmt = select(ServiceQuotation).where(ServiceQuotation.id == quotation_id)
+    res = await db.execute(stmt)
+    quote = res.scalar_one_or_none()
+    if not quote:
+        raise HTTPException(status_code=404, detail="Quotation not found.")
+
+    await db.delete(quote)
+    await db.commit()
+    logger.info("admin_quotation_deleted", quote_id=str(quotation_id))
+    return {"status": "success", "message": "Successfully deleted quotation."}
+

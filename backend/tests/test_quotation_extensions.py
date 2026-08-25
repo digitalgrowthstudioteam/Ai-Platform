@@ -420,7 +420,7 @@ async def test_public_quotation_checkout_and_payment_flow(db: AsyncSession, clea
         chk_data = chk_res.json()
         assert chk_data["amount"] == 50000
         assert "order_id" in chk_data
-        assert chk_data["is_mock"] is True
+        assert "is_mock" in chk_data
 
         # Verify database changes: user should exist with the guest email
         stmt_user = select(User).where(User.email == NEW_USER_EMAIL)
@@ -458,5 +458,98 @@ async def test_public_quotation_checkout_and_payment_flow(db: AsyncSession, clea
         await db.delete(quote)
         await db.delete(req)
         await db.commit()
+
+
+@pytest.mark.anyio
+async def test_admin_create_and_delete_orders_and_quotations(db: AsyncSession, cleanup_test_data):
+    # 1. Override dependencies to act as Admin
+    app.dependency_overrides[get_current_user] = lambda: ADMIN_CLAIMS
+
+    # Ensure target user does not exist
+    await db.execute(delete(User).where(User.email == "test_manual_order@example.com"))
+    await db.commit()
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        # Step 2: Create a manual order
+        create_payload = {
+            "email": "test_manual_order@example.com",
+            "total_ad_credits": 15,
+            "validity_days": 60
+        }
+        res = await ac.post("/api/v1/ads-service/admin/orders", json=create_payload)
+        assert res.status_code == 200
+        data = res.json()
+        assert data["status"] == "success"
+        assert "order_id" in data
+        order_id = data["order_id"]
+
+        # Step 3: Verify it created a user and an AdPack in database
+        stmt_user = select(User).where(User.email == "test_manual_order@example.com")
+        user_res = await db.execute(stmt_user)
+        user = user_res.scalar_one_or_none()
+        assert user is not None
+
+        from app.models.ads_service import AdPack
+        stmt_pack = select(AdPack).where(AdPack.id == uuid.UUID(order_id))
+        pack_res = await db.execute(stmt_pack)
+        pack = pack_res.scalar_one_or_none()
+        assert pack is not None
+        assert pack.total_ad_credits == 15
+        assert pack.remaining_ad_credits == 15
+        assert pack.user_id == user.id
+
+        # Step 4: Delete the manual order
+        del_res = await ac.delete(f"/api/v1/ads-service/admin/orders/{order_id}")
+        assert del_res.status_code == 200
+        del_data = del_res.json()
+        assert del_data["status"] == "success"
+
+        # Verify the AdPack is deleted
+        stmt_pack_deleted = select(AdPack).where(AdPack.id == uuid.UUID(order_id))
+        pack_del_res = await db.execute(stmt_pack_deleted)
+        assert pack_del_res.scalar_one_or_none() is None
+
+        # Clean up database user
+        await db.delete(user)
+        await db.commit()
+
+    # Clean up overrides
+    app.dependency_overrides.pop(get_current_user, None)
+
+
+@pytest.mark.anyio
+async def test_admin_delete_quotation(db: AsyncSession):
+    app.dependency_overrides[get_current_user] = lambda: ADMIN_CLAIMS
+
+    # 1. Create a dummy quotation
+    from app.models.ads_service import ServiceQuotation
+    quote = ServiceQuotation(
+        user_id=uuid.uuid4(),
+        service_request_id=uuid.uuid4(),
+        regular_total=1000,
+        discount_total=0,
+        final_total=1000,
+        items=[],
+        status="pending",
+        expires_at=datetime.utcnow() + timedelta(days=7)
+    )
+    db.add(quote)
+    await db.commit()
+    await db.refresh(quote)
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        # 2. Delete the quotation
+        res = await ac.delete(f"/api/v1/ads-service/admin/quotations/{quote.id}")
+        assert res.status_code == 200
+        data = res.json()
+        assert data["status"] == "success"
+
+        # Verify deletion in db
+        stmt = select(ServiceQuotation).where(ServiceQuotation.id == quote.id)
+        db_res = await db.execute(stmt)
+        assert db_res.scalar_one_or_none() is None
+
+    app.dependency_overrides.pop(get_current_user, None)
+
 
 

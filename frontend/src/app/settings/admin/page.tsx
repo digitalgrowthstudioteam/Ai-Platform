@@ -78,6 +78,12 @@ export default function AdminPage() {
   const [quoteValidityDays, setQuoteValidityDays] = useState(7);
   const [generatedQuoteLink, setGeneratedQuoteLink] = useState("");
 
+  // Manual Order Creation State
+  const [showCreateOrderModal, setShowCreateOrderModal] = useState(false);
+  const [orderEmail, setOrderEmail] = useState("");
+  const [orderAdQty, setOrderAdQty] = useState(5);
+  const [orderValidityDays, setOrderValidityDays] = useState(30);
+
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   
@@ -125,6 +131,39 @@ export default function AdminPage() {
       setNotification({
         type: "error",
         message: err.message || "Failed to generate quotation.",
+      });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleCreateManualOrder = async () => {
+    if (!orderEmail) {
+      setNotification({ type: "error", message: "Email address is required." });
+      return;
+    }
+    setActionLoading("create_order");
+    try {
+      await api.adminCreateOrder({
+        email: orderEmail,
+        total_ad_credits: orderAdQty,
+        validity_days: orderValidityDays,
+      });
+      setNotification({
+        type: "success",
+        message: "Successfully created manual ad order!",
+      });
+      setShowCreateOrderModal(false);
+      setOrderEmail("");
+      setOrderAdQty(5);
+      setOrderValidityDays(30);
+      // Reload orders list
+      const ordersRes = await api.getAdminAdsServiceOrders();
+      setAdsOrdersList(ordersRes);
+    } catch (err: any) {
+      setNotification({
+        type: "error",
+        message: err.message || "Failed to create manual ad order.",
       });
     } finally {
       setActionLoading(null);
@@ -950,6 +989,36 @@ export default function AdminPage() {
                         </button>
                       </form>
 
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!window.confirm("Are you sure you want to delete this quotation and request? This will permanently delete all associated data.")) return;
+                          setActionLoading(`delete_${selectedRequestId}`);
+                          try {
+                            await api.deleteUserAdServiceRequest(r.user_id, selectedRequestId);
+                            setNotification({
+                              type: "success",
+                              message: "Successfully deleted quotation and request.",
+                            });
+                            // Reload requests
+                            const adsRes = await api.getAdminAdsServiceRequests();
+                            setAdsRequestsList(adsRes);
+                            setSelectedRequestId(null);
+                          } catch (err: any) {
+                            setNotification({
+                              type: "error",
+                              message: err.message || "Failed to delete quotation.",
+                            });
+                          } finally {
+                            setActionLoading(null);
+                          }
+                        }}
+                        disabled={actionLoading !== null}
+                        className="w-full bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold py-2.5 rounded-xl transition flex items-center justify-center gap-1.5 shadow-sm cursor-pointer uppercase text-[10px]"
+                      >
+                        Delete Quotation & Request
+                      </button>
+
                       {/* Ticket Raising Section */}
                       <div className="border-t border-slate-100 pt-4 mt-2 space-y-3">
                         <div className="flex justify-between items-center">
@@ -1060,6 +1129,17 @@ export default function AdminPage() {
                 <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
                   <Megaphone size={16} className="text-blue-600" /> Active Service Orders ({filteredAdsOrders.length})
                 </h3>
+                <button
+                  onClick={() => {
+                    setOrderEmail("");
+                    setOrderAdQty(5);
+                    setOrderValidityDays(30);
+                    setShowCreateOrderModal(true);
+                  }}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow-md shadow-blue-500/10 cursor-pointer"
+                >
+                  + Create Manual Order
+                </button>
               </div>
 
               {/* Filters Row */}
@@ -1586,6 +1666,42 @@ export default function AdminPage() {
                           </div>
                         )}
                       </div>
+
+                      <hr className="border-slate-100" />
+
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!window.confirm("Are you sure you want to delete this order? All associated service request and ad packages will be permanently deleted. This action cannot be undone.")) return;
+                          setActionLoading("delete_order");
+                          try {
+                            await api.adminDeleteOrder(selectedOrder.id);
+                            setNotification({
+                              type: "success",
+                              message: "Successfully deleted order and its associated data.",
+                            });
+                            // Reload
+                            const [ordersRes, requestsRes] = await Promise.all([
+                              api.getAdminAdsServiceOrders(),
+                              api.getAdminAdsServiceRequests(),
+                            ]);
+                            setAdsOrdersList(ordersRes);
+                            setAdsRequestsList(requestsRes);
+                            setSelectedOrderRowId(null);
+                          } catch (err: any) {
+                            setNotification({
+                              type: "error",
+                              message: err.message || "Failed to delete order.",
+                            });
+                          } finally {
+                            setActionLoading(null);
+                          }
+                        }}
+                        disabled={actionLoading !== null}
+                        className="w-full bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold py-2.5 rounded-xl transition text-[11px] uppercase tracking-wide cursor-pointer disabled:opacity-50"
+                      >
+                        Delete Service Order
+                      </button>
                     </div>
                   );
                 })() : (
@@ -1794,6 +1910,81 @@ export default function AdminPage() {
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Manual Order Modal */}
+      {showCreateOrderModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-205">
+            <div className="border-b border-slate-100 bg-slate-50 px-6 py-4 flex justify-between items-center">
+              <h3 className="font-bold text-slate-800 text-sm flex items-center gap-1.5">
+                <Megaphone size={16} className="text-blue-600" /> Create Manual Order
+              </h3>
+              <button
+                onClick={() => setShowCreateOrderModal(false)}
+                className="text-slate-400 hover:text-slate-600 font-bold text-sm"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-4 text-xs font-sans text-left">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-500 uppercase">Client Email Address</label>
+                <input
+                  type="email"
+                  required
+                  placeholder="e.g. client@example.com"
+                  value={orderEmail}
+                  onChange={(e) => setOrderEmail(e.target.value)}
+                  className="w-full border border-slate-200 rounded-xl px-3.5 py-2 text-xs bg-white font-bold text-slate-800"
+                />
+                <span className="text-[9px] text-slate-400 block font-medium">
+                  If the client email does not exist, a placeholder account will be created.
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Number of Ads</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={orderAdQty}
+                    onChange={(e) => setOrderAdQty(parseInt(e.target.value) || 1)}
+                    className="w-full border border-slate-200 rounded-xl px-3.5 py-2 text-xs bg-white font-bold text-slate-800"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-550 uppercase">Validity (Days)</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={orderValidityDays}
+                    onChange={(e) => setOrderValidityDays(parseInt(e.target.value) || 30)}
+                    className="w-full border border-slate-200 rounded-xl px-3.5 py-2 text-xs bg-white font-bold text-slate-800"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-3 font-sans">
+                <button
+                  onClick={() => setShowCreateOrderModal(false)}
+                  className="border border-slate-200 hover:bg-slate-50 text-slate-650 font-bold px-4 py-2 rounded-xl text-[11px] uppercase tracking-wide cursor-pointer transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCreateManualOrder}
+                  disabled={actionLoading === "create_order"}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-2 rounded-xl text-[11px] uppercase tracking-wide cursor-pointer transition disabled:opacity-50"
+                >
+                  {actionLoading === "create_order" ? "Creating..." : "Create Order"}
+                </button>
+              </div>
             </div>
           </div>
         </div>

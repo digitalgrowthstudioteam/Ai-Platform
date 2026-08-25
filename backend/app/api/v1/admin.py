@@ -1154,7 +1154,7 @@ async def delete_user_ad_service_request(
     db: AsyncSession = Depends(get_db)
 ):
     verify_admin(claims)
-    from app.models.ads_service import MetaAdServiceRequest
+    from app.models.ads_service import MetaAdServiceRequest, ServiceQuotation, AdPack
     stmt = (
         select(MetaAdServiceRequest)
         .where(MetaAdServiceRequest.id == request_id)
@@ -1165,10 +1165,22 @@ async def delete_user_ad_service_request(
     if not service_req:
         raise HTTPException(status_code=404, detail="Ads service request not found.")
 
+    # Delete associated quotations
+    stmt_q = select(ServiceQuotation).where(ServiceQuotation.service_request_id == request_id)
+    res_q = await db.execute(stmt_q)
+    for q in res_q.scalars().all():
+        await db.delete(q)
+
+    # Delete associated packs
+    stmt_p = select(AdPack).where(AdPack.service_request_id == request_id)
+    res_p = await db.execute(stmt_p)
+    for p in res_p.scalars().all():
+        await db.delete(p)
+
     await db.delete(service_req)
     await db.commit()
     logger.info("admin_ad_service_request_deleted", user_id=user_id, request_id=request_id)
-    return {"status": "success", "message": "Successfully deleted ads service request."}
+    return {"status": "success", "message": "Successfully deleted ads service request and associated data."}
 
 
 # ──────────────────────────────────────────────

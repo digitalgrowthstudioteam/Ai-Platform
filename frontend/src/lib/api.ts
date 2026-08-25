@@ -879,6 +879,25 @@ class ApiClient {
     });
   }
 
+  async adminDeleteQuotation(quotationId: string) {
+    return this.request<any>(`/ads-service/admin/quotations/${quotationId}`, {
+      method: "DELETE",
+    });
+  }
+
+  async adminCreateOrder(payload: any) {
+    return this.request<any>("/ads-service/admin/orders", {
+      method: "POST",
+      body: payload,
+    });
+  }
+
+  async adminDeleteOrder(orderId: string) {
+    return this.request<any>(`/ads-service/admin/orders/${orderId}`, {
+      method: "DELETE",
+    });
+  }
+
   async updateIndividualOrderStatus(orderId: string, status: string, comment?: string) {
     return this.request<any>(`/ads-service/admin/orders/${orderId}/status`, {
       method: "POST",
