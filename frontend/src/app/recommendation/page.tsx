@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
+import { event as trackGAEvent } from "@/lib/analytics";
 import {
   Sparkles,
   ArrowRight,
@@ -333,6 +334,14 @@ export default function RecommendationPage() {
     // Log event for slide progression
     api.logFunnelEvent("recommendation_step_completed", { step: currentStep + 1, question_id: q.id }).catch(() => {});
 
+    // Track GA4 selection event
+    trackGAEvent("checklist_answer_select", {
+      question_id: q.id,
+      question_text: q.question,
+      selected_option: val,
+      step: currentStep + 1
+    });
+
     if (currentStep < QUESTIONS.length - 1) {
       setCurrentStep(currentStep + 1);
     } else {
@@ -358,6 +367,15 @@ export default function RecommendationPage() {
     }
 
     setAnswers({ ...answers, [q.id]: updated });
+
+    // Track GA4 selection event
+    trackGAEvent("checklist_answer_toggle", {
+      question_id: q.id,
+      question_text: q.question,
+      selected_option: val,
+      all_selected: updated,
+      step: currentStep + 1
+    });
   };
 
   const handleNextStep = () => {
@@ -598,6 +616,7 @@ export default function RecommendationPage() {
             </div>
 
             <button
+              id="btn-checklist-contact-submit"
               onClick={handleContactSubmit}
               disabled={submitting}
               className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold py-3.5 rounded-xl transition flex items-center justify-center gap-2 text-sm shadow-md shadow-blue-500/10 cursor-pointer disabled:opacity-55"
@@ -642,6 +661,7 @@ export default function RecommendationPage() {
               </div>
             ) : (
               <button
+                id="btn-checklist-login-google"
                 onClick={handleSaveAndSubmit}
                 disabled={submitting}
                 className="w-full bg-slate-900 hover:bg-slate-950 text-white font-bold py-3.5 rounded-xl transition flex items-center justify-center gap-3 disabled:opacity-55 cursor-pointer shadow-md"
@@ -688,6 +708,7 @@ export default function RecommendationPage() {
                 {currentQuestion.options.map((opt, idx) => (
                   <button
                     key={idx}
+                    id={`q-option-${currentQuestion.id}-${opt.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")}`}
                     onClick={() => handleSelectSingle(opt)}
                     className="flex items-center text-left border border-slate-200 hover:border-blue-600 p-4 rounded-2xl hover:bg-blue-50/20 transition group text-sm font-bold text-slate-800 cursor-pointer"
                   >
@@ -705,6 +726,7 @@ export default function RecommendationPage() {
                     return (
                       <button
                         key={idx}
+                        id={`q-option-${currentQuestion.id}-${opt.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")}`}
                         onClick={() => toggleMultiSelect(opt)}
                         className={`flex items-center text-left border p-4 rounded-2xl transition group text-sm font-bold cursor-pointer ${
                           isSelected
@@ -720,7 +742,14 @@ export default function RecommendationPage() {
                 </div>
                 
                 <button
-                  onClick={handleNextStep}
+                  id="btn-confirm-selection"
+                  onClick={() => {
+                    trackGAEvent("checklist_multi_confirm", {
+                      question_id: currentQuestion.id,
+                      selected_options: answers[currentQuestion.id] || []
+                    });
+                    handleNextStep();
+                  }}
                   disabled={!(answers[currentQuestion.id] || []).length}
                   className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold py-3.5 rounded-xl transition flex items-center justify-center gap-2 text-xs shadow-md"
                 >
@@ -733,7 +762,11 @@ export default function RecommendationPage() {
             {/* Navigation instructions footer */}
             <div className="flex items-center justify-between text-xs font-semibold text-slate-400 pt-4 border-t border-slate-100 flex-wrap gap-2">
               <button
-                onClick={handleBack}
+                id="btn-checklist-back"
+                onClick={() => {
+                  trackGAEvent("checklist_back_click", { current_step: currentStep + 1 });
+                  handleBack();
+                }}
                 disabled={currentStep === 0}
                 className="flex items-center gap-1 hover:text-slate-600 transition disabled:opacity-30 font-bold"
               >

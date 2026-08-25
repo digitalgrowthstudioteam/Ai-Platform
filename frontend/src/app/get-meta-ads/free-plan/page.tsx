@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
+import { event as trackGAEvent } from "@/lib/analytics";
 import Link from "next/link";
 import {
   Sparkles,
@@ -114,11 +115,21 @@ export default function FreePlanQuestionnairePage() {
       return;
     }
 
+    // Track step completion
+    trackGAEvent("freeplan_step_next", {
+      step: currentStep + 1,
+      business_name: businessName,
+      industry: industry === "Other" ? industryOther : industry
+    });
+
     setCurrentStep((prev) => prev + 1);
   };
 
   const handleBack = () => {
     if (currentStep > 0) {
+      trackGAEvent("freeplan_step_back", {
+        step: currentStep + 1
+      });
       setCurrentStep((prev) => prev - 1);
     }
   };
@@ -128,6 +139,13 @@ export default function FreePlanQuestionnairePage() {
       alert("Please fill in all personal/contact details.");
       return;
     }
+
+    // Track GA4 generation event
+    trackGAEvent("freeplan_generate_click", {
+      business_name: businessName,
+      industry,
+      campaign_objective: campaignObjective
+    });
 
     try {
       setGenerating(true);
@@ -190,6 +208,7 @@ export default function FreePlanQuestionnairePage() {
             <h3 className="text-xl font-bold text-slate-900">Let's get started. What's your business or brand name?</h3>
             <input
               type="text"
+              id="input-freeplan-business-name"
               placeholder="e.g. Acme Cosmetics"
               value={businessName}
               onChange={(e) => setBusinessName(e.target.value)}
@@ -203,6 +222,7 @@ export default function FreePlanQuestionnairePage() {
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-2">What industry is your business in?</label>
               <select
+                id="select-freeplan-industry"
                 value={industry}
                 onChange={(e) => setIndustry(e.target.value)}
                 className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-blue-500"
@@ -230,6 +250,7 @@ export default function FreePlanQuestionnairePage() {
                 <label className="block text-sm font-semibold text-slate-700 mb-2">Please specify industry</label>
                 <input
                   type="text"
+                  id="input-freeplan-industry-other"
                   placeholder="Your industry details"
                   value={industryOther}
                   onChange={(e) => setIndustryOther(e.target.value)}
@@ -241,6 +262,7 @@ export default function FreePlanQuestionnairePage() {
               <label className="block text-sm font-semibold text-slate-700 mb-2">What specific product or service do you sell?</label>
               <input
                 type="text"
+                id="input-freeplan-product-service"
                 placeholder="e.g. Organic anti-aging skin serum"
                 value={productOrService}
                 onChange={(e) => setProductOrService(e.target.value)}
@@ -255,6 +277,7 @@ export default function FreePlanQuestionnairePage() {
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-2">What is your primary marketing goal?</label>
               <select
+                id="select-freeplan-campaign-objective"
                 value={campaignObjective}
                 onChange={(e) => setCampaignObjective(e.target.value)}
                 className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-blue-500"
@@ -270,6 +293,7 @@ export default function FreePlanQuestionnairePage() {
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-2">Where do customers convert or buy?</label>
               <select
+                id="select-freeplan-conversion-location"
                 value={conversionLocation}
                 onChange={(e) => setConversionLocation(e.target.value)}
                 className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-blue-500"
@@ -290,6 +314,7 @@ export default function FreePlanQuestionnairePage() {
               <label className="block text-sm font-semibold text-slate-700 mb-2">Where is your target audience located?</label>
               <input
                 type="text"
+                id="input-freeplan-target-location"
                 placeholder="e.g. India, USA, or Maharashtra/Mumbai"
                 value={targetLocation}
                 onChange={(e) => setTargetLocation(e.target.value)}
@@ -299,6 +324,7 @@ export default function FreePlanQuestionnairePage() {
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-2">Describe your ideal customer (optional)</label>
               <textarea
+                id="textarea-freeplan-target-customer"
                 placeholder="e.g. Women aged 25-45 interested in organic wellness and skincare"
                 value={targetCustomer}
                 onChange={(e) => setTargetCustomer(e.target.value)}
@@ -313,6 +339,7 @@ export default function FreePlanQuestionnairePage() {
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-2">What is your planned daily/monthly budget?</label>
               <select
+                id="select-freeplan-budget"
                 value={budget}
                 onChange={(e) => setBudget(e.target.value)}
                 className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-blue-500"
@@ -327,6 +354,7 @@ export default function FreePlanQuestionnairePage() {
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-2">How long do you plan to run the campaign?</label>
               <select
+                id="select-freeplan-duration"
                 value={duration}
                 onChange={(e) => setDuration(e.target.value)}
                 className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-blue-500"
@@ -346,6 +374,7 @@ export default function FreePlanQuestionnairePage() {
               <label className="block text-sm font-semibold text-slate-700 mb-2">What is your website or landing page URL? (optional)</label>
               <input
                 type="url"
+                id="input-freeplan-website"
                 placeholder="e.g. https://mybusiness.com"
                 value={website}
                 onChange={(e) => setWebsite(e.target.value)}
@@ -356,6 +385,7 @@ export default function FreePlanQuestionnairePage() {
               <label className="block text-sm font-semibold text-slate-700 mb-2">What is the main offer, discount, or deal?</label>
               <input
                 type="text"
+                id="input-freeplan-offer"
                 placeholder="e.g. Get 20% off your first order + free shipping"
                 value={offer}
                 onChange={(e) => setOffer(e.target.value)}
@@ -370,6 +400,7 @@ export default function FreePlanQuestionnairePage() {
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-2">What is your experience running Meta Ads?</label>
               <select
+                id="select-freeplan-previous-ads-experience"
                 value={previousAdsExperience}
                 onChange={(e) => setPreviousAdsExperience(e.target.value)}
                 className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-blue-500"
@@ -383,6 +414,7 @@ export default function FreePlanQuestionnairePage() {
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-2">What is your main challenge with Meta Ads?</label>
               <textarea
+                id="textarea-freeplan-main-challenge"
                 placeholder="e.g. Getting clicks but no conversions, high CPA, not sure how to structure my campaigns..."
                 value={mainChallenge}
                 onChange={(e) => setMainChallenge(e.target.value)}
@@ -401,6 +433,7 @@ export default function FreePlanQuestionnairePage() {
               
               <div className="py-8">
                 <button
+                  id="btn-freeplan-login-google"
                   onClick={loginWithGoogle}
                   className="px-8 py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl shadow-lg transition flex items-center justify-center gap-2 mx-auto"
                 >
@@ -421,6 +454,7 @@ export default function FreePlanQuestionnairePage() {
                 <label className="block text-sm font-semibold text-slate-700 mb-2">First Name</label>
                 <input
                   type="text"
+                  id="input-freeplan-first-name"
                   placeholder="First Name"
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
@@ -431,6 +465,7 @@ export default function FreePlanQuestionnairePage() {
                 <label className="block text-sm font-semibold text-slate-700 mb-2">Last Name</label>
                 <input
                   type="text"
+                  id="input-freeplan-last-name"
                   placeholder="Last Name"
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
@@ -442,6 +477,7 @@ export default function FreePlanQuestionnairePage() {
               <label className="block text-sm font-semibold text-slate-700 mb-2">WhatsApp Number</label>
               <input
                 type="text"
+                id="input-freeplan-whatsapp"
                 placeholder="e.g. +91 9876543210"
                 value={whatsapp}
                 onChange={(e) => setWhatsapp(e.target.value)}
@@ -552,6 +588,7 @@ export default function FreePlanQuestionnairePage() {
         <div className="flex items-center justify-between pt-6 border-t border-slate-100">
           {currentStep > 0 && currentStep < 7 ? (
             <button
+              id="btn-freeplan-back"
               onClick={handleBack}
               className="flex items-center gap-1.5 text-sm font-semibold text-slate-500 hover:text-slate-900 transition"
             >
@@ -563,6 +600,7 @@ export default function FreePlanQuestionnairePage() {
 
           {currentStep < 7 ? (
             <button
+              id="btn-freeplan-continue"
               onClick={handleNext}
               className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white font-bold rounded-xl shadow-md shadow-blue-500/10 hover:shadow-lg transition flex items-center gap-1.5 ml-auto"
               style={{
@@ -573,6 +611,7 @@ export default function FreePlanQuestionnairePage() {
             </button>
           ) : (
             <button
+              id="btn-freeplan-generate"
               onClick={handleGenerate}
               disabled={generating}
               className="px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold rounded-xl shadow-md shadow-blue-500/10 hover:shadow-lg transition flex items-center gap-2 ml-auto"
