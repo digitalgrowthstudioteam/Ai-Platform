@@ -57,13 +57,15 @@ export default function AdminQuotationDetailClient() {
   const fetchRequestDetails = async () => {
     try {
       setLoading(true);
+      setError(null);
       const res = await api.getAdminAdsServiceRequest(requestId);
       setData(res);
       setNewRequestStatus(res.status);
       setNewPartnerStatus(res.partner_access_status || "not_requested");
     } catch (err: any) {
       console.error(err);
-      setError(err.message || "Failed to load service request details.");
+      const msg = err.message || (typeof err === "string" ? err : JSON.stringify(err));
+      setError(msg || "Failed to load service request details.");
     } finally {
       setLoading(false);
     }
@@ -71,7 +73,9 @@ export default function AdminQuotationDetailClient() {
 
   useEffect(() => {
     if (user && whitelistedAdmins.has(user.email || "")) {
-      fetchRequestDetails();
+      if (requestId && requestId !== "placeholder") {
+        fetchRequestDetails();
+      }
     }
   }, [user, requestId]);
 
