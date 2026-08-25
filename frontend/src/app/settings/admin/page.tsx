@@ -179,7 +179,7 @@ export default function AdminPage() {
   };
 
   // Check admin role
-  const isAdmin = user?.email === "flasshgames2026@gmail.com" || user?.email === "digitalgrowthstudioteam@gmail.com";
+  const isAdmin = user?.email === "flasshgames2026@gmail.com" || user?.email === "digitalgrowthstudioteam@gmail.com" || user?.email === "vikramrwadkar@gmail.com";
 
   const loadAdminDashboard = async () => {
     if (!isAdmin) return;

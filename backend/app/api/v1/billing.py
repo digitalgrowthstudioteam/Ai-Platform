@@ -288,6 +288,7 @@ async def create_billing_order(
                     whitelisted_admins = {
                         "flasshgames2026@gmail.com",
                         "digitalgrowthstudioteam@gmail.com",
+                        "vikramrwadkar@gmail.com",
                     }
                     if email in whitelisted_admins:
                         is_admin = True

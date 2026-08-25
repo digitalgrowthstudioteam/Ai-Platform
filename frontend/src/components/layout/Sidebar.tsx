@@ -140,7 +140,7 @@ export default function Sidebar() {
     loadSubAndProfile();
   }, [user]);
 
-  const isAdmin = user?.email === "flasshgames2026@gmail.com" || user?.email === "digitalgrowthstudioteam@gmail.com";
+  const isAdmin = user?.email === "flasshgames2026@gmail.com" || user?.email === "digitalgrowthstudioteam@gmail.com" || user?.email === "vikramrwadkar@gmail.com";
 
   const visibleNavigation = navigation.map((section) => {
     let items = [...section.items];

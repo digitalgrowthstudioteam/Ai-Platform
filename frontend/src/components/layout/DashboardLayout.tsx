@@ -47,7 +47,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   ].some(path => pathname === path || pathname.startsWith(path + "/"));
 
   const { user } = useAuth();
-  const isAdmin = user?.email === "flasshgames2026@gmail.com" || user?.email === "digitalgrowthstudioteam@gmail.com";
+  const isAdmin = user?.email === "flasshgames2026@gmail.com" || user?.email === "digitalgrowthstudioteam@gmail.com" || user?.email === "vikramrwadkar@gmail.com";
 
   // Check trial expiration
   const endsAt = sub?.expires_at ? new Date(sub.expires_at) : null;

@@ -66,7 +66,7 @@ async def require_active_subscription(
     user = await get_db_user_from_claims(claims, db)
     
     # Super admins bypass subscription guards
-    if user.email in ["flasshgames2026@gmail.com", "digitalgrowthstudioteam@gmail.com"]:
+    if user.email in ["flasshgames2026@gmail.com", "digitalgrowthstudioteam@gmail.com", "vikramrwadkar@gmail.com"]:
         return user
         
     if user.status == "suspended":

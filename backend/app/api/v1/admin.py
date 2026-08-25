@@ -113,6 +113,7 @@ def verify_admin(claims: dict):
     whitelisted_admins = {
         "flasshgames2026@gmail.com",
         "digitalgrowthstudioteam@gmail.com",
+        "vikramrwadkar@gmail.com",
     }
     if email not in whitelisted_admins:
         raise HTTPException(

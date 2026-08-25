@@ -1500,7 +1500,7 @@ async def admin_list_requests(
     Lists all service requests registered in the application. Restricted to administrators.
     """
     email = claims.get("email", "")
-    whitelisted_admins = {"flasshgames2026@gmail.com", "digitalgrowthstudioteam@gmail.com"}
+    whitelisted_admins = {"flasshgames2026@gmail.com", "digitalgrowthstudioteam@gmail.com", "vikramrwadkar@gmail.com"}
     if email not in whitelisted_admins:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -1558,7 +1558,7 @@ async def admin_get_request(
     Restricted to administrators.
     """
     email = claims.get("email", "")
-    whitelisted_admins = {"flasshgames2026@gmail.com", "digitalgrowthstudioteam@gmail.com"}
+    whitelisted_admins = {"flasshgames2026@gmail.com", "digitalgrowthstudioteam@gmail.com", "vikramrwadkar@gmail.com"}
     if email not in whitelisted_admins:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -1631,7 +1631,7 @@ async def admin_list_orders(
     Lists all split service orders (individual ads and add-on deliverables) for paid requests.
     """
     email = claims.get("email", "")
-    whitelisted_admins = {"flasshgames2026@gmail.com", "digitalgrowthstudioteam@gmail.com"}
+    whitelisted_admins = {"flasshgames2026@gmail.com", "digitalgrowthstudioteam@gmail.com", "vikramrwadkar@gmail.com"}
     if email not in whitelisted_admins:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -1763,7 +1763,7 @@ async def admin_update_request(
     Updates the request operational status or partner access permission, or deducts ad pack credits when ads are consumed.
     """
     email = claims.get("email", "")
-    whitelisted_admins = {"flasshgames2026@gmail.com", "digitalgrowthstudioteam@gmail.com"}
+    whitelisted_admins = {"flasshgames2026@gmail.com", "digitalgrowthstudioteam@gmail.com", "vikramrwadkar@gmail.com"}
     if email not in whitelisted_admins:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -1830,7 +1830,7 @@ async def admin_update_order_status(
     db: AsyncSession = Depends(get_db)
 ):
     email = claims.get("email", "")
-    whitelisted_admins = {"flasshgames2026@gmail.com", "digitalgrowthstudioteam@gmail.com"}
+    whitelisted_admins = {"flasshgames2026@gmail.com", "digitalgrowthstudioteam@gmail.com", "vikramrwadkar@gmail.com"}
     if email not in whitelisted_admins:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -2015,7 +2015,7 @@ async def admin_create_order(
     db: AsyncSession = Depends(get_db)
 ):
     email = claims.get("email", "")
-    whitelisted_admins = {"flasshgames2026@gmail.com", "digitalgrowthstudioteam@gmail.com"}
+    whitelisted_admins = {"flasshgames2026@gmail.com", "digitalgrowthstudioteam@gmail.com", "vikramrwadkar@gmail.com"}
     if email not in whitelisted_admins:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -2073,7 +2073,7 @@ async def admin_delete_order(
     db: AsyncSession = Depends(get_db)
 ):
     email = claims.get("email", "")
-    whitelisted_admins = {"flasshgames2026@gmail.com", "digitalgrowthstudioteam@gmail.com"}
+    whitelisted_admins = {"flasshgames2026@gmail.com", "digitalgrowthstudioteam@gmail.com", "vikramrwadkar@gmail.com"}
     if email not in whitelisted_admins:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -2212,7 +2212,7 @@ async def admin_delete_quotation(
     db: AsyncSession = Depends(get_db)
 ):
     email = claims.get("email", "")
-    whitelisted_admins = {"flasshgames2026@gmail.com", "digitalgrowthstudioteam@gmail.com"}
+    whitelisted_admins = {"flasshgames2026@gmail.com", "digitalgrowthstudioteam@gmail.com", "vikramrwadkar@gmail.com"}
     if email not in whitelisted_admins:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

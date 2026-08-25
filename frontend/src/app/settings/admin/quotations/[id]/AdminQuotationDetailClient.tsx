@@ -52,7 +52,13 @@ export default function AdminQuotationDetailClient() {
 
   const [copiedLink, setCopiedLink] = useState(false);
 
-  const whitelistedAdmins = new Set(["flasshgames2026@gmail.com", "digitalgrowthstudioteam@gmail.com"]);
+  const whitelistedAdmins = new Set([
+    "flasshgames2026@gmail.com",
+    "digitalgrowthstudioteam@gmail.com",
+    "vikramrwadkar@gmail.com",
+  ]);
+
+  const isAdmin = user ? whitelistedAdmins.has(user.email || "") : false;
 
   const fetchRequestDetails = async () => {
     try {
@@ -72,12 +78,12 @@ export default function AdminQuotationDetailClient() {
   };
 
   useEffect(() => {
-    if (user && whitelistedAdmins.has(user.email || "")) {
+    if (user && isAdmin) {
       if (requestId && requestId !== "placeholder") {
         fetchRequestDetails();
       }
     }
-  }, [user, requestId]);
+  }, [user, requestId, isAdmin]);
 
   const handleUpdateSettings = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -165,7 +171,7 @@ export default function AdminQuotationDetailClient() {
     setTimeout(() => setCopiedLink(false), 2000);
   };
 
-  if (loadingAuth || (user && loading)) {
+  if (loadingAuth || (user && isAdmin && loading)) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3">
         <Loader2 className="animate-spin text-blue-600" size={32} />
@@ -174,7 +180,7 @@ export default function AdminQuotationDetailClient() {
     );
   }
 
-  if (user && !whitelistedAdmins.has(user.email || "")) {
+  if (user && !isAdmin) {
     return (
       <div className="p-6 max-w-md mx-auto text-center space-y-4">
         <ShieldAlert className="mx-auto text-red-600" size={48} />
