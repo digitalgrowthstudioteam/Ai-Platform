@@ -868,6 +868,10 @@ class ApiClient {
     return this.request<any>("/ads-service/admin/requests");
   }
 
+  async getAdminAdsServiceRequest(requestId: string) {
+    return this.request<any>(`/ads-service/admin/requests/${requestId}`);
+  }
+
   async getAdminAdsServiceOrders() {
     return this.request<any>("/ads-service/admin/orders");
   }

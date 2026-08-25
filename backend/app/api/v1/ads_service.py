@@ -1547,6 +1547,81 @@ async def admin_list_requests(
     return requests_data
 
 
+@router.get("/admin/requests/{id}", summary="Admin: Get an individual service request details and its quotation")
+async def admin_get_request(
+    id: uuid.UUID,
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Retrieves the details of a single service request along with its user, ad packs, and associated quotation.
+    Restricted to administrators.
+    """
+    email = claims.get("email", "")
+    whitelisted_admins = {"flasshgames2026@gmail.com", "digitalgrowthstudioteam@gmail.com"}
+    if email not in whitelisted_admins:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied."
+        )
+
+    # Fetch request
+    stmt = select(MetaAdServiceRequest).where(MetaAdServiceRequest.id == id)
+    res = await db.execute(stmt)
+    r = res.scalar_one_or_none()
+    if not r:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Service request not found."
+        )
+
+    # Fetch associated user profile
+    stmt_u = select(User).where(User.id == r.user_id)
+    res_u = await db.execute(stmt_u)
+    u = res_u.scalar_one_or_none()
+
+    # Fetch associated ad packs
+    stmt_p = select(AdPack).where(AdPack.service_request_id == r.id)
+    res_p = await db.execute(stmt_p)
+    packs = res_p.scalars().all()
+    
+    remaining_credits = sum(p.remaining_ad_credits for p in packs if p.status == "active")
+
+    # Fetch associated quotation
+    stmt_q = select(ServiceQuotation).where(ServiceQuotation.service_request_id == r.id).order_by(ServiceQuotation.created_at.desc())
+    res_q = await db.execute(stmt_q)
+    quote = res_q.scalars().first()
+
+    return {
+        "id": str(r.id),
+        "user_id": str(r.user_id),
+        "customer_name": r.full_name,
+        "customer_email": r.email,
+        "business_name": r.business_name,
+        "whatsapp_number": r.whatsapp_number,
+        "industry": r.industry,
+        "industry_other": r.industry_other,
+        "status": r.status,
+        "partner_access_status": r.partner_access_status,
+        "remaining_credits": remaining_credits,
+        "created_at": r.created_at,
+        "user_eligibility": {
+            "eligible": u.ads_service_eligible if u else True,
+            "reason": u.restriction_reason if u else None
+        },
+        "quotation": {
+            "id": str(quote.id) if quote else None,
+            "regular_total": quote.regular_total if quote else None,
+            "discount_total": quote.discount_total if quote else None,
+            "final_total": quote.final_total if quote else None,
+            "currency": quote.currency if quote else None,
+            "status": quote.status if quote else None,
+            "items": quote.items if quote else None,
+            "expires_at": quote.expires_at if quote else None,
+        } if quote else None
+    }
+
+
 @router.get("/admin/orders", summary="Admin: List all service orders")
 async def admin_list_orders(
     claims: dict = Depends(get_current_user),

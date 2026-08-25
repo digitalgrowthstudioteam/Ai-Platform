@@ -24,6 +24,10 @@
       {
         "source": "/pay-quotation/**",
         "destination": "/pay-quotation/placeholder.html"
+      },
+      {
+        "source": "/settings/admin/quotations/**",
+        "destination": "/settings/admin/quotations/placeholder.html"
       }
     ],
     "headers": [

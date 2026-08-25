@@ -552,4 +552,67 @@ async def test_admin_delete_quotation(db: AsyncSession):
     app.dependency_overrides.pop(get_current_user, None)
 
 
+@pytest.mark.anyio
+async def test_admin_get_request_details(db: AsyncSession):
+    app.dependency_overrides[get_current_user] = lambda: ADMIN_CLAIMS
+
+    # 1. Create a dummy request and quotation
+    from app.models.ads_service import MetaAdServiceRequest, ServiceQuotation
+    user_id = uuid.uuid4()
+    req = MetaAdServiceRequest(
+        user_id=user_id,
+        full_name="Test Request Detail",
+        email="test_detail@example.com",
+        business_name="Test Business",
+        whatsapp_number="12345",
+        business_location="India",
+        industry="Ecommerce",
+        advertised_product="Consulting",
+        campaign_objective="Leads",
+        daily_budget="1000",
+        number_of_ads=1,
+        meta_account_exists=True,
+        creative_required=False,
+        status="submitted",
+        partner_access_status="not_requested"
+    )
+    db.add(req)
+    await db.commit()
+    await db.refresh(req)
+
+    quote = ServiceQuotation(
+        user_id=user_id,
+        service_request_id=req.id,
+        regular_total=5000,
+        discount_total=1000,
+        final_total=4000,
+        items=[{"description": "Ad Setup", "regular_price": 5000, "discount": 1000}],
+        status="pending",
+        expires_at=datetime.utcnow() + timedelta(days=7)
+    )
+    db.add(quote)
+    await db.commit()
+    await db.refresh(quote)
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        # 2. Get the request details
+        res = await ac.get(f"/api/v1/ads-service/admin/requests/{req.id}")
+        assert res.status_code == 200
+        data = res.json()
+        assert data["id"] == str(req.id)
+        assert data["customer_name"] == "Test Request Detail"
+        assert data["business_name"] == "Test Business"
+        assert data["quotation"] is not None
+        assert data["quotation"]["final_total"] == 4000
+        assert data["quotation"]["status"] == "pending"
+
+        # 3. Clean up database
+        await db.delete(quote)
+        await db.delete(req)
+        await db.commit()
+
+    app.dependency_overrides.pop(get_current_user, None)
+
+
+
 
