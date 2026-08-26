@@ -1181,8 +1181,6 @@ async def build_orders_for_request(r: MetaAdServiceRequest, db: AsyncSession) ->
             history = order_statuses[target_id].get("history", [])
         else:
             ad_status = "completed" if i <= used else r.status
-            if ad_status == "completed" and i > used:
-                ad_status = "whatsapp_pending"
             comment = ""
             history = []
 
@@ -1884,6 +1882,19 @@ async def admin_update_request(
     # Update simple parameters
     if payload.status:
         req.status = payload.status
+        if payload.status == "completed":
+            stmt_packs = (
+                select(AdPack)
+                .where(AdPack.service_request_id == req.id)
+                .where(AdPack.status == "active")
+            )
+            res_packs = await db.execute(stmt_packs)
+            packs = res_packs.scalars().all()
+            for p in packs:
+                p.used_ad_credits = p.total_ad_credits
+                p.remaining_ad_credits = 0
+                p.status = "consumed"
+                db.add(p)
     if payload.partner_access_status:
         req.partner_access_status = payload.partner_access_status
 
