@@ -1117,7 +1117,8 @@ class MetaSyncService:
             "comments": 0,
             "shares": 0,
             "saves": 0,
-            "reactions": 0
+            "reactions": 0,
+            "landing_page_views": 0
         }
 
         # Parse action counts
@@ -1177,6 +1178,8 @@ class MetaSyncService:
                 out["video_play_100"] += val
             elif atype == "link_click":
                 out["link_clicks"] += val
+            elif atype in ("landing_page_view", "landing_page_views"):
+                out["landing_page_views"] += val
 
         # Parse action values (revenue)
         for val_node in (action_values_list or []):
