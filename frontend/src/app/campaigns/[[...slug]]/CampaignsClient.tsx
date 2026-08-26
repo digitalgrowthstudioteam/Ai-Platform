@@ -1633,20 +1633,26 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
           {/* Breadcrumb Navigation */}
           <div className="flex justify-between items-center bg-white p-4 border border-border rounded-lg shadow-xs">
             <div className="flex items-center gap-2 text-xs text-slate-400 font-bold">
-              <button onClick={() => { setSelectedAd(null); setSelectedAdSet(null); setSelectedCampaign(null); }} className="hover:text-slate-600 transition">Campaigns</button>
+              <button onClick={() => router.push('/campaigns')} className="hover:text-slate-600 transition">Campaigns</button>
               <span>/</span>
-              <button onClick={() => { setSelectedAd(null); setSelectedAdSet(null); }} className="hover:text-slate-600 transition">{selectedCampaign.name}</button>
+              <button onClick={() => router.push(`/campaigns?c=${selectedCampaign.id}`)} className="hover:text-slate-600 transition">{selectedCampaign.name}</button>
               <span>/</span>
               {selectedAdSet && (
                 <>
-                  <button onClick={() => setSelectedAd(null)} className="hover:text-slate-600 transition">{selectedAdSet.name}</button>
+                  <button onClick={() => router.push(`/campaigns?c=${selectedCampaign.id}&as=${selectedAdSet.id}`)} className="hover:text-slate-600 transition">{selectedAdSet.name}</button>
                   <span>/</span>
                 </>
               )}
               <span className="text-slate-800">{selectedAd.name}</span>
             </div>
             <button
-              onClick={() => setSelectedAd(null)}
+              onClick={() => {
+                if (selectedAdSet) {
+                  router.push(`/campaigns?c=${selectedCampaign.id}&as=${selectedAdSet.id}`);
+                } else {
+                  router.push(`/campaigns?c=${selectedCampaign.id}`);
+                }
+              }}
               className="flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-slate-800 transition cursor-pointer"
             >
               <ArrowLeft size={14} /> Back
