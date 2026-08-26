@@ -674,34 +674,36 @@ export default function AdSetsPage() {
                       {/* Primary KPIs Cards */}
                       <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-6">
                         {adSetPerformance.primary_metrics.map((k: any, idx: number) => (
-                          <div key={idx} className="card border border-slate-150 bg-white shadow-xs rounded-2xl p-5 flex flex-col justify-between hover:shadow-md hover:border-slate-200 transition-all duration-200 space-y-4 min-h-[180px]">
-                            <div className="flex justify-between items-start">
-                              <div>
-                                <span className="text-[10px] font-bold text-slate-450 uppercase tracking-wider block">{k.name}</span>
-                                <span className="text-[8px] font-bold text-blue-600 bg-blue-50/80 px-2 py-0.5 rounded-full mt-1.5 inline-block uppercase tracking-wider">Primary KPI</span>
+                          <div key={idx} className="card border border-slate-150 bg-white shadow-xs rounded-2xl p-4 flex hover:shadow-md hover:border-slate-200 transition-all duration-200 gap-3 min-h-[160px]">
+                            {/* Left Column: KPI Info */}
+                            <div className="flex-1 flex flex-col justify-between py-1">
+                              <div className="space-y-1">
+                                <span className="text-[10px] font-extrabold text-slate-455 uppercase tracking-wider block">{k.name}</span>
+                                <span className="text-[8px] font-black text-blue-600 bg-blue-50/80 px-2 py-0.5 rounded-full inline-block uppercase tracking-wider">Primary KPI</span>
                               </div>
-                              {k.change_percent !== null && (
-                                <div className={`flex items-center gap-0.5 text-xs font-extrabold px-2 py-1 rounded-lg ${
-                                  k.status === "good" ? "text-emerald-700 bg-emerald-50" :
-                                  k.status === "critical" ? "text-rose-700 bg-rose-50" : "text-slate-600 bg-slate-50"
-                                }`}>
-                                  {k.trend === "improving" ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-                                  {k.change_percent > 0 ? "+" : ""}{k.change_percent.toFixed(1)}%
-                                </div>
-                              )}
-                            </div>
 
-                            <div className="flex items-baseline justify-between">
-                              <div className="text-3xl font-black text-slate-900 tracking-tight">
+                              <div className="text-3xl font-black text-slate-900 tracking-tight my-1">
                                 {k.metric.includes("spend") || k.metric.includes("cost_") || k.metric === "cpc" || k.metric === "cpa" || k.metric === "cpm"
                                   ? formatCurrency(k.value)
                                   : k.metric.includes("rate") || k.metric.includes("ctr")
                                   ? formatPercent(k.value)
                                   : formatNumber(k.value)}
                               </div>
+
+                              {k.change_percent !== null ? (
+                                <div className={`flex items-center gap-0.5 text-[10px] font-black px-2 py-0.5 rounded-lg w-fit ${
+                                  k.status === "good" ? "text-emerald-700 bg-emerald-50" :
+                                  k.status === "critical" ? "text-rose-700 bg-rose-50" : "text-slate-600 bg-slate-50"
+                                }`}>
+                                  {k.trend === "improving" ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+                                  {k.change_percent > 0 ? "+" : ""}{k.change_percent.toFixed(1)}%
+                                </div>
+                              ) : (
+                                <div className="h-4" />
+                              )}
                             </div>
 
-                            {/* Historical Context Bar */}
+                            {/* Right Column: Historical Stacked Grid */}
                             {(() => {
                               const formatVal = (val: number) => {
                                 if (k.metric.includes("spend") || k.metric.includes("cost_") || k.metric === "cpc" || k.metric === "cpa" || k.metric === "cpm") {
@@ -713,37 +715,21 @@ export default function AdSetsPage() {
                                 return formatNumber(val);
                               };
                               return (
-                                <div className="bg-slate-50 border border-slate-100 rounded-xl p-2.5 grid grid-cols-5 gap-1 text-center divide-x divide-slate-200/60 mt-1">
-                                  <div className="px-1">
-                                    <div className="text-[8px] text-slate-400 font-extrabold uppercase tracking-wider">Prev Day</div>
-                                    <div className="text-[10px] font-bold text-slate-800 mt-0.5 truncate">
-                                      {k.history && k.history["1d"] !== undefined ? formatVal(k.history["1d"]) : "—"}
+                                <div className="border-l border-slate-100 pl-3 flex flex-col justify-between py-1 shrink-0 w-[115px] font-sans">
+                                  {[
+                                    { label: "Prev Day", val: k.history && k.history["1d"] !== undefined ? k.history["1d"] : undefined },
+                                    { label: "3 Days", val: k.history ? k.history["3d"] : undefined },
+                                    { label: "7 Days", val: k.history ? k.history["7d"] : undefined },
+                                    { label: "14 Days", val: k.history ? k.history["14d"] : undefined },
+                                    { label: "28 Days", val: k.history ? k.history["28d"] : undefined },
+                                  ].map((item, i) => (
+                                    <div key={i} className="flex justify-between items-baseline gap-1 text-[9.5px]">
+                                      <span className="text-[7.5px] font-extrabold text-slate-400 uppercase tracking-wide shrink-0">{item.label}</span>
+                                      <span className="font-bold text-slate-700 tracking-tight shrink-0">
+                                        {item.val !== undefined ? formatVal(item.val) : "—"}
+                                      </span>
                                     </div>
-                                  </div>
-                                  <div className="px-1">
-                                    <div className="text-[8px] text-slate-400 font-extrabold uppercase tracking-wider">3 Days</div>
-                                    <div className="text-[10px] font-bold text-slate-800 mt-0.5 truncate">
-                                      {k.history ? formatVal(k.history["3d"]) : "—"}
-                                    </div>
-                                  </div>
-                                  <div className="px-1">
-                                    <div className="text-[8px] text-slate-400 font-extrabold uppercase tracking-wider">7 Days</div>
-                                    <div className="text-[10px] font-bold text-slate-800 mt-0.5 truncate">
-                                      {k.history ? formatVal(k.history["7d"]) : "—"}
-                                    </div>
-                                  </div>
-                                  <div className="px-1">
-                                    <div className="text-[8px] text-slate-400 font-extrabold uppercase tracking-wider">14 Days</div>
-                                    <div className="text-[10px] font-bold text-slate-800 mt-0.5 truncate">
-                                      {k.history ? formatVal(k.history["14d"]) : "—"}
-                                    </div>
-                                  </div>
-                                  <div className="px-1">
-                                    <div className="text-[8px] text-slate-400 font-extrabold uppercase tracking-wider">28 Days</div>
-                                    <div className="text-[10px] font-bold text-slate-800 mt-0.5 truncate">
-                                      {k.history ? formatVal(k.history["28d"]) : "—"}
-                                    </div>
-                                  </div>
+                                  ))}
                                 </div>
                               );
                             })()}
