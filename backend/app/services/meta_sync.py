@@ -1126,6 +1126,13 @@ class MetaSyncService:
             atype = act.get("action_type", "")
             val = int(act.get("value", 0))
 
+            # Dynamic future-proof accumulation:
+            # Capture all raw action types dynamically in the database JSON
+            if atype:
+                if atype not in out:
+                    out[atype] = 0
+                out[atype] += val
+
             if atype in ("purchase", "offsite_conversion.fb_pixel_purchase", "onsite_conversion.purchase"):
                 out["purchases"] += val
             elif atype in ("lead", "offsite_conversion.fb_pixel_lead", "leadgen_grouped"):
@@ -1185,6 +1192,8 @@ class MetaSyncService:
         for val_node in (action_values_list or []):
             atype = val_node.get("action_type", "")
             val = float(val_node.get("value", 0.0))
+            if atype:
+                out[f"value_{atype}"] = val
             if atype in ("purchase", "offsite_conversion.fb_pixel_purchase", "onsite_conversion.purchase"):
                 out["revenue"] += val
 
