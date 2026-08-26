@@ -1782,8 +1782,9 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
                       </div>
                     ) : adPlacementsData.length > 0 ? (
                       (() => {
-                        const totalSpend = adPlacementsData.reduce((s: number, p: any) => s + (p.spend || 0), 0);
-                        return adPlacementsData.slice(0, 5).map((p: any, i: number) => {
+                        const sortedPlacements = [...adPlacementsData].sort((a: any, b: any) => (b.spend || 0) - (a.spend || 0));
+                        const totalSpend = sortedPlacements.reduce((s: number, p: any) => s + (p.spend || 0), 0);
+                        return sortedPlacements.slice(0, 5).map((p: any, i: number) => {
                           const pctSpend = totalSpend > 0 ? ((p.spend || 0) / totalSpend * 100) : 0;
                           const pCtr = p.impressions > 0 ? ((p.clicks || 0) / p.impressions * 100) : 0;
                           return (
