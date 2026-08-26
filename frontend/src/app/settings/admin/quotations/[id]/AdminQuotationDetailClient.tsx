@@ -265,7 +265,7 @@ export default function AdminQuotationDetailClient() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
         {/* Left Columns - Detail Cards */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-6 order-2 lg:order-1">
           {/* Card 1: To Whom We Quoted */}
           <div className="bg-white border border-slate-150 rounded-2xl p-6 shadow-xs space-y-4">
             <h3 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-3 flex items-center gap-2">
@@ -425,7 +425,7 @@ export default function AdminQuotationDetailClient() {
         </div>
 
         {/* Right Column - Service Controls */}
-        <div className="space-y-6">
+        <div className="space-y-6 order-1 lg:order-2">
           {/* Card 3: Service Settings */}
           <div className="bg-white border border-slate-150 rounded-2xl p-6 shadow-xs space-y-4">
             <h3 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-3 flex items-center gap-2">
