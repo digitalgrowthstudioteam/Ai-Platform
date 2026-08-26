@@ -1535,6 +1535,15 @@ async def get_admin_finance_stats(
     }
 
     for s in active_subs:
+        # Exclude admin overrides, mock payments, and complimentary/bonus starter plans
+        sub_id = s.razorpay_subscription_id
+        if not sub_id:
+            continue
+        if sub_id == "free_grant_bonus":
+            continue
+        if sub_id.startswith("order_mock_") or sub_id.startswith("pay_mock_") or sub_id.startswith("free_") or sub_id.startswith("manual-"):
+            continue
+            
         plan_name = s.plan.lower()
         meta_ai_plans_paise += PLAN_PRICES.get(plan_name, 0)
 
@@ -1565,6 +1574,13 @@ async def get_admin_finance_stats(
     }
 
     for a in addons_records:
+        # Exclude admin overrides and mock payments
+        pmt_id = a.razorpay_payment_id
+        if not pmt_id:
+            continue
+        if pmt_id.startswith("order_mock_") or pmt_id.startswith("pay_mock_") or pmt_id.startswith("free_") or pmt_id.startswith("manual-"):
+            continue
+            
         price = ADDON_PRICES.get(a.addon_id, 0) * a.quantity
         if "AI_INTELLIGENCE_" in a.addon_id:
             ai_intelligence_paise += price
@@ -1684,11 +1700,19 @@ async def get_admin_finance_stats(
     res_add_ren = await db.execute(stmt_add_ren)
     add_ren = res_add_ren.scalars().all()
 
-    next_month_renewals_count = len(sub_ren) + len(add_ren)
+    next_month_renewals_count = 0
     next_month_renewals_val = 0
     for s in sub_ren:
+        sub_id = s.razorpay_subscription_id
+        if not sub_id or sub_id == "free_grant_bonus" or sub_id.startswith("order_mock_") or sub_id.startswith("pay_mock_") or sub_id.startswith("free_") or sub_id.startswith("manual-"):
+            continue
+        next_month_renewals_count += 1
         next_month_renewals_val += PLAN_PRICES.get(s.plan.lower(), 0)
     for a in add_ren:
+        pmt_id = a.razorpay_payment_id
+        if not pmt_id or pmt_id.startswith("order_mock_") or pmt_id.startswith("pay_mock_") or pmt_id.startswith("free_") or pmt_id.startswith("manual-"):
+            continue
+        next_month_renewals_count += 1
         next_month_renewals_val += ADDON_PRICES.get(a.addon_id, 0) * a.quantity
 
     # 10. Fetch Expenses in the range

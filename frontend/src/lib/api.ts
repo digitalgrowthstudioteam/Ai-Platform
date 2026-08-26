@@ -582,6 +582,29 @@ class ApiClient {
     }>("/admin/stats");
   }
 
+  async getAdminFinanceStats(startDate?: string, endDate?: string) {
+    let url = "/admin/finance/stats";
+    const params = new URLSearchParams();
+    if (startDate) params.append("start_date", startDate);
+    if (endDate) params.append("end_date", endDate);
+    const qs = params.toString();
+    if (qs) url += `?${qs}`;
+    return this.request<any>(url);
+  }
+
+  async createAdminExpense(payload: { category: string; amount: number; description?: string; expense_date?: string }) {
+    return this.request<any>("/admin/finance/expenses", {
+      method: "POST",
+      body: payload,
+    });
+  }
+
+  async deleteAdminExpense(expenseId: string) {
+    return this.request<any>(`/admin/finance/expenses/${expenseId}`, {
+      method: "DELETE",
+    });
+  }
+
   async getAdminUsers() {
     return this.request<any[]>("/admin/users");
   }

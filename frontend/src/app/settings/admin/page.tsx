@@ -26,6 +26,10 @@ import {
   Sparkles,
   Brain,
   Sliders,
+  TrendingUp,
+  Plus,
+  Trash2,
+  DollarSign,
 } from "lucide-react";
 
 export default function AdminPage() {
@@ -33,11 +37,11 @@ export default function AdminPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const [activeTab, setActiveTab] = useState<"overview" | "users" | "tickets" | "ads_services" | "ads_orders" | "ads_leads">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "users" | "tickets" | "ads_services" | "ads_orders" | "ads_leads" | "finance">("overview");
 
   useEffect(() => {
     const tabParam = searchParams.get("tab");
-    if (tabParam && ["overview", "users", "tickets", "ads_services", "ads_orders", "ads_leads"].includes(tabParam)) {
+    if (tabParam && ["overview", "users", "tickets", "ads_services", "ads_orders", "ads_leads", "finance"].includes(tabParam)) {
       setActiveTab(tabParam as any);
     }
   }, [searchParams]);
@@ -60,6 +64,19 @@ export default function AdminPage() {
   const [newRequestStatus, setNewRequestStatus] = useState("");
   const [newPartnerStatus, setNewPartnerStatus] = useState("");
   const [creditsToConsume, setCreditsToConsume] = useState(0);
+
+  // Finance Dashboard states
+  const [financeStats, setFinanceStats] = useState<any>(null);
+  const [financeLoading, setFinanceLoading] = useState(false);
+  const [financeStartDate, setFinanceStartDate] = useState("");
+  const [financeEndDate, setFinanceEndDate] = useState("");
+  
+  // Expense Form state
+  const [expenseCategory, setExpenseCategory] = useState("marketing");
+  const [expenseAmount, setExpenseAmount] = useState("");
+  const [expenseDate, setExpenseDate] = useState("");
+  const [expenseDescription, setExpenseDescription] = useState("");
+  const [showAddExpenseModal, setShowAddExpenseModal] = useState(false);
 
   // Selected ads order row
   const [selectedOrderRowId, setSelectedOrderRowId] = useState<string | null>(null);
@@ -178,6 +195,60 @@ export default function AdminPage() {
     }
   };
 
+  const handleAddExpense = async () => {
+    if (!expenseAmount || parseFloat(expenseAmount) <= 0) {
+      alert("Please enter a valid expense amount.");
+      return;
+    }
+    setActionLoading("add_expense");
+    try {
+      await api.createAdminExpense({
+        category: expenseCategory,
+        amount: parseFloat(expenseAmount),
+        description: expenseDescription,
+        expense_date: expenseDate ? new Date(expenseDate).toISOString() : undefined,
+      });
+      setNotification({
+        type: "success",
+        message: "Successfully added manual expense!",
+      });
+      setShowAddExpenseModal(false);
+      setExpenseAmount("");
+      setExpenseDescription("");
+      setExpenseDate("");
+      // Reload stats
+      loadFinanceStats(financeStartDate, financeEndDate);
+    } catch (err: any) {
+      setNotification({
+        type: "error",
+        message: err.message || "Failed to add manual expense.",
+      });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleDeleteExpense = async (expenseId: string) => {
+    if (!confirm("Are you sure you want to delete this expense record?")) return;
+    setActionLoading(`delete_expense_${expenseId}`);
+    try {
+      await api.deleteAdminExpense(expenseId);
+      setNotification({
+        type: "success",
+        message: "Successfully deleted expense record!",
+      });
+      // Reload stats
+      loadFinanceStats(financeStartDate, financeEndDate);
+    } catch (err: any) {
+      setNotification({
+        type: "error",
+        message: err.message || "Failed to delete expense record.",
+      });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   // Check admin role
   const isAdmin = user?.email === "flasshgames2026@gmail.com" || user?.email === "digitalgrowthstudioteam@gmail.com" || user?.email === "vikramrwadkar@gmail.com";
 
@@ -203,6 +274,28 @@ export default function AdminPage() {
       setLoading(false);
     }
   };
+
+  const loadFinanceStats = async (start?: string, end?: string) => {
+    try {
+      setFinanceLoading(true);
+      const res = await api.getAdminFinanceStats(start, end);
+      setFinanceStats(res);
+    } catch (err: any) {
+      console.error("Failed to load finance stats:", err);
+      setNotification({
+        type: "error",
+        message: err.message || "Failed to load finance stats."
+      });
+    } finally {
+      setFinanceLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "finance" && isAdmin) {
+      loadFinanceStats(financeStartDate, financeEndDate);
+    }
+  }, [activeTab, financeStartDate, financeEndDate, isAdmin]);
 
   useEffect(() => {
     if (!loadingAuth) {
@@ -375,6 +468,14 @@ export default function AdminPage() {
           }`}
         >
           Meta Ads Leads (Drafts)
+        </button>
+        <button
+          onClick={() => setActiveTab("finance")}
+          className={`pb-2.5 text-xs font-bold transition-all border-b-2 px-1 flex items-center gap-1.5 ${
+            activeTab === "finance" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-400"
+          }`}
+        >
+          Finance Dashboard
         </button>
       </div>
 
@@ -1802,6 +1903,392 @@ export default function AdminPage() {
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB CONTENT: Finance Panel */}
+      {activeTab === "finance" && (
+        <div className="space-y-6">
+          {/* Finance Date range control */}
+          <div className="flex justify-between items-center bg-white border border-slate-150 rounded-2xl p-4 shadow-xs flex-wrap gap-4 text-xs">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="text-blue-600 animate-pulse" size={18} />
+              <span className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">Financial Reports & Performance Ledger</span>
+            </div>
+            <div className="flex items-center gap-4 text-[11px] font-sans flex-wrap">
+              <div className="flex items-center gap-1.5">
+                <span className="font-bold text-slate-500">From:</span>
+                <input
+                  type="date"
+                  value={financeStartDate}
+                  onChange={(e) => setFinanceStartDate(e.target.value)}
+                  className="border border-slate-200 rounded-xl px-3 py-1.5 font-bold text-slate-700 bg-slate-50/50 focus:ring-1 focus:ring-blue-500 outline-none"
+                />
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="font-bold text-slate-500">To:</span>
+                <input
+                  type="date"
+                  value={financeEndDate}
+                  onChange={(e) => setFinanceEndDate(e.target.value)}
+                  className="border border-slate-200 rounded-xl px-3 py-1.5 font-bold text-slate-700 bg-slate-50/50 focus:ring-1 focus:ring-blue-500 outline-none"
+                />
+              </div>
+              {(financeStartDate || financeEndDate) && (
+                <button
+                  onClick={() => {
+                    setFinanceStartDate("");
+                    setFinanceEndDate("");
+                  }}
+                  className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold px-3 py-1.5 rounded-xl cursor-pointer transition"
+                >
+                  Reset
+                </button>
+              )}
+            </div>
+          </div>
+
+          {financeLoading ? (
+            <div className="flex flex-col items-center justify-center min-h-[30vh] gap-2">
+              <Loader2 className="animate-spin text-blue-600" size={32} />
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Compiling Finance Stats...</span>
+            </div>
+          ) : financeStats ? (
+            <div className="space-y-6 font-sans">
+              {/* Summary KPIs Banner */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                {/* Gross Revenue */}
+                <div className="bg-gradient-to-br from-blue-50 to-indigo-50/20 border border-blue-100 rounded-2xl p-5 shadow-xs flex flex-col justify-between">
+                  <div>
+                    <span className="text-[10px] font-bold text-blue-700/80 uppercase tracking-wider">Gross Revenue</span>
+                    <h3 className="text-2xl font-black text-slate-900 mt-1.5">
+                      ₹{financeStats.gross_revenue_inr.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+                    </h3>
+                  </div>
+                  <div className="mt-3.5 space-y-1 text-[10px] border-t border-blue-100/50 pt-2 font-medium text-slate-500">
+                    <div className="flex justify-between">
+                      <span>SaaS Add-ons:</span>
+                      <span className="font-bold text-slate-700">₹{(financeStats.category_breakdown.addons / 100).toLocaleString("en-IN")}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Offer Promos:</span>
+                      <span className="font-bold text-slate-700">₹{(financeStats.category_breakdown.offers / 100).toLocaleString("en-IN")}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Meta AI Plans:</span>
+                      <span className="font-bold text-slate-700">₹{(financeStats.category_breakdown.meta_ai_plans / 100).toLocaleString("en-IN")}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>AI Intel Subs:</span>
+                      <span className="font-bold text-slate-700">₹{(financeStats.category_breakdown.ai_intelligence / 100).toLocaleString("en-IN")}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Credit Packs:</span>
+                      <span className="font-bold text-slate-700">₹{(financeStats.category_breakdown.one_time_credits / 100).toLocaleString("en-IN")}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Total Expenses */}
+                <div className="bg-white border border-slate-150 rounded-2xl p-5 shadow-xs flex flex-col justify-between">
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Expenses</span>
+                    <h3 className="text-2xl font-black text-slate-900 mt-1.5">
+                      ₹{financeStats.total_expenses_inr.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+                    </h3>
+                  </div>
+                  <div className="mt-4 pt-2.5 border-t border-slate-100 text-[10px] text-slate-400 font-medium">
+                    Manual expense ledger items recorded by admin within active filters.
+                  </div>
+                </div>
+
+                {/* Net Profit */}
+                <div className="bg-white border border-slate-150 rounded-2xl p-5 shadow-xs flex flex-col justify-between">
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Net Profit</span>
+                    <h3 className={`text-2xl font-black mt-1.5 ${financeStats.net_profit_inr >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
+                      ₹{financeStats.net_profit_inr.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+                    </h3>
+                  </div>
+                  <div className="mt-4 pt-2.5 border-t border-slate-100 text-[10px] text-slate-400 font-medium flex items-center justify-between">
+                    <span>Profit Margin:</span>
+                    <span className={`font-bold ${financeStats.net_profit_inr >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
+                      {financeStats.gross_revenue_inr > 0 ? ((financeStats.net_profit_inr / financeStats.gross_revenue_inr) * 100).toFixed(1) : 0}%
+                    </span>
+                  </div>
+                </div>
+
+                {/* Active Subscriptions */}
+                <div className="bg-white border border-slate-150 rounded-2xl p-5 shadow-xs flex flex-col justify-between">
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Active Subscriptions</span>
+                    <h3 className="text-2xl font-black text-slate-900 mt-1.5">
+                      {financeStats.active_subscriptions_count + financeStats.active_addons_count}
+                    </h3>
+                  </div>
+                  <div className="mt-3.5 pt-2 border-t border-slate-100 text-[10px] text-slate-500 font-medium space-y-1">
+                    <div className="flex justify-between">
+                      <span>Base AI Plans:</span>
+                      <span className="font-bold text-slate-700">{financeStats.active_subscriptions_count} active</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Recurring Add-ons:</span>
+                      <span className="font-bold text-slate-700">{financeStats.active_addons_count} active</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Two-Column Grid */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+                
+                {/* Left Column: Funnel & Forecasts */}
+                <div className="lg:col-span-1 space-y-6">
+                  {/* Quotations Metrics */}
+                  <div className="bg-white border border-slate-150 rounded-2xl p-6 shadow-xs text-left space-y-4">
+                    <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider pb-2 border-b border-slate-100">
+                      Quotation Funnel (Filters)
+                    </h3>
+                    <div className="space-y-3.5 text-xs">
+                      {/* Generated / Pending */}
+                      <div className="flex justify-between items-center">
+                        <div className="space-y-0.5">
+                          <p className="font-bold text-slate-700">Generated / Pending</p>
+                          <p className="text-[10px] text-slate-400 font-medium">Awaiting payment verification</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-extrabold text-slate-800">{financeStats.quotations_pending_count} quotes</p>
+                          <p className="text-[10px] text-slate-500 font-bold">₹{(financeStats.quotations_pending_value_paise / 100).toLocaleString("en-IN")}</p>
+                        </div>
+                      </div>
+
+                      {/* Expiring Tomorrow */}
+                      <div className="flex justify-between items-center">
+                        <div className="space-y-0.5">
+                          <p className="font-bold text-amber-700">Expiring Tomorrow</p>
+                          <p className="text-[10px] text-slate-450 font-medium">Action required / high urgency</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-extrabold text-amber-800">{financeStats.quotations_expiring_tomorrow_count} quotes</p>
+                          <p className="text-[10px] text-amber-600 font-bold">₹{(financeStats.quotations_expiring_tomorrow_value_paise / 100).toLocaleString("en-IN")}</p>
+                        </div>
+                      </div>
+
+                      {/* Expired / Cancelled */}
+                      <div className="flex justify-between items-center">
+                        <div className="space-y-0.5">
+                          <p className="font-bold text-slate-600">Quotation Expired</p>
+                          <p className="text-[10px] text-slate-400 font-medium">Unpaid, expired or cancelled</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-extrabold text-slate-700">{financeStats.quotations_expired_count} quotes</p>
+                          <p className="text-[10px] text-slate-500 font-bold">₹{(financeStats.quotations_expired_value_paise / 100).toLocaleString("en-IN")}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Subscription Forecast */}
+                  <div className="bg-white border border-slate-150 rounded-2xl p-6 shadow-xs text-left space-y-4">
+                    <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider pb-2 border-b border-slate-100 flex items-center gap-1">
+                      <Calendar size={14} className="text-blue-600" /> Next Month Forecast
+                    </h3>
+                    <div className="p-4 bg-slate-50 border border-slate-100 rounded-xl space-y-1">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Estimated Renewals</span>
+                      <h4 className="text-xl font-black text-slate-800">
+                        ₹{(financeStats.next_month_renewals_value_paise / 100).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+                      </h4>
+                      <p className="text-[10px] text-slate-500 font-bold pt-1">
+                        From {financeStats.next_month_renewals_count} active plan/addon expiries.
+                      </p>
+                    </div>
+                    <p className="text-[10px] leading-relaxed text-slate-400 font-medium">
+                      Note: Forecast assumes all active plans and recurring addons renew successfully without cancellations.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Right Column: Manual Expenses Ledger */}
+                <div className="lg:col-span-2 bg-white border border-slate-150 rounded-2xl p-6 shadow-xs text-left space-y-4">
+                  <div className="flex justify-between items-center border-b border-slate-100 pb-3 flex-wrap gap-2">
+                    <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider">
+                      Manual Expenses Ledger ({financeStats.expenses.length})
+                    </h3>
+                    <button
+                      onClick={() => setShowAddExpenseModal(true)}
+                      className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-[10px] uppercase tracking-wide px-3.5 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1"
+                    >
+                      <Plus size={11} /> Add Expense
+                    </button>
+                  </div>
+
+                  {financeStats.expenses.length === 0 ? (
+                    <div className="py-12 text-center text-slate-400 space-y-1">
+                      <AlertTriangle className="mx-auto text-slate-300" size={32} />
+                      <p className="text-xs font-bold">No manual expenses logged.</p>
+                      <p className="text-[10px]">Expenses added manually will appear here and update calculations.</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs font-sans">
+                        <thead>
+                          <tr className="border-b border-slate-100 text-slate-400 font-bold text-[10px] uppercase tracking-wider text-left">
+                            <th className="pb-2.5">Category</th>
+                            <th className="pb-2.5">Description</th>
+                            <th className="pb-2.5">Expense Date</th>
+                            <th className="pb-2.5 text-right">Amount</th>
+                            <th className="pb-2.5 text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {financeStats.expenses.map((exp: any) => {
+                            const catColors: Record<string, string> = {
+                              marketing: "bg-orange-50 text-orange-700 border-orange-100",
+                              servers: "bg-purple-50 text-purple-700 border-purple-100",
+                              salaries: "bg-teal-50 text-teal-700 border-teal-100",
+                              office: "bg-blue-50 text-blue-700 border-blue-100",
+                              tools: "bg-indigo-50 text-indigo-700 border-indigo-100",
+                              other: "bg-slate-50 text-slate-700 border-slate-100",
+                            };
+                            return (
+                              <tr key={exp.id} className="hover:bg-slate-50/30 transition text-slate-700">
+                                <td className="py-3 pr-2">
+                                  <span className={`px-2 py-0.5 border rounded-full text-[9px] font-bold uppercase ${catColors[exp.category] || catColors.other}`}>
+                                    {exp.category}
+                                  </span>
+                                </td>
+                                <td className="py-3 pr-2 font-medium max-w-[150px] truncate" title={exp.description || "—"}>
+                                  {exp.description || "—"}
+                                </td>
+                                <td className="py-3 pr-2 font-medium text-slate-500">
+                                  {new Date(exp.expense_date).toLocaleDateString()}
+                                </td>
+                                <td className="py-3 pr-2 font-extrabold text-slate-900 text-right">
+                                  ₹{exp.amount.toLocaleString("en-IN")}
+                                </td>
+                                <td className="py-3 text-right">
+                                  <button
+                                    onClick={() => handleDeleteExpense(exp.id)}
+                                    disabled={actionLoading === `delete_expense_${exp.id}`}
+                                    className="text-rose-500 hover:text-rose-705 p-1 rounded-md transition cursor-pointer disabled:opacity-50 inline-block align-middle"
+                                    title="Delete record"
+                                  >
+                                    <Trash2 size={13} />
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+
+              </div>
+            </div>
+          ) : (
+            <div className="py-12 bg-white border border-slate-150 rounded-2xl text-center text-slate-400">
+              <AlertTriangle className="mx-auto text-slate-350" size={36} />
+              <p className="text-xs font-bold mt-2">Failed to compile finance reports.</p>
+              <button
+                onClick={() => loadFinanceStats(financeStartDate, financeEndDate)}
+                className="mt-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-[10px] uppercase tracking-wide px-4 py-2 rounded-xl transition cursor-pointer"
+              >
+                Retry Load
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Manual Expense Form Modal */}
+      {showAddExpenseModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="bg-white w-full max-w-sm rounded-2xl shadow-xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-205">
+            <div className="border-b border-slate-100 bg-slate-50 px-6 py-4 flex justify-between items-center">
+              <h3 className="font-bold text-slate-800 text-sm flex items-center gap-1.5">
+                <DollarSign size={16} className="text-blue-600" /> Log Business Expense
+              </h3>
+              <button
+                onClick={() => setShowAddExpenseModal(false)}
+                className="text-slate-400 hover:text-slate-600 font-bold text-sm cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 text-xs font-sans text-left">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-550 uppercase">Expense Category</label>
+                <select
+                  value={expenseCategory}
+                  onChange={(e) => setExpenseCategory(e.target.value)}
+                  className="w-full border border-slate-200 rounded-xl px-3.5 py-2 text-xs bg-white font-bold text-slate-800"
+                >
+                  <option value="marketing">Marketing & Ads</option>
+                  <option value="servers">Servers & Cloud Hosting</option>
+                  <option value="salaries">Salaries & Contractors</option>
+                  <option value="office">Office & Rent</option>
+                  <option value="tools">SaaS Tools & APIs</option>
+                  <option value="other">Other Miscellaneous</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Amount (₹ INR)</label>
+                  <input
+                    type="number"
+                    min={0.01}
+                    step={0.01}
+                    required
+                    placeholder="e.g. 1500"
+                    value={expenseAmount}
+                    onChange={(e) => setExpenseAmount(e.target.value)}
+                    className="w-full border border-slate-200 rounded-xl px-3.5 py-2 text-xs bg-white font-bold text-slate-800"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-550 uppercase">Expense Date</label>
+                  <input
+                    type="date"
+                    value={expenseDate}
+                    onChange={(e) => setExpenseDate(e.target.value)}
+                    className="w-full border border-slate-200 rounded-xl px-3.5 py-1.5 text-xs bg-white font-bold text-slate-800"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-500 uppercase">Description / Memo</label>
+                <textarea
+                  rows={3}
+                  placeholder="e.g. Supabase DB usage or contractor payment"
+                  value={expenseDescription}
+                  onChange={(e) => setExpenseDescription(e.target.value)}
+                  className="w-full border border-slate-200 rounded-xl px-3.5 py-2 text-xs bg-white font-bold text-slate-800 focus:ring-1 focus:ring-blue-500 outline-none"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-3">
+                <button
+                  onClick={() => setShowAddExpenseModal(false)}
+                  className="border border-slate-200 hover:bg-slate-50 text-slate-655 font-bold px-4 py-2 rounded-xl text-[11px] uppercase tracking-wide cursor-pointer transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAddExpense}
+                  disabled={actionLoading === "add_expense"}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-2 rounded-xl text-[11px] uppercase tracking-wide cursor-pointer transition disabled:opacity-50 flex items-center gap-1"
+                >
+                  {actionLoading === "add_expense" && <Loader2 size={11} className="animate-spin" />}
+                  Record Expense
+                </button>
+              </div>
             </div>
           </div>
         </div>
