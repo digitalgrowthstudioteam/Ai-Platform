@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
@@ -236,7 +236,7 @@ const PRODUCT_OPTIONS_BY_INDUSTRY: Record<string, string[]> = {
   ],
 };
 
-export default function GetAdsPage() {
+function GetAdsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isNew = searchParams.get("new") === "true";
@@ -1751,5 +1751,17 @@ export default function GetAdsPage() {
         Digital Growth Studio • AI Meta Ads Strategy Auditor • © {new Date().getFullYear()}
       </footer>
     </div>
+  );
+}
+
+export default function GetAdsPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+        <Loader2 className="animate-spin text-blue-600" size={32} />
+      </div>
+    }>
+      <GetAdsPageContent />
+    </Suspense>
   );
 }
