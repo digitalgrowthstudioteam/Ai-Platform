@@ -27,7 +27,17 @@ export default function AdminQuotationDetailClient() {
   const params = useParams();
   const router = useRouter();
   const { user, loading: loadingAuth } = useAuth();
-  const requestId = params?.id as string;
+  
+  // Resolve requestId from params or pathname fallback to support static hosting router environments
+  let requestId = params?.id as string;
+  if (typeof window !== "undefined") {
+    const cleanPath = window.location.pathname.replace(/\/$/, "");
+    const segments = cleanPath.split("/");
+    const pathId = segments[segments.length - 1];
+    if (pathId && pathId !== "quotations" && pathId !== "admin" && pathId !== "placeholder") {
+      requestId = pathId;
+    }
+  }
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -384,7 +394,7 @@ export default function AdminQuotationDetailClient() {
                     <input
                       type="text"
                       readOnly
-                      value={`${window.location.origin}/pay-quotation/${data.quotation.id}`}
+                      value={`${typeof window !== "undefined" ? window.location.origin : ""}/pay-quotation/${data.quotation.id}`}
                       className="flex-1 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 font-mono text-[10px] text-slate-600 outline-none"
                     />
                     <button

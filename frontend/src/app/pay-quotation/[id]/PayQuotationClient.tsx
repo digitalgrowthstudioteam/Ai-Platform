@@ -19,7 +19,16 @@ import {
 } from "lucide-react";
 
 export default function PayQuotationClient() {
-  const { id } = useParams();
+  const params = useParams();
+  let id = params?.id as string;
+  if (typeof window !== "undefined") {
+    const cleanPath = window.location.pathname.replace(/\/$/, "");
+    const segments = cleanPath.split("/");
+    const pathId = segments[segments.length - 1];
+    if (pathId && pathId !== "pay-quotation" && pathId !== "placeholder") {
+      id = pathId;
+    }
+  }
   const router = useRouter();
   const { user, isAuthenticated } = useAuth();
 
