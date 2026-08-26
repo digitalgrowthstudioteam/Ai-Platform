@@ -20,6 +20,9 @@ from app.models.ticket import SupportTicket
 from app.models.notification import Notification
 from app.models.campaign import Campaign
 from app.models.subscription_addon import SubscriptionAddOn
+from app.models.ads_service import ServiceQuotation
+from app.models.ai_assistant import AICreditTransaction
+from app.models.manual_expense import ManualExpense
 
 logger = structlog.get_logger()
 router = APIRouter(prefix="/admin", tags=["Admin Control Panel"])
@@ -102,6 +105,56 @@ class AdminAdPackOverrideRequest(BaseModel):
 class AdminAdServiceRequestOverrideRequest(BaseModel):
     status: Optional[str] = None
     additional_services: Optional[list] = None
+
+
+class AdminExpenseCreatePayload(BaseModel):
+    category: str
+    amount: float
+    description: Optional[str] = None
+    expense_date: Optional[datetime] = None
+
+
+class AdminExpenseItem(BaseModel):
+    id: uuid.UUID
+    category: str
+    amount: float
+    currency: str
+    description: Optional[str] = None
+    expense_date: datetime
+    created_at: datetime
+
+
+class FinanceCategoryBreakdown(BaseModel):
+    addons: int
+    offers: int
+    meta_ai_plans: int
+    ai_intelligence: int
+    one_time_credits: int
+
+
+class FinanceStatsResponse(BaseModel):
+    total_earned_paise: int
+    gross_revenue_inr: float
+    total_expenses_inr: float
+    net_profit_inr: float
+    category_breakdown: FinanceCategoryBreakdown
+    
+    quotations_pending_count: int
+    quotations_pending_value_paise: int
+    
+    quotations_expired_count: int
+    quotations_expired_value_paise: int
+    
+    quotations_expiring_tomorrow_count: int
+    quotations_expiring_tomorrow_value_paise: int
+    
+    next_month_renewals_count: int
+    next_month_renewals_value_paise: int
+    
+    active_subscriptions_count: int
+    active_addons_count: int
+    
+    expenses: List[AdminExpenseItem]
 
 
 # ──────────────────────────────────────────────
@@ -1407,3 +1460,345 @@ async def get_admin_ai_dashboard(
         "profit_inr": profit_inr,
         "margin_pct": margin_pct
     }
+
+
+# ──────────────────────────────────────────────
+# Admin: Finance & Expense Management Routes
+# ──────────────────────────────────────────────
+
+@router.get("/finance/stats", response_model=FinanceStatsResponse, summary="Admin: Query finance overview and statistics")
+async def get_admin_finance_stats(
+    start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
+    end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    verify_admin(claims)
+
+    # Parse dates if provided
+    start_dt = None
+    end_dt = None
+    if start_date:
+        try:
+            start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid start_date format. Use YYYY-MM-DD.")
+    if end_date:
+        try:
+            # Include the entire end day
+            end_dt = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1) - timedelta(seconds=1)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid end_date format. Use YYYY-MM-DD.")
+
+    # 1. Total Earned from ServiceQuotation (Offers & Add-ons/Regular Quotes)
+    stmt_quotes = select(ServiceQuotation).where(ServiceQuotation.status == "paid")
+    if start_dt:
+        stmt_quotes = stmt_quotes.where(ServiceQuotation.updated_at >= start_dt)
+    if end_dt:
+        stmt_quotes = stmt_quotes.where(ServiceQuotation.updated_at <= end_dt)
+    
+    res_quotes = await db.execute(stmt_quotes)
+    paid_quotes = res_quotes.scalars().all()
+
+    offers_paise = 0
+    addons_paise = 0
+
+    for q in paid_quotes:
+        is_promo = False
+        if q.items:
+            for item in q.items:
+                if item.get("service_type") == "ad_management_promo" or item.get("name", "").lower() == "introductory offer":
+                    is_promo = True
+                    break
+        
+        if is_promo:
+            offers_paise += q.final_total
+        else:
+            addons_paise += q.final_total
+
+    # 2. Total Earned from Base Subscriptions (Starter, Growth, Pro, Agency)
+    stmt_subs = select(Subscription).where(Subscription.status == "active")
+    if start_dt:
+        stmt_subs = stmt_subs.where(Subscription.started_at >= start_dt)
+    if end_dt:
+        stmt_subs = stmt_subs.where(Subscription.started_at <= end_dt)
+        
+    res_subs = await db.execute(stmt_subs)
+    active_subs = res_subs.scalars().all()
+
+    meta_ai_plans_paise = 0
+    PLAN_PRICES = {
+        "starter": 9900,
+        "growth": 99900,
+        "pro": 299900,
+        "agency": 499900,
+    }
+
+    for s in active_subs:
+        plan_name = s.plan.lower()
+        meta_ai_plans_paise += PLAN_PRICES.get(plan_name, 0)
+
+    # 3. Total Earned from AI Intelligence Subscriptions & Other Add-ons
+    stmt_addons = select(SubscriptionAddOn).where(SubscriptionAddOn.status == "active")
+    if start_dt:
+        stmt_addons = stmt_addons.where(SubscriptionAddOn.created_at >= start_dt)
+    if end_dt:
+        stmt_addons = stmt_addons.where(SubscriptionAddOn.created_at <= end_dt)
+
+    res_addons = await db.execute(stmt_addons)
+    addons_records = res_addons.scalars().all()
+
+    ai_intelligence_paise = 0
+    
+    ADDON_PRICES = {
+        "additional_account": 29900,
+        "faster_sync": 99900,
+        "lifetime_history_monthly": 19900,
+        "lifetime_history_annual": 199900,
+        "ai_deep_analysis": 49900,
+        "additional_team_member": 19900,
+        "AI_INTELLIGENCE_INDIVIDUAL_MONTHLY": 49900,
+        "AI_INTELLIGENCE_INDIVIDUAL_YEARLY": 499900,
+        "AI_INTELLIGENCE_ALL_MONTHLY": 999900,
+        "AI_INTELLIGENCE_ALL_YEARLY": 6999900,
+        "additional_optimization_campaign": 9900,
+    }
+
+    for a in addons_records:
+        price = ADDON_PRICES.get(a.addon_id, 0) * a.quantity
+        if "AI_INTELLIGENCE_" in a.addon_id:
+            ai_intelligence_paise += price
+        else:
+            addons_paise += price
+
+    # 4. Total Earned from One-time Credit Packs
+    stmt_txns = (
+        select(AICreditTransaction)
+        .where(AICreditTransaction.credit_type == "purchased")
+        .where(AICreditTransaction.transaction_type == "grant")
+        .where(AICreditTransaction.reason == "Credit pack purchase")
+    )
+    if start_dt:
+        stmt_txns = stmt_txns.where(AICreditTransaction.created_at >= start_dt)
+    if end_dt:
+        stmt_txns = stmt_txns.where(AICreditTransaction.created_at <= end_dt)
+
+    res_txns = await db.execute(stmt_txns)
+    txns = res_txns.scalars().all()
+
+    one_time_credits_paise = 0
+    CREDIT_PACK_PRICES = {
+        100: 19900,
+        500: 94900,
+        1000: 189900,
+        3000: 579900,
+        5000: 899900,
+    }
+    for t in txns:
+        one_time_credits_paise += CREDIT_PACK_PRICES.get(t.credit_amount, 0)
+
+    # 5. Quotation Pending stats
+    stmt_q_pend = select(ServiceQuotation).where(ServiceQuotation.status == "pending")
+    if start_dt:
+        stmt_q_pend = stmt_q_pend.where(ServiceQuotation.created_at >= start_dt)
+    if end_dt:
+        stmt_q_pend = stmt_q_pend.where(ServiceQuotation.created_at <= end_dt)
+    res_q_pend = await db.execute(stmt_q_pend)
+    q_pend = res_q_pend.scalars().all()
+    q_pend_count = len(q_pend)
+    q_pend_val = sum(q.final_total for q in q_pend)
+
+    # 6. Quotation Expired stats
+    now_utc = datetime.utcnow()
+    stmt_q_exp = select(ServiceQuotation).where(
+        (ServiceQuotation.status.in_(["cancelled", "expired"])) |
+        ((ServiceQuotation.status == "pending") & (ServiceQuotation.expires_at < now_utc))
+    )
+    if start_dt:
+        stmt_q_exp = stmt_q_exp.where(ServiceQuotation.created_at >= start_dt)
+    if end_dt:
+        stmt_q_exp = stmt_q_exp.where(ServiceQuotation.created_at <= end_dt)
+    res_q_exp = await db.execute(stmt_q_exp)
+    q_exp = res_q_exp.scalars().all()
+    q_exp_count = len(q_exp)
+    q_exp_val = sum(q.final_total for q in q_exp)
+
+    # 7. Quotation Expiring Tomorrow
+    tomorrow_start = now_utc.date() + timedelta(days=1)
+    tomorrow_start_dt = datetime(tomorrow_start.year, tomorrow_start.month, tomorrow_start.day)
+    tomorrow_end_dt = tomorrow_start_dt + timedelta(days=1) - timedelta(seconds=1)
+    
+    stmt_q_tmrw = select(ServiceQuotation).where(
+        ServiceQuotation.status == "pending"
+    ).where(
+        ServiceQuotation.expires_at >= tomorrow_start_dt
+    ).where(
+        ServiceQuotation.expires_at <= tomorrow_end_dt
+    )
+    res_q_tmrw = await db.execute(stmt_q_tmrw)
+    q_tmrw = res_q_tmrw.scalars().all()
+    q_tmrw_count = len(q_tmrw)
+    q_tmrw_val = sum(q.final_total for q in q_tmrw)
+
+    # 8. Active Subscriptions & Add-ons count
+    stmt_sub_active = select(func.count(Subscription.id)).where(Subscription.status == "active")
+    res_sub_active = await db.execute(stmt_sub_active)
+    active_subs_count = res_sub_active.scalar_one()
+
+    stmt_add_active = select(func.count(SubscriptionAddOn.id)).where(SubscriptionAddOn.status == "active")
+    res_add_active = await db.execute(stmt_add_active)
+    active_addons_count = res_add_active.scalar_one()
+
+    # 9. Next Month Renewals Forecast
+    today = now_utc.date()
+    if today.month == 12:
+        next_month_year = today.year + 1
+        next_month = 1
+    else:
+        next_month_year = today.year
+        next_month = today.month + 1
+    
+    next_month_start = datetime(next_month_year, next_month, 1)
+    if next_month == 12:
+        next_month_end = datetime(next_month_year + 1, 1, 1) - timedelta(seconds=1)
+    else:
+        next_month_end = datetime(next_month_year, next_month + 1, 1) - timedelta(seconds=1)
+
+    stmt_sub_ren = select(Subscription).where(
+        Subscription.status == "active"
+    ).where(
+        Subscription.expires_at >= next_month_start
+    ).where(
+        Subscription.expires_at <= next_month_end
+    )
+    res_sub_ren = await db.execute(stmt_sub_ren)
+    sub_ren = res_sub_ren.scalars().all()
+
+    stmt_add_ren = select(SubscriptionAddOn).where(
+        SubscriptionAddOn.status == "active"
+    ).where(
+        SubscriptionAddOn.expires_at >= next_month_start
+    ).where(
+        SubscriptionAddOn.expires_at <= next_month_end
+    )
+    res_add_ren = await db.execute(stmt_add_ren)
+    add_ren = res_add_ren.scalars().all()
+
+    next_month_renewals_count = len(sub_ren) + len(add_ren)
+    next_month_renewals_val = 0
+    for s in sub_ren:
+        next_month_renewals_val += PLAN_PRICES.get(s.plan.lower(), 0)
+    for a in add_ren:
+        next_month_renewals_val += ADDON_PRICES.get(a.addon_id, 0) * a.quantity
+
+    # 10. Fetch Expenses in the range
+    stmt_expenses = select(ManualExpense).order_by(ManualExpense.expense_date.desc())
+    if start_dt:
+        stmt_expenses = stmt_expenses.where(ManualExpense.expense_date >= start_dt)
+    if end_dt:
+        stmt_expenses = stmt_expenses.where(ManualExpense.expense_date <= end_dt)
+
+    res_expenses = await db.execute(stmt_expenses)
+    expenses_list = res_expenses.scalars().all()
+
+    total_expenses_inr = sum(e.amount for e in expenses_list)
+
+    total_earned_paise = (
+        addons_paise +
+        offers_paise +
+        meta_ai_plans_paise +
+        ai_intelligence_paise +
+        one_time_credits_paise
+    )
+    gross_revenue_inr = total_earned_paise / 100.0
+    net_profit_inr = gross_revenue_inr - total_expenses_inr
+
+    category_breakdown = FinanceCategoryBreakdown(
+        addons=addons_paise,
+        offers=offers_paise,
+        meta_ai_plans=meta_ai_plans_paise,
+        ai_intelligence=ai_intelligence_paise,
+        one_time_credits=one_time_credits_paise
+    )
+
+    expenses_formatted = [
+        AdminExpenseItem(
+            id=e.id,
+            category=e.category,
+            amount=e.amount,
+            currency=e.currency,
+            description=e.description,
+            expense_date=e.expense_date,
+            created_at=e.created_at
+        )
+        for e in expenses_list
+    ]
+
+    return FinanceStatsResponse(
+        total_earned_paise=total_earned_paise,
+        gross_revenue_inr=gross_revenue_inr,
+        total_expenses_inr=total_expenses_inr,
+        net_profit_inr=net_profit_inr,
+        category_breakdown=category_breakdown,
+        quotations_pending_count=q_pend_count,
+        quotations_pending_value_paise=q_pend_val,
+        quotations_expired_count=q_exp_count,
+        quotations_expired_value_paise=q_exp_val,
+        quotations_expiring_tomorrow_count=q_tmrw_count,
+        quotations_expiring_tomorrow_value_paise=q_tmrw_val,
+        next_month_renewals_count=next_month_renewals_count,
+        next_month_renewals_value_paise=next_month_renewals_val,
+        active_subscriptions_count=active_subs_count,
+        active_addons_count=active_addons_count,
+        expenses=expenses_formatted
+    )
+
+
+@router.post("/finance/expenses", response_model=AdminExpenseItem, summary="Admin: Record a manual business expense")
+async def create_admin_expense(
+    payload: AdminExpenseCreatePayload,
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    verify_admin(claims)
+    
+    expense = ManualExpense(
+        category=payload.category,
+        amount=payload.amount,
+        description=payload.description,
+        expense_date=payload.expense_date or datetime.utcnow(),
+    )
+    db.add(expense)
+    await db.commit()
+    await db.refresh(expense)
+    
+    return AdminExpenseItem(
+        id=expense.id,
+        category=expense.category,
+        amount=expense.amount,
+        currency=expense.currency,
+        description=expense.description,
+        expense_date=expense.expense_date,
+        created_at=expense.created_at
+    )
+
+
+@router.delete("/finance/expenses/{expense_id}", summary="Admin: Delete a manual business expense")
+async def delete_admin_expense(
+    expense_id: uuid.UUID,
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    verify_admin(claims)
+    
+    stmt = select(ManualExpense).where(ManualExpense.id == expense_id)
+    res = await db.execute(stmt)
+    expense = res.scalar_one_or_none()
+    
+    if not expense:
+        raise HTTPException(status_code=404, detail="Expense record not found.")
+        
+    await db.delete(expense)
+    await db.commit()
+    
+    return {"status": "success", "message": "Expense record deleted successfully."}
