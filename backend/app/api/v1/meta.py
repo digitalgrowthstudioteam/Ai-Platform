@@ -324,33 +324,6 @@ async def get_ad_accounts(
     synced_accounts_map = {acc.meta_account_id: acc for acc in synced_accounts}
 
     try:
-        # Mock connection bypass (EAAGm0PX is user's mock token prefix for tests)
-        if connection.access_token.startswith("EAAGm0PX") or connection.access_token == "mock_access_token":
-            # Return Mock Data for testing
-            mock_accounts = [
-                {"id": "act_101010101", "name": "DGS Primary Ad Account", "currency": "INR", "timezone": "Asia/Kolkata", "account_status": 1},
-                {"id": "act_202020202", "name": "Brand Growth Sandbox", "currency": "USD", "timezone": "America/New_York", "account_status": 1},
-                {"id": "act_303030303", "name": "Underperforming Ecom Store", "currency": "INR", "timezone": "Asia/Kolkata", "account_status": 2},
-            ]
-            
-            out_list = []
-            for acc in mock_accounts:
-                db_acc = synced_accounts_map.get(acc["id"])
-                out_list.append(
-                    MetaAdAccountResponse(
-                        id=acc["id"],
-                        name=acc["name"],
-                        currency=acc["currency"],
-                        timezone=acc["timezone"],
-                        account_status=acc["account_status"],
-                        is_connected=db_acc is not None,
-                        industry=db_acc.industry if db_acc else None,
-                        ai_intelligence_status=db_acc.ai_intelligence_status if db_acc else "none",
-                        historical_intelligence_status=db_acc.historical_intelligence_status if db_acc else "none",
-                    )
-                )
-            return out_list
-
         async with httpx.AsyncClient() as client:
             # Call Meta Marketing API: /me/adaccounts
             meta_url = (
@@ -383,8 +356,9 @@ async def get_ad_accounts(
     except Exception as e:
         import structlog
         logger = structlog.get_logger()
-        logger.warning("failed_fetching_live_adaccounts_fallback_to_mock", error=str(e))
+        logger.warning("failed_fetching_live_adaccounts", error=str(e))
         
+        # Fallback: return already-synced accounts from database (real data)
         if synced_accounts:
             out_list = []
             for acc in synced_accounts:
@@ -403,29 +377,8 @@ async def get_ad_accounts(
                 )
             return out_list
 
-        mock_accounts = [
-            {"id": "act_101010101", "name": "DGS Primary Ad Account", "currency": "INR", "timezone": "Asia/Kolkata", "account_status": 1},
-            {"id": "act_202020202", "name": "Brand Growth Sandbox", "currency": "USD", "timezone": "America/New_York", "account_status": 1},
-            {"id": "act_303030303", "name": "Underperforming Ecom Store", "currency": "INR", "timezone": "Asia/Kolkata", "account_status": 2},
-        ]
-        
-        out_list = []
-        for acc in mock_accounts:
-            db_acc = synced_accounts_map.get(acc["id"])
-            out_list.append(
-                MetaAdAccountResponse(
-                    id=acc["id"],
-                    name=acc["name"],
-                    currency=acc["currency"],
-                    timezone=acc["timezone"],
-                    account_status=acc["account_status"],
-                    is_connected=db_acc is not None,
-                    industry=db_acc.industry if db_acc else None,
-                    ai_intelligence_status=db_acc.ai_intelligence_status if db_acc else "none",
-                    historical_intelligence_status=db_acc.historical_intelligence_status if db_acc else "none",
-                )
-            )
-        return out_list
+        # No synced accounts and API failed — return empty list, never mock data
+        return []
 
 
 async def run_sync_inline(ad_account_uuid: str):
@@ -477,33 +430,24 @@ async def select_ad_accounts(
             detail="Meta account is not connected."
         )
 
-    # 1. Fetch available accounts (either mock or live) to get currency, name etc.
+    # 1. Fetch available accounts from Meta API (always real data)
     available_accounts = {}
     try:
-        # Mock connection bypass
-        if connection.access_token.startswith("EAAGm0PX") or connection.access_token == "mock_access_token":
-            mock_accounts = [
-                {"id": "act_101010101", "name": "DGS Primary Ad Account", "currency": "INR", "timezone": "Asia/Kolkata", "account_status": 1},
-                {"id": "act_202020202", "name": "Brand Growth Sandbox", "currency": "USD", "timezone": "America/New_York", "account_status": 1},
-                {"id": "act_303030303", "name": "Underperforming Ecom Store", "currency": "INR", "timezone": "Asia/Kolkata", "account_status": 2},
-            ]
-            available_accounts = {acc["id"]: acc for acc in mock_accounts}
-        else:
-            async with httpx.AsyncClient() as client:
-                meta_url = (
-                    f"https://graph.facebook.com/{settings.META_API_VERSION}/me/adaccounts"
-                    f"?fields=id,name,currency,timezone,account_status"
-                    f"&access_token={connection.access_token}"
-                )
-                r = await client.get(meta_url)
-                r.raise_for_status()
-                available_accounts = {acc["id"]: acc for acc in r.json().get("data", [])}
+        async with httpx.AsyncClient() as client:
+            meta_url = (
+                f"https://graph.facebook.com/{settings.META_API_VERSION}/me/adaccounts"
+                f"?fields=id,name,currency,timezone,account_status"
+                f"&access_token={connection.access_token}"
+            )
+            r = await client.get(meta_url)
+            r.raise_for_status()
+            available_accounts = {acc["id"]: acc for acc in r.json().get("data", [])}
     except Exception as e:
         import structlog
         logger = structlog.get_logger()
-        logger.warning("failed_fetching_live_adaccounts_select_fallback_to_mock", error=str(e))
+        logger.warning("failed_fetching_live_adaccounts_select", error=str(e))
         
-        # Check if they have synced accounts in DB
+        # Fallback: use already-synced accounts from database (real data)
         stmt_synced = select(MetaAdAccount).where(MetaAdAccount.user_id == user.id)
         res_synced = await db.execute(stmt_synced)
         synced_accounts = res_synced.scalars().all()
@@ -519,13 +463,7 @@ async def select_ad_accounts(
                 }
                 for acc in synced_accounts
             }
-        else:
-            mock_accounts = [
-                {"id": "act_101010101", "name": "DGS Primary Ad Account", "currency": "INR", "timezone": "Asia/Kolkata", "account_status": 1},
-                {"id": "act_202020202", "name": "Brand Growth Sandbox", "currency": "USD", "timezone": "America/New_York", "account_status": 1},
-                {"id": "act_303030303", "name": "Underperforming Ecom Store", "currency": "INR", "timezone": "Asia/Kolkata", "account_status": 2},
-            ]
-            available_accounts = {acc["id"]: acc for acc in mock_accounts}
+        # If no synced accounts and API failed, available_accounts stays empty
 
     # 2. Check for active paid subscription
     stmt_sub = select(Subscription).where(Subscription.user_id == user.id).where(Subscription.status == "active")

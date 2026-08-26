@@ -36,9 +36,11 @@ def mock_auth():
 @pytest.mark.asyncio
 async def test_meta_sync_service_mock_pipeline(db: AsyncSession):
     """
-    Verify that MetaSyncService successfully executes the mock synchronization pipeline,
-    populates campaign trees, creatives, and daily historical performance metrics.
+    Verify that MetaSyncService successfully executes the marketing synchronization pipeline
+    against mocked Meta API endpoints, populating database tables accurately.
     """
+    from unittest.mock import AsyncMock, patch, MagicMock
+
     # 1. Pre-register test User
     user = User(
         firebase_uid=MOCK_CLAIMS["uid"],
@@ -53,18 +55,18 @@ async def test_meta_sync_service_mock_pipeline(db: AsyncSession):
     await db.commit()
     await db.refresh(user)
 
-    # 2. Setup mock MetaConnection using EAAGm0PX mock token prefix
+    # 2. Setup MetaConnection
     conn = MetaConnection(
         user_id=user.id,
         meta_user_id="meta_sync_user_999",
         status="connected",
-        access_token="EAAGm0PX_mock_token_abc123",
+        access_token="test_live_token_abc123",
     )
     db.add(conn)
     await db.commit()
     await db.refresh(conn)
 
-    # 3. Setup mock MetaAdAccount linked to connection
+    # 3. Setup MetaAdAccount
     ad_acc = MetaAdAccount(
         user_id=user.id,
         meta_connection_id=conn.id,
@@ -78,12 +80,68 @@ async def test_meta_sync_service_mock_pipeline(db: AsyncSession):
     await db.commit()
     await db.refresh(ad_acc)
 
-    # 4. Trigger MetaSyncService sync
+    # Mock responses
+    camp_resp = {"data": [
+        {"id": "camp_111_act_101010101", "name": "DG - Prospecting Conversions", "objective": "OUTCOMES", "status": "ACTIVE", "buying_type": "AUCTION", "daily_budget": 150000},
+        {"id": "camp_222_act_101010101", "name": "DG - Retargeting Customers", "objective": "OUTCOMES", "status": "ACTIVE", "buying_type": "AUCTION", "daily_budget": 80000}
+    ]}
+    adset_resp = {"data": [
+        {"id": "adset_111_act_101010101", "name": "Broad Audience (India)", "campaign": {"id": "camp_111_act_101010101"}, "status": "ACTIVE", "optimization_goal": "OFFSITE_CONVERSIONS", "billing_event": "IMPRESSIONS", "destination_type": "WEBSITE", "daily_budget": 100000}
+    ]}
+    ads_resp = {"data": [
+        {"id": "ad_111_1_act_101010101", "name": "Summer Sale - Video 1", "adset": {"id": "adset_111_act_101010101"}, "status": "ACTIVE", "creative": {"id": "creative_ad_111_1_act_101010101", "title": "Summer Sale - Video 1", "body": "Body text", "image_url": "http://img", "url_tags": "tags", "video_id": "vid_111"}}
+    ]}
+
+    today_date = datetime.utcnow().date()
+    camp_insights_last_30d = [{"campaign_id": "camp_111_act_101010101", "date_start": (today_date - timedelta(days=day)).strftime("%Y-%m-%d"), "spend": "50.00", "impressions": "1000", "reach": "900", "frequency": "1.1", "clicks": "50", "actions": [{"action_type": "purchase", "value": "2"}, {"action_type": "landing_page_view", "value": "10"}, {"action_type": "link_click", "value": "12"}], "action_values": [{"action_type": "purchase", "value": "200.0"}]} for day in range(1, 30)]
+    camp_insights_today = [{"campaign_id": "camp_111_act_101010101", "date_start": today_date.strftime("%Y-%m-%d"), "spend": "50.00", "impressions": "1000", "reach": "900", "frequency": "1.1", "clicks": "50", "actions": [{"action_type": "purchase", "value": "2"}, {"action_type": "landing_page_view", "value": "10"}, {"action_type": "link_click", "value": "12"}], "action_values": [{"action_type": "purchase", "value": "200.0"}]}]
+
+    adset_insights_last_30d = [{"adset_id": "adset_111_act_101010101", "date_start": (today_date - timedelta(days=day)).strftime("%Y-%m-%d"), "spend": "50.00", "impressions": "1000", "reach": "900", "frequency": "1.1", "clicks": "50", "actions": [{"action_type": "purchase", "value": "2"}, {"action_type": "landing_page_view", "value": "10"}, {"action_type": "link_click", "value": "12"}], "action_values": [{"action_type": "purchase", "value": "200.0"}]} for day in range(1, 30)]
+    adset_insights_today = [{"adset_id": "adset_111_act_101010101", "date_start": today_date.strftime("%Y-%m-%d"), "spend": "50.00", "impressions": "1000", "reach": "900", "frequency": "1.1", "clicks": "50", "actions": [{"action_type": "purchase", "value": "2"}, {"action_type": "landing_page_view", "value": "10"}, {"action_type": "link_click", "value": "12"}], "action_values": [{"action_type": "purchase", "value": "200.0"}]}]
+
+    ad_insights_last_30d = [{"ad_id": "ad_111_1_act_101010101", "date_start": (today_date - timedelta(days=day)).strftime("%Y-%m-%d"), "spend": "50.00", "impressions": "1000", "reach": "900", "frequency": "1.1", "clicks": "50", "actions": [{"action_type": "purchase", "value": "2"}, {"action_type": "landing_page_view", "value": "10"}, {"action_type": "link_click", "value": "12"}], "action_values": [{"action_type": "purchase", "value": "200.0"}]} for day in range(1, 30)]
+    ad_insights_today = [{"ad_id": "ad_111_1_act_101010101", "date_start": today_date.strftime("%Y-%m-%d"), "spend": "50.00", "impressions": "1000", "reach": "900", "frequency": "1.1", "clicks": "50", "actions": [{"action_type": "purchase", "value": "2"}, {"action_type": "landing_page_view", "value": "10"}, {"action_type": "link_click", "value": "12"}], "action_values": [{"action_type": "purchase", "value": "200.0"}]}]
+
+    async def mock_get(url, *args, **kwargs):
+        resp = MagicMock()
+        resp.status_code = 200
+        resp.raise_for_status = MagicMock()
+        
+        if "campaigns" in url:
+            resp.json.return_value = camp_resp
+        elif "adsets" in url:
+            resp.json.return_value = adset_resp
+        elif "ads" in url:
+            resp.json.return_value = ads_resp
+        elif "insights" in url:
+            if "level=campaign" in url:
+                if "last_30d" in url:
+                    resp.json.return_value = {"data": camp_insights_last_30d}
+                else:
+                    resp.json.return_value = {"data": camp_insights_today}
+            elif "level=adset" in url:
+                if "last_30d" in url:
+                    resp.json.return_value = {"data": adset_insights_last_30d}
+                else:
+                    resp.json.return_value = {"data": adset_insights_today}
+            elif "level=ad" in url:
+                if "last_30d" in url:
+                    resp.json.return_value = {"data": ad_insights_last_30d}
+                else:
+                    resp.json.return_value = {"data": ad_insights_today}
+        return resp
+
+    mock_client_instance = AsyncMock()
+    mock_client_instance.get = AsyncMock(side_effect=mock_get)
+    mock_client_instance.__aenter__ = AsyncMock(return_value=mock_client_instance)
+    mock_client_instance.__aexit__ = AsyncMock(return_value=None)
+
+    # 4. Trigger MetaSyncService sync with patched AsyncClient
     service = MetaSyncService()
-    await service.sync_ad_account(db, str(ad_acc.id))
+    with patch("app.services.meta_sync.httpx.AsyncClient", return_value=mock_client_instance):
+        await service.sync_ad_account(db, str(ad_acc.id))
 
     # 5. Verify database records are successfully created
-    # Verify Campaigns
     stmt = select(Campaign).where(Campaign.ad_account_id == ad_acc.id)
     res = await db.execute(stmt)
     campaigns = res.scalars().all()
@@ -118,16 +176,17 @@ async def test_meta_sync_service_mock_pipeline(db: AsyncSession):
     stmt = select(CampaignDailyMetrics).where(CampaignDailyMetrics.campaign_id == campaigns[0].id)
     res = await db.execute(stmt)
     metrics = res.scalars().all()
-    assert len(metrics) == initial_sync_days
+    # Should be 30 days (last_30d has 29 records, today has 1 record)
+    assert len(metrics) == 30
 
     # 6. Verify Idempotency: re-running the sync upserts instead of throwing duplicate key errors
-    await service.sync_ad_account(db, str(ad_acc.id))
+    with patch("app.services.meta_sync.httpx.AsyncClient", return_value=mock_client_instance):
+        await service.sync_ad_account(db, str(ad_acc.id))
     
-    # Confirm count is still initial_sync_days (not doubled)
     stmt = select(CampaignDailyMetrics).where(CampaignDailyMetrics.campaign_id == campaigns[0].id)
     res = await db.execute(stmt)
     metrics_recheck = res.scalars().all()
-    assert len(metrics_recheck) == initial_sync_days
+    assert len(metrics_recheck) == 30
 
     # Cleanup DB records
     await db.delete(ad_acc)

@@ -61,18 +61,9 @@ class MetaSyncService:
         await db.commit()
 
         try:
-            # Check for mock bypass
-            is_mock_account = ad_acc.meta_account_id in {"act_101010101", "act_202020202", "act_303030303"}
-            if token.startswith("EAAGm0PX") or token == "mock_access_token" or is_mock_account:
-                logger.info("meta_sync_using_mock_pipeline", ad_account_id=ad_acc.meta_account_id)
-                await self._sync_mock_data(db, ad_acc)
-            else:
-                logger.info("meta_sync_using_live_pipeline", ad_account_id=ad_acc.meta_account_id)
-                try:
-                    await self._sync_live_data(db, ad_acc, token)
-                except Exception as live_err:
-                    logger.warning("live_sync_failed_falling_back_to_mock", ad_account_id=ad_acc.meta_account_id, error=str(live_err))
-                    await self._sync_mock_data(db, ad_acc)
+            # Always use real Meta API data — never inject mock/simulated metrics
+            logger.info("meta_sync_using_live_pipeline", ad_account_id=ad_acc.meta_account_id)
+            await self._sync_live_data(db, ad_acc, token)
 
             # Mark connection status as success
             conn.last_sync_status = "success"

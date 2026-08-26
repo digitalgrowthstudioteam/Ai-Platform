@@ -125,6 +125,8 @@ async def test_meta_status_not_connected(mock_auth):
 @pytest.mark.asyncio
 async def test_meta_accounts_and_selection(mock_auth, db: AsyncSession):
     """Verify listing available Meta ad accounts and selecting them."""
+    from unittest.mock import AsyncMock, patch, MagicMock
+
     # Pre-create our mock user and meta connection in DB (first clear leftovers)
     await db.execute(delete(User).where(User.email == MOCK_CLAIMS["email"]))
     await db.commit()
@@ -133,7 +135,6 @@ async def test_meta_accounts_and_selection(mock_auth, db: AsyncSession):
         firebase_uid=MOCK_CLAIMS["uid"],
         email=MOCK_CLAIMS["email"],
         name=MOCK_CLAIMS["name"],
-        # Note: we don't start the trial initially here to test select_ad_accounts trial activation flow
     )
     db.add(user)
     await db.commit()
@@ -143,15 +144,35 @@ async def test_meta_accounts_and_selection(mock_auth, db: AsyncSession):
         user_id=user.id,
         meta_user_id="meta_user_id_888",
         status="connected",
-        access_token="mock_access_token",
+        access_token="test_real_token_for_testing",
     )
     db.add(conn)
     await db.commit()
 
+    # Mock Meta API response for /me/adaccounts
+    mock_meta_accounts = {
+        "data": [
+            {"id": "act_101010101", "name": "DGS Primary Ad Account", "currency": "INR", "timezone": "Asia/Kolkata", "account_status": 1},
+            {"id": "act_202020202", "name": "Brand Growth Sandbox", "currency": "USD", "timezone": "America/New_York", "account_status": 1},
+            {"id": "act_303030303", "name": "Underperforming Ecom Store", "currency": "INR", "timezone": "Asia/Kolkata", "account_status": 2},
+        ]
+    }
+
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json.return_value = mock_meta_accounts
+
+    mock_client_instance = AsyncMock()
+    mock_client_instance.get.return_value = mock_response
+    mock_client_instance.__aenter__ = AsyncMock(return_value=mock_client_instance)
+    mock_client_instance.__aexit__ = AsyncMock(return_value=None)
+
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        # 1. Fetch available accounts (uses mock bypass due to mock_access_token)
-        response = await client.get("/api/v1/meta/accounts")
+        # 1. Fetch available accounts (mocked Meta API response)
+        with patch("app.api.v1.meta.httpx.AsyncClient", return_value=mock_client_instance):
+            response = await client.get("/api/v1/meta/accounts")
         assert response.status_code == 200
         accounts = response.json()
         assert len(accounts) == 3
@@ -160,7 +181,8 @@ async def test_meta_accounts_and_selection(mock_auth, db: AsyncSession):
 
         # 2. Select first ad account
         payload = {"account_ids": ["act_101010101"], "industries": {"act_101010101": "Ecommerce"}}
-        select_response = await client.post("/api/v1/meta/accounts/select", json=payload)
+        with patch("app.api.v1.meta.httpx.AsyncClient", return_value=mock_client_instance):
+            select_response = await client.post("/api/v1/meta/accounts/select", json=payload)
         assert select_response.status_code == 200
         assert select_response.json()["status"] == "success"
 
@@ -188,3 +210,4 @@ async def test_meta_accounts_and_selection(mock_auth, db: AsyncSession):
         # Cleanup user
         await db.delete(user)
         await db.commit()
+

@@ -724,7 +724,7 @@ async def list_placements(
     conn = conn_res.scalar_one_or_none()
 
     token = conn.access_token if conn else None
-    is_mock = not token or token.startswith("EAAGm0PX") or token == "mock_access_token" or ad_acc.meta_account_id in {"act_101010101", "act_202020202", "act_303030303"}
+
 
     # Resolve target ID
     target_id = ad_acc.meta_account_id
@@ -765,7 +765,7 @@ async def list_placements(
             target_id = adset_id
 
     platform_breakdowns = []
-    if not is_mock and token:
+    if token:
         try:
             async with httpx.AsyncClient() as client:
                 time_range_str = ""
@@ -786,24 +786,7 @@ async def list_placements(
                 if r.status_code == 200:
                     platform_breakdowns = r.json().get("data", [])
         except Exception as e:
-            logger.warn("Failed to fetch live placement data from Meta. Falling back to mocks.", error=str(e))
-
-    if is_mock or not platform_breakdowns:
-        if is_cake_baking:
-            platform_breakdowns = [
-                {"publisher_platform": "facebook", "platform_position": "facebook_reels", "spend": 12.34, "impressions": 300, "clicks": 8, "actions": [{"action_type": "messaging_connections", "value": 1}]},
-                {"publisher_platform": "instagram", "platform_position": "instagram_feed", "spend": 71.77, "impressions": 1500, "clicks": 35, "actions": [{"action_type": "messaging_connections", "value": 2}]},
-                {"publisher_platform": "instagram", "platform_position": "instagram_reels", "spend": 52.86, "impressions": 1100, "clicks": 28, "actions": [{"action_type": "messaging_connections", "value": 2}]},
-                {"publisher_platform": "facebook", "platform_position": "feed", "spend": 39.67, "impressions": 900, "clicks": 20, "actions": [{"action_type": "messaging_connections", "value": 2}]},
-                {"publisher_platform": "whatsapp", "platform_position": "whatsapp_status", "spend": 15.53, "impressions": 400, "clicks": 10, "actions": [{"action_type": "messaging_connections", "value": 1}]},
-            ]
-        else:
-            platform_breakdowns = [
-                {"publisher_platform": "facebook", "platform_position": "feed", "spend": 4500.00, "impressions": 50000, "clicks": 800, "actions": [{"action_type": "purchase", "value": 8}], "action_values": [{"action_type": "purchase", "value": 6400.00}]},
-                {"publisher_platform": "instagram", "platform_position": "instagram_reels", "spend": 3200.00, "impressions": 40000, "clicks": 950, "actions": [{"action_type": "purchase", "value": 15}], "action_values": [{"action_type": "purchase", "value": 12000.00}]},
-                {"publisher_platform": "audience_network", "platform_position": "classic", "spend": 950.00, "impressions": 12000, "clicks": 110, "actions": [], "action_values": []},
-                {"publisher_platform": "messenger", "platform_position": "messenger_inbox", "spend": 450.00, "impressions": 5000, "clicks": 85, "actions": [{"action_type": "purchase", "value": 2}], "action_values": [{"action_type": "purchase", "value": 1600.00}]},
-            ]
+            logger.warn("Failed to fetch live placement data from Meta.", error=str(e))
 
     output = []
     for platform in platform_breakdowns:
@@ -888,7 +871,7 @@ async def list_demographics(
     conn = conn_res.scalar_one_or_none()
 
     token = conn.access_token if conn else None
-    is_mock = not token or token.startswith("EAAGm0PX") or token == "mock_access_token" or ad_acc.meta_account_id in {"act_101010101", "act_202020202", "act_303030303"}
+
 
     # Resolve target ID
     target_id = ad_acc.meta_account_id
@@ -929,7 +912,7 @@ async def list_demographics(
             target_id = adset_id
 
     demographic_breakdowns = []
-    if not is_mock and token:
+    if token:
         try:
             async with httpx.AsyncClient() as client:
                 time_range_str = ""
@@ -949,28 +932,7 @@ async def list_demographics(
                 if r.status_code == 200:
                     demographic_breakdowns = r.json().get("data", [])
         except Exception as e:
-            logger.warn("Failed to fetch live demographic data from Meta. Falling back to mocks.", error=str(e))
-
-    if is_mock or not demographic_breakdowns:
-        if is_cake_baking:
-            demographic_breakdowns = [
-                {"age": "18-24", "gender": "female", "spend": 30.23, "impressions": 400, "clicks": 4, "actions": []},
-                {"age": "18-24", "gender": "male", "spend": 20.00, "impressions": 300, "clicks": 3, "actions": []},
-                {"age": "25-34", "gender": "female", "spend": 62.53, "impressions": 800, "clicks": 18, "actions": [{"action_type": "messaging_connections", "value": 3}]},
-                {"age": "25-34", "gender": "male", "spend": 40.00, "impressions": 500, "clicks": 12, "actions": [{"action_type": "messaging_connections", "value": 2}]},
-                {"age": "35-44", "gender": "female", "spend": 46.48, "impressions": 600, "clicks": 11, "actions": [{"action_type": "messaging_connections", "value": 2}]},
-                {"age": "35-44", "gender": "male", "spend": 30.00, "impressions": 400, "clicks": 8, "actions": [{"action_type": "messaging_connections", "value": 1}]},
-                {"age": "45-54", "gender": "female", "spend": 1.45, "impressions": 20, "clicks": 0, "actions": []},
-            ]
-        else:
-            demographic_breakdowns = [
-                {"age": "18-24", "gender": "female", "spend": 1200.00, "impressions": 15000, "clicks": 180, "actions": [{"action_type": "purchase", "value": 1}], "action_values": [{"action_type": "purchase", "value": 800.00}]},
-                {"age": "18-24", "gender": "male", "spend": 1100.00, "impressions": 14000, "clicks": 150, "actions": [{"action_type": "purchase", "value": 0}], "action_values": []},
-                {"age": "25-34", "gender": "female", "spend": 3500.00, "impressions": 40000, "clicks": 720, "actions": [{"action_type": "purchase", "value": 14}], "action_values": [{"action_type": "purchase", "value": 11200.00}]},
-                {"age": "25-34", "gender": "male", "spend": 2800.00, "impressions": 30000, "clicks": 600, "actions": [{"action_type": "purchase", "value": 10}], "action_values": [{"action_type": "purchase", "value": 8000.00}]},
-                {"age": "35-44", "gender": "female", "spend": 1900.00, "impressions": 20000, "clicks": 320, "actions": [{"action_type": "purchase", "value": 5}], "action_values": [{"action_type": "purchase", "value": 4000.00}]},
-                {"age": "35-44", "gender": "male", "spend": 1500.00, "impressions": 18000, "clicks": 280, "actions": [{"action_type": "purchase", "value": 3}], "action_values": [{"action_type": "purchase", "value": 2400.00}]},
-            ]
+            logger.warn("Failed to fetch live demographic data from Meta.", error=str(e))
 
     output = []
     for demo in demographic_breakdowns:
@@ -1054,7 +1016,7 @@ async def list_regions(
     conn = conn_res.scalar_one_or_none()
 
     token = conn.access_token if conn else None
-    is_mock = not token or token.startswith("EAAGm0PX") or token == "mock_access_token" or ad_acc.meta_account_id in {"act_101010101", "act_202020202", "act_303030303"}
+
 
     # Resolve target ID
     target_id = ad_acc.meta_account_id
@@ -1095,7 +1057,7 @@ async def list_regions(
             target_id = adset_id
 
     region_breakdowns = []
-    if not is_mock and token:
+    if token:
         try:
             async with httpx.AsyncClient() as client:
                 time_range_str = ""
@@ -1115,20 +1077,7 @@ async def list_regions(
                 if r.status_code == 200:
                     region_breakdowns = r.json().get("data", [])
         except Exception as e:
-            logger.warn("Failed to fetch live regional data from Meta. Falling back to mocks.", error=str(e))
-
-    if is_mock or not region_breakdowns:
-        if is_cake_baking:
-            region_breakdowns = [
-                {"region": "Goa", "spend": 192.12, "impressions": 3000, "clicks": 60, "actions": [{"action_type": "messaging_connections", "value": 8}]},
-                {"region": "Maharashtra", "spend": 0.00, "impressions": 0, "clicks": 0, "actions": []},
-            ]
-        else:
-            region_breakdowns = [
-                {"region": "California", "spend": 2500.00, "impressions": 30000, "clicks": 450, "actions": [{"action_type": "purchase", "value": 5}], "action_values": [{"action_type": "purchase", "value": 4000.00}]},
-                {"region": "New York", "spend": 1800.00, "impressions": 22000, "clicks": 320, "actions": [{"action_type": "purchase", "value": 3}], "action_values": [{"action_type": "purchase", "value": 2400.00}]},
-                {"region": "Texas", "spend": 1500.00, "impressions": 18000, "clicks": 270, "actions": [{"action_type": "purchase", "value": 2}], "action_values": [{"action_type": "purchase", "value": 1600.00}]},
-            ]
+            logger.warn("Failed to fetch live regional data from Meta.", error=str(e))
 
     output = []
     for reg in region_breakdowns:
@@ -1207,10 +1156,10 @@ async def list_audiences(
     conn = conn_res.scalar_one_or_none()
 
     token = conn.access_token if conn else None
-    is_mock = not token or token.startswith("EAAGm0PX") or token == "mock_access_token" or ad_acc.meta_account_id in {"act_101010101", "act_202020202", "act_303030303"}
+
 
     custom_audiences = []
-    if not is_mock and token:
+    if token:
         try:
             async with httpx.AsyncClient() as client:
                 audiences_url = (
@@ -1222,15 +1171,7 @@ async def list_audiences(
                 if r.status_code == 200:
                     custom_audiences = r.json().get("data", [])
         except Exception as e:
-            logger.warn("Failed to fetch live audiences from Meta. Falling back to mocks.", error=str(e))
-
-    if is_mock or not custom_audiences:
-        custom_audiences = [
-            {"id": "aud_1", "name": "Website Visitors - Last 30 Days", "subtype": "WEBSITE", "approximate_count_size": 12500, "description": "Pixel-tracked users visiting any landing page"},
-            {"id": "aud_2", "name": "Lookalike (IN, 1%) - Purchases", "subtype": "LOOKALIKE", "approximate_count_size": 420000, "description": "1% Lookalike based on seed purchase conversion event"},
-            {"id": "aud_3", "name": "CRM Sync - Newsletter Subscribers List", "subtype": "CUSTOM", "approximate_count_size": 8400, "description": "Customer list match sync uploaded on 14 Aug"},
-            {"id": "aud_4", "name": "Engaged with Instagram Page - 365 Days", "subtype": "ENGAGEMENT", "approximate_count_size": 32000, "description": "Users who sent a DM, saved a post, or visited profile"},
-        ]
+            logger.warn("Failed to fetch live audiences from Meta.", error=str(e))
 
     output = []
     for aud in custom_audiences:
