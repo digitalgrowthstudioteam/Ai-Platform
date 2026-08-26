@@ -43,6 +43,7 @@ export default function AdminQuotationDetailClient() {
   const [newRequestStatus, setNewRequestStatus] = useState("");
   const [newPartnerStatus, setNewPartnerStatus] = useState("");
   const [creditsToConsume, setCreditsToConsume] = useState(0);
+  const [isEligible, setIsEligible] = useState(true);
 
   // Ticket raising state
   const [showOrderTicketForm, setShowOrderTicketForm] = useState(false);
@@ -68,6 +69,7 @@ export default function AdminQuotationDetailClient() {
       setData(res);
       setNewRequestStatus(res.status);
       setNewPartnerStatus(res.partner_access_status || "not_requested");
+      setIsEligible(res.user_eligibility?.eligible !== false);
     } catch (err: any) {
       console.error(err);
       const msg = err.message || (typeof err === "string" ? err : JSON.stringify(err));
@@ -106,6 +108,30 @@ export default function AdminQuotationDetailClient() {
       setNotification({
         type: "error",
         message: err.message || "Failed to update service request parameters.",
+      });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleToggleEligibility = async (eligibleValue: boolean) => {
+    if (!requestId) return;
+    setActionLoading("toggle_eligibility");
+    setNotification(null);
+    try {
+      await api.adminUpdateAdsServiceRequest(requestId, {
+        ads_service_eligible: eligibleValue,
+      });
+      setIsEligible(eligibleValue);
+      setNotification({
+        type: "success",
+        message: `Successfully updated category approval status to: ${eligibleValue ? "APPROVED" : "RESTRICTED"}.`,
+      });
+      fetchRequestDetails();
+    } catch (err: any) {
+      setNotification({
+        type: "error",
+        message: err.message || "Failed to update category approval status.",
       });
     } finally {
       setActionLoading(null);
@@ -466,7 +492,34 @@ export default function AdminQuotationDetailClient() {
                 {actionLoading === "update_settings" && <Loader2 size={12} className="animate-spin" />}
                 Save Service Settings
               </button>
-            </form>
+             </form>
+
+            {/* Category Approval Toggle */}
+            <div className="space-y-2 pt-3 border-t border-slate-100">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Category Approval Status</label>
+              <div className="flex items-center justify-between bg-slate-50 p-2.5 rounded-xl border border-slate-150">
+                <div className="space-y-0.5 text-left flex-1 pr-2">
+                  <span className="font-bold text-slate-800 block text-[10px]">
+                    {isEligible ? "Category Approved" : "Category Restricted"}
+                  </span>
+                  <span className="text-[9px] text-slate-400 font-semibold block leading-tight">
+                    {isEligible ? "User is allowed to proceed to checkout" : (data?.user_eligibility?.reason || "Prohibited category detected")}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleToggleEligibility(!isEligible)}
+                  disabled={actionLoading === "toggle_eligibility"}
+                  className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all duration-150 ${
+                    isEligible
+                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100"
+                      : "bg-red-50 text-red-700 border border-red-200 hover:bg-red-100"
+                  }`}
+                >
+                  {isEligible ? "Approved" : "Restricted"}
+                </button>
+              </div>
+            </div>
 
             <button
               type="button"

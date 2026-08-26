@@ -45,6 +45,13 @@ async def evaluate_service_eligibility(
     Evaluates request parameters (industry, descriptions) for Ads Service eligibility.
     If ineligible, flags user.ads_service_eligible = False and user.restriction_reason.
     """
+    # 0. Check admin manual override approval
+    if user.restriction_reason == "Category Approved by Admin Override":
+        return {
+            "eligible": True,
+            "reason": None
+        }
+
     # 1. Check if user is already restricted by admin (non-automatic)
     if user.ads_service_eligible == False:
         if not (user.restriction_reason and user.restriction_reason.startswith("Prohibited category detected")):

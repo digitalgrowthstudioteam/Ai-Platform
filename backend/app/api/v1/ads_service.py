@@ -151,6 +151,7 @@ class AdminUpdateServiceRequest(BaseModel):
     status: Optional[str] = None
     partner_access_status: Optional[str] = None
     ad_credits_to_consume: Optional[int] = None
+    ads_service_eligible: Optional[bool] = None
 
 class AdminUpdateOrderStatusPayload(BaseModel):
     status: str
@@ -1884,6 +1885,19 @@ async def admin_update_request(
         req.status = payload.status
     if payload.partner_access_status:
         req.partner_access_status = payload.partner_access_status
+
+    # Update user eligibility if requested
+    if payload.ads_service_eligible is not None:
+        stmt_u = select(User).where(User.id == req.user_id)
+        res_u = await db.execute(stmt_u)
+        user = res_u.scalar_one_or_none()
+        if user:
+            user.ads_service_eligible = payload.ads_service_eligible
+            if payload.ads_service_eligible:
+                user.restriction_reason = "Category Approved by Admin Override"
+            else:
+                user.restriction_reason = "Category Restricted by Admin"
+            db.add(user)
 
     # Consume credits if requested
     if payload.ad_credits_to_consume and payload.ad_credits_to_consume > 0:

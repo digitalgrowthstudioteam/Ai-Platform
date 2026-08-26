@@ -576,7 +576,9 @@ function GetAdsPageContent() {
           meta_ad_account_id: selectedMetaAdAccountId,
         };
 
-        const res = await api.submitAdsServiceRequest(checkPayload);
+        const res = isAuthenticated
+          ? await api.submitAdsServiceRequest(checkPayload)
+          : await api.submitAdsServiceRequestPublic(checkPayload);
         if (res.status === "restricted") {
           setEligibleState({ eligible: false, reason: "Restricted category detected." });
           return;
