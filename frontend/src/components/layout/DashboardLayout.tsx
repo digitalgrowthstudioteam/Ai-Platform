@@ -16,16 +16,21 @@ interface DashboardLayoutProps {
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [sub, setSub] = useState<any>(null);
+  const [userStatus, setUserStatus] = useState<string>("active");
   const [loading, setLoading] = useState(true);
   const pathname = usePathname();
   const router = useRouter();
 
   const fetchSubscription = async () => {
     try {
-      const res = await api.getSubscription();
-      setSub(res);
+      const [subRes, meRes] = await Promise.all([
+        api.getSubscription(),
+        api.getMe()
+      ]);
+      setSub(subRes);
+      setUserStatus(meRes.status);
     } catch (err) {
-      console.error("Failed to fetch subscription for layout:", err);
+      console.error("Failed to fetch subscription or user details for layout:", err);
     } finally {
       setLoading(false);
     }
@@ -46,7 +51,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     "/settings/admin",
   ].some(path => pathname === path || pathname.startsWith(path + "/"));
 
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const isAdmin = user?.email === "flasshgames2026@gmail.com" || user?.email === "digitalgrowthstudioteam@gmail.com" || user?.email === "vikramrwadkar@gmail.com";
 
   // Check trial expiration
@@ -92,7 +97,34 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         <Topbar />
         
         <main className="dashboard-content flex-grow animate-fade-in relative">
-          {shouldShowLockScreen ? (
+          {userStatus === "suspended" ? (
+            <div className="absolute inset-0 bg-slate-950/95 flex items-center justify-center p-6 z-50 animate-fade-in">
+              <div className="bg-slate-900 border border-rose-500/30 rounded-3xl p-8 max-w-md w-full text-center space-y-6 shadow-2xl relative overflow-hidden">
+                <div className="absolute -top-12 -left-12 w-40 h-40 bg-rose-600/10 rounded-full blur-2xl pointer-events-none" />
+                <div className="absolute -bottom-12 -right-12 w-40 h-40 bg-rose-900/10 rounded-full blur-2xl pointer-events-none" />
+                
+                <div className="mx-auto w-16 h-16 bg-rose-500/10 text-rose-400 border border-rose-500/30 rounded-2xl flex items-center justify-center shadow-lg shadow-rose-500/5">
+                  <Lock size={32} className="text-rose-500 animate-pulse" />
+                </div>
+                
+                <div className="space-y-2">
+                  <h2 className="text-2xl font-black text-white tracking-tight">Access Restricted</h2>
+                  <p className="text-rose-200/70 text-sm leading-relaxed">
+                    Your account has been restricted from using this platform. Please contact support if you believe this is an error or to request reinstatement.
+                  </p>
+                </div>
+
+                <div className="pt-4 border-t border-slate-800">
+                  <button
+                    onClick={() => logout().then(() => router.push("/login"))}
+                    className="w-full py-3.5 bg-slate-950 hover:bg-slate-850 border border-slate-800 text-slate-300 font-bold text-sm rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    Log Out
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : shouldShowLockScreen ? (
             <div className="absolute inset-0 bg-slate-900/95 flex items-center justify-center p-6 z-50 animate-fade-in">
               <div className="bg-slate-950 border border-slate-800 rounded-3xl p-8 max-w-md w-full text-center space-y-6 shadow-2xl relative overflow-hidden">
                 <div className="absolute -top-12 -left-12 w-40 h-40 bg-blue-600/10 rounded-full blur-2xl pointer-events-none" />

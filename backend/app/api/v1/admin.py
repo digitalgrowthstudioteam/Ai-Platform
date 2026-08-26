@@ -1826,3 +1826,42 @@ async def delete_admin_expense(
     await db.commit()
     
     return {"status": "success", "message": "Expense record deleted successfully."}
+
+
+@router.delete("/users/{user_id}", summary="Delete a user permanently")
+async def delete_user(
+    user_id: uuid.UUID,
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Deletes a user and all their associated connections, campaigns, metrics, briefs, and subscriptions.
+    Also attempts to delete their account from Firebase Auth.
+    """
+    verify_admin(claims)
+
+    stmt = select(User).where(User.id == user_id)
+    res = await db.execute(stmt)
+    user = res.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found."
+        )
+
+    # 1. Delete from Firebase if possible
+    firebase_uid = user.firebase_uid
+    try:
+        from firebase_admin import auth
+        auth.delete_user(firebase_uid)
+        logger.info("firebase_user_deleted_successfully", firebase_uid=firebase_uid)
+    except Exception as e:
+        logger.warning("firebase_user_deletion_failed", firebase_uid=firebase_uid, error=str(e))
+
+    # 2. Delete from database (Cascades automatically to other tables due to foreign keys)
+    await db.delete(user)
+    await db.commit()
+
+    logger.info("admin_delete_user_success", user_id=user_id, email=user.email)
+    return {"status": "success", "message": f"Successfully permanently deleted user {user.email} and all associated data."}

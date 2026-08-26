@@ -101,7 +101,7 @@ class ApiClient {
 
   // Phase 1: Auth endpoints
   async getMe() {
-    return this.request<{ uid: string; email: string; name: string; picture?: string }>("/auth/me");
+    return this.request<{ uid: string; email: string; name: string; picture?: string; status: string }>("/auth/me");
   }
 
   // Phase 3: Meta Connection endpoints
@@ -625,6 +625,12 @@ class ApiClient {
 
   async getAdminUserDetails(userId: string) {
     return this.request<any>(`/admin/users/${userId}/details`);
+  }
+
+  async deleteUser(userId: string) {
+    return this.request<{ status: string; message: string }>(`/admin/users/${userId}`, {
+      method: "DELETE",
+    });
   }
 
   async updateUserAddons(userId: string, addonId: string, quantity: number) {

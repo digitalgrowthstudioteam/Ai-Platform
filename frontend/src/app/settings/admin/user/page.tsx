@@ -122,6 +122,34 @@ function AdminUserDetailContent() {
     }
   };
 
+  const handleDeleteUser = async () => {
+    if (!userDetails?.user) return;
+    
+    const expectedName = userDetails.user.name || userDetails.user.email;
+    const consent = prompt(
+      `WARNING: This will permanently delete user ${userDetails.user.email} and all of their active connections, sync history, briefs, and recommendations.\n\nTo confirm, please type the user's name ("${expectedName}") below:`
+    );
+
+    if (consent === null) return; // User cancelled
+    
+    if (consent.trim() !== expectedName.trim()) {
+      alert("Name verification failed. Deletion aborted.");
+      return;
+    }
+
+    try {
+      setActionLoading("delete");
+      await api.deleteUser(userId);
+      alert("User account has been permanently deleted successfully.");
+      router.push("/settings/admin");
+    } catch (err: any) {
+      console.error("Failed to delete user:", err);
+      setNotification({ type: "error", message: err.message || "Failed to delete user." });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const handleCreditsOverride = async (credits: number) => {
     try {
       setActionLoading("credits");
@@ -456,14 +484,16 @@ function AdminUserDetailContent() {
                   <span className={`px-2 py-0.5 rounded font-bold uppercase text-[9px] ${
                     userDetails.user.status === "active" ? "text-green-700 bg-green-50" : "text-rose-700 bg-rose-50"
                   }`}>
-                    {userDetails.user.status}
+                    {userDetails.user.status === "active" ? "Active" : "Restricted"}
                   </span>
                   <button
                     disabled={actionLoading === "status"}
                     onClick={() => handleStatusOverride(userDetails.user.status)}
-                    className="text-blue-600 font-bold hover:underline cursor-pointer"
+                    className={`font-bold hover:underline cursor-pointer text-xs ${
+                      userDetails.user.status === "active" ? "text-rose-600" : "text-green-600"
+                    }`}
                   >
-                    Toggle
+                    {userDetails.user.status === "active" ? "Restrict" : "Unrestrict"}
                   </button>
                 </div>
               </div>
@@ -505,6 +535,16 @@ function AdminUserDetailContent() {
                   <span className="text-[10px] block">On: {new Date(userDetails.user.deletion_scheduled_at).toLocaleDateString()}</span>
                 </div>
               )}
+
+              <div className="pt-4 border-t border-slate-100 mt-4">
+                <button
+                  disabled={actionLoading === "delete"}
+                  onClick={handleDeleteUser}
+                  className="w-full py-2.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  Delete User Account
+                </button>
+              </div>
             </div>
           </div>
 

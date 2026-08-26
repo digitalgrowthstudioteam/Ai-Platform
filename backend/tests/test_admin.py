@@ -250,3 +250,22 @@ async def test_admin_ad_packs_and_service_requests_override(mock_admin_auth, set
         # Cleanup created AdPack
         await db.delete(pack)
         await db.commit()
+
+
+@pytest.mark.asyncio
+async def test_admin_delete_user_success(mock_admin_auth, setup_admin_test_data, db: AsyncSession):
+    """
+    Verify that an admin can delete a user permanently.
+    """
+    user_id = setup_admin_test_data["target_user"].id
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # Delete user
+        response = await client.delete(f"/api/v1/admin/users/{user_id}")
+        assert response.status_code == 200
+        assert response.json()["status"] == "success"
+
+        # Verify database user is deleted
+        stmt = select(User).where(User.id == user_id)
+        res = await db.execute(stmt)
+        assert res.scalar_one_or_none() is None
