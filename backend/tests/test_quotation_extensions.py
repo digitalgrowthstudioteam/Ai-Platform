@@ -635,27 +635,37 @@ async def test_public_guest_request_creation_and_admin_list(db: AsyncSession):
     }
     
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        # 1. Post to guest endpoint and verify success response but no DB write
         res = await ac.post("/api/v1/ads-service/public/request", json=payload)
         assert res.status_code == 200
         data = res.json()
         assert data["status"] == "success"
         assert data["service_status"] == "draft"
-        request_id = data["request_id"]
+        assert data["request_id"] == "guest_draft_placeholder"
         
-        # Verify placeholder user and request exist in DB
-        stmt_req = select(MetaAdServiceRequest).where(MetaAdServiceRequest.id == uuid.UUID(request_id))
-        res_req = await db.execute(stmt_req)
-        req = res_req.scalar_one()
-        assert req.status == "draft"
-        assert req.email == "guest_user_test@example.com"
-        
-        stmt_user = select(User).where(User.id == req.user_id)
+        # Verify NO user or request exists in DB with this guest email
+        stmt_user = select(User).where(User.email == "guest_user_test@example.com")
         res_user = await db.execute(stmt_user)
-        user = res_user.scalar_one()
-        assert user.email == "guest_user_test@example.com"
-        assert user.firebase_uid.startswith("placeholder_")
-        
-        # 2. Verify admin request list returns completion score
+        assert res_user.scalar_one_or_none() is None
+
+        # 2. To test the admin request list and completion score, submit an authenticated request
+        user_auth = User(
+            firebase_uid="firebase_uid_test_authenticated_678",
+            email="authenticated_user_test@example.com",
+            name="Authenticated User",
+            status="active"
+        )
+        db.add(user_auth)
+        await db.commit()
+        await db.refresh(user_auth)
+
+        app.dependency_overrides[get_current_user] = lambda: {"uid": "firebase_uid_test_authenticated_678", "email": "authenticated_user_test@example.com"}
+        auth_res = await ac.post("/api/v1/ads-service/request", json=payload)
+        assert auth_res.status_code == 200
+        auth_data = auth_res.json()
+        request_id = auth_data["request_id"]
+
+        # Verify admin request list returns completion score for authenticated request
         app.dependency_overrides[get_current_user] = lambda: ADMIN_CLAIMS
         admin_res = await ac.get("/api/v1/ads-service/admin/requests")
         assert admin_res.status_code == 200
@@ -669,8 +679,10 @@ async def test_public_guest_request_creation_and_admin_list(db: AsyncSession):
         assert matched_req["completion"]["score"] == 100 # all 9 fields filled
         
         # 3. Clean up DB
+        stmt_req = select(MetaAdServiceRequest).where(MetaAdServiceRequest.id == uuid.UUID(request_id))
+        req = (await db.execute(stmt_req)).scalar_one()
         await db.delete(req)
-        await db.delete(user)
+        await db.delete(user_auth)
         await db.commit()
 
     app.dependency_overrides.pop(get_current_user, None)

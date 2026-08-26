@@ -293,8 +293,8 @@ def calculate_rates(data: dict) -> dict:
 
     # Basic calculations
     frequency = (impressions / reach) if reach > 0 else 1.0
-    ctr = (clicks / impressions * 100.0) if impressions > 0 else 0.0
-    link_ctr = (link_clicks / impressions * 100.0) if impressions > 0 else 0.0
+    ctr = (clicks / impressions) if impressions > 0 else 0.0
+    link_ctr = (link_clicks / impressions) if impressions > 0 else 0.0
     cpc = (spend / clicks) if clicks > 0 else 0.0
     link_cpc = (spend / link_clicks) if link_clicks > 0 else 0.0
     cpm = (spend / impressions * 1000) if impressions > 0 else 0.0

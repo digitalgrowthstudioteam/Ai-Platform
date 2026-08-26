@@ -32,6 +32,7 @@ import {
   Lock,
   MessageCircle,
   Loader2,
+  Brain,
 } from "lucide-react";
 
 interface ServicePricing {
@@ -246,7 +247,7 @@ function GetAdsPageContent() {
   const [config, setConfig] = useState<ServicePricing | null>(null);
   const [activeRequest, setActiveRequest] = useState<any>(null);
   const [quotation, setQuotation] = useState<any>(null);
-  const [eligibleState, setEligibleState] = useState<any>({ eligible: true, reason: null });
+  const [eligibleState, setEligibleState] = useState<any>({ eligible: true, reason: null, intro_offer_eligible: true });
 
   // Connected accounts details from backend Meta OAuth (if any)
   const [connectedMetaAccount, setConnectedMetaAccount] = useState<any>(null);
@@ -257,6 +258,7 @@ function GetAdsPageContent() {
   const [businessName, setBusinessName] = useState("");
   const [email, setEmail] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
+  const [countryCode, setCountryCode] = useState("+91");
   const [website, setWebsite] = useState("");
   const [location, setLocation] = useState("");
   const [industry, setIndustry] = useState("Ecommerce");
@@ -372,7 +374,6 @@ function GetAdsPageContent() {
     loadCampaignPlan();
   }, [searchParams]);
 
-  // Load initial configs & latest requests
   useEffect(() => {
     async function loadData() {
       try {
@@ -380,6 +381,38 @@ function GetAdsPageContent() {
         // Load Pricing Config
         const cfg = await api.getAdsServiceConfig();
         setConfig(cfg);
+
+        // Load local storage guest draft if not logged in
+        if (!isAuthenticated) {
+          try {
+            const savedStr = localStorage.getItem("dgs_guest_draft_wizard_state");
+            if (savedStr) {
+              const saved = JSON.parse(savedStr);
+              if (saved.fullName) setFullName(saved.fullName);
+              if (saved.businessName) setBusinessName(saved.businessName);
+              if (saved.email) setEmail(saved.email);
+              if (saved.countryCode) setCountryCode(saved.countryCode);
+              if (saved.whatsapp) setWhatsapp(saved.whatsapp);
+              if (saved.website) setWebsite(saved.website);
+              if (saved.location) setLocation(saved.location);
+              if (saved.industry) setIndustry(saved.industry);
+              if (saved.industryOther) setIndustryOther(saved.industryOther);
+              if (saved.description) setDescription(saved.description);
+              if (saved.descriptionOther) setDescriptionOther(saved.descriptionOther);
+              if (saved.advertisedProduct) setAdvertisedProduct(saved.advertisedProduct);
+              if (saved.advertisedProductOther) setAdvertisedProductOther(saved.advertisedProductOther);
+              if (saved.campaignObjective) setCampaignObjective(saved.campaignObjective);
+              if (saved.expectedBudget) setExpectedBudget(saved.expectedBudget);
+              if (saved.adQuantity) setAdQuantity(saved.adQuantity);
+              if (saved.creativeRequired !== undefined) setCreativeRequired(saved.creativeRequired);
+              if (saved.selectedServices) setSelectedServices(saved.selectedServices);
+              if (saved.metaAccountExists !== undefined) setMetaAccountExists(saved.metaAccountExists);
+              if (saved.selectedMetaAdAccountId) setSelectedMetaAdAccountId(saved.selectedMetaAdAccountId);
+            }
+          } catch (e) {
+            console.error("Failed to restore wizard state from localStorage:", e);
+          }
+        }
 
         if (isAuthenticated && user) {
           // Pre-populate user contact info if logged in
@@ -403,9 +436,15 @@ function GetAdsPageContent() {
 
           // Load latest requests
           const latest = await api.getLatestAdsServiceRequest();
-          setEligibleState(latest.user_eligibility || { eligible: true });
+          setEligibleState({
+            eligible: true,
+            intro_offer_eligible: true,
+            ...(latest.user_eligibility || {})
+          });
           
+          let hasExistingRequest = false;
           if (latest.request) {
+            hasExistingRequest = true;
             if (!isNew && latest.request.status !== "draft") {
               router.push("/dashboard/services");
               return;
@@ -420,10 +459,37 @@ function GetAdsPageContent() {
             setFullName(latest.request.full_name || "");
             setBusinessName(latest.request.business_name || "");
             setEmail(latest.request.email || "");
-            setWhatsapp(latest.request.whatsapp_number || "");
+            
+            // Split whatsapp number into countryCode and local 10 digits
+            const num = latest.request.whatsapp_number || "";
+            if (num.startsWith("+91")) {
+              setCountryCode("+91");
+              setWhatsapp(num.substring(3));
+            } else if (num.startsWith("+1")) {
+              setCountryCode("+1");
+              setWhatsapp(num.substring(2));
+            } else if (num.startsWith("+44")) {
+              setCountryCode("+44");
+              setWhatsapp(num.substring(3));
+            } else if (num.startsWith("+971")) {
+              setCountryCode("+971");
+              setWhatsapp(num.substring(4));
+            } else if (num.startsWith("+61")) {
+              setCountryCode("+61");
+              setWhatsapp(num.substring(3));
+            } else if (num.startsWith("+65")) {
+              setCountryCode("+65");
+              setWhatsapp(num.substring(3));
+            } else {
+              setCountryCode("+91");
+              setWhatsapp(num);
+            }
+
             setWebsite(latest.request.website || "");
             setLocation(latest.request.business_location || "");
-            setIndustry(latest.request.industry || "Ecommerce");
+            
+            const reqInd = latest.request.industry || "Ecommerce";
+            setIndustry(reqInd);
             setIndustryOther(latest.request.industry_other || "");
 
             // For Description MCQ mapping
@@ -441,7 +507,7 @@ function GetAdsPageContent() {
 
             // For Advertised Product MCQ mapping
             const reqProd = latest.request.advertised_product || "";
-            const indOptions = PRODUCT_OPTIONS_BY_INDUSTRY[latest.request.industry || "Ecommerce"] || PRODUCT_OPTIONS_BY_INDUSTRY["Other"];
+            const indOptions = PRODUCT_OPTIONS_BY_INDUSTRY[reqInd] || PRODUCT_OPTIONS_BY_INDUSTRY["Other"];
             if (indOptions.includes(reqProd)) {
               setAdvertisedProduct(reqProd);
               setAdvertisedProductOther("");
@@ -460,37 +526,47 @@ function GetAdsPageContent() {
             setSelectedServices(latest.request.additional_services || []);
             setMetaAccountExists(latest.request.meta_account_exists);
             setSelectedMetaAdAccountId(latest.request.meta_ad_account_id || "");
-          } else if (businessName) {
-            // Auto submit draft on login if questionnaire was started
+          } else {
+            // Auto submit draft on login if guest questionnaire was stored in localStorage
             try {
-              const actualDescription = description === "Other business model / custom operation" ? descriptionOther : description;
-              const actualAdvertisedProduct = advertisedProduct === "Other Custom Product/Service" ? advertisedProductOther : advertisedProduct;
-              
-              const payload = {
-                campaign_plan_id: searchParams.get("plan_id") || undefined,
-                full_name: fullName || user?.displayName || "",
-                business_name: businessName,
-                email: email || user?.email || "",
-                whatsapp_number: whatsapp,
-                website,
-                business_location: location,
-                industry,
-                industry_other: industryOther,
-                business_description: actualDescription,
-                advertised_product: actualAdvertisedProduct,
-                campaign_objective: campaignObjective,
-                daily_budget: expectedBudget,
-                number_of_ads: adQuantity,
-                creative_required: creativeRequired,
-                additional_services: selectedServices,
-                meta_account_exists: metaAccountExists,
-                meta_ad_account_id: selectedMetaAdAccountId,
-                status: "draft",
-              };
-              await api.submitAdsServiceRequest(payload);
-              const reloadedLatest = await api.getLatestAdsServiceRequest();
-              setActiveRequest(reloadedLatest.request);
-              setQuotation(reloadedLatest.quotation);
+              const savedStr = localStorage.getItem("dgs_guest_draft_wizard_state");
+              if (savedStr) {
+                const saved = JSON.parse(savedStr);
+                const actualDescription = saved.description === "Other business model / custom operation" ? saved.descriptionOther : saved.description;
+                const actualAdvertisedProduct = saved.advertisedProduct === "Other Custom Product/Service" ? saved.advertisedProductOther : saved.advertisedProduct;
+                
+                const finalCC = saved.countryCode || "+91";
+                const finalWA = saved.whatsapp || "";
+
+                const payload = {
+                  campaign_plan_id: searchParams.get("plan_id") || undefined,
+                  full_name: saved.fullName || user?.displayName || "",
+                  business_name: saved.businessName,
+                  email: saved.email || user?.email || "",
+                  whatsapp_number: `${finalCC}${finalWA}`,
+                  website: saved.website,
+                  business_location: saved.location,
+                  industry: saved.industry,
+                  industry_other: saved.industryOther,
+                  business_description: actualDescription,
+                  advertised_product: actualAdvertisedProduct,
+                  campaign_objective: saved.campaignObjective,
+                  daily_budget: saved.expectedBudget,
+                  number_of_ads: saved.adQuantity,
+                  creative_required: saved.creativeRequired,
+                  additional_services: saved.selectedServices,
+                  meta_account_exists: saved.metaAccountExists,
+                  meta_ad_account_id: saved.selectedMetaAdAccountId,
+                  status: "draft",
+                };
+                await api.submitAdsServiceRequest(payload);
+                const reloadedLatest = await api.getLatestAdsServiceRequest();
+                setActiveRequest(reloadedLatest.request);
+                setQuotation(reloadedLatest.quotation);
+
+                // Clear guest draft locally after successful DB synchronization
+                localStorage.removeItem("dgs_guest_draft_wizard_state");
+              }
             } catch (e) {
               console.error("Failed to auto-submit guest draft request on login:", e);
             }
@@ -520,6 +596,87 @@ function GetAdsPageContent() {
     });
   };
 
+  const validateEmail = (val: string): string | null => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!val || !emailRegex.test(val)) {
+      return "Please enter a valid email address.";
+    }
+    const dummyKeywords = ["test", "dummy", "example", "placeholder", "admin", "noreply", "fake", "temp", "mailinator", "yopmail", "abc.com", "xyz.com"];
+    const domain = val.split("@")[1].toLowerCase();
+    const name = val.split("@")[0].toLowerCase();
+    
+    if (dummyKeywords.some(k => name.includes(k) || domain.includes(k))) {
+      return "Please enter a valid business email address (avoid using test/dummy domains).";
+    }
+    return null;
+  };
+
+  const validateWhatsApp = (val: string): string | null => {
+    const digits = val.replace(/\D/g, "");
+    if (digits.length !== 10) {
+      return "WhatsApp number must be exactly 10 digits.";
+    }
+    if (!/^[6-9]/.test(digits)) {
+      return "Please enter a valid 10-digit mobile number starting with 6, 7, 8, or 9.";
+    }
+    if (/^(\d)\1{9}$/.test(digits)) {
+      return "Please enter a valid mobile number (avoid repeating digits).";
+    }
+    if (digits === "1234567890" || digits === "0987654321") {
+      return "Please enter a valid mobile number (avoid sequential digits).";
+    }
+    return null;
+  };
+
+  const saveWizardStateToLocalStorage = (
+    fn: string, bn: string, em: string, cc: string, wa: string, wb: string, loc: string,
+    ind: string, indO: string, desc: string, descO: string, prod: string, prodO: string,
+    obj: string, bud: string, qty: number, cr: boolean, svcs: string[], mae: boolean, maid: string
+  ) => {
+    try {
+      const state = {
+        fullName: fn,
+        businessName: bn,
+        email: em,
+        countryCode: cc,
+        whatsapp: wa,
+        website: wb,
+        location: loc,
+        industry: ind,
+        industryOther: indO,
+        description: desc,
+        descriptionOther: descO,
+        advertisedProduct: prod,
+        advertisedProductOther: prodO,
+        campaignObjective: obj,
+        expectedBudget: bud,
+        adQuantity: qty,
+        creativeRequired: cr,
+        selectedServices: svcs,
+        metaAccountExists: mae,
+        selectedMetaAdAccountId: maid
+      };
+      localStorage.setItem("dgs_guest_draft_wizard_state", JSON.stringify(state));
+    } catch (e) {
+      console.error("Failed to save wizard state to localStorage:", e);
+    }
+  };
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      saveWizardStateToLocalStorage(
+        fullName, businessName, email, countryCode, whatsapp, website, location,
+        industry, industryOther, description, descriptionOther, advertisedProduct, advertisedProductOther,
+        campaignObjective, expectedBudget, adQuantity, creativeRequired, selectedServices, metaAccountExists, selectedMetaAdAccountId
+      );
+    }
+  }, [
+    fullName, businessName, email, countryCode, whatsapp, website, location,
+    industry, industryOther, description, descriptionOther, advertisedProduct, advertisedProductOther,
+    campaignObjective, expectedBudget, adQuantity, creativeRequired, selectedServices, metaAccountExists, selectedMetaAdAccountId,
+    isAuthenticated
+  ]);
+
   const handleNextStep = async () => {
     // Basic step validation
     if (currentStep === 1) {
@@ -527,10 +684,14 @@ function GetAdsPageContent() {
         setNotification({ type: "warning", message: "Please fill in all required fields." });
         return;
       }
-      // Simple whatsapp verification
-      const digits = whatsapp.replace(/\D/g, "");
-      if (digits.length < 10) {
-        setNotification({ type: "warning", message: "Please enter a valid WhatsApp phone number." });
+      const emailError = validateEmail(email);
+      if (emailError) {
+        setNotification({ type: "warning", message: emailError });
+        return;
+      }
+      const whatsappError = validateWhatsApp(whatsapp);
+      if (whatsappError) {
+        setNotification({ type: "warning", message: whatsappError });
         return;
       }
     }
@@ -560,7 +721,7 @@ function GetAdsPageContent() {
           full_name: fullName,
           business_name: businessName,
           email,
-          whatsapp_number: whatsapp,
+          whatsapp_number: `${countryCode}${whatsapp}`,
           website,
           business_location: location,
           industry,
@@ -614,7 +775,7 @@ function GetAdsPageContent() {
           full_name: fullName,
           business_name: businessName,
           email,
-          whatsapp_number: whatsapp,
+          whatsapp_number: `${countryCode}${whatsapp}`,
           website,
           business_location: location,
           industry,
@@ -659,7 +820,7 @@ function GetAdsPageContent() {
         full_name: fullName,
         business_name: businessName,
         email,
-        whatsapp_number: whatsapp,
+        whatsapp_number: `${countryCode}${whatsapp}`,
         website,
         business_location: location,
         industry,
@@ -709,7 +870,7 @@ function GetAdsPageContent() {
       full_name: fullName,
       business_name: businessName,
       email,
-      whatsapp_number: whatsapp,
+      whatsapp_number: `${countryCode}${whatsapp}`,
       website,
       business_location: location,
       industry,
@@ -768,7 +929,7 @@ function GetAdsPageContent() {
         full_name: fullName,
         business_name: businessName,
         email,
-        whatsapp_number: whatsapp,
+        whatsapp_number: `${countryCode}${whatsapp}`,
         website,
         business_location: location,
         industry,
@@ -840,7 +1001,7 @@ function GetAdsPageContent() {
         prefill: {
           email,
           name: fullName,
-          contact: whatsapp,
+          contact: `${countryCode}${whatsapp}`,
         },
         theme: {
           color: "#2563EB",
@@ -1085,13 +1246,31 @@ function GetAdsPageContent() {
                     </div>
                     <div className="space-y-1.5">
                       <label className="text-[10px] font-bold text-slate-500 uppercase">WhatsApp Phone Number *</label>
-                      <input
-                        type="tel"
-                        value={whatsapp}
-                        onChange={(e) => setWhatsapp(e.target.value)}
-                        placeholder="e.g. 9876543210"
-                        className="w-full border border-slate-200 rounded-xl px-4 py-3 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-blue-500"
-                      />
+                      <div className="flex gap-2">
+                        <select
+                          value={countryCode}
+                          onChange={(e) => setCountryCode(e.target.value)}
+                          className="border border-slate-200 rounded-xl px-3 py-3 text-xs font-semibold text-slate-800 bg-white focus:ring-2 focus:ring-blue-500 shrink-0"
+                        >
+                          <option value="+91">🇮🇳 +91</option>
+                          <option value="+1">🇺🇸 +1</option>
+                          <option value="+44">🇬🇧 +44</option>
+                          <option value="+971">🇦🇪 +971</option>
+                          <option value="+61">🇦🇺 +61</option>
+                          <option value="+65">🇸🇬 +65</option>
+                        </select>
+                        <input
+                          type="tel"
+                          maxLength={10}
+                          value={whatsapp}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/\D/g, "");
+                            setWhatsapp(val);
+                          }}
+                          placeholder="e.g. 9876543210"
+                          className="w-full border border-slate-200 rounded-xl px-4 py-3 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
                       <span className="text-[9px] text-slate-400 block font-semibold">Our team will contact you on WhatsApp after submission.</span>
                     </div>
                     <div className="space-y-1.5">
@@ -1363,151 +1542,216 @@ function GetAdsPageContent() {
               {/* STEP 5: NUMBER OF ADS */}
               {currentStep === 5 && (
                 <div className="space-y-6 text-left">
-                  <div className="space-y-1">
-                    <h2 className="text-2xl font-black text-slate-900">Select Number of Ads</h2>
-                    <p className="text-xs text-slate-500">Choose the exact quantity of ads you want us to manage. More ads grant higher wholesale discounts.</p>
-                  </div>
-
-                  {/* Slider Control */}
-                  <div className="bg-slate-50 border border-slate-150 rounded-3xl p-6 space-y-6">
-                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                      <div>
-                        <span className="text-sm font-bold text-slate-800 block">Choose Quantity</span>
-                        <p className="text-[10px] text-slate-500 mt-0.5">Drag the slider to select your required quantity of ads.</p>
-                      </div>
-                      <div className="bg-blue-600 text-white px-3 py-1.5 rounded-2xl flex items-center gap-1.5 shadow-sm border border-blue-500">
-                        <input
-                          type="text"
-                          pattern="[0-9]*"
-                          inputMode="numeric"
-                          value={adQuantity || ""}
-                          onChange={(e) => {
-                            const raw = e.target.value;
-                            if (raw === "") {
-                              setAdQuantity(0);
-                            } else {
-                              const val = parseInt(raw, 10);
-                              if (!isNaN(val) && val >= 0) {
-                                setAdQuantity(Math.min(val, 200));
-                              }
-                            }
-                          }}
-                          onBlur={() => {
-                            if (!adQuantity || adQuantity < 1) {
-                              setAdQuantity(1);
-                            }
-                          }}
-                          className="w-10 bg-transparent text-white text-base font-black text-center focus:outline-none border-b border-blue-350 focus:border-white transition font-sans"
-                        />
-                        <span className="text-xs font-bold uppercase font-sans pr-1">{adQuantity === 1 ? "Ad" : "Ads"}</span>
-                      </div>
-                    </div>
-
-                    <div className="space-y-4">
-                      {/* Range Input with custom styles */}
-                      <input
-                        type="range"
-                        min="1"
-                        max={Math.max(50, adQuantity)}
-                        value={adQuantity || 1}
-                        onChange={(e) => setAdQuantity(parseInt(e.target.value, 10))}
-                        className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600 focus:outline-none"
-                      />
-                      
-                      <div className="flex justify-between text-[9px] font-bold text-slate-450 uppercase px-1 font-sans">
-                        <span>1 Ad</span>
-                        <span>10 Ads</span>
-                        <span>20 Ads</span>
-                        <span>30 Ads</span>
-                        <span>40 Ads</span>
-                        <span>{Math.max(50, adQuantity)}+ Ads</span>
-                      </div>
-                    </div>
-
-                    {/* Calculated Prices for selected quantity */}
-                    <div className="border-t border-slate-200/60 pt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {eligibleState?.intro_offer_eligible ? (
+                    <div className="space-y-6 animate-in fade-in duration-200">
                       <div className="space-y-1">
-                        <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">Per-Ad Pricing Details</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-lg font-black text-slate-900 font-sans">₹{adPerUnitPrice}</span>
-                          <span className="text-[10px] font-bold text-slate-500 font-sans">/ ad</span>
-                          {/* Discount Chip */}
-                          <span className="bg-emerald-50 text-emerald-700 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider font-sans">
-                            {adQuantity === 1 && eligibleState?.intro_offer_eligible ? "Best Value" : `${Math.round(((1499 - adPerUnitPrice)/1499)*100)}% Off`}
+                        <h2 className="text-2xl font-black text-slate-900">Special Promotion Active!</h2>
+                        <p className="text-xs text-slate-500">You are eligible for our exclusive, one-time introductory offer. Try our ad management service at a major discount.</p>
+                      </div>
+
+                      {/* Promo Display Card */}
+                      <div className="bg-gradient-to-br from-blue-50 to-indigo-50/20 border border-blue-200/60 rounded-3xl p-6 space-y-5 shadow-xs text-left relative overflow-hidden">
+                        {/* Glowing accent background */}
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-blue-400/10 rounded-full blur-xl -mr-6 -mt-6"></div>
+                        
+                        <div className="flex justify-between items-center flex-wrap gap-2">
+                          <span className="bg-blue-600 text-white text-[9px] font-black uppercase px-2.5 py-1 rounded-full tracking-wider shadow-sm flex items-center gap-1">
+                            <Sparkles size={10} /> Exclusive Trial
                           </span>
+                          <span className="text-[10px] text-slate-455 font-bold uppercase tracking-wider">One-Time Offer</span>
                         </div>
-                        <span className="text-[9.5px] text-slate-500 block font-medium">
-                          Validity Period: <span className="font-bold text-slate-700 font-sans">{adValidityDays} Days</span>
-                        </span>
+
+                        <div className="space-y-2">
+                          <h3 className="text-base font-black text-slate-800">1 Meta Ad Campaign Setup & Launch</h3>
+                          <p className="text-xs text-slate-550 leading-relaxed font-medium">
+                            Includes complete professional campaign setup, strategy consulting, custom creatives guidance, and target audience setup for your business.
+                          </p>
+                        </div>
+
+                        <div className="border-t border-slate-200/60 pt-4 flex justify-between items-end flex-wrap gap-3">
+                          <div className="space-y-1">
+                            <span className="text-[9.5px] text-slate-450 block font-bold uppercase tracking-wider">Introductory Pricing</span>
+                            <div className="flex items-baseline gap-2 font-sans">
+                              <span className="text-xs text-slate-455 line-through font-semibold">₹1,499</span>
+                              <span className="text-3xl font-black text-blue-600">₹333</span>
+                            </div>
+                            <span className="text-[9.5px] text-emerald-600 font-extrabold block">
+                              Save ₹1,166 (77% OFF)
+                            </span>
+                          </div>
+                          
+                          <div className="text-right space-y-0.5">
+                            <span className="text-[9px] text-slate-450 block font-bold uppercase tracking-wider">Validity Period</span>
+                            <span className="text-xs font-black text-slate-700 font-sans">30 Days</span>
+                          </div>
+                        </div>
+
+                        {/* Complimentary Subscription Bonus Banner */}
+                        <div className="bg-white/85 border border-blue-100/80 rounded-2xl p-3.5 flex gap-2.5 items-start">
+                          <Brain size={16} className="text-blue-600 shrink-0 mt-0.5" />
+                          <div className="space-y-0.5">
+                            <span className="text-[9.5px] font-bold text-slate-850 block">Complimentary Bonus Included</span>
+                            <p className="text-[9.5px] text-slate-550 font-medium leading-normal">
+                              Get 30 days of the <strong className="text-blue-600">Starter AI Optimization Plan</strong> (worth ₹99/mo) completely free to monitor and optimize your ad delivery.
+                            </p>
+                          </div>
+                        </div>
                       </div>
 
-                      <div className="space-y-1 md:text-right md:border-l md:border-slate-200/60 md:pl-6">
-                        <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">Total Service Charges</span>
-                        <div className="flex items-baseline md:justify-end gap-2 flex-wrap font-sans">
-                          <span className="text-xs text-slate-400 line-through font-semibold">₹{(1499 * adQuantity).toLocaleString()}</span>
-                          <span className="text-2xl font-black text-blue-600 font-sans">₹{adTotalOfferPrice.toLocaleString()}</span>
-                        </div>
-                        <span className="text-[10px] text-emerald-600 font-bold block font-sans">
-                          You save ₹{(1499 * adQuantity - adTotalOfferPrice).toLocaleString()}!
-                        </span>
-                      </div>
+                      {/* Small text disclaimer */}
+                      <p className="text-[10px] text-slate-400 text-center font-medium leading-relaxed italic max-w-xs mx-auto">
+                        * There are no hidden fees. The advertising budget is paid directly to Meta. To request multiple ad campaigns, you can purchase add-on campaigns later from your dashboard.
+                      </p>
                     </div>
-                  </div>
+                  ) : (
+                    <>
+                      <div className="space-y-1">
+                        <h2 className="text-2xl font-black text-slate-900">Select Number of Ads</h2>
+                        <p className="text-xs text-slate-500">Choose the exact quantity of ads you want us to manage. More ads grant higher wholesale discounts.</p>
+                      </div>
 
-                  {/* Pricing Tiers Table */}
-                  <div className="bg-slate-50/50 border border-slate-150 rounded-3xl p-5 space-y-3">
-                    <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">Volume Discount Tiers</h3>
-                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                      {(() => {
-                        const packs = config?.ad_packs || [];
-                        const sortedPacks = [...packs]
-                          .filter((p: any) => p.active)
-                          .sort((a: any, b: any) => a.ad_quantity - b.ad_quantity);
+                      {/* Slider Control */}
+                      <div className="bg-slate-50 border border-slate-150 rounded-3xl p-6 space-y-6">
+                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                          <div>
+                            <span className="text-sm font-bold text-slate-800 block">Choose Quantity</span>
+                            <p className="text-[10px] text-slate-500 mt-0.5">Drag the slider to select your required quantity of ads.</p>
+                          </div>
+                          <div className="bg-blue-600 text-white px-3 py-1.5 rounded-2xl flex items-center gap-1.5 shadow-sm border border-blue-500">
+                            <input
+                              type="text"
+                              pattern="[0-9]*"
+                              inputMode="numeric"
+                              value={adQuantity || ""}
+                              onChange={(e) => {
+                                const raw = e.target.value;
+                                if (raw === "") {
+                                  setAdQuantity(0);
+                                } else {
+                                  const val = parseInt(raw, 10);
+                                  if (!isNaN(val) && val >= 0) {
+                                    setAdQuantity(Math.min(val, 200));
+                                  }
+                                }
+                              }}
+                              onBlur={() => {
+                                if (!adQuantity || adQuantity < 1) {
+                                  setAdQuantity(1);
+                                }
+                              }}
+                              className="w-10 bg-transparent text-white text-base font-black text-center focus:outline-none border-b border-blue-350 focus:border-white transition font-sans"
+                            />
+                            <span className="text-xs font-bold uppercase font-sans pr-1">{adQuantity === 1 ? "Ad" : "Ads"}</span>
+                          </div>
+                        </div>
 
-                        return sortedPacks.map((pack: any, idx) => {
-                          let range = `${pack.ad_quantity} Ad${pack.ad_quantity > 1 ? "s" : ""}`;
-                          let desc = "Standard";
-                          if (pack.ad_quantity === 1) desc = "Standard";
-                          else if (pack.ad_quantity === 5) desc = "Volume Save";
-                          else if (pack.ad_quantity === 15) desc = "Pro Scaler";
-                          else if (pack.ad_quantity === 30) desc = "Growth Tier";
-                          else desc = "Wholesale";
+                        <div className="space-y-4">
+                          {/* Range Input with custom styles */}
+                          <input
+                            type="range"
+                            min="1"
+                            max={Math.max(50, adQuantity)}
+                            value={adQuantity || 1}
+                            onChange={(e) => setAdQuantity(parseInt(e.target.value, 10))}
+                            className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600 focus:outline-none"
+                          />
+                          
+                          <div className="flex justify-between text-[9px] font-bold text-slate-450 uppercase px-1 font-sans">
+                            <span>1 Ad</span>
+                            <span>10 Ads</span>
+                            <span>20 Ads</span>
+                            <span>30 Ads</span>
+                            <span>40 Ads</span>
+                            <span>{Math.max(50, adQuantity)}+ Ads</span>
+                          </div>
+                        </div>
 
-                          if (idx > 0) {
-                            const prevQty = sortedPacks[idx - 1].ad_quantity;
-                            if (pack.ad_quantity === 9999) {
-                              range = `${prevQty + 1}+ Ads`;
-                            } else {
-                              range = `${prevQty + 1} - ${pack.ad_quantity} Ads`;
-                            }
-                          }
-
-                          const isCurrent = matchedPackId === pack.id;
-
-                          return (
-                            <div 
-                              key={pack.id || idx} 
-                              className={`p-2.5 rounded-2xl border text-center transition flex flex-col justify-between ${
-                                isCurrent 
-                                  ? "border-blue-600 bg-white shadow-sm ring-1 ring-blue-600/30" 
-                                  : "border-slate-150 bg-white/40"
-                              }`}
-                            >
-                              <span className={`text-[9px] font-black uppercase block ${isCurrent ? "text-blue-600" : "text-slate-400"}`}>
-                                {range}
-                              </span>
-                              <span className="text-sm font-black text-slate-800 block mt-1 font-sans">
-                                {pack.ad_quantity === 1 && eligibleState?.intro_offer_eligible ? "₹333" : `₹${pack.price_per_ad || pack.offer_price}`}
-                              </span>
-                              <span className="text-[8px] text-slate-400 font-semibold block mt-0.5 uppercase">
-                                {pack.ad_quantity === 1 && eligibleState?.intro_offer_eligible ? "Intro Offer" : desc}
+                        {/* Calculated Prices for selected quantity */}
+                        <div className="border-t border-slate-200/60 pt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-1">
+                            <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">Per-Ad Pricing Details</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg font-black text-slate-900 font-sans">₹{adPerUnitPrice}</span>
+                              <span className="text-[10px] font-bold text-slate-500 font-sans">/ ad</span>
+                              {/* Discount Chip */}
+                              <span className="bg-emerald-50 text-emerald-705 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider font-sans">
+                                {adQuantity === 1 && eligibleState?.intro_offer_eligible ? "Best Value" : `${Math.round(((1499 - adPerUnitPrice)/1499)*100)}% Off`}
                               </span>
                             </div>
-                          );
-                        });
-                      })()}
-                    </div>
-                  </div>
+                            <span className="text-[9.5px] text-slate-500 block font-medium">
+                              Validity Period: <span className="font-bold text-slate-700 font-sans">{adValidityDays} Days</span>
+                            </span>
+                          </div>
+
+                          <div className="space-y-1 md:text-right md:border-l md:border-slate-200/60 md:pl-6">
+                            <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">Total Service Charges</span>
+                            <div className="flex items-baseline md:justify-end gap-2 flex-wrap font-sans">
+                              <span className="text-xs text-slate-400 line-through font-semibold">₹{(1499 * adQuantity).toLocaleString()}</span>
+                              <span className="text-2xl font-black text-blue-600 font-sans">₹{adTotalOfferPrice.toLocaleString()}</span>
+                            </div>
+                            <span className="text-[10px] text-emerald-600 font-bold block font-sans">
+                              You save ₹{(1499 * adQuantity - adTotalOfferPrice).toLocaleString()}!
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Pricing Tiers Table */}
+                      <div className="bg-slate-50/50 border border-slate-150 rounded-3xl p-5 space-y-3">
+                        <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">Volume Discount Tiers</h3>
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                          {(() => {
+                            const packs = config?.ad_packs || [];
+                            const sortedPacks = [...packs]
+                              .filter((p: any) => p.active)
+                              .sort((a: any, b: any) => a.ad_quantity - b.ad_quantity);
+
+                            return sortedPacks.map((pack: any, idx) => {
+                              let range = `${pack.ad_quantity} Ad${pack.ad_quantity > 1 ? "s" : ""}`;
+                              let desc = "Standard";
+                              if (pack.ad_quantity === 1) desc = "Standard";
+                              else if (pack.ad_quantity === 5) desc = "Volume Save";
+                              else if (pack.ad_quantity === 15) desc = "Pro Scaler";
+                              else if (pack.ad_quantity === 30) desc = "Growth Tier";
+                              else desc = "Wholesale";
+
+                              if (idx > 0) {
+                                const prevQty = sortedPacks[idx - 1].ad_quantity;
+                                if (pack.ad_quantity === 9999) {
+                                  range = `${prevQty + 1}+ Ads`;
+                                } else {
+                                  range = `${prevQty + 1} - ${pack.ad_quantity} Ads`;
+                                }
+                              }
+
+                              const isCurrent = matchedPackId === pack.id;
+
+                              return (
+                                <div 
+                                  key={pack.id || idx} 
+                                  className={`p-2.5 rounded-2xl border text-center transition flex flex-col justify-between ${
+                                    isCurrent 
+                                      ? "border-blue-600 bg-white shadow-sm ring-1 ring-blue-600/30" 
+                                      : "border-slate-150 bg-white/40"
+                                  }`}
+                                >
+                                  <span className={`text-[9px] font-black uppercase block ${isCurrent ? "text-blue-600" : "text-slate-405"}`}>
+                                    {range}
+                                  </span>
+                                  <span className="text-sm font-black text-slate-800 block mt-1 font-sans">
+                                    {pack.ad_quantity === 1 && eligibleState?.intro_offer_eligible ? "₹333" : `₹${pack.price_per_ad || pack.offer_price}`}
+                                  </span>
+                                  <span className="text-[8px] text-slate-400 font-semibold block mt-0.5 uppercase">
+                                    {pack.ad_quantity === 1 && eligibleState?.intro_offer_eligible ? "Intro Offer" : desc}
+                                  </span>
+                                </div>
+                              );
+                            });
+                          })()}
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
 
