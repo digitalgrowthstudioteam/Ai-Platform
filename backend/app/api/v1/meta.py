@@ -584,7 +584,7 @@ async def select_ad_accounts(
             user.trial_ends_at = datetime.utcnow() + timedelta(days=7)
             user.trial_used = True
             user.trial_meta_account_id = first_acc_id
-            user.plan_id = "starter"
+            user.plan_id = "trial"
 
     # 3. Validate max_meta_accounts entitlement limit for paid subscribers
     from app.services.entitlement_engine import EntitlementEngine

@@ -888,7 +888,7 @@ async def activate_service_trial(
         user.trial_started_at = datetime.utcnow()
         user.trial_ends_at = datetime.utcnow() + timedelta(days=7)
         user.trial_used = True
-        user.plan_id = "starter"
+        user.plan_id = "trial"
         db.add(user)
 
         req.status = "trial_started"

@@ -35,7 +35,7 @@ class User(BaseModel):
     plan_id: Mapped[Optional[str]] = mapped_column(
         String(50),
         nullable=True,
-        default="starter",
+        default="trial",
     )
     credits: Mapped[int] = mapped_column(
         Integer,
