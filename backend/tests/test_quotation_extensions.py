@@ -614,5 +614,68 @@ async def test_admin_get_request_details(db: AsyncSession):
     app.dependency_overrides.pop(get_current_user, None)
 
 
+@pytest.mark.anyio
+async def test_public_guest_request_creation_and_admin_list(db: AsyncSession):
+    # 1. Submit public request as a guest
+    payload = {
+        "full_name": "Guest User",
+        "business_name": "Guest Business",
+        "email": "guest_user_test@example.com",
+        "whatsapp_number": "9876543210",
+        "website": "guestbusiness.com",
+        "business_location": "Delhi",
+        "industry": "E-commerce",
+        "advertised_product": "Clothing",
+        "campaign_objective": "Sales",
+        "daily_budget": "500",
+        "number_of_ads": 3,
+        "creative_required": True,
+        "additional_services": ["pixel_setup"],
+        "meta_account_exists": True
+    }
+    
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        res = await ac.post("/api/v1/ads-service/public/request", json=payload)
+        assert res.status_code == 200
+        data = res.json()
+        assert data["status"] == "success"
+        assert data["service_status"] == "draft"
+        request_id = data["request_id"]
+        
+        # Verify placeholder user and request exist in DB
+        stmt_req = select(MetaAdServiceRequest).where(MetaAdServiceRequest.id == uuid.UUID(request_id))
+        res_req = await db.execute(stmt_req)
+        req = res_req.scalar_one()
+        assert req.status == "draft"
+        assert req.email == "guest_user_test@example.com"
+        
+        stmt_user = select(User).where(User.id == req.user_id)
+        res_user = await db.execute(stmt_user)
+        user = res_user.scalar_one()
+        assert user.email == "guest_user_test@example.com"
+        assert user.firebase_uid.startswith("placeholder_")
+        
+        # 2. Verify admin request list returns completion score
+        app.dependency_overrides[get_current_user] = lambda: ADMIN_CLAIMS
+        admin_res = await ac.get("/api/v1/ads-service/admin/requests")
+        assert admin_res.status_code == 200
+        admin_data = admin_res.json()
+        
+        # Find our request
+        matching = [r for r in admin_data if r["id"] == request_id]
+        assert len(matching) == 1
+        matched_req = matching[0]
+        assert matched_req["completion"] is not None
+        assert matched_req["completion"]["score"] == 100 # all 9 fields filled
+        
+        # 3. Clean up DB
+        await db.delete(req)
+        await db.delete(user)
+        await db.commit()
+
+    app.dependency_overrides.pop(get_current_user, None)
+
+
+
 
 

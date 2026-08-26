@@ -648,35 +648,12 @@ export default function GetAdsPage() {
       return;
     }
 
-    setCurrentStep(currentStep + 1);
-    setNotification(null);
-  };
-
-  const handlePrevStep = () => {
-    const isRestrictedBack = isNew && activeRequest && activeRequest.status !== "draft" && currentStep <= 5;
-    if (currentStep > 0 && !isRestrictedBack) {
-      setCurrentStep(currentStep - 1);
-      setNotification(null);
-    }
-  };
-
-  const handleSaveDraft = async () => {
-    if (!isAuthenticated) {
-      setNotification({ type: "warning", message: "Please authenticate with Google to register your request." });
-      return;
-    }
-
-    const actualDescription = description === "Other business model / custom operation"
-      ? descriptionOther
-      : description;
-    
-    const actualAdvertisedProduct = advertisedProduct === "Other Custom Product/Service"
-      ? advertisedProductOther
-      : advertisedProduct;
-
-    try {
-      setSubmitting(true);
+    // Save progress as they go starting from first form input page
+    if (currentStep >= 1) {
+      const actualDescription = description === "Other business model / custom operation" ? descriptionOther : description;
+      const actualAdvertisedProduct = advertisedProduct === "Other Custom Product/Service" ? advertisedProductOther : advertisedProduct;
       const payload = {
+        campaign_plan_id: searchParams.get("plan_id") || undefined,
         full_name: fullName,
         business_name: businessName,
         email,
@@ -694,18 +671,75 @@ export default function GetAdsPage() {
         additional_services: selectedServices,
         meta_account_exists: metaAccountExists,
         meta_ad_account_id: selectedMetaAdAccountId,
-        status: "draft",
+        status: "draft"
       };
-
-      const res = await api.submitAdsServiceRequest(payload);
-      setNotification({ type: "success", message: "Ads service request saved successfully!" });
       
-      // Reload quote
-      const latest = await api.getLatestAdsServiceRequest();
-      setActiveRequest(latest.request);
-      setQuotation(latest.quotation);
+      if (isAuthenticated) {
+        api.submitAdsServiceRequest(payload).catch(err => console.error("Failed to auto-save draft:", err));
+      } else {
+        api.submitAdsServiceRequestPublic(payload).catch(err => console.error("Failed to auto-save guest draft:", err));
+      }
+    }
+
+    setCurrentStep(currentStep + 1);
+    setNotification(null);
+  };
+
+  const handlePrevStep = () => {
+    const isRestrictedBack = isNew && activeRequest && activeRequest.status !== "draft" && currentStep <= 5;
+    if (currentStep > 0 && !isRestrictedBack) {
+      setCurrentStep(currentStep - 1);
+      setNotification(null);
+    }
+  };
+
+  const handleSaveDraft = async () => {
+    const actualDescription = description === "Other business model / custom operation"
+      ? descriptionOther
+      : description;
+    
+    const actualAdvertisedProduct = advertisedProduct === "Other Custom Product/Service"
+      ? advertisedProductOther
+      : advertisedProduct;
+
+    const payload = {
+      campaign_plan_id: searchParams.get("plan_id") || undefined,
+      full_name: fullName,
+      business_name: businessName,
+      email,
+      whatsapp_number: whatsapp,
+      website,
+      business_location: location,
+      industry,
+      industry_other: industryOther,
+      business_description: actualDescription,
+      advertised_product: actualAdvertisedProduct,
+      campaign_objective: campaignObjective,
+      daily_budget: expectedBudget,
+      number_of_ads: adQuantity,
+      creative_required: creativeRequired,
+      additional_services: selectedServices,
+      meta_account_exists: metaAccountExists,
+      meta_ad_account_id: selectedMetaAdAccountId,
+      status: "draft",
+    };
+
+    try {
+      setSubmitting(true);
+      if (isAuthenticated) {
+        await api.submitAdsServiceRequest(payload);
+        setNotification({ type: "success", message: "Draft saved successfully!" });
+        
+        // Reload quote
+        const latest = await api.getLatestAdsServiceRequest();
+        setActiveRequest(latest.request);
+        setQuotation(latest.quotation);
+      } else {
+        await api.submitAdsServiceRequestPublic(payload);
+        setNotification({ type: "success", message: "Your progress is saved. Please log in with Google to continue setup." });
+      }
     } catch (err: any) {
-      setNotification({ type: "error", message: err.message || "Failed to save request." });
+      setNotification({ type: "error", message: err.message || "Failed to save draft." });
     } finally {
       setSubmitting(false);
     }
@@ -1475,96 +1509,95 @@ export default function GetAdsPage() {
                 </div>
               )}
 
-              {/* STEP 6: CREATIVE & ADDITIONAL SERVICES */}
-              {currentStep === 6 && (
-                <div className="space-y-6 text-left">
-                  <div className="space-y-1">
-                    <h2 className="text-2xl font-black text-slate-900">Creative & Additional Services</h2>
-                    <p className="text-xs text-slate-500">Decide if you require ad creative design assets or tracking setups.</p>
+              {currentStep >= 6 && !isAuthenticated ? (
+                <div className="space-y-6 text-center py-6">
+                  <div className="bg-blue-50 text-blue-600 p-4 rounded-full w-fit mx-auto border border-blue-100">
+                    <Lock size={32} />
                   </div>
-
-                  <div className="space-y-6">
-                    {/* Creative Choice */}
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Do you need us to design your ad creative? *</label>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <button
-                          onClick={() => setCreativeRequired(false)}
-                          className={`border p-4 rounded-2xl text-left transition ${
-                            !creativeRequired ? "border-blue-600 bg-blue-50/20" : "border-slate-200 hover:border-blue-600"
-                          }`}
-                        >
-                          <span className="text-xs font-bold text-slate-800 block">I already have my creative</span>
-                          <span className="text-[10px] text-slate-500 mt-0.5 block">No extra visual creative service charges.</span>
-                        </button>
-                        <button
-                          onClick={() => setCreativeRequired(true)}
-                          className={`border p-4 rounded-2xl text-left transition ${
-                            creativeRequired ? "border-blue-600 bg-blue-50/20" : "border-slate-200 hover:border-blue-600"
-                          }`}
-                        >
-                          <div className="flex justify-between items-baseline">
-                            <span className="text-xs font-bold text-slate-800">I need creative design</span>
-                            <span className="text-xs font-extrabold text-blue-600">₹{config?.services_pricing?.creative_design_service?.offer_price || 499} extra</span>
-                          </div>
-                          <span className="text-[10px] text-slate-500 mt-0.5 block">Includes banner design matching Meta guidelines.</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Additional Services Checklist */}
-                    <div className="space-y-2.5">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Additional services to include</label>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {config?.additional_services.filter((svc: any) => svc.active !== false).map((svc) => {
-                          const isSelected = selectedServices.includes(svc.id);
-                          return (
-                            <button
-                              key={svc.id}
-                              onClick={() => toggleServiceSelection(svc.id)}
-                              className={`flex justify-between items-center text-left border p-3.5 rounded-xl transition ${
-                                isSelected ? "border-blue-600 bg-blue-50/10 text-blue-900" : "border-slate-100 hover:border-blue-600 text-slate-700 bg-slate-50/50"
-                              }`}
-                            >
-                              <div className="flex items-center gap-2">
-                                <CheckSquare size={16} className={isSelected ? "text-blue-600" : "text-slate-300"} />
-                                <span className="text-xs font-semibold">{svc.name}</span>
-                              </div>
-                              <span className="text-xs font-bold">
-                                {svc.instant ? `₹${svc.offer_price}` : "Custom"}
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
+                  <h3 className="text-xl font-extrabold text-slate-900 font-sans">Authenticate Your Session</h3>
+                  <p className="text-slate-500 text-xs max-w-sm mx-auto leading-relaxed">
+                    Please login with Google to register your campaign requirements, view your special quotation, and start your 7-day Starter trial.
+                  </p>
+                  <div className="pt-4">
+                    <button
+                      onClick={loginWithGoogle}
+                      className="px-6 py-3.5 bg-slate-900 hover:bg-slate-950 text-white font-bold rounded-xl shadow-lg transition flex items-center justify-center gap-2 mx-auto text-xs"
+                    >
+                      Continue with Google <ArrowRight size={14} />
+                    </button>
                   </div>
                 </div>
-              )}
+              ) : (
+                <>
+                  {currentStep === 6 && (
+                    <div className="space-y-6 text-left animate-fade-in">
+                      <div className="space-y-1">
+                        <h2 className="text-2xl font-black text-slate-900">Creative & Additional Services</h2>
+                        <p className="text-xs text-slate-500">Decide if you require ad creative design assets or tracking setups.</p>
+                      </div>
 
-              {/* STEP 7: QUOTATION & PAYMENT */}
-              {currentStep === 7 && (
-                !isAuthenticated ? (
-                  <div className="space-y-6 text-center py-6">
-                    <div className="bg-blue-50 text-blue-600 p-4 rounded-full w-fit mx-auto border border-blue-100">
-                      <Lock size={32} />
+                      <div className="space-y-6">
+                        {/* Creative Choice */}
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Do you need us to design your ad creative? *</label>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <button
+                              onClick={() => setCreativeRequired(false)}
+                              className={`border p-4 rounded-2xl text-left transition ${
+                                !creativeRequired ? "border-blue-600 bg-blue-50/20" : "border-slate-200 hover:border-blue-600"
+                              }`}
+                            >
+                              <span className="text-xs font-bold text-slate-800 block">I already have my creative</span>
+                              <span className="text-[10px] text-slate-500 mt-0.5 block">No extra visual creative service charges.</span>
+                            </button>
+                            <button
+                              onClick={() => setCreativeRequired(true)}
+                              className={`border p-4 rounded-2xl text-left transition ${
+                                creativeRequired ? "border-blue-600 bg-blue-50/20" : "border-slate-200 hover:border-blue-600"
+                              }`}
+                            >
+                              <div className="flex justify-between items-baseline">
+                                <span className="text-xs font-bold text-slate-800">I need creative design</span>
+                                <span className="text-xs font-extrabold text-blue-600">₹{config?.services_pricing?.creative_design_service?.offer_price || 499} extra</span>
+                              </div>
+                              <span className="text-[10px] text-slate-500 mt-0.5 block">Includes banner design matching Meta guidelines.</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Additional Services Checklist */}
+                        <div className="space-y-2.5">
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Additional services to include</label>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {config?.additional_services.filter((svc: any) => svc.active !== false).map((svc) => {
+                              const isSelected = selectedServices.includes(svc.id);
+                              return (
+                                <button
+                                  key={svc.id}
+                                  onClick={() => toggleServiceSelection(svc.id)}
+                                  className={`flex justify-between items-center text-left border p-3.5 rounded-xl transition ${
+                                    isSelected ? "border-blue-600 bg-blue-50/10 text-blue-900" : "border-slate-100 hover:border-blue-600 text-slate-700 bg-slate-50/50"
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <CheckSquare size={16} className={isSelected ? "text-blue-600" : "text-slate-300"} />
+                                    <span className="text-xs font-semibold">{svc.name}</span>
+                                  </div>
+                                  <span className="text-xs font-bold">
+                                    {svc.instant ? `₹${svc.offer_price}` : "Custom"}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <h3 className="text-xl font-extrabold text-slate-900">Authenticate Your Session</h3>
-                    <p className="text-slate-500 text-xs max-w-sm mx-auto leading-relaxed">
-                      Please login with Google to register your campaign requirements, view your special quotation, and start your 7-day Starter trial.
-                    </p>
-                    <div className="pt-4">
-                      <button
-                        onClick={loginWithGoogle}
-                        className="px-6 py-3.5 bg-slate-900 hover:bg-slate-950 text-white font-bold rounded-xl shadow-lg transition flex items-center justify-center gap-2 mx-auto text-xs"
-                      >
-                        Continue with Google <ArrowRight size={14} />
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  quotation && (
-                    <div className="space-y-6 text-left">
+                  )}
+
+                  {/* STEP 7: QUOTATION & PAYMENT */}
+                  {currentStep === 7 && quotation && (
+                    <div className="space-y-6 text-left animate-fade-in">
                       <div className="space-y-1">
                         <h2 className="text-2xl font-black text-slate-900 flex items-center gap-2">
                           <Sparkles className="text-blue-600" size={24} /> Service Quotation
@@ -1645,8 +1678,8 @@ export default function GetAdsPage() {
                         </label>
                       </div>
                     </div>
-                  )
-                )
+                  )}
+                </>
               )}
             </div>
 

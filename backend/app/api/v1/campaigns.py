@@ -458,6 +458,7 @@ async def get_adset_performance(
         }
         return MetricEngine.calculate_derived_metrics(raw_map)
 
+    hist_1d = aggregate_history(1)
     hist_3d = aggregate_history(3)
     hist_7d = aggregate_history(7)
     hist_14d = aggregate_history(14)
@@ -511,6 +512,7 @@ async def get_adset_performance(
             "data_source": "Meta API Normalized Layer",
             "availability": "available" if val is not None else "unavailable",
             "history": {
+                "1d": hist_1d.get(m_id, 0.0) if hist_1d.get(m_id) is not None else 0.0,
                 "3d": hist_3d.get(m_id, 0.0) if hist_3d.get(m_id) is not None else 0.0,
                 "7d": hist_7d.get(m_id, 0.0) if hist_7d.get(m_id) is not None else 0.0,
                 "14d": hist_14d.get(m_id, 0.0) if hist_14d.get(m_id) is not None else 0.0,

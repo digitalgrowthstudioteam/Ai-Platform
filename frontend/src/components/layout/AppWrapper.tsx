@@ -26,6 +26,7 @@ export default function AppWrapper({ children }: AppWrapperProps) {
     "/recommendation",
     "/get-meta-ads",
     "/get-meta-ads/free-plan",
+    "/get-ads",
   ].includes(cleanPath) || cleanPath.startsWith("/pay-quotation");
   const isAuthRoute = ["/login", "/signup", "/reset-password"].includes(cleanPath);
 

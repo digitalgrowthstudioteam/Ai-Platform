@@ -713,7 +713,13 @@ export default function AdSetsPage() {
                                 return formatNumber(val);
                               };
                               return (
-                                <div className="bg-slate-50 border border-slate-100 rounded-xl p-2.5 grid grid-cols-4 gap-1 text-center divide-x divide-slate-200/60 mt-1">
+                                <div className="bg-slate-50 border border-slate-100 rounded-xl p-2.5 grid grid-cols-5 gap-1 text-center divide-x divide-slate-200/60 mt-1">
+                                  <div className="px-1">
+                                    <div className="text-[8px] text-slate-400 font-extrabold uppercase tracking-wider">Prev Day</div>
+                                    <div className="text-[10px] font-bold text-slate-800 mt-0.5 truncate">
+                                      {k.history && k.history["1d"] !== undefined ? formatVal(k.history["1d"]) : "—"}
+                                    </div>
+                                  </div>
                                   <div className="px-1">
                                     <div className="text-[8px] text-slate-400 font-extrabold uppercase tracking-wider">3 Days</div>
                                     <div className="text-[10px] font-bold text-slate-800 mt-0.5 truncate">

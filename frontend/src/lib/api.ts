@@ -819,6 +819,13 @@ class ApiClient {
     });
   }
 
+  async submitAdsServiceRequestPublic(payload: any) {
+    return this.request<any>("/ads-service/public/request", {
+      method: "POST",
+      body: payload,
+    });
+  }
+
   async getLatestAdsServiceRequest() {
     return this.request<any>("/ads-service/request/latest");
   }

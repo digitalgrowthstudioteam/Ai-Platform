@@ -33,11 +33,11 @@ export default function AdminPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const [activeTab, setActiveTab] = useState<"overview" | "users" | "tickets" | "ads_services" | "ads_orders">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "users" | "tickets" | "ads_services" | "ads_orders" | "ads_leads">("overview");
 
   useEffect(() => {
     const tabParam = searchParams.get("tab");
-    if (tabParam && ["overview", "users", "tickets", "ads_services", "ads_orders"].includes(tabParam)) {
+    if (tabParam && ["overview", "users", "tickets", "ads_services", "ads_orders", "ads_leads"].includes(tabParam)) {
       setActiveTab(tabParam as any);
     }
   }, [searchParams]);
@@ -367,6 +367,14 @@ export default function AdminPage() {
           }`}
         >
           Meta Ads Orders (Paid/Allotted)
+        </button>
+        <button
+          onClick={() => setActiveTab("ads_leads")}
+          className={`pb-2.5 text-xs font-bold transition-all border-b-2 px-1 ${
+            activeTab === "ads_leads" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-400"
+          }`}
+        >
+          Meta Ads Leads (Drafts)
         </button>
       </div>
 
@@ -875,6 +883,101 @@ export default function AdminPage() {
                         <span>Partner Access: <b>{r.partner_access_status || "not_requested"}</b></span>
                         <span>Active Credits: <b>{r.remaining_credits} remaining</b></span>
                       </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
+      {activeTab === "ads_leads" && (() => {
+        const filteredLeads = adsRequestsList.filter((r) => {
+          const isLead = r.status === "draft";
+          if (!isLead) return false;
+
+          const matchSearch =
+            r.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (r.customer_name && r.customer_name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+            (r.customer_email && r.customer_email.toLowerCase().includes(searchQuery.toLowerCase())) ||
+            (r.business_name && r.business_name.toLowerCase().includes(searchQuery.toLowerCase()));
+
+          return matchSearch;
+        });
+
+        return (
+          <div className="font-sans text-left">
+            {/* Leads List */}
+            <div className="bg-white border border-slate-150 rounded-2xl p-6 shadow-xs space-y-4">
+              <div className="flex justify-between items-center border-b border-slate-100 pb-3 flex-wrap gap-2">
+                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                  <Megaphone size={16} className="text-blue-600" /> Meta Ads Leads (Drafts: {filteredLeads.length})
+                </h3>
+              </div>
+
+              {/* Filters Row */}
+              <div className="grid grid-cols-1 gap-3 pb-2 border-b border-slate-100 font-sans">
+                <input
+                  type="text"
+                  placeholder="Search by ID, Client, Business..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="px-3.5 py-2 border border-slate-200 rounded-xl text-xs font-semibold focus:ring-1 focus:ring-blue-500 bg-slate-50/20 w-full"
+                />
+              </div>
+
+              {filteredLeads.length === 0 ? (
+                <div className="py-12 text-center text-slate-400 text-xs italic">
+                  No draft leads found.
+                </div>
+              ) : (
+                <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
+                  {filteredLeads.map((r) => (
+                    <div 
+                      key={r.id}
+                      onClick={() => {
+                        router.push(`/settings/admin/quotations/${r.id}`);
+                      }}
+                      className="p-4 border border-slate-150 bg-white rounded-xl hover:bg-slate-50/50 hover:border-slate-300 transition cursor-pointer text-left shadow-sm space-y-2"
+                    >
+                      <div className="flex justify-between items-start flex-wrap gap-2">
+                        <div>
+                          <h4 className="font-extrabold text-sm text-slate-800">{r.business_name || "Untitled Business"}</h4>
+                          <p className="text-[10px] text-slate-450 font-bold mt-0.5">
+                            ID: <span className="font-mono text-[9px]">{r.id}</span>
+                          </p>
+                          <p className="text-[10px] text-slate-450 font-bold">
+                            Customer: {r.customer_name || "N/A"} ({r.customer_email || "N/A"}) | WhatsApp: {r.whatsapp_number || "N/A"}
+                          </p>
+                          <p className="text-[10px] text-slate-450 font-bold">
+                            Industry: {r.industry === "Other" ? r.industry_other : r.industry || "N/A"}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-[9px] font-bold px-2.5 py-0.5 rounded-full uppercase bg-slate-100 text-slate-700">
+                            {r.status}
+                          </span>
+                          {r.completion && (
+                            <div className="text-[10px] text-slate-500 font-extrabold mt-1.5 bg-blue-50/80 px-2 py-0.5 rounded-lg border border-blue-100/50">
+                              Form Completion: {r.completion.score}%
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {r.completion?.filled_fields && (
+                        <div className="text-[9px] text-slate-450 font-semibold bg-slate-50 p-2 rounded-lg border border-slate-100">
+                          <span className="font-bold text-slate-500 uppercase tracking-wider block text-[8px] mb-1">Filled Information:</span>
+                          <div className="flex flex-wrap gap-1.5 mt-1">
+                            {r.completion.filled_fields.map((f: string) => (
+                              <span key={f} className="bg-white border border-slate-200 px-1.5 py-0.5 rounded text-[8px] font-bold text-slate-600 capitalize">
+                                {f.replace("_", " ")}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

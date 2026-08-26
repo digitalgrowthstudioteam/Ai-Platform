@@ -414,6 +414,7 @@ export default function AdminQuotationDetailClient() {
                   onChange={(e) => setNewRequestStatus(e.target.value)}
                   className="w-full px-3 py-2 border rounded-xl bg-white font-bold"
                 >
+                  <option value="draft">Draft (Lead Only)</option>
                   <option value="submitted">Submitted (In Review)</option>
                   <option value="restricted">Restricted (Ineligible)</option>
                   <option value="whatsapp_pending">WhatsApp Contact Pending</option>

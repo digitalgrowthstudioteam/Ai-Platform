@@ -27,6 +27,7 @@ export default function FreePlanQuestionnairePage() {
   const [generating, setGenerating] = useState(false);
   const [submittingUser, setSubmittingUser] = useState(false);
   const [hasPlan, setHasPlan] = useState(false);
+  const [planId, setPlanId] = useState<string | null>(null);
   const [alreadyJoined, setAlreadyJoined] = useState(false);
 
   // Form State
@@ -64,6 +65,7 @@ export default function FreePlanQuestionnairePage() {
           const plans = await api.getCampaignPlans();
           if (plans && plans.length > 0) {
             setHasPlan(true);
+            setPlanId(plans[0].id || null);
           }
         } catch (e) {
           console.error("Failed to check plan eligibility status:", e);
@@ -494,20 +496,28 @@ export default function FreePlanQuestionnairePage() {
   if (alreadyJoined) {
     return (
       <div className="min-h-screen bg-slate-50 text-slate-900 flex items-center justify-center p-6">
-        <div className="max-w-md w-full bg-white border border-slate-200 p-8 rounded-3xl text-center space-y-6 shadow-xl">
+        <div className="max-w-md w-full bg-white border border-slate-200 p-8 rounded-3xl text-center space-y-6 shadow-xl animate-in fade-in zoom-in-95 duration-200">
           <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto border border-emerald-100">
             <CheckCircle2 size={32} />
           </div>
-          <h2 className="text-2xl font-extrabold text-slate-900">Welcome Onboard!</h2>
+          <h2 className="text-2xl font-extrabold text-slate-900">Welcome Back!</h2>
           <p className="text-sm text-slate-500 leading-relaxed">
-            You are already an active client of Digital Growth Studio! You do not need to generate a free campaign plan.
+            You are already an active client of Digital Growth Studio! Let's get your ads running—start with our introductory <strong>Meta Ads ₹333 Plan</strong> or access your dashboard.
           </p>
-          <button
-            onClick={() => router.push("/dashboard")}
-            className="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold rounded-xl shadow-lg transition"
-          >
-            Access Client Dashboard
-          </button>
+          <div className="flex flex-col gap-3">
+            <button
+              onClick={() => router.push("/get-ads")}
+              className="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold rounded-xl shadow-lg transition"
+            >
+              Get Meta Ads at ₹333 🚀
+            </button>
+            <button
+              onClick={() => router.push("/dashboard")}
+              className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold rounded-xl border border-slate-200 transition"
+            >
+              Access Client Dashboard
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -517,17 +527,27 @@ export default function FreePlanQuestionnairePage() {
     return (
       <div className="min-h-screen bg-slate-50 text-slate-900 flex items-center justify-center p-6">
         <div className="max-w-md w-full bg-white border border-slate-200 p-8 rounded-3xl text-center space-y-6 shadow-xl animate-in fade-in zoom-in-95 duration-200">
-          <AlertTriangle size={48} className="text-blue-500 mx-auto animate-pulse" />
-          <h2 className="text-2xl font-extrabold text-slate-900">Plan Already Generated</h2>
+          <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto border border-blue-100">
+            <Sparkles size={32} />
+          </div>
+          <h2 className="text-2xl font-extrabold text-slate-900">Welcome Back!</h2>
           <p className="text-sm text-slate-500 leading-relaxed">
-            You have already generated your free Meta Ads Campaign Plan! Each user is limited to one free plan.
+            You have already generated your free Meta Ads Campaign Plan! Let's bring your plan to life—launch your first high-converting campaign with our introductory <strong>Meta Ads ₹333 Plan</strong> today.
           </p>
-          <button
-            onClick={() => router.push("/dashboard/campaign-plans")}
-            className="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold rounded-xl shadow-lg transition"
-          >
-            View My Campaign Plan
-          </button>
+          <div className="flex flex-col gap-3">
+            <button
+              onClick={() => router.push("/get-ads")}
+              className="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold rounded-xl shadow-lg transition"
+            >
+              Get Meta Ads at ₹333 🚀
+            </button>
+            <button
+              onClick={() => router.push(planId ? `/dashboard/campaign-plans/${planId}` : "/dashboard/campaign-plans")}
+              className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold rounded-xl border border-slate-200 transition"
+            >
+              View My Campaign Plan
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -585,49 +605,51 @@ export default function FreePlanQuestionnairePage() {
         </div>
 
         {/* Buttons */}
-        <div className="flex items-center justify-between pt-6 border-t border-slate-100">
-          {currentStep > 0 && currentStep < 7 ? (
-            <button
-              id="btn-freeplan-back"
-              onClick={handleBack}
-              className="flex items-center gap-1.5 text-sm font-semibold text-slate-500 hover:text-slate-900 transition"
-            >
-              <ArrowLeft size={16} /> Back
-            </button>
-          ) : (
-            <div />
-          )}
+        {(currentStep < 7 || isAuthenticated) && (
+          <div className="flex items-center justify-between pt-6 border-t border-slate-100">
+            {currentStep > 0 && currentStep < 7 ? (
+              <button
+                id="btn-freeplan-back"
+                onClick={handleBack}
+                className="flex items-center gap-1.5 text-sm font-semibold text-slate-500 hover:text-slate-900 transition"
+              >
+                <ArrowLeft size={16} /> Back
+              </button>
+            ) : (
+              <div />
+            )}
 
-          {currentStep < 7 ? (
-            <button
-              id="btn-freeplan-continue"
-              onClick={handleNext}
-              className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white font-bold rounded-xl shadow-md shadow-blue-500/10 hover:shadow-lg transition flex items-center gap-1.5 ml-auto"
-              style={{
-                background: "linear-gradient(to right, #2563eb, #1d4ed8)",
-              }}
-            >
-              Continue <ArrowRight size={16} />
-            </button>
-          ) : (
-            <button
-              id="btn-freeplan-generate"
-              onClick={handleGenerate}
-              disabled={generating}
-              className="px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold rounded-xl shadow-md shadow-blue-500/10 hover:shadow-lg transition flex items-center gap-2 ml-auto"
-            >
-              {generating ? (
-                <>
-                  <Loader2 size={18} className="animate-spin" /> Generating Plan...
-                </>
-              ) : (
-                <>
-                  Generate My Campaign Plan <Sparkles size={18} />
-                </>
-              )}
-            </button>
-          )}
-        </div>
+            {currentStep < 7 ? (
+              <button
+                id="btn-freeplan-continue"
+                onClick={handleNext}
+                className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white font-bold rounded-xl shadow-md shadow-blue-500/10 hover:shadow-lg transition flex items-center gap-1.5 ml-auto"
+                style={{
+                  background: "linear-gradient(to right, #2563eb, #1d4ed8)",
+                }}
+              >
+                Continue <ArrowRight size={16} />
+              </button>
+            ) : (
+              <button
+                id="btn-freeplan-generate"
+                onClick={handleGenerate}
+                disabled={generating}
+                className="px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold rounded-xl shadow-md shadow-blue-500/10 hover:shadow-lg transition flex items-center gap-2 ml-auto"
+              >
+                {generating ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin" /> Generating Plan...
+                  </>
+                ) : (
+                  <>
+                    Generate My Campaign Plan <Sparkles size={18} />
+                  </>
+                )}
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="text-center text-xs text-slate-400 mt-8">
