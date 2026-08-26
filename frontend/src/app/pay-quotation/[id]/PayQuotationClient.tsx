@@ -36,6 +36,7 @@ export default function PayQuotationClient() {
   const [quotation, setQuotation] = useState<any>(null);
   const [paying, setPaying] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [countdown, setCountdown] = useState(3);
   
   // User Prefill Info
   const [email, setEmail] = useState("");
@@ -96,6 +97,23 @@ export default function PayQuotationClient() {
       setFullName((prev) => prev || user.displayName || "");
     }
   }, [user, isAuthenticated]);
+
+  // Redirect to login if quotation is already paid, expired, or cancelled
+  useEffect(() => {
+    if (quotation && (quotation.status === "paid" || quotation.status === "expired" || quotation.status === "cancelled")) {
+      const interval = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev <= 1) {
+            clearInterval(interval);
+            router.push("/login");
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      return () => clearInterval(interval);
+    }
+  }, [quotation, router]);
 
   const loadRazorpayScript = () => {
     return new Promise((resolve) => {
@@ -251,6 +269,39 @@ export default function PayQuotationClient() {
         </div>
         <div className="text-center text-xs text-slate-400">
           Digital Growth Studio • Secure Onboarding
+        </div>
+      </div>
+    );
+  }
+
+  if (quotation && (quotation.status === "paid" || quotation.status === "expired" || quotation.status === "cancelled")) {
+    const isPaid = quotation.status === "paid";
+    return (
+      <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col justify-between py-16 px-6">
+        <div className="max-w-md w-full mx-auto bg-white border border-slate-200 p-8 rounded-3xl text-center space-y-6 shadow-xl">
+          <div className={`w-16 h-16 ${isPaid ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-amber-50 text-amber-600 border-amber-100"} rounded-full flex items-center justify-center mx-auto border`}>
+            {isPaid ? <CheckCircle2 size={32} /> : <AlertTriangle size={32} />}
+          </div>
+          <h2 className="text-2xl font-extrabold text-slate-900">
+            {isPaid ? "Quotation Already Paid! ✅" : "Quotation Expired / Cancelled"}
+          </h2>
+          <p className="text-sm text-slate-500 leading-relaxed">
+            {isPaid
+              ? "This service quotation has already been successfully paid and processed."
+              : "This service quotation is no longer active."}
+          </p>
+          <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl text-center text-xs text-slate-600">
+            Redirecting you to the login page in <span className="font-bold text-blue-600 text-sm">{countdown}</span> seconds...
+          </div>
+          <Link
+            href="/login"
+            className="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold rounded-xl shadow-lg transition flex items-center justify-center gap-1 text-sm cursor-pointer"
+          >
+            Go to Login Page
+          </Link>
+        </div>
+        <div className="text-center text-xs text-slate-400">
+          Digital Growth Studio • Secure Portal
         </div>
       </div>
     );
