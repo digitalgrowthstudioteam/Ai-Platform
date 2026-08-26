@@ -917,171 +917,26 @@ class AIBriefService:
     async def _create_mock_daily_brief(
         cls, db: AsyncSession, ad_account_uuid: uuid.UUID, user_uuid: uuid.UUID, report_date: date
     ) -> AIDailyBrief:
-        """Helper to create a fully populated realistic fallback Daily Brief (9.8)."""
-        top_priorities = [
-            {
-                "id": "mock_crit_1",
-                "entity_type": "ad",
-                "entity_id": str(uuid.uuid4()),
-                "entity_name": "Image C (Standard Call Out)",
-                "title": "Review Image C Fatigue",
-                "description": "CPL increased 54% yesterday due to CTR drop.",
-                "reason": "Audience creative fatigue on static image layout.",
-                "objective": "Leads",
-                "problem": "CPL increased 54%",
-                "root_cause": "Creative Fatigue",
-                "evidence": "CTR ↓ 29%, Frequency ↑ 42%",
-                "confidence_score": 0.91,
-                "priority": "critical"
-            },
-            {
-                "id": "mock_crit_2",
-                "entity_type": "campaign",
-                "entity_id": str(uuid.uuid4()),
-                "entity_name": "Video A Campaign",
-                "title": "Scaling Opportunity on Reels",
-                "description": "Video A is converting 26% below target CPL. Expand delivery.",
-                "reason": "Reels placement performing significantly above baseline.",
-                "objective": "Engagement",
-                "problem": "None",
-                "root_cause": "Strong hook rate",
-                "evidence": "Cost per conversation is ₹71.00",
-                "confidence_score": 0.88,
-                "priority": "opportunity"
-            },
-            {
-                "id": "mock_crit_3",
-                "entity_type": "campaign",
-                "entity_id": str(uuid.uuid4()),
-                "entity_name": "Campaign B",
-                "title": "Maintain stable messaging creatives",
-                "description": "Active ad copy is performing within normal historical variation limits. Keep delivery active.",
-                "reason": "Stable ad delivery.",
-                "objective": "Engagement",
-                "problem": "None",
-                "root_cause": "Normal pacing",
-                "evidence": "Frequency stable",
-                "confidence_score": 0.92,
-                "priority": "medium"
-            }
-        ]
-
-        opportunities = [
-            {
-                "id": "mock_opp_1",
-                "entity_type": "ad_set",
-                "entity_id": str(uuid.uuid4()),
-                "entity_name": "Instagram Reels Adset",
-                "title": "Scaling Opportunity",
-                "description": "Instagram Reels is generating leads 31% cheaper than campaign average.",
-                "reason": "Prioritize Reels-focused creative testing cycle.",
-                "objective": "Leads",
-                "problem": "None",
-                "root_cause": "Low CPC Reels auctions",
-                "evidence": "CPL is ₹84.50",
-                "confidence_score": 0.89,
-                "priority": "opportunity"
-            }
-        ]
-
-        dont_change_items = [
-            {
-                "id": "mock_dc_1",
-                "entity_type": "campaign",
-                "entity_id": str(uuid.uuid4()),
-                "entity_name": "Campaign B",
-                "title": "Don't Change Campaign B",
-                "description": "Campaign B is performing within normal variation thresholds.",
-                "reason": "Yesterday CPL spiked 11% but 7-day average remains stable. Do not intervene.",
-                "objective": "Engagement",
-                "problem": "None",
-                "root_cause": "Auction volatility",
-                "evidence": "CPL baseline is within range",
-                "confidence_score": 0.95,
-                "priority": "medium"
-            }
-        ]
-
-        experiments = [
-            {
-                "id": "mock_exp_1",
-                "entity_type": "ad",
-                "entity_id": str(uuid.uuid4()),
-                "entity_name": "Video A",
-                "title": "Refine Hook of Video A",
-                "description": "Create a new variation of Video A with customer testimonial hook.",
-                "reason": "Hook testing cycle.",
-                "hypothesis": "Refining opening visual hook will maintain low CPL without reducing landing page quality.",
-                "objective": "Sales",
-                "problem": "None",
-                "root_cause": "Opportunity",
-                "evidence": "CTR is 1.8%",
-                "confidence_score": 0.85,
-                "priority": "medium"
-            }
-        ]
-
-        watch_items = [
-            {
-                "id": "mock_watch_1",
-                "entity_type": "ad_set",
-                "entity_id": str(uuid.uuid4()),
-                "entity_name": "Audience segment C",
-                "title": "Auction Pressure Alert",
-                "description": "Audience segment C has increasing CPM auction pressure.",
-                "reason": "Monitor frequency metrics over the next 48 hours.",
-                "objective": "Sales",
-                "problem": "CPM rose 18%",
-                "root_cause": "Auction competition",
-                "evidence": "CPM increased from ₹220 to ₹259",
-                "confidence_score": 0.82,
-                "priority": "low"
-            }
-        ]
-
+        """Helper to create a blank fallback Daily Brief (no mock data)."""
         brief = AIDailyBrief(
             user_id=user_uuid,
             ad_account_id=ad_account_uuid,
             report_date=report_date,
-            overall_status="Improving",
-            spend=2840.0,
-            results=38,
+            overall_status="Stable",
+            spend=0.0,
+            results=0,
             primary_kpi="CPL",
-            primary_kpi_value=74.74,
-            primary_kpi_change=-0.12,
-            biggest_win={
-                "title": "Video A (Problem-Focused Hook)",
-                "kpi": "CPL",
-                "prev_value": 96.0,
-                "value": 71.0,
-                "change_pct": -26.0,
-                "ai_explanation": "Performance improved primarily because CTR increased 31% while CPC remained stable on Reels."
-            },
-            biggest_problem={
-                "title": "Image C (Standard Call Out)",
-                "kpi": "CPL",
-                "prev_value": 142.0,
-                "value": 219.0,
-                "change_pct": 54.0,
-                "root_cause": "CTR declined 29% while CPM remained stable.",
-                "diagnosis": "Likely creative/message fatigue issue.",
-                "recommendation": "Review and replace with a refreshed visual variation."
-            },
-            positive_changes=[
-                "Video A CPL decreased 26% yesterday",
-                "Instagram Reels conversion rate increased 18%",
-                "Campaign A Leads increased 22% overall"
-            ],
-            negative_changes=[
-                "Image C CPL increased 54%",
-                "Campaign B ad frequency rose 21% today",
-                "Retargeting landing page CTR fell 18%"
-            ],
-            watch_items=watch_items,
-            opportunities=opportunities,
-            experiments=experiments,
-            dont_change_items=dont_change_items,
-            top_priorities=top_priorities,
+            primary_kpi_value=0.0,
+            primary_kpi_change=0.0,
+            biggest_win=None,
+            biggest_problem=None,
+            positive_changes=[],
+            negative_changes=[],
+            watch_items=[],
+            opportunities=[],
+            experiments=[],
+            dont_change_items=[],
+            top_priorities=[],
             generated_at=datetime.utcnow()
         )
 
@@ -1094,92 +949,27 @@ class AIBriefService:
     async def _create_mock_weekly_brief(
         cls, db: AsyncSession, ad_account_uuid: uuid.UUID, user_uuid: uuid.UUID, start_date: date
     ) -> AIWeeklyBrief:
-        """Helper to create a fully populated realistic fallback Weekly Brief (9.22)."""
+        """Helper to create a blank fallback Weekly Brief (no mock data)."""
         end_date = start_date + timedelta(days=6)
-        top_priorities = [
-            {
-                "id": 1,
-                "status": "critical",
-                "title": "🔴 Replace/test Image C",
-                "description": "Creative performance is deteriorating rapidly this week."
-            },
-            {
-                "id": 2,
-                "status": "opportunity",
-                "title": "🔵 Build two variations from Video A",
-                "description": "Scale the winning pattern of short-form video Reels."
-            },
-            {
-                "id": 3,
-                "status": "dont_change",
-                "title": "🟢 Continue Campaign B",
-                "description": "No intervention needed. Pacing is highly stable."
-            }
-        ]
-
         brief = AIWeeklyBrief(
             user_id=user_uuid,
             ad_account_id=ad_account_uuid,
             start_date=start_date,
             end_date=end_date,
-            overall_status="Improving",
-            spend=18400.0,
-            results=246,
+            overall_status="Stable",
+            spend=0.0,
+            results=0,
             primary_kpi="CPL",
-            primary_kpi_value=74.80,
-            primary_kpi_change=-0.16,
-            biggest_win={
-                "title": "Video A (Problem-Focused Hook)",
-                "kpi": "CPL",
-                "change_pct": -34.0,
-                "explanation": "Video A consistently outperformed the campaign average across the last 7 days."
-            },
-            biggest_problem={
-                "title": "Image C (Standard Banner)",
-                "kpi": "CPL",
-                "change_pct": 47.0,
-                "explanation": "CTR declined while CPM remained stable, indicating a likely creative/message fatigue issue."
-            },
-            winning_pattern={
-                "pattern": "🧬 Short-form video + problem hook + Reels placement",
-                "confidence": 91.0,
-                "description": "Short-form video with a problem-focused hook delivers 34% cheaper CPL on Instagram Reels compared to campaign average."
-            },
-            creative_fatigue_items=[
-                {
-                    "ad_name": "Image C (Standard Product Card)",
-                    "frequency": 3.8,
-                    "ctr_trend_pct": -22.0,
-                    "cpl_trend_pct": 47.0,
-                    "confidence": 94.0
-                },
-                {
-                    "ad_name": "Video Ad B (Feature Walkthrough)",
-                    "frequency": 2.9,
-                    "ctr_trend_pct": -14.0,
-                    "cpl_trend_pct": 19.0,
-                    "confidence": 81.0
-                }
-            ],
-            opportunities=[
-                {
-                    "description": "Campaign A generates 34% of conversions while receiving only 18% of spend.",
-                    "action": "Consider prioritizing this campaign for controlled future budget testing."
-                }
-            ],
-            dont_change_items=[
-                {
-                    "description": "Campaign B performance is stable.",
-                    "reason": "Recent metrics fluctuation is within expected normal variance limits. Do not adjust parameters."
-                }
-            ],
-            experiments=[
-                {
-                    "description": "Test winning headline with new creative.",
-                    "hypothesis": "Deploying the winning problem statement copy angle with a Reels video variation will scale results."
-                }
-            ],
-            top_priorities=top_priorities,
+            primary_kpi_value=0.0,
+            primary_kpi_change=0.0,
+            biggest_win=None,
+            biggest_problem=None,
+            winning_pattern=None,
+            creative_fatigue_items=[],
+            opportunities=[],
+            dont_change_items=[],
+            experiments=[],
+            top_priorities=[],
             generated_at=datetime.utcnow()
         )
 
