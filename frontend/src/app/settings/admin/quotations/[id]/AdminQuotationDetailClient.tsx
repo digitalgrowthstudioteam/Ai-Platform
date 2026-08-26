@@ -71,9 +71,18 @@ export default function AdminQuotationDetailClient() {
       setNewPartnerStatus(res.partner_access_status || "not_requested");
       setIsEligible(res.user_eligibility?.eligible !== false);
     } catch (err: any) {
-      console.error(err);
-      const msg = err.message || (typeof err === "string" ? err : JSON.stringify(err));
-      setError(msg || "Failed to load service request details.");
+      console.error("Error fetching request details:", err);
+      let msg = "Failed to load service request details.";
+      try {
+        if (err && typeof err === "object") {
+          msg = err.message || err.detail || JSON.stringify(err);
+        } else if (typeof err === "string") {
+          msg = err;
+        }
+      } catch (jsonErr) {
+        msg = err.message || String(err);
+      }
+      setError(msg);
     } finally {
       setLoading(false);
     }
