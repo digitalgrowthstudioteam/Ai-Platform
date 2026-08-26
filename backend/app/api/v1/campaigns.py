@@ -418,8 +418,21 @@ async def get_adset_performance(
     rows_hist = res_hist.scalars().all()
 
     def aggregate_history(days: int) -> dict:
-        cutoff = end_date - timedelta(days=days-1)
-        period_rows = [r for r in rows_hist if r.date >= cutoff]
+        """
+        Aggregate metrics for a prior comparison window.
+        - days=1: Only yesterday (end_date - 1)
+        - days=3: 3 days ending yesterday (end_date-3 to end_date-1)
+        - days=7: 7 days ending yesterday (end_date-7 to end_date-1)
+        - etc.
+        This ensures history windows never overlap with the current period.
+        """
+        window_end = end_date - timedelta(days=1)  # always exclude current day
+        if days == 1:
+            window_start = window_end  # single day (yesterday)
+        else:
+            window_start = end_date - timedelta(days=days)
+        
+        period_rows = [r for r in rows_hist if window_start <= r.date <= window_end]
         
         aggregated_actions = {}
         total_spend = 0.0
