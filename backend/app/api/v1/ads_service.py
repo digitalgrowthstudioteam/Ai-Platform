@@ -1657,6 +1657,7 @@ async def admin_get_request(
     Retrieves the details of a single service request along with its user, ad packs, and associated quotation.
     Restricted to administrators.
     """
+    # Retrieve request details for the admin console
     email = claims.get("email", "")
     whitelisted_admins = {"flasshgames2026@gmail.com", "digitalgrowthstudioteam@gmail.com", "vikramrwadkar@gmail.com"}
     if email not in whitelisted_admins:
