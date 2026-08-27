@@ -581,14 +581,18 @@ async def get_ai_intelligence_status(
     # 1. Resolve active addons to count slots
     addons = await EntitlementEngine.get_active_addons(user.id, db)
     
+    # Canonical set of addon IDs that grant individual AI Intelligence slots
+    INDIVIDUAL_AI_ADDON_IDS = {"AI_INTELLIGENCE_INDIVIDUAL_MONTHLY", "AI_INTELLIGENCE_INDIVIDUAL_YEARLY", "ai_deep_analysis"}
+    ALL_ACCOUNTS_AI_ADDON_IDS = {"AI_INTELLIGENCE_ALL_MONTHLY", "AI_INTELLIGENCE_ALL_YEARLY"}
+
     all_accounts_active = any(
-        a.addon_id in ["AI_INTELLIGENCE_ALL_MONTHLY", "AI_INTELLIGENCE_ALL_YEARLY"] 
+        a.addon_id in ALL_ACCOUNTS_AI_ADDON_IDS
         for a in addons
     )
     
     individual_slots_total = sum(
         a.quantity for a in addons 
-        if a.addon_id in ["AI_INTELLIGENCE_INDIVIDUAL_MONTHLY", "AI_INTELLIGENCE_INDIVIDUAL_YEARLY"]
+        if a.addon_id in INDIVIDUAL_AI_ADDON_IDS
     )
     
     # 2. Get all Meta Ad Accounts for this user
@@ -656,8 +660,11 @@ async def assign_ai_intelligence(
     
     # 1. Check if user has active ALL_ACCOUNTS
     addons = await EntitlementEngine.get_active_addons(user.id, db)
+    INDIVIDUAL_AI_ADDON_IDS = {"AI_INTELLIGENCE_INDIVIDUAL_MONTHLY", "AI_INTELLIGENCE_INDIVIDUAL_YEARLY", "ai_deep_analysis"}
+    ALL_ACCOUNTS_AI_ADDON_IDS = {"AI_INTELLIGENCE_ALL_MONTHLY", "AI_INTELLIGENCE_ALL_YEARLY"}
+
     all_accounts_active = any(
-        a.addon_id in ["AI_INTELLIGENCE_ALL_MONTHLY", "AI_INTELLIGENCE_ALL_YEARLY"] 
+        a.addon_id in ALL_ACCOUNTS_AI_ADDON_IDS
         for a in addons
     )
     if all_accounts_active:
@@ -669,7 +676,7 @@ async def assign_ai_intelligence(
     # 2. Check if user has available individual slots
     individual_slots_total = sum(
         a.quantity for a in addons 
-        if a.addon_id in ["AI_INTELLIGENCE_INDIVIDUAL_MONTHLY", "AI_INTELLIGENCE_INDIVIDUAL_YEARLY"]
+        if a.addon_id in INDIVIDUAL_AI_ADDON_IDS
     )
     if individual_slots_total <= 0:
         raise HTTPException(

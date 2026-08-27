@@ -498,7 +498,7 @@ class EntitlementEngine:
                 for a in addons
             )
             has_ai_intelligence = any(
-                a.addon_id in ["AI_INTELLIGENCE_ALL_MONTHLY", "AI_INTELLIGENCE_ALL_YEARLY", "AI_INTELLIGENCE_INDIVIDUAL_MONTHLY", "AI_INTELLIGENCE_INDIVIDUAL_YEARLY"]
+                a.addon_id in ["AI_INTELLIGENCE_ALL_MONTHLY", "AI_INTELLIGENCE_ALL_YEARLY", "AI_INTELLIGENCE_INDIVIDUAL_MONTHLY", "AI_INTELLIGENCE_INDIVIDUAL_YEARLY", "ai_deep_analysis"]
                 for a in addons
             )
             if not has_lifetime_history and not has_ai_intelligence:
@@ -554,12 +554,12 @@ class EntitlementEngine:
             
         # Check individual accounts active
         has_individual = any(
-            a.addon_id in ["AI_INTELLIGENCE_INDIVIDUAL_MONTHLY", "AI_INTELLIGENCE_INDIVIDUAL_YEARLY"]
+            a.addon_id in ["AI_INTELLIGENCE_INDIVIDUAL_MONTHLY", "AI_INTELLIGENCE_INDIVIDUAL_YEARLY", "ai_deep_analysis"]
             for a in addons
         )
         individual_slots = sum(
             a.quantity for a in addons 
-            if a.addon_id in ["AI_INTELLIGENCE_INDIVIDUAL_MONTHLY", "AI_INTELLIGENCE_INDIVIDUAL_YEARLY"]
+            if a.addon_id in ["AI_INTELLIGENCE_INDIVIDUAL_MONTHLY", "AI_INTELLIGENCE_INDIVIDUAL_YEARLY", "ai_deep_analysis"]
         )
         
         if has_individual and individual_slots > 0:
@@ -595,7 +595,7 @@ class EntitlementEngine:
                             "valid_until": None
                         }
                 
-                expiry = max(a.expires_at for a in addons if a.addon_id in ["AI_INTELLIGENCE_INDIVIDUAL_MONTHLY", "AI_INTELLIGENCE_INDIVIDUAL_YEARLY"])
+                expiry = max(a.expires_at for a in addons if a.addon_id in ["AI_INTELLIGENCE_INDIVIDUAL_MONTHLY", "AI_INTELLIGENCE_INDIVIDUAL_YEARLY", "ai_deep_analysis"])
                 return {
                     "enabled": True,
                     "scope": "ACCOUNT",
