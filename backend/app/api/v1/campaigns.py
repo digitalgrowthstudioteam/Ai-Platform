@@ -626,7 +626,7 @@ async def get_adset_performance(
     try:
         # Join to fetch access token and meta_adset_id
         conn_stmt = (
-            select(MetaConnection.access_token, AdSet.meta_adset_id)
+            select(MetaConnection, AdSet.meta_adset_id)
             .join(Campaign, AdSet.campaign_id == Campaign.id)
             .join(MetaAdAccount, Campaign.ad_account_id == MetaAdAccount.id)
             .join(MetaConnection, MetaAdAccount.meta_connection_id == MetaConnection.id)
@@ -635,7 +635,8 @@ async def get_adset_performance(
         conn_res = await db.execute(conn_stmt)
         conn_row = conn_res.fetchone()
         if conn_row and conn_row[0] and conn_row[1]:
-            token, meta_adset_id = conn_row
+            conn_obj, meta_adset_id = conn_row
+            token = conn_obj.access_token
             from app.core.config import settings
             import httpx
             url = f"https://graph.facebook.com/{settings.META_API_VERSION}/{meta_adset_id}?fields=targeting"
@@ -650,7 +651,6 @@ async def get_adset_performance(
                             if name:
                                 interests.append(name)
     except Exception as e:
-        from app.core.logging import logger
         logger.warn("Failed to fetch targeting interests from Meta API", error=str(e))
 
     return {
