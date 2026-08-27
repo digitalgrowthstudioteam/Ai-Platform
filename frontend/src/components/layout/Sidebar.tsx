@@ -60,6 +60,8 @@ const navigation: NavSection[] = [
     label: "CAMPAIGNS",
     items: [
       { label: "All Campaigns", href: "/campaigns", icon: Megaphone },
+      { label: "All Adsets", href: "/ad-sets", icon: Layers },
+      { label: "All Ads", href: "/ads", icon: Image },
     ],
   },
   {
