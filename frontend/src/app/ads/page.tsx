@@ -766,7 +766,7 @@ export default function AdsPage() {
                       const pros = [];
                       const m = selectedAd.metrics;
                       if (m.roas >= 2.0) pros.push(`Profitable ROAS delivery at ${m.roas.toFixed(2)}x.`);
-                      if (m.ctr >= 0.015) pros.push(`Strong copy resonance (CTR: ${(m.ctr*100).toFixed(2)}%).`);
+                      if (m.ctr >= 1.5) pros.push(`Strong copy resonance (CTR: ${(m.ctr).toFixed(2)}%).`);
                       if (m.cpc > 0 && m.cpc < 4.0) pros.push(`Highly efficient Cost Per Click (₹${m.cpc.toFixed(2)}).`);
                       if (m.purchases >= 5) pros.push(`Stable conversion pool with ${m.purchases} total purchases.`);
                       if (pros.length === 0) pros.push("Ad impressions are stable and delivery budget is processing normally.");
@@ -785,7 +785,7 @@ export default function AdsPage() {
                       const cons = [];
                       const m = selectedAd.metrics;
                       if (m.roas > 0 && m.roas < 1.0) cons.push(`ROAS of ${m.roas.toFixed(2)}x represents a net revenue loss.`);
-                      if (m.ctr > 0 && m.ctr < 0.008) cons.push(`Low CTR (${(m.ctr*100).toFixed(2)}%) indicates weak creative engagement.`);
+                      if (m.ctr > 0 && m.ctr < 0.8) cons.push(`Low CTR (${(m.ctr).toFixed(2)}%) indicates weak creative engagement.`);
                       if (m.cpc > 10.0) cons.push(`Elevated Cost Per Click (₹${m.cpc.toFixed(2)}) increases cost of audience acquisition.`);
                       if (m.purchases === 0 && m.spend > 400) cons.push(`Zero conversions generated despite ₹${m.spend.toFixed(2)} ad spend.`);
                       if (cons.length === 0) cons.push("No critical budget leaks or audience targeting defects detected.");
