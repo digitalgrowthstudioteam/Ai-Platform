@@ -726,6 +726,18 @@ async def get_sync_status(
             status_code=status.HTTP_404_NOT_FOUND, 
             detail="No active Meta integration connection found."
         )
+
+    # Self-healing auto-recovery: Reset stuck sync if in progress for more than 10 minutes
+    if connection.last_sync_status == "in_progress" and connection.last_sync_at:
+        from datetime import timezone
+        last_sync_time = connection.last_sync_at
+        if last_sync_time.tzinfo is None:
+            last_sync_time = last_sync_time.replace(tzinfo=timezone.utc)
+        elapsed = (datetime.now(timezone.utc) - last_sync_time).total_seconds()
+        if elapsed > 600:
+            connection.last_sync_status = "failed"
+            connection.last_sync_error = "Sync timed out / aborted"
+            await db.commit()
         
     from app.services.entitlement_engine import EntitlementEngine
     entitlements = await EntitlementEngine.resolve_entitlements(user, db)

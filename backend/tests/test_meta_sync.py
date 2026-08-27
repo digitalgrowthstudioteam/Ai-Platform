@@ -263,3 +263,53 @@ async def test_trigger_sync_route(mock_delay, mock_auth, db: AsyncSession):
     await db.delete(conn)
     await db.delete(user)
     await db.commit()
+
+
+@pytest.mark.asyncio
+async def test_meta_sync_status_self_healing(db: AsyncSession, mock_auth):
+    """Verify that visiting /sync/status automatically resets a stuck sync."""
+    # 1. Setup User and Connection with in_progress status and old last_sync_at (e.g. 15 minutes ago)
+    user = User(
+        firebase_uid=MOCK_CLAIMS["uid"],
+        email=MOCK_CLAIMS["email"],
+        name=MOCK_CLAIMS["name"],
+        trial_status="active",
+        trial_started_at=datetime.utcnow(),
+        trial_ends_at=datetime.utcnow() + timedelta(days=7),
+        trial_used=True,
+    )
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+
+    conn = MetaConnection(
+        user_id=user.id,
+        meta_user_id="meta_usr_sync_status_test",
+        access_token="mock_token",
+        status="connected",
+        last_sync_status="in_progress",
+        last_sync_at=datetime.utcnow() - timedelta(minutes=15),
+    )
+    db.add(conn)
+    await db.commit()
+
+    # 2. Call GET /sync/status
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.get("/api/v1/meta/sync/status")
+        assert response.status_code == 200
+        data = response.json()
+        
+        # Verify it self-healed and returned "failed" status
+        assert data["last_sync_status"] == "failed"
+        assert data["last_sync_error"] == "Sync timed out / aborted"
+        
+    # Check that database status is also updated to "failed"
+    await db.refresh(conn)
+    assert conn.last_sync_status == "failed"
+    assert conn.last_sync_error == "Sync timed out / aborted"
+
+    # Cleanup
+    await db.delete(conn)
+    await db.delete(user)
+    await db.commit()
