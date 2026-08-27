@@ -175,6 +175,37 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
   // Tab State
   const [activeTab, setActiveTab] = useState<"overview" | "adsets">("overview");
   const [breakdownView, setBreakdownView] = useState<"placement" | "platform" | "demographic" | "region">("placement");
+  const [breakdownSortBy, setBreakdownSortBy] = useState<string>("spend");
+  const [breakdownSortOrder, setBreakdownSortOrder] = useState<"asc" | "desc">("desc");
+  const [adSortBy, setAdSortBy] = useState<string>("spend");
+  const [adSortOrder, setAdSortOrder] = useState<"asc" | "desc">("desc");
+
+  const handleCampaignHeaderSort = (key: string) => {
+    if (sortBy === key) {
+      setSortOrder(prev => prev === "asc" ? "desc" : "asc");
+    } else {
+      setSortBy(key);
+      setSortOrder("desc");
+    }
+  };
+
+  const handleBreakdownHeaderSort = (key: string) => {
+    if (breakdownSortBy === key) {
+      setBreakdownSortOrder(breakdownSortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setBreakdownSortBy(key);
+      setBreakdownSortOrder("desc");
+    }
+  };
+
+  const handleAdHeaderSort = (key: string) => {
+    if (adSortBy === key) {
+      setAdSortOrder(adSortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setAdSortBy(key);
+      setAdSortOrder("desc");
+    }
+  };
 
   // Hierarchy details states
   const [adSets, setAdSets] = useState<any[]>([]);
@@ -246,6 +277,35 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
     fetchAdBreakdowns();
   }, [selectedAccount?.id, selectedAd?.id, selectedCampaign?.id, selectedAdSet?.id, datePreset, customStartDate, customEndDate]);
 
+  const isSelectedAdSetRoas = useMemo(() => {
+    if (!selectedAdSet) return true;
+    const isConversationGoal = selectedAdSet.optimization_goal?.toUpperCase().includes("CONVERSATION") || false;
+    const isLeadGoal = selectedAdSet.optimization_goal?.toUpperCase().includes("LEAD") || false;
+    return !isConversationGoal && !isLeadGoal;
+  }, [selectedAdSet]);
+
+  const sortedPlacements = useMemo(() => {
+    return [...placementsData].map(p => {
+      const costPerResult = p.results > 0 ? p.spend / p.results : 0;
+      return { ...p, costPerResult };
+    }).sort((a, b) => {
+      let valA: any = a[breakdownSortBy as keyof typeof a];
+      let valB: any = b[breakdownSortBy as keyof typeof b];
+      if (breakdownSortBy === "name") {
+        const nameA = (a.platform_position || a.publisher_platform || "").toLowerCase();
+        const nameB = (b.platform_position || b.publisher_platform || "").toLowerCase();
+        return breakdownSortOrder === "asc" ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
+      }
+      if (breakdownSortBy === "roas" && !isSelectedAdSetRoas) {
+        valA = a.costPerResult;
+        valB = b.costPerResult;
+      }
+      if (valA === undefined) valA = 0;
+      if (valB === undefined) valB = 0;
+      return breakdownSortOrder === "asc" ? valA - valB : valB - valA;
+    });
+  }, [placementsData, breakdownSortBy, breakdownSortOrder, isSelectedAdSetRoas]);
+
   const platformDistribution = useMemo(() => {
     const platformMap: Record<string, { spend: number; impressions: number; clicks: number; results: number; revenue: number }> = {};
     placementsData.forEach(p => {
@@ -263,9 +323,25 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
       const ctr = metrics.impressions > 0 ? (metrics.clicks / metrics.impressions) * 100 : 0;
       const cpc = metrics.clicks > 0 ? metrics.spend / metrics.clicks : 0;
       const roas = metrics.spend > 0 ? metrics.revenue / metrics.spend : 0;
-      return { platform, ...metrics, ctr, cpc, roas };
-    }).sort((a, b) => b.spend - a.spend);
-  }, [placementsData]);
+      const costPerResult = metrics.results > 0 ? metrics.spend / metrics.results : 0;
+      return { platform, ...metrics, ctr, cpc, roas, costPerResult };
+    }).sort((a, b) => {
+      let valA: any = a[breakdownSortBy as keyof typeof a];
+      let valB: any = b[breakdownSortBy as keyof typeof b];
+      if (breakdownSortBy === "name") {
+        valA = a.platform.toLowerCase();
+        valB = b.platform.toLowerCase();
+        return breakdownSortOrder === "asc" ? valA.localeCompare(valB) : valB.localeCompare(valA);
+      }
+      if (breakdownSortBy === "roas" && !isSelectedAdSetRoas) {
+        valA = a.costPerResult;
+        valB = b.costPerResult;
+      }
+      if (valA === undefined) valA = 0;
+      if (valB === undefined) valB = 0;
+      return breakdownSortOrder === "asc" ? valA - valB : valB - valA;
+    });
+  }, [placementsData, breakdownSortBy, breakdownSortOrder, isSelectedAdSetRoas]);
 
   const ageDistribution = useMemo(() => {
     const ageMap: Record<string, { spend: number; impressions: number; clicks: number; results: number; revenue: number }> = {};
@@ -284,9 +360,25 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
       const ctr = metrics.impressions > 0 ? (metrics.clicks / metrics.impressions) * 100 : 0;
       const cpc = metrics.clicks > 0 ? metrics.spend / metrics.clicks : 0;
       const roas = metrics.spend > 0 ? metrics.revenue / metrics.spend : 0;
-      return { age, ...metrics, ctr, cpc, roas };
-    }).sort((a, b) => b.spend - a.spend);
-  }, [demographicsData]);
+      const costPerResult = metrics.results > 0 ? metrics.spend / metrics.results : 0;
+      return { age, ...metrics, ctr, cpc, roas, costPerResult };
+    }).sort((a, b) => {
+      let valA: any = a[breakdownSortBy as keyof typeof a];
+      let valB: any = b[breakdownSortBy as keyof typeof b];
+      if (breakdownSortBy === "name") {
+        valA = a.age.toLowerCase();
+        valB = b.age.toLowerCase();
+        return breakdownSortOrder === "asc" ? valA.localeCompare(valB) : valB.localeCompare(valA);
+      }
+      if (breakdownSortBy === "roas" && !isSelectedAdSetRoas) {
+        valA = a.costPerResult;
+        valB = b.costPerResult;
+      }
+      if (valA === undefined) valA = 0;
+      if (valB === undefined) valB = 0;
+      return breakdownSortOrder === "asc" ? valA - valB : valB - valA;
+    });
+  }, [demographicsData, breakdownSortBy, breakdownSortOrder, isSelectedAdSetRoas]);
 
   const genderDistribution = useMemo(() => {
     const genderMap: Record<string, { spend: number; impressions: number; clicks: number; results: number; revenue: number }> = {};
@@ -305,9 +397,47 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
       const ctr = metrics.impressions > 0 ? (metrics.clicks / metrics.impressions) * 100 : 0;
       const cpc = metrics.clicks > 0 ? metrics.spend / metrics.clicks : 0;
       const roas = metrics.spend > 0 ? metrics.revenue / metrics.spend : 0;
-      return { gender, ...metrics, ctr, cpc, roas };
-    }).sort((a, b) => b.spend - a.spend);
-  }, [demographicsData]);
+      const costPerResult = metrics.results > 0 ? metrics.spend / metrics.results : 0;
+      return { gender, ...metrics, ctr, cpc, roas, costPerResult };
+    }).sort((a, b) => {
+      let valA: any = a[breakdownSortBy as keyof typeof a];
+      let valB: any = b[breakdownSortBy as keyof typeof b];
+      if (breakdownSortBy === "name") {
+        valA = a.gender.toLowerCase();
+        valB = b.gender.toLowerCase();
+        return breakdownSortOrder === "asc" ? valA.localeCompare(valB) : valB.localeCompare(valA);
+      }
+      if (breakdownSortBy === "roas" && !isSelectedAdSetRoas) {
+        valA = a.costPerResult;
+        valB = b.costPerResult;
+      }
+      if (valA === undefined) valA = 0;
+      if (valB === undefined) valB = 0;
+      return breakdownSortOrder === "asc" ? valA - valB : valB - valA;
+    });
+  }, [demographicsData, breakdownSortBy, breakdownSortOrder, isSelectedAdSetRoas]);
+
+  const regionDistribution = useMemo(() => {
+    return [...regionsData].map(r => {
+      const costPerResult = r.results > 0 ? r.spend / r.results : 0;
+      return { ...r, costPerResult };
+    }).sort((a, b) => {
+      let valA: any = a[breakdownSortBy as keyof typeof a];
+      let valB: any = b[breakdownSortBy as keyof typeof b];
+      if (breakdownSortBy === "name") {
+        valA = (a.region || "").toLowerCase();
+        valB = (b.region || "").toLowerCase();
+        return breakdownSortOrder === "asc" ? valA.localeCompare(valB) : valB.localeCompare(valA);
+      }
+      if (breakdownSortBy === "roas" && !isSelectedAdSetRoas) {
+        valA = a.costPerResult;
+        valB = b.costPerResult;
+      }
+      if (valA === undefined) valA = 0;
+      if (valB === undefined) valB = 0;
+      return breakdownSortOrder === "asc" ? valA - valB : valB - valA;
+    });
+  }, [regionsData, breakdownSortBy, breakdownSortOrder, isSelectedAdSetRoas]);
 
   // Fetch subscription on mount
   useEffect(() => {
@@ -1539,15 +1669,109 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
                 <div className="overflow-x-auto">
                   <table className="min-w-full text-xs text-left divide-y divide-border">
                     <thead className="bg-slate-50/50">
-                      <tr className="text-subtle font-bold uppercase tracking-wider border-b border-border">
-                        <th className="p-4">Campaign Name</th>
-                        {visibleColumns.includes("status") && <th className="p-4">Status</th>}
-                        {visibleColumns.includes("objective") && <th className="p-4">Objective</th>}
-                        {visibleColumns.includes("spend") && <th className="p-4 text-right">Spend</th>}
-                        {visibleColumns.includes("primaryResult") && <th className="p-4 text-right">Primary Result</th>}
-                        {visibleColumns.includes("costPerResult") && <th className="p-4 text-right">Cost Per Result</th>}
-                        {visibleColumns.includes("ctr") && <th className="p-4 text-right">CTR</th>}
-                        {visibleColumns.includes("roas") && <th className="p-4 text-right">ROAS</th>}
+                      <tr className="text-subtle font-bold uppercase tracking-wider border-b border-border select-none">
+                        <th 
+                          onClick={() => handleCampaignHeaderSort("name")}
+                          className="p-4 cursor-pointer hover:bg-slate-100 transition group"
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>Campaign Name</span>
+                            <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${sortBy === "name" ? "font-bold text-blue-600" : ""}`}>
+                              {sortBy === "name" ? (sortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                            </span>
+                          </div>
+                        </th>
+                        {visibleColumns.includes("status") && (
+                          <th 
+                            onClick={() => handleCampaignHeaderSort("status")}
+                            className="p-4 cursor-pointer hover:bg-slate-100 transition group"
+                          >
+                            <div className="flex items-center gap-1">
+                              <span>Status</span>
+                              <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${sortBy === "status" ? "font-bold text-blue-600" : ""}`}>
+                                {sortBy === "status" ? (sortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                              </span>
+                            </div>
+                          </th>
+                        )}
+                        {visibleColumns.includes("objective") && (
+                          <th 
+                            onClick={() => handleCampaignHeaderSort("objective")}
+                            className="p-4 cursor-pointer hover:bg-slate-100 transition group"
+                          >
+                            <div className="flex items-center gap-1">
+                              <span>Objective</span>
+                              <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${sortBy === "objective" ? "font-bold text-blue-600" : ""}`}>
+                                {sortBy === "objective" ? (sortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                              </span>
+                            </div>
+                          </th>
+                        )}
+                        {visibleColumns.includes("spend") && (
+                          <th 
+                            onClick={() => handleCampaignHeaderSort("spend")}
+                            className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
+                          >
+                            <div className="flex items-center justify-end gap-1">
+                              <span>Spend</span>
+                              <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${sortBy === "spend" ? "font-bold text-blue-600" : ""}`}>
+                                {sortBy === "spend" ? (sortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                              </span>
+                            </div>
+                          </th>
+                        )}
+                        {visibleColumns.includes("primaryResult") && (
+                          <th 
+                            onClick={() => handleCampaignHeaderSort("purchases")}
+                            className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
+                          >
+                            <div className="flex items-center justify-end gap-1">
+                              <span>Primary Result</span>
+                              <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${sortBy === "purchases" ? "font-bold text-blue-600" : ""}`}>
+                                {sortBy === "purchases" ? (sortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                              </span>
+                            </div>
+                          </th>
+                        )}
+                        {visibleColumns.includes("costPerResult") && (
+                          <th 
+                            onClick={() => handleCampaignHeaderSort("cpc")}
+                            className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
+                          >
+                            <div className="flex items-center justify-end gap-1">
+                              <span>Cost Per Result</span>
+                              <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${sortBy === "cpc" ? "font-bold text-blue-600" : ""}`}>
+                                {sortBy === "cpc" ? (sortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                              </span>
+                            </div>
+                          </th>
+                        )}
+                        {visibleColumns.includes("ctr") && (
+                          <th 
+                            onClick={() => handleCampaignHeaderSort("ctr")}
+                            className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
+                          >
+                            <div className="flex items-center justify-end gap-1">
+                              <span>CTR</span>
+                              <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${sortBy === "ctr" ? "font-bold text-blue-600" : ""}`}>
+                                {sortBy === "ctr" ? (sortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                              </span>
+                            </div>
+                          </th>
+                        )}
+                        {visibleColumns.includes("roas") && (
+                          <th 
+                            onClick={() => handleCampaignHeaderSort("roas")}
+                            className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
+                          >
+                            <div className="flex items-center justify-end gap-1">
+                              <span>ROAS</span>
+                              <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${sortBy === "roas" ? "font-bold text-blue-600" : ""}`}>
+                                {sortBy === "roas" ? (sortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                              </span>
+                            </div>
+                          </th>
+                        )}
                         {visibleColumns.includes("health") && <th className="p-4 text-center">Health</th>}
                         {visibleColumns.includes("aiStatus") && <th className="p-4 text-center">AI Status</th>}
                       </tr>
@@ -2234,19 +2458,89 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
                 <div className="overflow-x-auto">
                   {(() => {
                     const isAdSetConversations = selectedAdSet?.optimization_goal?.toUpperCase().includes("CONVERSATION");
+                    const sortedAds = [...ads]
+                      .filter(ad => ad.adset_name === selectedAdSet.name)
+                      .sort((a, b) => {
+                        let valA: any = 0;
+                        let valB: any = 0;
+                        const key = adSortBy === "roas" && isAdSetConversations ? "cpm" : adSortBy;
+                        if (key === "name") {
+                          valA = a.name.toLowerCase();
+                          valB = b.name.toLowerCase();
+                          return adSortOrder === "asc" ? valA.localeCompare(valB) : valB.localeCompare(valA);
+                        } else if (key === "status") {
+                          valA = a.status.toLowerCase();
+                          valB = b.status.toLowerCase();
+                          return adSortOrder === "asc" ? valA.localeCompare(valB) : valB.localeCompare(valA);
+                        } else {
+                          valA = a.metrics[key] || 0;
+                          valB = b.metrics[key] || 0;
+                        }
+                        return adSortOrder === "asc" ? valA - valB : valB - valA;
+                      });
                     return (
                       <table className="min-w-full text-xs text-left divide-y divide-border">
                         <thead className="bg-slate-50/50">
-                          <tr className="text-slate-400 font-bold uppercase border-b border-border">
-                            <th className="p-4">Ad Name</th>
-                            <th className="p-4">Status</th>
-                            <th className="p-4 text-right">Spend</th>
-                            <th className="p-4 text-right">CTR</th>
-                            <th className="p-4 text-right">{isAdSetConversations ? "CPM" : "ROAS"}</th>
+                          <tr className="text-slate-400 font-bold uppercase border-b border-border select-none">
+                            <th 
+                              onClick={() => handleAdHeaderSort("name")}
+                              className="p-4 cursor-pointer hover:bg-slate-100 transition group"
+                            >
+                              <div className="flex items-center gap-1">
+                                <span>Ad Name</span>
+                                <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${adSortBy === "name" ? "font-bold text-blue-600" : ""}`}>
+                                  {adSortBy === "name" ? (adSortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                                </span>
+                              </div>
+                            </th>
+                            <th 
+                              onClick={() => handleAdHeaderSort("status")}
+                              className="p-4 cursor-pointer hover:bg-slate-100 transition group"
+                            >
+                              <div className="flex items-center gap-1">
+                                <span>Status</span>
+                                <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${adSortBy === "status" ? "font-bold text-blue-600" : ""}`}>
+                                  {adSortBy === "status" ? (adSortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                                </span>
+                              </div>
+                            </th>
+                            <th 
+                              onClick={() => handleAdHeaderSort("spend")}
+                              className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
+                            >
+                              <div className="flex items-center justify-end gap-1">
+                                <span>Spend</span>
+                                <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${adSortBy === "spend" ? "font-bold text-blue-600" : ""}`}>
+                                  {adSortBy === "spend" ? (adSortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                                </span>
+                              </div>
+                            </th>
+                            <th 
+                              onClick={() => handleAdHeaderSort("ctr")}
+                              className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
+                            >
+                              <div className="flex items-center justify-end gap-1">
+                                <span>CTR</span>
+                                <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${adSortBy === "ctr" ? "font-bold text-blue-600" : ""}`}>
+                                  {adSortBy === "ctr" ? (adSortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                                </span>
+                              </div>
+                            </th>
+                            <th 
+                              onClick={() => handleAdHeaderSort("roas")}
+                              className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
+                            >
+                              <div className="flex items-center justify-end gap-1">
+                                <span>{isAdSetConversations ? "CPM" : "ROAS"}</span>
+                                <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${adSortBy === "roas" ? "font-bold text-blue-600" : ""}`}>
+                                  {adSortBy === "roas" ? (adSortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                                </span>
+                              </div>
+                            </th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-border font-medium text-slate-700">
-                          {ads.filter(ad => ad.adset_name === selectedAdSet.name).map((ad, idx) => (
+                          {sortedAds.map((ad, idx) => (
                             <tr 
                               key={idx} 
                               onClick={() => handleSelectAdFromList(ad)}
@@ -2322,12 +2616,62 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
                     <div className="overflow-x-auto">
                       <table className="min-w-full text-xs text-left divide-y divide-border">
                         <thead className="bg-slate-50/50">
-                          <tr className="text-subtle font-bold uppercase tracking-wider border-b border-border">
-                            <th className="p-4">Platform</th>
-                            <th className="p-4 text-right">Spend Contribution</th>
-                            <th className="p-4 text-right">CTR</th>
-                            <th className="p-4 text-right">{adSetResultInfo.label}</th>
-                            <th className="p-4 text-right">{adSetResultInfo.isRoas ? "ROAS Contribution" : adSetResultInfo.costLabel}</th>
+                          <tr className="text-subtle font-bold uppercase tracking-wider border-b border-border select-none">
+                            <th 
+                              onClick={() => handleBreakdownHeaderSort("name")}
+                              className="p-4 cursor-pointer hover:bg-slate-100 transition group"
+                            >
+                              <div className="flex items-center gap-1">
+                                <span>Platform</span>
+                                <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${breakdownSortBy === "name" ? "font-bold text-blue-600" : ""}`}>
+                                  {breakdownSortBy === "name" ? (breakdownSortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                                </span>
+                              </div>
+                            </th>
+                            <th 
+                              onClick={() => handleBreakdownHeaderSort("spend")}
+                              className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
+                            >
+                              <div className="flex items-center justify-end gap-1">
+                                <span>Spend Contribution</span>
+                                <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${breakdownSortBy === "spend" ? "font-bold text-blue-600" : ""}`}>
+                                  {breakdownSortBy === "spend" ? (breakdownSortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                                </span>
+                              </div>
+                            </th>
+                            <th 
+                              onClick={() => handleBreakdownHeaderSort("ctr")}
+                              className="p-4 text-right cursor-pointer hover:bg-slate-100 transition select-none group"
+                            >
+                              <div className="flex items-center justify-end gap-1">
+                                <span>CTR</span>
+                                <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${breakdownSortBy === "ctr" ? "font-bold text-blue-600" : ""}`}>
+                                  {breakdownSortBy === "ctr" ? (breakdownSortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                                </span>
+                              </div>
+                            </th>
+                            <th 
+                              onClick={() => handleBreakdownHeaderSort("results")}
+                              className="p-4 text-right cursor-pointer hover:bg-slate-100 transition select-none group"
+                            >
+                              <div className="flex items-center justify-end gap-1">
+                                <span>{adSetResultInfo.label}</span>
+                                <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${breakdownSortBy === "results" ? "font-bold text-blue-600" : ""}`}>
+                                  {breakdownSortBy === "results" ? (breakdownSortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                                </span>
+                              </div>
+                            </th>
+                            <th 
+                              onClick={() => handleBreakdownHeaderSort("roas")}
+                              className="p-4 text-right cursor-pointer hover:bg-slate-100 transition select-none group"
+                            >
+                              <div className="flex items-center justify-end gap-1">
+                                <span>{adSetResultInfo.isRoas ? "ROAS Contribution" : adSetResultInfo.costLabel}</span>
+                                <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${breakdownSortBy === "roas" ? "font-bold text-blue-600" : ""}`}>
+                                  {breakdownSortBy === "roas" ? (breakdownSortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                                </span>
+                              </div>
+                            </th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-border font-medium text-slate-700">
@@ -2337,14 +2681,14 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
                                 Loading placement metrics...
                               </td>
                             </tr>
-                          ) : placementsData.length === 0 ? (
+                          ) : sortedPlacements.length === 0 ? (
                             <tr>
                               <td colSpan={5} className="p-8 text-center text-slate-400 font-medium">
                                 No placement data found.
                               </td>
                             </tr>
                           ) : (
-                            placementsData.map((p, idx) => {
+                            sortedPlacements.map((p, idx) => {
                               const friendlyName = p.platform_position 
                                 ? p.platform_position.split("_").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ") 
                                 : p.publisher_platform.charAt(0).toUpperCase() + p.publisher_platform.slice(1);
@@ -2379,12 +2723,62 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
                     <div className="overflow-x-auto">
                       <table className="min-w-full text-xs text-left divide-y divide-border">
                         <thead className="bg-slate-50/50">
-                          <tr className="text-subtle font-bold uppercase tracking-wider border-b border-border">
-                            <th className="p-4">Platform</th>
-                            <th className="p-4 text-right">Spend Contribution</th>
-                            <th className="p-4 text-right">CTR</th>
-                            <th className="p-4 text-right">{adSetResultInfo.label}</th>
-                            <th className="p-4 text-right">{adSetResultInfo.isRoas ? "ROAS Contribution" : adSetResultInfo.costLabel}</th>
+                          <tr className="text-subtle font-bold uppercase tracking-wider border-b border-border select-none">
+                            <th 
+                              onClick={() => handleBreakdownHeaderSort("name")}
+                              className="p-4 cursor-pointer hover:bg-slate-100 transition group"
+                            >
+                              <div className="flex items-center gap-1">
+                                <span>Platform</span>
+                                <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${breakdownSortBy === "name" ? "font-bold text-blue-600" : ""}`}>
+                                  {breakdownSortBy === "name" ? (breakdownSortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                                </span>
+                              </div>
+                            </th>
+                            <th 
+                              onClick={() => handleBreakdownHeaderSort("spend")}
+                              className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
+                            >
+                              <div className="flex items-center justify-end gap-1">
+                                <span>Spend Contribution</span>
+                                <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${breakdownSortBy === "spend" ? "font-bold text-blue-600" : ""}`}>
+                                  {breakdownSortBy === "spend" ? (breakdownSortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                                </span>
+                              </div>
+                            </th>
+                            <th 
+                              onClick={() => handleBreakdownHeaderSort("ctr")}
+                              className="p-4 text-right cursor-pointer hover:bg-slate-100 transition select-none group"
+                            >
+                              <div className="flex items-center justify-end gap-1">
+                                <span>CTR</span>
+                                <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${breakdownSortBy === "ctr" ? "font-bold text-blue-600" : ""}`}>
+                                  {breakdownSortBy === "ctr" ? (breakdownSortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                                </span>
+                              </div>
+                            </th>
+                            <th 
+                              onClick={() => handleBreakdownHeaderSort("results")}
+                              className="p-4 text-right cursor-pointer hover:bg-slate-100 transition select-none group"
+                            >
+                              <div className="flex items-center justify-end gap-1">
+                                <span>{adSetResultInfo.label}</span>
+                                <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${breakdownSortBy === "results" ? "font-bold text-blue-600" : ""}`}>
+                                  {breakdownSortBy === "results" ? (breakdownSortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                                </span>
+                              </div>
+                            </th>
+                            <th 
+                              onClick={() => handleBreakdownHeaderSort("roas")}
+                              className="p-4 text-right cursor-pointer hover:bg-slate-100 transition select-none group"
+                            >
+                              <div className="flex items-center justify-end gap-1">
+                                <span>{adSetResultInfo.isRoas ? "ROAS Contribution" : adSetResultInfo.costLabel}</span>
+                                <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${breakdownSortBy === "roas" ? "font-bold text-blue-600" : ""}`}>
+                                  {breakdownSortBy === "roas" ? (breakdownSortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                                </span>
+                              </div>
+                            </th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-border font-medium text-slate-700">
@@ -2544,12 +2938,62 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
                     <div className="overflow-x-auto">
                       <table className="min-w-full text-xs text-left divide-y divide-border">
                         <thead className="bg-slate-50/50">
-                          <tr className="text-subtle font-bold uppercase tracking-wider border-b border-border">
-                            <th className="p-4">Region / State</th>
-                            <th className="p-4 text-right">Spend Contribution</th>
-                            <th className="p-4 text-right">CTR</th>
-                            <th className="p-4 text-right">{adSetResultInfo.label}</th>
-                            <th className="p-4 text-right">{adSetResultInfo.isRoas ? "ROAS" : adSetResultInfo.costLabel}</th>
+                          <tr className="text-subtle font-bold uppercase tracking-wider border-b border-border select-none">
+                            <th 
+                              onClick={() => handleBreakdownHeaderSort("name")}
+                              className="p-4 cursor-pointer hover:bg-slate-100 transition group"
+                            >
+                              <div className="flex items-center gap-1">
+                                <span>Region / State</span>
+                                <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${breakdownSortBy === "name" ? "font-bold text-blue-600" : ""}`}>
+                                  {breakdownSortBy === "name" ? (breakdownSortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                                </span>
+                              </div>
+                            </th>
+                            <th 
+                              onClick={() => handleBreakdownHeaderSort("spend")}
+                              className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
+                            >
+                              <div className="flex items-center justify-end gap-1">
+                                <span>Spend Contribution</span>
+                                <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${breakdownSortBy === "spend" ? "font-bold text-blue-600" : ""}`}>
+                                  {breakdownSortBy === "spend" ? (breakdownSortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                                </span>
+                              </div>
+                            </th>
+                            <th 
+                              onClick={() => handleBreakdownHeaderSort("ctr")}
+                              className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
+                            >
+                              <div className="flex items-center justify-end gap-1">
+                                <span>CTR</span>
+                                <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${breakdownSortBy === "ctr" ? "font-bold text-blue-600" : ""}`}>
+                                  {breakdownSortBy === "ctr" ? (breakdownSortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                                </span>
+                              </div>
+                            </th>
+                            <th 
+                              onClick={() => handleBreakdownHeaderSort("results")}
+                              className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
+                            >
+                              <div className="flex items-center justify-end gap-1">
+                                <span>{adSetResultInfo.label}</span>
+                                <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${breakdownSortBy === "results" ? "font-bold text-blue-600" : ""}`}>
+                                  {breakdownSortBy === "results" ? (breakdownSortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                                </span>
+                              </div>
+                            </th>
+                            <th 
+                              onClick={() => handleBreakdownHeaderSort("roas")}
+                              className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
+                            >
+                              <div className="flex items-center justify-end gap-1">
+                                <span>{adSetResultInfo.isRoas ? "ROAS" : adSetResultInfo.costLabel}</span>
+                                <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${breakdownSortBy === "roas" ? "font-bold text-blue-600" : ""}`}>
+                                  {breakdownSortBy === "roas" ? (breakdownSortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                                </span>
+                              </div>
+                            </th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-border font-medium text-slate-700">
@@ -2559,14 +3003,14 @@ export default function CampaignsClient({ slug: propSlug }: { slug?: string[] })
                                 Loading regional metrics...
                               </td>
                             </tr>
-                          ) : regionsData.length === 0 ? (
+                          ) : regionDistribution.length === 0 ? (
                             <tr>
                               <td colSpan={5} className="p-8 text-center text-slate-400 font-medium">
                                 No regional data found.
                               </td>
                             </tr>
                           ) : (
-                            regionsData.map((r, idx) => {
+                            regionDistribution.map((r, idx) => {
                               const spendPct = selectedAdSet.metrics.spend > 0 ? (r.spend / selectedAdSet.metrics.spend) : 0;
                               return (
                                 <tr key={idx} className="hover:bg-slate-50 transition">

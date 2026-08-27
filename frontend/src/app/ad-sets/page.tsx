@@ -45,6 +45,45 @@ export default function AdSetsPage() {
   const [sortBy, setSortBy] = useState<string>("spend");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
+  const [breakdownSortBy, setBreakdownSortBy] = useState<string>("spend");
+  const [breakdownSortOrder, setBreakdownSortOrder] = useState<"asc" | "desc">("desc");
+  const [adSortBy, setAdSortBy] = useState<string>("spend");
+  const [adSortOrder, setAdSortOrder] = useState<"asc" | "desc">("desc");
+
+  const handleAdSetsHeaderSort = (key: string) => {
+    if (sortBy === key) {
+      setSortOrder(prev => prev === "asc" ? "desc" : "asc");
+    } else {
+      setSortBy(key);
+      setSortOrder("desc");
+    }
+  };
+
+  const handleBreakdownHeaderSort = (key: string) => {
+    if (breakdownSortBy === key) {
+      setBreakdownSortOrder(breakdownSortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setBreakdownSortBy(key);
+      setBreakdownSortOrder("desc");
+    }
+  };
+
+  const handleAdHeaderSort = (key: string) => {
+    if (adSortBy === key) {
+      setAdSortOrder(adSortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setAdSortBy(key);
+      setAdSortOrder("desc");
+    }
+  };
+
+  const isSelectedAdSetRoas = useMemo(() => {
+    if (!selectedAdSet) return true;
+    const isConversationGoal = selectedAdSet.optimization_goal?.toUpperCase().includes("CONVERSATION") || false;
+    const isLeadGoal = selectedAdSet.optimization_goal?.toUpperCase().includes("LEAD") || false;
+    return !isConversationGoal && !isLeadGoal;
+  }, [selectedAdSet]);
+
   // Tabbed detail view states
   const [adSetTab, setAdSetTab] = useState<"overview" | "ads" | "breakdowns" | "aidiagnosis">("overview");
   const [breakdownView, setBreakdownView] = useState<"placement" | "platform" | "demographic" | "region">("placement");
@@ -81,6 +120,28 @@ export default function AdSetsPage() {
     fetchBreakdowns();
   }, [selectedAccount?.id, selectedAdSet?.id, adSetTab, datePreset, customStartDate, customEndDate]);
 
+  const sortedPlacements = useMemo(() => {
+    return [...placementsData].map(p => {
+      const costPerResult = p.results > 0 ? p.spend / p.results : 0;
+      return { ...p, costPerResult };
+    }).sort((a, b) => {
+      let valA: any = a[breakdownSortBy as keyof typeof a];
+      let valB: any = b[breakdownSortBy as keyof typeof b];
+      if (breakdownSortBy === "name") {
+        const nameA = (a.platform_position || a.publisher_platform || "").toLowerCase();
+        const nameB = (b.platform_position || b.publisher_platform || "").toLowerCase();
+        return breakdownSortOrder === "asc" ? valA.localeCompare(nameB) : nameB.localeCompare(nameA);
+      }
+      if (breakdownSortBy === "roas" && !isSelectedAdSetRoas) {
+        valA = a.costPerResult;
+        valB = b.costPerResult;
+      }
+      if (valA === undefined) valA = 0;
+      if (valB === undefined) valB = 0;
+      return breakdownSortOrder === "asc" ? valA - valB : valB - valA;
+    });
+  }, [placementsData, breakdownSortBy, breakdownSortOrder, isSelectedAdSetRoas]);
+
   const platformDistribution = useMemo(() => {
     const platformMap: Record<string, { spend: number; impressions: number; clicks: number; results: number; revenue: number }> = {};
     placementsData.forEach(p => {
@@ -98,9 +159,25 @@ export default function AdSetsPage() {
       const ctr = metrics.impressions > 0 ? (metrics.clicks / metrics.impressions) * 100 : 0;
       const cpc = metrics.clicks > 0 ? metrics.spend / metrics.clicks : 0;
       const roas = metrics.spend > 0 ? metrics.revenue / metrics.spend : 0;
-      return { platform, ...metrics, ctr, cpc, roas };
-    }).sort((a, b) => b.spend - a.spend);
-  }, [placementsData]);
+      const costPerResult = metrics.results > 0 ? metrics.spend / metrics.results : 0;
+      return { platform, ...metrics, ctr, cpc, roas, costPerResult };
+    }).sort((a, b) => {
+      let valA: any = a[breakdownSortBy as keyof typeof a];
+      let valB: any = b[breakdownSortBy as keyof typeof b];
+      if (breakdownSortBy === "name") {
+        valA = a.platform.toLowerCase();
+        valB = b.platform.toLowerCase();
+        return breakdownSortOrder === "asc" ? valA.localeCompare(valB) : valB.localeCompare(valA);
+      }
+      if (breakdownSortBy === "roas" && !isSelectedAdSetRoas) {
+        valA = a.costPerResult;
+        valB = b.costPerResult;
+      }
+      if (valA === undefined) valA = 0;
+      if (valB === undefined) valB = 0;
+      return breakdownSortOrder === "asc" ? valA - valB : valB - valA;
+    });
+  }, [placementsData, breakdownSortBy, breakdownSortOrder, isSelectedAdSetRoas]);
 
   const ageDistribution = useMemo(() => {
     const ageMap: Record<string, { spend: number; impressions: number; clicks: number; results: number; revenue: number }> = {};
@@ -119,9 +196,25 @@ export default function AdSetsPage() {
       const ctr = metrics.impressions > 0 ? (metrics.clicks / metrics.impressions) * 100 : 0;
       const cpc = metrics.clicks > 0 ? metrics.spend / metrics.clicks : 0;
       const roas = metrics.spend > 0 ? metrics.revenue / metrics.spend : 0;
-      return { age, ...metrics, ctr, cpc, roas };
-    }).sort((a, b) => b.spend - a.spend);
-  }, [demographicsData]);
+      const costPerResult = metrics.results > 0 ? metrics.spend / metrics.results : 0;
+      return { age, ...metrics, ctr, cpc, roas, costPerResult };
+    }).sort((a, b) => {
+      let valA: any = a[breakdownSortBy as keyof typeof a];
+      let valB: any = b[breakdownSortBy as keyof typeof b];
+      if (breakdownSortBy === "name") {
+        valA = a.age.toLowerCase();
+        valB = b.age.toLowerCase();
+        return breakdownSortOrder === "asc" ? valA.localeCompare(valB) : valB.localeCompare(valA);
+      }
+      if (breakdownSortBy === "roas" && !isSelectedAdSetRoas) {
+        valA = a.costPerResult;
+        valB = b.costPerResult;
+      }
+      if (valA === undefined) valA = 0;
+      if (valB === undefined) valB = 0;
+      return breakdownSortOrder === "asc" ? valA - valB : valB - valA;
+    });
+  }, [demographicsData, breakdownSortBy, breakdownSortOrder, isSelectedAdSetRoas]);
 
   const genderDistribution = useMemo(() => {
     const genderMap: Record<string, { spend: number; impressions: number; clicks: number; results: number; revenue: number }> = {};
@@ -140,9 +233,47 @@ export default function AdSetsPage() {
       const ctr = metrics.impressions > 0 ? (metrics.clicks / metrics.impressions) * 100 : 0;
       const cpc = metrics.clicks > 0 ? metrics.spend / metrics.clicks : 0;
       const roas = metrics.spend > 0 ? metrics.revenue / metrics.spend : 0;
-      return { gender, ...metrics, ctr, cpc, roas };
-    }).sort((a, b) => b.spend - a.spend);
-  }, [demographicsData]);
+      const costPerResult = metrics.results > 0 ? metrics.spend / metrics.results : 0;
+      return { gender, ...metrics, ctr, cpc, roas, costPerResult };
+    }).sort((a, b) => {
+      let valA: any = a[breakdownSortBy as keyof typeof a];
+      let valB: any = b[breakdownSortBy as keyof typeof b];
+      if (breakdownSortBy === "name") {
+        valA = a.gender.toLowerCase();
+        valB = b.gender.toLowerCase();
+        return breakdownSortOrder === "asc" ? valA.localeCompare(valB) : valB.localeCompare(valA);
+      }
+      if (breakdownSortBy === "roas" && !isSelectedAdSetRoas) {
+        valA = a.costPerResult;
+        valB = b.costPerResult;
+      }
+      if (valA === undefined) valA = 0;
+      if (valB === undefined) valB = 0;
+      return breakdownSortOrder === "asc" ? valA - valB : valB - valA;
+    });
+  }, [demographicsData, breakdownSortBy, breakdownSortOrder, isSelectedAdSetRoas]);
+
+  const regionDistribution = useMemo(() => {
+    return [...regionsData].map(r => {
+      const costPerResult = r.results > 0 ? r.spend / r.results : 0;
+      return { ...r, costPerResult };
+    }).sort((a, b) => {
+      let valA: any = a[breakdownSortBy as keyof typeof a];
+      let valB: any = b[breakdownSortBy as keyof typeof b];
+      if (breakdownSortBy === "name") {
+        valA = (a.region || "").toLowerCase();
+        valB = (b.region || "").toLowerCase();
+        return breakdownSortOrder === "asc" ? valA.localeCompare(valB) : valB.localeCompare(valA);
+      }
+      if (breakdownSortBy === "roas" && !isSelectedAdSetRoas) {
+        valA = a.costPerResult;
+        valB = b.costPerResult;
+      }
+      if (valA === undefined) valA = 0;
+      if (valB === undefined) valB = 0;
+      return breakdownSortOrder === "asc" ? valA - valB : valB - valA;
+    });
+  }, [regionsData, breakdownSortBy, breakdownSortOrder, isSelectedAdSetRoas]);
 
   // Fetch subscription on mount
   useEffect(() => {
@@ -981,18 +1112,88 @@ export default function AdSetsPage() {
                   <span className="text-xs text-slate-400 font-medium">{adSetAds.length} Ads Active</span>
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="min-w-full text-xs text-left divide-y divide-border">
-                    <thead className="bg-slate-50/50">
-                      <tr className="text-slate-400 font-bold uppercase border-b border-border">
-                        <th className="p-4">Ad Name</th>
-                        <th className="p-4">Status</th>
-                        <th className="p-4 text-right">Spend</th>
-                        <th className="p-4 text-right">CTR</th>
-                        <th className="p-4 text-right">ROAS</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border font-medium text-slate-700">
-                      {adSetAds.map((ad, idx) => (
+                  {(() => {
+                    const sortedAds = [...adSetAds]
+                      .sort((a, b) => {
+                        let valA: any = 0;
+                        let valB: any = 0;
+                        if (adSortBy === "name") {
+                          valA = a.name.toLowerCase();
+                          valB = b.name.toLowerCase();
+                          return adSortOrder === "asc" ? valA.localeCompare(valB) : valB.localeCompare(valA);
+                        } else if (adSortBy === "status") {
+                          valA = a.status.toLowerCase();
+                          valB = b.status.toLowerCase();
+                          return adSortOrder === "asc" ? valA.localeCompare(valB) : valB.localeCompare(valA);
+                        } else {
+                          valA = a.metrics[adSortBy] || 0;
+                          valB = b.metrics[adSortBy] || 0;
+                        }
+                        return adSortOrder === "asc" ? valA - valB : valB - valA;
+                      });
+                    return (
+                      <table className="min-w-full text-xs text-left divide-y divide-border">
+                        <thead className="bg-slate-50/50">
+                          <tr className="text-slate-400 font-bold uppercase border-b border-border select-none">
+                            <th 
+                              onClick={() => handleAdHeaderSort("name")}
+                              className="p-4 cursor-pointer hover:bg-slate-100 transition group"
+                            >
+                              <div className="flex items-center gap-1">
+                                <span>Ad Name</span>
+                                <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${adSortBy === "name" ? "font-bold text-blue-600" : ""}`}>
+                                  {adSortBy === "name" ? (adSortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                                </span>
+                              </div>
+                            </th>
+                            <th 
+                              onClick={() => handleAdHeaderSort("status")}
+                              className="p-4 cursor-pointer hover:bg-slate-100 transition group"
+                            >
+                              <div className="flex items-center gap-1">
+                                <span>Status</span>
+                                <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${adSortBy === "status" ? "font-bold text-blue-600" : ""}`}>
+                                  {adSortBy === "status" ? (adSortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                                </span>
+                              </div>
+                            </th>
+                            <th 
+                              onClick={() => handleAdHeaderSort("spend")}
+                              className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
+                            >
+                              <div className="flex items-center justify-end gap-1">
+                                <span>Spend</span>
+                                <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${adSortBy === "spend" ? "font-bold text-blue-600" : ""}`}>
+                                  {adSortBy === "spend" ? (adSortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                                </span>
+                              </div>
+                            </th>
+                            <th 
+                              onClick={() => handleAdHeaderSort("ctr")}
+                              className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
+                            >
+                              <div className="flex items-center justify-end gap-1">
+                                <span>CTR</span>
+                                <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${adSortBy === "ctr" ? "font-bold text-blue-600" : ""}`}>
+                                  {adSortBy === "ctr" ? (adSortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                                </span>
+                              </div>
+                            </th>
+                            <th 
+                              onClick={() => handleAdHeaderSort("roas")}
+                              className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
+                            >
+                              <div className="flex items-center justify-end gap-1">
+                                <span>ROAS</span>
+                                <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${adSortBy === "roas" ? "font-bold text-blue-600" : ""}`}>
+                                  {adSortBy === "roas" ? (adSortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                                </span>
+                              </div>
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border font-medium text-slate-700">
+                          {sortedAds.map((ad, idx) => (
                         <tr key={idx} className="hover:bg-slate-50 transition">
                           <td className="p-4 flex items-center gap-3">
                             {ad.creative?.image_url ? (
@@ -1024,6 +1225,8 @@ export default function AdSetsPage() {
                       )}
                     </tbody>
                   </table>
+                    );
+                  })()}
                 </div>
               </div>
             )}
@@ -1071,12 +1274,62 @@ export default function AdSetsPage() {
                       <div className="overflow-x-auto">
                         <table className="min-w-full text-xs text-left divide-y divide-border">
                           <thead className="bg-slate-50/50">
-                            <tr className="text-subtle font-bold uppercase tracking-wider border-b border-border">
-                              <th className="p-4">Platform</th>
-                              <th className="p-4 text-right">Spend Contribution</th>
-                              <th className="p-4 text-right">CTR</th>
-                              <th className="p-4 text-right">{resultLabel}</th>
-                              <th className="p-4 text-right">{isRoas ? "ROAS Contribution" : "Cost Per Result"}</th>
+                            <tr className="text-subtle font-bold uppercase tracking-wider border-b border-border select-none">
+                              <th 
+                                onClick={() => handleBreakdownHeaderSort("name")}
+                                className="p-4 cursor-pointer hover:bg-slate-100 transition group"
+                              >
+                                <div className="flex items-center gap-1">
+                                  <span>Platform</span>
+                                  <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${breakdownSortBy === "name" ? "font-bold text-blue-600" : ""}`}>
+                                    {breakdownSortBy === "name" ? (breakdownSortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                                  </span>
+                                </div>
+                              </th>
+                              <th 
+                                onClick={() => handleBreakdownHeaderSort("spend")}
+                                className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
+                              >
+                                <div className="flex items-center justify-end gap-1">
+                                  <span>Spend Contribution</span>
+                                  <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${breakdownSortBy === "spend" ? "font-bold text-blue-600" : ""}`}>
+                                    {breakdownSortBy === "spend" ? (breakdownSortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                                  </span>
+                                </div>
+                              </th>
+                              <th 
+                                onClick={() => handleBreakdownHeaderSort("ctr")}
+                                className="p-4 text-right cursor-pointer hover:bg-slate-100 transition select-none group"
+                              >
+                                <div className="flex items-center justify-end gap-1">
+                                  <span>CTR</span>
+                                  <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${breakdownSortBy === "ctr" ? "font-bold text-blue-600" : ""}`}>
+                                    {breakdownSortBy === "ctr" ? (breakdownSortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                                  </span>
+                                </div>
+                              </th>
+                              <th 
+                                onClick={() => handleBreakdownHeaderSort("results")}
+                                className="p-4 text-right cursor-pointer hover:bg-slate-100 transition select-none group"
+                              >
+                                <div className="flex items-center justify-end gap-1">
+                                  <span>{resultLabel}</span>
+                                  <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${breakdownSortBy === "results" ? "font-bold text-blue-600" : ""}`}>
+                                    {breakdownSortBy === "results" ? (breakdownSortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                                  </span>
+                                </div>
+                              </th>
+                              <th 
+                                onClick={() => handleBreakdownHeaderSort("roas")}
+                                className="p-4 text-right cursor-pointer hover:bg-slate-100 transition select-none group"
+                              >
+                                <div className="flex items-center justify-end gap-1">
+                                  <span>{isRoas ? "ROAS Contribution" : "Cost Per Result"}</span>
+                                  <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${breakdownSortBy === "roas" ? "font-bold text-blue-600" : ""}`}>
+                                    {breakdownSortBy === "roas" ? (breakdownSortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                                  </span>
+                                </div>
+                              </th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-border font-medium text-slate-700">
@@ -1086,14 +1339,14 @@ export default function AdSetsPage() {
                                   Loading placement metrics...
                                 </td>
                               </tr>
-                            ) : placementsData.length === 0 ? (
+                            ) : sortedPlacements.length === 0 ? (
                               <tr>
                                 <td colSpan={5} className="p-8 text-center text-slate-400 font-medium">
                                   No placement data found.
                                 </td>
                               </tr>
                             ) : (
-                              placementsData.map((p, idx) => {
+                              sortedPlacements.map((p, idx) => {
                                 const friendlyName = p.platform_position 
                                   ? p.platform_position.split("_").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ") 
                                   : p.publisher_platform.charAt(0).toUpperCase() + p.publisher_platform.slice(1);
@@ -1128,12 +1381,62 @@ export default function AdSetsPage() {
                       <div className="overflow-x-auto">
                         <table className="min-w-full text-xs text-left divide-y divide-border">
                           <thead className="bg-slate-50/50">
-                            <tr className="text-subtle font-bold uppercase tracking-wider border-b border-border">
-                              <th className="p-4">Platform</th>
-                              <th className="p-4 text-right">Spend Contribution</th>
-                              <th className="p-4 text-right">CTR</th>
-                              <th className="p-4 text-right">{resultLabel}</th>
-                              <th className="p-4 text-right">{isRoas ? "ROAS Contribution" : "Cost Per Result"}</th>
+                            <tr className="text-subtle font-bold uppercase tracking-wider border-b border-border select-none">
+                              <th 
+                                onClick={() => handleBreakdownHeaderSort("name")}
+                                className="p-4 cursor-pointer hover:bg-slate-100 transition group"
+                              >
+                                <div className="flex items-center gap-1">
+                                  <span>Platform</span>
+                                  <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${breakdownSortBy === "name" ? "font-bold text-blue-600" : ""}`}>
+                                    {breakdownSortBy === "name" ? (breakdownSortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                                  </span>
+                                </div>
+                              </th>
+                              <th 
+                                onClick={() => handleBreakdownHeaderSort("spend")}
+                                className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
+                              >
+                                <div className="flex items-center justify-end gap-1">
+                                  <span>Spend Contribution</span>
+                                  <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${breakdownSortBy === "spend" ? "font-bold text-blue-600" : ""}`}>
+                                    {breakdownSortBy === "spend" ? (breakdownSortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                                  </span>
+                                </div>
+                              </th>
+                              <th 
+                                onClick={() => handleBreakdownHeaderSort("ctr")}
+                                className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
+                              >
+                                <div className="flex items-center justify-end gap-1">
+                                  <span>CTR</span>
+                                  <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${breakdownSortBy === "ctr" ? "font-bold text-blue-600" : ""}`}>
+                                    {breakdownSortBy === "ctr" ? (breakdownSortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                                  </span>
+                                </div>
+                              </th>
+                              <th 
+                                onClick={() => handleBreakdownHeaderSort("results")}
+                                className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
+                              >
+                                <div className="flex items-center justify-end gap-1">
+                                  <span>{resultLabel}</span>
+                                  <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${breakdownSortBy === "results" ? "font-bold text-blue-600" : ""}`}>
+                                    {breakdownSortBy === "results" ? (breakdownSortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                                  </span>
+                                </div>
+                              </th>
+                              <th 
+                                onClick={() => handleBreakdownHeaderSort("roas")}
+                                className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
+                              >
+                                <div className="flex items-center justify-end gap-1">
+                                  <span>{isRoas ? "ROAS Contribution" : "Cost Per Result"}</span>
+                                  <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${breakdownSortBy === "roas" ? "font-bold text-blue-600" : ""}`}>
+                                    {breakdownSortBy === "roas" ? (breakdownSortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                                  </span>
+                                </div>
+                              </th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-border font-medium text-slate-700">
@@ -1184,15 +1487,65 @@ export default function AdSetsPage() {
                         </div>
                         <div className="overflow-x-auto">
                           <table className="min-w-full text-xs text-left divide-y divide-border">
-                            <thead className="bg-slate-50/50">
-                              <tr className="text-subtle font-bold uppercase tracking-wider border-b border-border">
-                                <th className="p-4">Age Segment</th>
-                                <th className="p-4 text-right">Spend Contribution</th>
-                                <th className="p-4 text-right">CTR</th>
-                                <th className="p-4 text-right">{resultLabel}</th>
-                                <th className="p-4 text-right">{isRoas ? "ROAS" : "Cost Per Result"}</th>
-                              </tr>
-                            </thead>
+                          <thead className="bg-slate-50/50">
+                            <tr className="text-subtle font-bold uppercase tracking-wider border-b border-border select-none">
+                              <th 
+                                onClick={() => handleBreakdownHeaderSort("name")}
+                                className="p-4 cursor-pointer hover:bg-slate-100 transition group"
+                              >
+                                <div className="flex items-center gap-1">
+                                  <span>Age Segment</span>
+                                  <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${breakdownSortBy === "name" ? "font-bold text-blue-600" : ""}`}>
+                                    {breakdownSortBy === "name" ? (breakdownSortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                                  </span>
+                                </div>
+                              </th>
+                              <th 
+                                onClick={() => handleBreakdownHeaderSort("spend")}
+                                className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
+                              >
+                                <div className="flex items-center justify-end gap-1">
+                                  <span>Spend Contribution</span>
+                                  <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${breakdownSortBy === "spend" ? "font-bold text-blue-600" : ""}`}>
+                                    {breakdownSortBy === "spend" ? (breakdownSortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                                  </span>
+                                </div>
+                              </th>
+                              <th 
+                                onClick={() => handleBreakdownHeaderSort("ctr")}
+                                className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
+                              >
+                                <div className="flex items-center justify-end gap-1">
+                                  <span>CTR</span>
+                                  <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${breakdownSortBy === "ctr" ? "font-bold text-blue-600" : ""}`}>
+                                    {breakdownSortBy === "ctr" ? (breakdownSortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                                  </span>
+                                </div>
+                              </th>
+                              <th 
+                                onClick={() => handleBreakdownHeaderSort("results")}
+                                className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
+                              >
+                                <div className="flex items-center justify-end gap-1">
+                                  <span>{resultLabel}</span>
+                                  <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${breakdownSortBy === "results" ? "font-bold text-blue-600" : ""}`}>
+                                    {breakdownSortBy === "results" ? (breakdownSortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                                  </span>
+                                </div>
+                              </th>
+                              <th 
+                                onClick={() => handleBreakdownHeaderSort("roas")}
+                                className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
+                              >
+                                <div className="flex items-center justify-end gap-1">
+                                  <span>{isRoas ? "ROAS" : "Cost Per Result"}</span>
+                                  <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${breakdownSortBy === "roas" ? "font-bold text-blue-600" : ""}`}>
+                                    {breakdownSortBy === "roas" ? (breakdownSortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                                  </span>
+                                </div>
+                              </th>
+                            </tr>
+                          </thead>
                             <tbody className="divide-y divide-border font-medium text-slate-700">
                               {loadingBreakdowns ? (
                                 <tr>
@@ -1238,12 +1591,62 @@ export default function AdSetsPage() {
                         <div className="overflow-x-auto">
                           <table className="min-w-full text-xs text-left divide-y divide-border">
                             <thead className="bg-slate-50/50">
-                              <tr className="text-subtle font-bold uppercase tracking-wider border-b border-border">
-                                <th className="p-4">Gender</th>
-                                <th className="p-4 text-right">Spend Contribution</th>
-                                <th className="p-4 text-right">CTR</th>
-                                <th className="p-4 text-right">{resultLabel}</th>
-                                <th className="p-4 text-right">{isRoas ? "ROAS" : "Cost Per Result"}</th>
+                              <tr className="text-subtle font-bold uppercase tracking-wider border-b border-border select-none">
+                                <th 
+                                  onClick={() => handleBreakdownHeaderSort("name")}
+                                  className="p-4 cursor-pointer hover:bg-slate-100 transition group"
+                                >
+                                  <div className="flex items-center gap-1">
+                                    <span>Gender</span>
+                                    <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${breakdownSortBy === "name" ? "font-bold text-blue-600" : ""}`}>
+                                      {breakdownSortBy === "name" ? (breakdownSortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                                    </span>
+                                  </div>
+                                </th>
+                                <th 
+                                  onClick={() => handleBreakdownHeaderSort("spend")}
+                                  className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
+                                >
+                                  <div className="flex items-center justify-end gap-1">
+                                    <span>Spend Contribution</span>
+                                    <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${breakdownSortBy === "spend" ? "font-bold text-blue-600" : ""}`}>
+                                      {breakdownSortBy === "spend" ? (breakdownSortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                                    </span>
+                                  </div>
+                                </th>
+                                <th 
+                                  onClick={() => handleBreakdownHeaderSort("ctr")}
+                                  className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
+                                >
+                                  <div className="flex items-center justify-end gap-1">
+                                    <span>CTR</span>
+                                    <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${breakdownSortBy === "ctr" ? "font-bold text-blue-600" : ""}`}>
+                                      {breakdownSortBy === "ctr" ? (breakdownSortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                                    </span>
+                                  </div>
+                                </th>
+                                <th 
+                                  onClick={() => handleBreakdownHeaderSort("results")}
+                                  className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
+                                >
+                                  <div className="flex items-center justify-end gap-1">
+                                    <span>{resultLabel}</span>
+                                    <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${breakdownSortBy === "results" ? "font-bold text-blue-600" : ""}`}>
+                                      {breakdownSortBy === "results" ? (breakdownSortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                                    </span>
+                                  </div>
+                                </th>
+                                <th 
+                                  onClick={() => handleBreakdownHeaderSort("roas")}
+                                  className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
+                                >
+                                  <div className="flex items-center justify-end gap-1">
+                                    <span>{isRoas ? "ROAS" : "Cost Per Result"}</span>
+                                    <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${breakdownSortBy === "roas" ? "font-bold text-blue-600" : ""}`}>
+                                      {breakdownSortBy === "roas" ? (breakdownSortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                                    </span>
+                                  </div>
+                                </th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-border font-medium text-slate-700">
@@ -1460,16 +1863,96 @@ export default function AdSetsPage() {
             <div className="overflow-x-auto">
               <table className="min-w-full text-xs text-left divide-y divide-border">
                 <thead className="bg-slate-50/50">
-                  <tr className="text-subtle font-bold uppercase tracking-wider border-b border-border">
-                    <th className="p-4">Ad Set Details</th>
+                  <tr className="text-subtle font-bold uppercase tracking-wider border-b border-border select-none">
+                    <th 
+                      onClick={() => handleAdSetsHeaderSort("name")}
+                      className="p-4 cursor-pointer hover:bg-slate-100 transition group"
+                    >
+                      <div className="flex items-center gap-1">
+                        <span>Ad Set Details</span>
+                        <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${sortBy === "name" ? "font-bold text-blue-600" : ""}`}>
+                          {sortBy === "name" ? (sortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                        </span>
+                      </div>
+                    </th>
                     <th className="p-4">Campaign</th>
-                    <th className="p-4 text-right">Spend</th>
-                    <th className="p-4 text-right">Impressions</th>
-                    <th className="p-4 text-right">Clicks</th>
-                    <th className="p-4 text-right">Conversions</th>
-                    <th className="p-4 text-right">CTR</th>
-                    <th className="p-4 text-right">CPC</th>
-                    <th className="p-4 text-right">ROAS</th>
+                    <th 
+                      onClick={() => handleAdSetsHeaderSort("spend")}
+                      className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
+                    >
+                      <div className="flex items-center justify-end gap-1">
+                        <span>Spend</span>
+                        <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${sortBy === "spend" ? "font-bold text-blue-600" : ""}`}>
+                          {sortBy === "spend" ? (sortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                        </span>
+                      </div>
+                    </th>
+                    <th 
+                      onClick={() => handleAdSetsHeaderSort("impressions")}
+                      className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
+                    >
+                      <div className="flex items-center justify-end gap-1">
+                        <span>Impressions</span>
+                        <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${sortBy === "impressions" ? "font-bold text-blue-600" : ""}`}>
+                          {sortBy === "impressions" ? (sortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                        </span>
+                      </div>
+                    </th>
+                    <th 
+                      onClick={() => handleAdSetsHeaderSort("clicks")}
+                      className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
+                    >
+                      <div className="flex items-center justify-end gap-1">
+                        <span>Clicks</span>
+                        <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${sortBy === "clicks" ? "font-bold text-blue-600" : ""}`}>
+                          {sortBy === "clicks" ? (sortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                        </span>
+                      </div>
+                    </th>
+                    <th 
+                      onClick={() => handleAdSetsHeaderSort("purchases")}
+                      className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
+                    >
+                      <div className="flex items-center justify-end gap-1">
+                        <span>Conversions</span>
+                        <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${sortBy === "purchases" ? "font-bold text-blue-600" : ""}`}>
+                          {sortBy === "purchases" ? (sortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                        </span>
+                      </div>
+                    </th>
+                    <th 
+                      onClick={() => handleAdSetsHeaderSort("ctr")}
+                      className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
+                    >
+                      <div className="flex items-center justify-end gap-1">
+                        <span>CTR</span>
+                        <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${sortBy === "ctr" ? "font-bold text-blue-600" : ""}`}>
+                          {sortBy === "ctr" ? (sortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                        </span>
+                      </div>
+                    </th>
+                    <th 
+                      onClick={() => handleAdSetsHeaderSort("cpc")}
+                      className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
+                    >
+                      <div className="flex items-center justify-end gap-1">
+                        <span>CPC</span>
+                        <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${sortBy === "cpc" ? "font-bold text-blue-600" : ""}`}>
+                          {sortBy === "cpc" ? (sortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                        </span>
+                      </div>
+                    </th>
+                    <th 
+                      onClick={() => handleAdSetsHeaderSort("roas")}
+                      className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
+                    >
+                      <div className="flex items-center justify-end gap-1">
+                        <span>ROAS</span>
+                        <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${sortBy === "roas" ? "font-bold text-blue-600" : ""}`}>
+                          {sortBy === "roas" ? (sortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                        </span>
+                      </div>
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border font-medium text-slate-700">

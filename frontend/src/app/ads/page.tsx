@@ -45,6 +45,15 @@ export default function AdsPage() {
   const [sortBy, setSortBy] = useState<string>("spend");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
+  const handleAdsHeaderSort = (key: string) => {
+    if (sortBy === key) {
+      setSortOrder(prev => prev === "asc" ? "desc" : "asc");
+    } else {
+      setSortBy(key);
+      setSortOrder("desc");
+    }
+  };
+
   // Fetch subscription on mount
   useEffect(() => {
     const fetchSub = async () => {
@@ -471,15 +480,95 @@ export default function AdsPage() {
             <div className="overflow-x-auto">
               <table className="min-w-full text-xs text-left divide-y divide-border">
                 <thead className="bg-slate-50/50">
-                  <tr className="text-subtle font-bold uppercase tracking-wider border-b border-border">
-                    <th className="p-4">Ad Creative Preview</th>
-                    <th className="p-4 text-right">Spend</th>
-                    <th className="p-4 text-right">Impressions</th>
-                    <th className="p-4 text-right">Clicks</th>
-                    <th className="p-4 text-right">Conversions</th>
-                    <th className="p-4 text-right">CTR</th>
-                    <th className="p-4 text-right">CPC</th>
-                    <th className="p-4 text-right">ROAS</th>
+                  <tr className="text-subtle font-bold uppercase tracking-wider border-b border-border select-none">
+                    <th 
+                      onClick={() => handleAdsHeaderSort("name")}
+                      className="p-4 cursor-pointer hover:bg-slate-100 transition group"
+                    >
+                      <div className="flex items-center gap-1">
+                        <span>Ad Creative Preview</span>
+                        <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${sortBy === "name" ? "font-bold text-blue-600" : ""}`}>
+                          {sortBy === "name" ? (sortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                        </span>
+                      </div>
+                    </th>
+                    <th 
+                      onClick={() => handleAdsHeaderSort("spend")}
+                      className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
+                    >
+                      <div className="flex items-center justify-end gap-1">
+                        <span>Spend</span>
+                        <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${sortBy === "spend" ? "font-bold text-blue-600" : ""}`}>
+                          {sortBy === "spend" ? (sortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                        </span>
+                      </div>
+                    </th>
+                    <th 
+                      onClick={() => handleAdsHeaderSort("impressions")}
+                      className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
+                    >
+                      <div className="flex items-center justify-end gap-1">
+                        <span>Impressions</span>
+                        <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${sortBy === "impressions" ? "font-bold text-blue-600" : ""}`}>
+                          {sortBy === "impressions" ? (sortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                        </span>
+                      </div>
+                    </th>
+                    <th 
+                      onClick={() => handleAdsHeaderSort("clicks")}
+                      className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
+                    >
+                      <div className="flex items-center justify-end gap-1">
+                        <span>Clicks</span>
+                        <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${sortBy === "clicks" ? "font-bold text-blue-600" : ""}`}>
+                          {sortBy === "clicks" ? (sortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                        </span>
+                      </div>
+                    </th>
+                    <th 
+                      onClick={() => handleAdsHeaderSort("purchases")}
+                      className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
+                    >
+                      <div className="flex items-center justify-end gap-1">
+                        <span>Conversions</span>
+                        <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${sortBy === "purchases" ? "font-bold text-blue-600" : ""}`}>
+                          {sortBy === "purchases" ? (sortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                        </span>
+                      </div>
+                    </th>
+                    <th 
+                      onClick={() => handleAdsHeaderSort("ctr")}
+                      className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
+                    >
+                      <div className="flex items-center justify-end gap-1">
+                        <span>CTR</span>
+                        <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${sortBy === "ctr" ? "font-bold text-blue-600" : ""}`}>
+                          {sortBy === "ctr" ? (sortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                        </span>
+                      </div>
+                    </th>
+                    <th 
+                      onClick={() => handleAdsHeaderSort("cpc")}
+                      className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
+                    >
+                      <div className="flex items-center justify-end gap-1">
+                        <span>CPC</span>
+                        <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${sortBy === "cpc" ? "font-bold text-blue-600" : ""}`}>
+                          {sortBy === "cpc" ? (sortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                        </span>
+                      </div>
+                    </th>
+                    <th 
+                      onClick={() => handleAdsHeaderSort("roas")}
+                      className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
+                    >
+                      <div className="flex items-center justify-end gap-1">
+                        <span>ROAS</span>
+                        <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${sortBy === "roas" ? "font-bold text-blue-600" : ""}`}>
+                          {sortBy === "roas" ? (sortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                        </span>
+                      </div>
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border font-medium text-slate-700">
