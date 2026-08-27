@@ -47,7 +47,7 @@ export default function AdSetsPage() {
 
   // Tabbed detail view states
   const [adSetTab, setAdSetTab] = useState<"overview" | "ads" | "breakdowns" | "aidiagnosis">("overview");
-  const [breakdownView, setBreakdownView] = useState<"placement" | "demographic" | "region">("placement");
+  const [breakdownView, setBreakdownView] = useState<"placement" | "platform" | "demographic" | "region">("placement");
   const [adSetPerformance, setAdSetPerformance] = useState<any | null>(null);
   const [adSetAds, setAdSetAds] = useState<any[]>([]);
   const [loadingPerf, setLoadingPerf] = useState(false);
@@ -80,6 +80,27 @@ export default function AdSetsPage() {
     };
     fetchBreakdowns();
   }, [selectedAccount?.id, selectedAdSet?.id, adSetTab, datePreset, customStartDate, customEndDate]);
+
+  const platformDistribution = useMemo(() => {
+    const platformMap: Record<string, { spend: number; impressions: number; clicks: number; results: number; revenue: number }> = {};
+    placementsData.forEach(p => {
+      const platform = p.publisher_platform || "Unknown";
+      if (!platformMap[platform]) {
+        platformMap[platform] = { spend: 0, impressions: 0, clicks: 0, results: 0, revenue: 0 };
+      }
+      platformMap[platform].spend += p.spend || 0;
+      platformMap[platform].impressions += p.impressions || 0;
+      platformMap[platform].clicks += p.clicks || 0;
+      platformMap[platform].results += p.results || 0;
+      platformMap[platform].revenue += p.revenue || 0;
+    });
+    return Object.entries(platformMap).map(([platform, metrics]) => {
+      const ctr = metrics.impressions > 0 ? (metrics.clicks / metrics.impressions) * 100 : 0;
+      const cpc = metrics.clicks > 0 ? metrics.spend / metrics.clicks : 0;
+      const roas = metrics.spend > 0 ? metrics.revenue / metrics.spend : 0;
+      return { platform, ...metrics, ctr, cpc, roas };
+    }).sort((a, b) => b.spend - a.spend);
+  }, [placementsData]);
 
   const ageDistribution = useMemo(() => {
     const ageMap: Record<string, { spend: number; impressions: number; clicks: number; results: number; revenue: number }> = {};
@@ -859,6 +880,29 @@ export default function AdSetsPage() {
                             </div>
                           </div>
                         </div>
+
+                        {/* Audience Targeting Card */}
+                        <div className="card border border-border bg-white shadow-sm rounded-xl p-5 space-y-4">
+                          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                            <Users size={14} className="text-blue-500" /> Audience Targeting
+                          </h3>
+                          <div className="space-y-3 text-xs">
+                            <div>
+                              <span className="text-[10px] text-slate-400 font-bold uppercase block">Targeted Interests</span>
+                              {adSetPerformance.interests && adSetPerformance.interests.length > 0 ? (
+                                <div className="flex flex-wrap gap-1.5 mt-2">
+                                  {adSetPerformance.interests.map((interest: string, idx: number) => (
+                                    <span key={idx} className="px-2 py-1 bg-slate-100 text-slate-700 rounded-md font-medium text-[10px]">
+                                      {interest}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="text-slate-500 italic mt-1.5">No interests targeting specified (or broad targeting).</div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </>
@@ -1000,6 +1044,12 @@ export default function AdSetsPage() {
                       Placements Breakdown
                     </button>
                     <button 
+                      onClick={() => setBreakdownView("platform")}
+                      className={`pb-2 border-b-2 transition ${breakdownView === "platform" ? "border-primary text-slate-700" : "border-transparent"}`}
+                    >
+                      Platform Breakdown
+                    </button>
+                    <button 
                       onClick={() => setBreakdownView("demographic")}
                       className={`pb-2 border-b-2 transition ${breakdownView === "demographic" ? "border-primary text-slate-700" : "border-transparent"}`}
                     >
@@ -1047,6 +1097,61 @@ export default function AdSetsPage() {
                                 const friendlyName = p.platform_position 
                                   ? p.platform_position.split("_").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ") 
                                   : p.publisher_platform.charAt(0).toUpperCase() + p.publisher_platform.slice(1);
+                                const spendPct = selectedAdSet.metrics.spend > 0 ? (p.spend / selectedAdSet.metrics.spend) : 0;
+                                return (
+                                  <tr key={idx} className="hover:bg-slate-50 transition">
+                                    <td className="p-4 font-bold text-slate-800">{friendlyName}</td>
+                                    <td className="p-4 text-right">{formatCurrency(p.spend)} ({Math.round(spendPct * 100)}%)</td>
+                                    <td className="p-4 text-right">{p.ctr.toFixed(2)}%</td>
+                                    <td className="p-4 text-right">{p.results}</td>
+                                    <td className="p-4 text-right text-green-600 font-bold">
+                                      {isRoas 
+                                        ? `${p.roas.toFixed(2)}x`
+                                        : (p.results > 0 ? formatCurrency(p.spend / p.results) : "—")
+                                      }
+                                    </td>
+                                  </tr>
+                                );
+                              })
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {breakdownView === "platform" && (
+                    <div className="card border border-border bg-white shadow-sm rounded-lg overflow-hidden">
+                      <div className="p-4 bg-slate-50/50 border-b border-border text-xs font-bold text-slate-600">
+                        Platform distribution breakdown relative to ad set metrics
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full text-xs text-left divide-y divide-border">
+                          <thead className="bg-slate-50/50">
+                            <tr className="text-subtle font-bold uppercase tracking-wider border-b border-border">
+                              <th className="p-4">Platform</th>
+                              <th className="p-4 text-right">Spend Contribution</th>
+                              <th className="p-4 text-right">CTR</th>
+                              <th className="p-4 text-right">{resultLabel}</th>
+                              <th className="p-4 text-right">{isRoas ? "ROAS Contribution" : "Cost Per Result"}</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-border font-medium text-slate-700">
+                            {loadingBreakdowns ? (
+                              <tr>
+                                <td colSpan={5} className="p-8 text-center text-slate-400 font-medium animate-pulse">
+                                  Loading platform metrics...
+                                </td>
+                              </tr>
+                            ) : platformDistribution.length === 0 ? (
+                              <tr>
+                                <td colSpan={5} className="p-8 text-center text-slate-400 font-medium">
+                                  No platform data found.
+                                </td>
+                              </tr>
+                            ) : (
+                              platformDistribution.map((p, idx) => {
+                                const friendlyName = p.platform === "audience_network" ? "Audience Network" : p.platform.charAt(0).toUpperCase() + p.platform.slice(1);
                                 const spendPct = selectedAdSet.metrics.spend > 0 ? (p.spend / selectedAdSet.metrics.spend) : 0;
                                 return (
                                   <tr key={idx} className="hover:bg-slate-50 transition">

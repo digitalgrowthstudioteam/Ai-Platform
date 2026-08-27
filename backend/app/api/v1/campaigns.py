@@ -13,7 +13,7 @@ from typing import List, Optional
 from app.database import get_db
 from app.dependencies import get_current_user, require_active_subscription
 from app.api.v1.meta import get_db_user_from_claims
-from app.models.meta import MetaAdAccount
+from app.models.meta import MetaAdAccount, MetaConnection
 from app.models.campaign import Campaign, AdSet
 from app.models.metrics import CampaignDailyMetrics, AdSetDailyMetrics
 
@@ -621,6 +621,38 @@ async def get_adset_performance(
             "value": int(val) if isinstance(val, (int, float)) else 0
         })
 
+    # Fetch interests live from Meta API if token and meta_adset_id are available
+    interests = []
+    try:
+        # Join to fetch access token and meta_adset_id
+        conn_stmt = (
+            select(MetaConnection.access_token, AdSet.meta_adset_id)
+            .join(Campaign, AdSet.campaign_id == Campaign.id)
+            .join(MetaAdAccount, Campaign.ad_account_id == MetaAdAccount.id)
+            .join(MetaConnection, MetaAdAccount.meta_connection_id == MetaConnection.id)
+            .where(AdSet.id == adset_id)
+        )
+        conn_res = await db.execute(conn_stmt)
+        conn_row = conn_res.fetchone()
+        if conn_row and conn_row[0] and conn_row[1]:
+            token, meta_adset_id = conn_row
+            from app.core.config import settings
+            import httpx
+            url = f"https://graph.facebook.com/{settings.META_API_VERSION}/{meta_adset_id}?fields=targeting"
+            async with httpx.AsyncClient() as client:
+                r = await client.get(f"{url}&access_token={token}", timeout=10.0)
+                if r.status_code == 200:
+                    targeting = r.json().get("targeting", {})
+                    flexible_spec = targeting.get("flexible_spec", [])
+                    for spec in flexible_spec:
+                        for interest in spec.get("interests", []):
+                            name = interest.get("name")
+                            if name:
+                                interests.append(name)
+    except Exception as e:
+        from app.core.logging import logger
+        logger.warn("Failed to fetch targeting interests from Meta API", error=str(e))
+
     return {
         "adset_id": str(adset_id),
         "campaign_id": str(campaign_id),
@@ -641,6 +673,7 @@ async def get_adset_performance(
             "reasons": score_reasons
         },
         "funnel": funnel,
+        "interests": interests,
         "trend_summary": "improving" if score >= 75 else ("degrading" if score < 50 else "stable")
     }
 
