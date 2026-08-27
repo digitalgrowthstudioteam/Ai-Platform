@@ -936,12 +936,17 @@ async def get_account_health_score(
     else:
         positives.append("Healthy outbound CTR above 1%")
 
-    if rates["lpv_rate"] < 0.60:
-        funnel_score -= 20
-        negatives.append("Landing Page View rate below 60% compared to link clicks")
-        risks.append("Slow loading landing page or high bounce rate")
-    else:
-        positives.append("Efficient landing page loading transit velocity")
+    has_website_campaign = (
+        data.get("landing_page_views", 0) > 0 or 
+        any(k in ("sales", "leads", "traffic") for k in objective_raws.keys())
+    )
+    if has_website_campaign:
+        if rates["lpv_rate"] < 0.60:
+            funnel_score -= 20
+            negatives.append("Landing Page View rate below 60% compared to link clicks")
+            risks.append("Slow loading landing page or high bounce rate")
+        else:
+            positives.append("Efficient landing page loading transit velocity")
 
     # 3. Creative Score (Video retention, Thruplay)
     creative_score = 100
