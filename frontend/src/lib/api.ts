@@ -566,6 +566,35 @@ class ApiClient {
     });
   }
 
+  async getLifetimeHistoryStatus() {
+    return this.request<{
+      individual_slots_total: number;
+      individual_slots_used: number;
+      individual_slots_available: number;
+      accounts: Array<{
+        id: string;
+        meta_account_id: string;
+        account_name: string;
+        ai_intelligence_status: string;
+        historical_intelligence_status: string;
+      }>;
+    }>("/billing/lifetime-history/status");
+  }
+
+  async assignLifetimeHistory(adAccountId: string) {
+    return this.request<{ status: string; message: string }>("/billing/lifetime-history/assign", {
+      method: "POST",
+      body: { ad_account_id: adAccountId },
+    });
+  }
+
+  async unassignLifetimeHistory(adAccountId: string) {
+    return this.request<{ status: string; message: string }>("/billing/lifetime-history/unassign", {
+      method: "POST",
+      body: { ad_account_id: adAccountId },
+    });
+  }
+
   async getPlansAvailability() {
     return this.request<{ starter_available: boolean; active_starter_count: number }>("/billing/plans/availability");
   }

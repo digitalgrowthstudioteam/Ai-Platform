@@ -241,13 +241,14 @@ function GetAdsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isNew = searchParams.get("new") === "true";
-  const { user, loginWithGoogle, isAuthenticated } = useAuth();
+  const { user, loginWithGoogle, isAuthenticated, logout } = useAuth();
   const [currentStep, setCurrentStep] = useState(0);
   const [loading, setLoading] = useState(true);
   const [config, setConfig] = useState<ServicePricing | null>(null);
   const [activeRequest, setActiveRequest] = useState<any>(null);
   const [quotation, setQuotation] = useState<any>(null);
   const [eligibleState, setEligibleState] = useState<any>({ eligible: true, reason: null, intro_offer_eligible: true });
+  const [showActionModal, setShowActionModal] = useState(false);
 
   // Connected accounts details from backend Meta OAuth (if any)
   const [connectedMetaAccount, setConnectedMetaAccount] = useState<any>(null);
@@ -1446,17 +1447,7 @@ function GetAdsPageContent() {
                         </button>
                       </div>
 
-                      {metaAccountExists ? (
-                        <div className="border border-dashed border-slate-200 rounded-2xl p-6 text-center space-y-4">
-                          <p className="text-xs font-semibold text-slate-500">Click the button below to link your Meta Marketing integration.</p>
-                          <Link
-                            href="/meta-integration"
-                            className="inline-flex bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-5 py-3 rounded-xl transition shadow-md shadow-blue-500/10"
-                          >
-                            Connect Meta Integration
-                          </Link>
-                        </div>
-                      ) : (
+                      {!metaAccountExists && (
                         <div className="border border-blue-200 bg-blue-50/30 rounded-2xl p-6 space-y-4">
                           <div className="flex justify-between items-baseline">
                             <h3 className="text-base font-extrabold text-slate-900">Meta Ad Account Setup Service</h3>
@@ -1951,32 +1942,23 @@ function GetAdsPageContent() {
                 )}
 
                 {currentStep === STEPS.length - 1 ? (
-                  isAuthenticated ? (
-                    <button
-                      onClick={handleCheckout}
-                      disabled={submitting || !termsAccepted}
-                      className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold text-xs px-6 py-3.5 rounded-xl transition shadow-md shadow-blue-500/10 flex items-center gap-2 disabled:opacity-50 cursor-pointer"
-                    >
-                      {submitting ? (
-                        <>
-                          <Loader2 size={14} className="animate-spin" />
-                          Checking out...
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles size={14} />
-                          Pay & Activate Service
-                        </>
-                      )}
-                    </button>
-                  ) : (
-                    <button
-                      onClick={loginWithGoogle}
-                      className="bg-slate-900 hover:bg-slate-950 text-white font-bold text-xs px-6 py-3.5 rounded-xl transition shadow-md flex items-center gap-2 cursor-pointer"
-                    >
-                      Login to Pay <ArrowRight size={14} />
-                    </button>
-                  )
+                  <button
+                    onClick={() => setShowActionModal(true)}
+                    disabled={submitting || !termsAccepted}
+                    className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold text-xs px-6 py-3.5 rounded-xl transition shadow-md shadow-blue-500/10 flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+                  >
+                    {submitting ? (
+                      <>
+                        <Loader2 size={14} className="animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles size={14} />
+                        Pay & Activate Service
+                      </>
+                    )}
+                  </button>
                 ) : (
                   <button
                     onClick={handleNextStep}
@@ -1996,6 +1978,89 @@ function GetAdsPageContent() {
       <footer className="py-6 px-6 border-t border-slate-200 bg-white text-center text-xs font-semibold text-slate-400">
         Digital Growth Studio • AI Meta Ads Strategy Auditor • © {new Date().getFullYear()}
       </footer>
+
+      {/* Action Options Modal */}
+      {showActionModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-3xl shadow-xl max-w-md w-full border border-slate-100 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-8 space-y-6 text-center animate-in fade-in duration-200">
+              <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mx-auto shadow-sm">
+                <Sparkles size={24} />
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-xl font-extrabold text-slate-900 font-sans">Choose an Option</h3>
+                <p className="text-xs text-slate-500 leading-relaxed font-semibold">
+                  Select how you would like to proceed with your Meta Ads request.
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                {isAuthenticated ? (
+                  <button
+                    onClick={async () => {
+                      setShowActionModal(false);
+                      await handleCheckout();
+                    }}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-3.5 px-4 rounded-xl transition shadow-md shadow-blue-500/10 flex items-center justify-center gap-2 cursor-pointer font-sans"
+                  >
+                    <Sparkles size={14} /> Pay & Activate Service
+                  </button>
+                ) : (
+                  <button
+                    onClick={async () => {
+                      setShowActionModal(false);
+                      await loginWithGoogle();
+                    }}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-3.5 px-4 rounded-xl transition shadow-md shadow-blue-500/10 flex items-center justify-center gap-2 cursor-pointer font-sans"
+                  >
+                    <User size={14} /> Login & Pay
+                  </button>
+                )}
+
+                <button
+                  onClick={() => {
+                    setShowActionModal(false);
+                    router.push("/dashboard");
+                  }}
+                  className="w-full bg-slate-900 hover:bg-slate-950 text-white font-bold text-xs py-3.5 px-4 rounded-xl transition shadow-md flex items-center justify-center gap-2 cursor-pointer font-sans"
+                >
+                  <Globe size={14} /> Access Platform / Dashboard
+                </button>
+
+                {isAuthenticated ? (
+                  <button
+                    onClick={async () => {
+                      setShowActionModal(false);
+                      await logout();
+                      await loginWithGoogle();
+                    }}
+                    className="w-full border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs py-3.5 px-4 rounded-xl transition flex items-center justify-center gap-2 cursor-pointer font-sans"
+                  >
+                    <User size={14} /> Login to Another Account
+                  </button>
+                ) : (
+                  <button
+                    onClick={async () => {
+                      setShowActionModal(false);
+                      await loginWithGoogle();
+                    }}
+                    className="w-full border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs py-3.5 px-4 rounded-xl transition flex items-center justify-center gap-2 cursor-pointer font-sans"
+                  >
+                    <User size={14} /> Log In / Sign In
+                  </button>
+                )}
+              </div>
+
+              <button
+                onClick={() => setShowActionModal(false)}
+                className="text-xs text-slate-450 hover:text-slate-700 transition font-bold"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

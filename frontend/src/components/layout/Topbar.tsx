@@ -77,6 +77,18 @@ export default function Topbar() {
     }
   };
 
+  const handleRetrySync = async () => {
+    try {
+      setSyncStatus(prev => ({ ...prev, status: "in_progress" }));
+      await api.triggerSync();
+      // Fetch status again after triggering
+      await fetchSyncStatus();
+    } catch (err) {
+      console.error("Failed to retry sync:", err);
+      setSyncStatus(prev => ({ ...prev, status: "failed" }));
+    }
+  };
+
 
 
 
@@ -234,15 +246,27 @@ export default function Topbar() {
 
       {/* Right Actions */}
       <div className="topbar-actions">
-        {/* Sync Status Badge (Display Only — sync runs automatically per plan interval) */}
-        <div 
-          className={`topbar-sync ${syncClass} flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border border-border`} 
-          id="sync-status"
-          title={`Auto-syncs based on your plan interval`}
-        >
-          {syncIcon}
-          <span>{syncLabel}</span>
-        </div>
+        {/* Sync Status Badge (Display Only, unless failed which offers manual retry) */}
+        {syncStatus.status === "failed" ? (
+          <button 
+            onClick={handleRetrySync}
+            className="topbar-sync failed flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border border-red-200 bg-red-50/50 hover:bg-red-150 text-red-700 cursor-pointer transition outline-none" 
+            id="sync-status"
+            title="Sync failed. Click to retry sync manually."
+          >
+            <RefreshCw size={12} className="text-red-500 hover:rotate-180 transition-transform duration-300" />
+            <span>Sync failed. Retry?</span>
+          </button>
+        ) : (
+          <div 
+            className={`topbar-sync ${syncClass} flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border border-border`} 
+            id="sync-status"
+            title={`Auto-syncs based on your plan interval`}
+          >
+            {syncIcon}
+            <span>{syncLabel}</span>
+          </div>
+        )}
 
         {/* Notifications */}
         <div className="relative" ref={notificationRef}>

@@ -745,3 +745,162 @@ async def unassign_ai_intelligence(
     await db.commit()
     logger.info("unassigned_ai_intelligence_from_account", user_id=user.id, ad_account_id=str(target_acc.id))
     return {"status": "success", "message": f"Successfully paused continuous Full AI Intelligence on account: {target_acc.account_name}."}
+
+
+# ──────────────────────────────────────────────
+# Lifetime Historical Data Assignment Endpoints
+# ──────────────────────────────────────────────
+class LifetimeHistoryStatusResponse(BaseModel):
+    individual_slots_total: int
+    individual_slots_used: int
+    individual_slots_available: int
+    accounts: List[AIIntelligenceAccountDetail]
+
+
+@router.get("/lifetime-history/status", response_model=LifetimeHistoryStatusResponse, summary="Get Lifetime History subscription and accounts assignment status")
+async def get_lifetime_history_status(
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    user = await get_db_user_from_claims(claims, db)
+    
+    # 1. Resolve active addons to count slots
+    addons = await EntitlementEngine.get_active_addons(user.id, db)
+    
+    individual_slots_total = sum(
+        a.quantity for a in addons 
+        if a.addon_id in ["lifetime_history_monthly", "lifetime_history_annual"]
+    )
+    
+    # 2. Get all Meta Ad Accounts for this user
+    from app.models.meta import MetaAdAccount
+    stmt = select(MetaAdAccount).where(MetaAdAccount.user_id == user.id)
+    res = await db.execute(stmt)
+    accounts = res.scalars().all()
+    
+    individual_slots_used = sum(
+        1 for acc in accounts 
+        if acc.historical_intelligence_status == "active" and acc.ai_intelligence_status != "active"
+    )
+    individual_slots_available = max(0, individual_slots_total - individual_slots_used)
+    
+    accounts_list = [
+        AIIntelligenceAccountDetail(
+            id=acc.id,
+            meta_account_id=acc.meta_account_id,
+            account_name=acc.account_name,
+            ai_intelligence_status=acc.ai_intelligence_status or "none",
+            historical_intelligence_status=acc.historical_intelligence_status or "none",
+        ) for acc in accounts
+    ]
+    
+    return LifetimeHistoryStatusResponse(
+        individual_slots_total=individual_slots_total,
+        individual_slots_used=individual_slots_used,
+        individual_slots_available=individual_slots_available,
+        accounts=accounts_list
+    )
+
+
+@router.post("/lifetime-history/assign", summary="Assign an individual Lifetime History entitlement slot to an ad account")
+async def assign_lifetime_history(
+    req: AIAssignmentRequest,
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    user = await get_db_user_from_claims(claims, db)
+    
+    # 1. Check if user has active ALL_ACCOUNTS
+    addons = await EntitlementEngine.get_active_addons(user.id, db)
+    all_accounts_active = any(
+        a.addon_id in ["AI_INTELLIGENCE_ALL_MONTHLY", "AI_INTELLIGENCE_ALL_YEARLY"] 
+        for a in addons
+    )
+    if all_accounts_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Assignment not required. All connected accounts are already covered by your All Accounts subscription."
+        )
+        
+    # 2. Check if user has available individual slots
+    individual_slots_total = sum(
+        a.quantity for a in addons 
+        if a.addon_id in ["lifetime_history_monthly", "lifetime_history_annual"]
+    )
+    if individual_slots_total <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No active Lifetime Historical Data subscriptions found. Please purchase a slot first."
+        )
+        
+    # 3. Find the target MetaAdAccount
+    from app.models.meta import MetaAdAccount
+    stmt = select(MetaAdAccount).where(MetaAdAccount.user_id == user.id)
+    try:
+        acc_uuid = uuid.UUID(req.ad_account_id)
+        stmt = stmt.where(MetaAdAccount.id == acc_uuid)
+    except (ValueError, TypeError):
+        stmt = stmt.where(MetaAdAccount.meta_account_id == req.ad_account_id)
+    res = await db.execute(stmt)
+    target_acc = res.scalar_one_or_none()
+    if not target_acc:
+        raise HTTPException(status_code=404, detail="Target ad account not found.")
+        
+    # If already active, nothing to do
+    if target_acc.historical_intelligence_status == "active":
+        return {"status": "success", "message": f"Lifetime history for '{target_acc.account_name}' is already active."}
+        
+    # 4. Resolve current assignments
+    stmt_all = select(MetaAdAccount).where(MetaAdAccount.user_id == user.id)
+    res_all = await db.execute(stmt_all)
+    all_accounts = res_all.scalars().all()
+    active_assigned = [
+        acc for acc in all_accounts 
+        if acc.historical_intelligence_status == "active" and acc.ai_intelligence_status != "active"
+    ]
+    
+    # If active count is already at max slots, we must unassign/pause one to make space
+    if len(active_assigned) >= individual_slots_total:
+        active_assigned.sort(key=lambda x: x.created_at)
+        to_unassign = active_assigned[0]
+        to_unassign.historical_intelligence_status = "paused"
+        db.add(to_unassign)
+        
+    target_acc.historical_intelligence_status = "active"
+    db.add(target_acc)
+    
+    await db.commit()
+    return {"status": "success", "message": f"Successfully activated Lifetime Historical Data on account: {target_acc.account_name}."}
+
+
+@router.post("/lifetime-history/unassign", summary="Unassign/pause Lifetime History entitlement from an ad account")
+async def unassign_lifetime_history(
+    req: AIAssignmentRequest,
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    user = await get_db_user_from_claims(claims, db)
+    
+    from app.models.meta import MetaAdAccount
+    stmt = select(MetaAdAccount).where(MetaAdAccount.user_id == user.id)
+    try:
+        acc_uuid = uuid.UUID(req.ad_account_id)
+        stmt = stmt.where(MetaAdAccount.id == acc_uuid)
+    except (ValueError, TypeError):
+        stmt = stmt.where(MetaAdAccount.meta_account_id == req.ad_account_id)
+    res = await db.execute(stmt)
+    target_acc = res.scalar_one_or_none()
+    if not target_acc:
+        raise HTTPException(status_code=404, detail="Target ad account not found.")
+        
+    if target_acc.ai_intelligence_status == "active":
+        raise HTTPException(
+            status_code=400, 
+            detail="Cannot disable Lifetime History while Full AI Intelligence is active on this account."
+        )
+        
+    target_acc.historical_intelligence_status = "paused"
+    db.add(target_acc)
+    
+    await db.commit()
+    return {"status": "success", "message": f"Successfully paused Lifetime Historical Data on account: {target_acc.account_name}."}

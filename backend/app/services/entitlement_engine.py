@@ -5,7 +5,7 @@ import structlog
 from datetime import datetime, timezone, date, timedelta
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 
 logger = structlog.get_logger()
 from app.models.user import User
@@ -424,16 +424,8 @@ class EntitlementEngine:
         has_faster_sync = any(a.addon_id == "faster_sync" for a in addons)
         sync_interval_hours = 3 if has_faster_sync else base_config["sync_interval_hours"]
 
-        # 4. Lifetime History overriding retention days
-        has_lifetime_history = any(
-            a.addon_id in ["lifetime_history_monthly", "lifetime_history_annual"] 
-            for a in addons
-        )
-        
         # Resolve dynamic historical days limits
-        if has_lifetime_history:
-            historical_days = 99999
-        elif is_trial_active:
+        if is_trial_active:
             historical_days = 7
         elif plan_id == "starter":
             historical_days = 30
@@ -499,6 +491,30 @@ class EntitlementEngine:
             stmt = stmt.where(MetaAdAccount.meta_account_id == ad_account_id)
         res = await db.execute(stmt)
         acc = res.scalar_one_or_none()
+        if acc and acc.historical_intelligence_status == "active" and acc.ai_intelligence_status != "active":
+            addons = await cls.get_active_addons(user_id, db)
+            has_lifetime_history = any(
+                a.addon_id in ["lifetime_history_monthly", "lifetime_history_annual"] 
+                for a in addons
+            )
+            has_ai_intelligence = any(
+                a.addon_id in ["AI_INTELLIGENCE_ALL_MONTHLY", "AI_INTELLIGENCE_ALL_YEARLY", "AI_INTELLIGENCE_INDIVIDUAL_MONTHLY", "AI_INTELLIGENCE_INDIVIDUAL_YEARLY"]
+                for a in addons
+            )
+            if not has_lifetime_history and not has_ai_intelligence:
+                acc.historical_intelligence_status = "paused"
+                db.add(acc)
+                await db.commit()
+            else:
+                return {
+                    "enabled": acc.ai_intelligence_status == "active",
+                    "scope": "ACCOUNT",
+                    "source": "LIFETIME_HISTORY_ACTIVE",
+                    "ad_account_id": str(acc.id),
+                    "historical_access": "FULL",
+                    "valid_until": None
+                }
+
         if not acc:
             return {
                 "enabled": False,
@@ -606,10 +622,31 @@ class EntitlementEngine:
         }
 
     @classmethod
-    async def enforce_historical_days(cls, start_date: date, user: User, db: AsyncSession) -> date:
+    async def enforce_historical_days(
+        cls, 
+        start_date: date, 
+        user: User, 
+        db: AsyncSession, 
+        ad_account_id: Optional[str] = None
+    ) -> date:
         """Capping the start date of a query window based on user plan entitlements."""
         ent = await cls.resolve_entitlements(user, db)
         historical_days = ent.get("historical_days", 30)
+        
+        if historical_days < 99999 and ad_account_id:
+            import uuid
+            from app.models.meta import MetaAdAccount
+            stmt = select(MetaAdAccount).where(MetaAdAccount.user_id == user.id)
+            try:
+                acc_uuid = uuid.UUID(ad_account_id)
+                stmt = stmt.where(MetaAdAccount.id == acc_uuid)
+            except (ValueError, TypeError):
+                stmt = stmt.where(MetaAdAccount.meta_account_id == ad_account_id)
+            res = await db.execute(stmt)
+            acc = res.scalar_one_or_none()
+            if acc and acc.historical_intelligence_status == "active":
+                historical_days = 99999
+
         if historical_days > 3650:
             return start_date
         oldest_allowed = date.today() - timedelta(days=historical_days)

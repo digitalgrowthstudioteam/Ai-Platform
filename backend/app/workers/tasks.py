@@ -132,12 +132,15 @@ async def trigger_all_active_syncs_async():
                 if should_sync:
                     logger.info("triggering_overdue_sync", ad_account_id=acc.meta_account_id, interval_hours=interval_hours)
                     # A. Trigger Celery task as fallback
+                    celery_triggered = False
                     try:
                         sync_ad_account_task.delay(str(acc.id))
+                        celery_triggered = True
                     except Exception:
                         pass
                     # B. Trigger inline sync in background thread as guaranteed fallback
-                    asyncio.create_task(run_sync_inline(str(acc.id)))
+                    if not celery_triggered:
+                        asyncio.create_task(run_sync_inline(str(acc.id)))
 
 
 @celery_app.task(name="app.workers.tasks.force_sync_all_accounts_task")
@@ -181,9 +184,12 @@ async def force_sync_all_accounts_async():
         for acc in accounts:
             logger.info("triggering_daily_force_sync", ad_account_id=acc.meta_account_id)
             # A. Trigger Celery task as fallback
+            celery_triggered = False
             try:
                 sync_ad_account_task.delay(str(acc.id))
+                celery_triggered = True
             except Exception as e:
                 logger.error("triggering_force_sync_celery_failed", ad_account_id=acc.meta_account_id, error=str(e))
             # B. Trigger inline sync in background thread as guaranteed fallback
-            asyncio.create_task(run_sync_inline(str(acc.id)))
+            if not celery_triggered:
+                asyncio.create_task(run_sync_inline(str(acc.id)))

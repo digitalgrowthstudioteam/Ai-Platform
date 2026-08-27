@@ -1334,11 +1334,13 @@ async def admin_resync_user(
 
     synced_count = 0
     for acc in accounts:
+        celery_triggered = False
         try:
             sync_ad_account_task.delay(str(acc.id))
+            celery_triggered = True
         except Exception:
             pass
-        if background_tasks:
+        if background_tasks and not celery_triggered:
             background_tasks.add_task(run_sync_inline, str(acc.id))
         synced_count += 1
 

@@ -156,7 +156,7 @@ async def list_ads(
     from datetime import timedelta
 
     # Enforce plan historical days date capping
-    start_date = await EntitlementEngine.enforce_historical_days(start_date, user, db)
+    start_date = await EntitlementEngine.enforce_historical_days(start_date, user, db, ad_account_id)
 
     # 1. Resolve Active Ad Account
     accessible_ids = await EntitlementEngine.get_accessible_user_ids(user, db)
@@ -381,7 +381,7 @@ async def list_adsets(
     from datetime import timedelta
 
     # Enforce plan historical days date capping
-    start_date = await EntitlementEngine.enforce_historical_days(start_date, user, db)
+    start_date = await EntitlementEngine.enforce_historical_days(start_date, user, db, ad_account_id)
 
     # 1. Resolve Active Ad Account
     accessible_ids = await EntitlementEngine.get_accessible_user_ids(user, db)
@@ -1211,8 +1211,20 @@ async def get_ad_daily_metrics(
     user = await get_db_user_from_claims(claims, db)
     from app.services.entitlement_engine import EntitlementEngine
 
+    # Resolve target ad account link
+    stmt_acc = (
+        select(Campaign.ad_account_id)
+        .join(AdSet, AdSet.campaign_id == Campaign.id)
+        .join(Ad, Ad.ad_set_id == AdSet.id)
+        .where(Ad.id == ad_id)
+    )
+    res_acc = await db.execute(stmt_acc)
+    ad_account_uuid = res_acc.scalar_one_or_none()
+
     # Enforce plan historical days date capping
-    start_date = await EntitlementEngine.enforce_historical_days(start_date, user, db)
+    start_date = await EntitlementEngine.enforce_historical_days(
+        start_date, user, db, str(ad_account_uuid) if ad_account_uuid else None
+    )
 
     # Verify ad access
     accessible_ids = await EntitlementEngine.get_accessible_user_ids(user, db)

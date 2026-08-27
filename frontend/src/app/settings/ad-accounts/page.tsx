@@ -14,6 +14,8 @@ interface AdAccount {
   account_status: number;
   is_connected: boolean;
   industry?: string | null;
+  ai_intelligence_status?: string | null;
+  historical_intelligence_status?: string | null;
 }
 
 export default function AdAccountsPage() {
@@ -36,6 +38,12 @@ export default function AdAccountsPage() {
   const [showDisconnectModal, setShowDisconnectModal] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [upgradeModalMessage, setUpgradeModalMessage] = useState("");
+  
+  const [lifetimeHistoryStatus, setLifetimeHistoryStatus] = useState<{
+    individual_slots_total: number;
+    individual_slots_used: number;
+    individual_slots_available: number;
+  } | null>(null);
 
   // Check connection status and load ad accounts
   const checkStatus = async () => {
@@ -51,6 +59,13 @@ export default function AdAccountsPage() {
         // Load ad accounts list
         const accountsRes = await api.getMetaAccounts();
         setAccounts(accountsRes);
+
+        try {
+          const lhRes = await api.getLifetimeHistoryStatus();
+          setLifetimeHistoryStatus(lhRes);
+        } catch (lhErr) {
+          console.error("Failed to load lifetime history status:", lhErr);
+        }
         
         // Set initially connected accounts
         const connectedIds = accountsRes.filter(a => a.is_connected).map(a => a.id);
@@ -124,6 +139,40 @@ export default function AdAccountsPage() {
     } catch (err: any) {
       setError(err.message || "Failed to initiate Meta OAuth connection");
       setLoading(false);
+    }
+  };
+
+  const handleToggleLifetimeHistory = async (adAccountId: string, currentStatus: string) => {
+    try {
+      setSaving(true);
+      setError(null);
+      setSuccess(null);
+      
+      if (currentStatus === "active") {
+        const res = await api.unassignLifetimeHistory(adAccountId);
+        setSuccess(res.message);
+      } else {
+        if (lifetimeHistoryStatus && lifetimeHistoryStatus.individual_slots_available <= 0) {
+          setError("No available Lifetime Historical Data slots. Please purchase a slot or unassign another account first.");
+          setSaving(false);
+          return;
+        }
+        const res = await api.assignLifetimeHistory(adAccountId);
+        setSuccess(res.message);
+      }
+      
+      const [accountsRes, lhRes] = await Promise.all([
+        api.getMetaAccounts(),
+        api.getLifetimeHistoryStatus()
+      ]);
+      setAccounts(accountsRes);
+      setLifetimeHistoryStatus(lhRes);
+      refreshAccounts();
+    } catch (err: any) {
+      console.error("Failed to toggle lifetime history:", err);
+      setError(err.message || "Failed to toggle Lifetime Historical Data assignment");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -306,9 +355,16 @@ export default function AdAccountsPage() {
 
           {/* Ad Accounts Selection list */}
           <div className="card border border-border bg-white shadow-sm">
-            <div className="card-header border-b border-border p-6">
-              <h3 className="text-base font-bold text-foreground">Select Active Ad Accounts</h3>
-              <p className="text-xs text-subtle font-medium text-slate-500">Toggle to activate or deactivate Meta Ad Account integration pipelines.</p>
+            <div className="card-header border-b border-border p-6 flex flex-col sm:flex-row justify-between sm:items-center gap-3">
+              <div>
+                <h3 className="text-base font-bold text-foreground">Select Active Ad Accounts</h3>
+                <p className="text-xs text-subtle font-medium text-slate-500">Toggle to activate or deactivate Meta Ad Account integration pipelines.</p>
+              </div>
+              {lifetimeHistoryStatus && lifetimeHistoryStatus.individual_slots_total > 0 && (
+                <div className="bg-blue-50 text-blue-700 border border-blue-100 rounded-lg px-3 py-1.5 text-xs font-bold shrink-0 self-start sm:self-center">
+                  Lifetime History Slots: {lifetimeHistoryStatus.individual_slots_used} / {lifetimeHistoryStatus.individual_slots_total} used
+                </div>
+              )}
             </div>
             
             <div className="divide-y divide-border">
@@ -377,6 +433,38 @@ export default function AdAccountsPage() {
                               <option value="Local Business">Local Business</option>
                               <option value="Other">Other</option>
                             </select>
+                          </div>
+                        )}
+
+                        {isChecked && isActive && (
+                          <div className="pt-3 flex flex-col gap-1.5 border-t border-slate-100 mt-2.5" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-center justify-between w-56 bg-slate-50 border border-slate-200 rounded-lg p-2">
+                              <div>
+                                <span className="block text-[10px] font-bold text-slate-700 uppercase tracking-wider">
+                                  Lifetime History
+                                </span>
+                                <span className="block text-[9px] text-slate-400 font-medium">
+                                  {acc.historical_intelligence_status === "active" ? "Activated" : "Paused/Inactive"}
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                disabled={saving}
+                                onClick={() => handleToggleLifetimeHistory(acc.id, acc.historical_intelligence_status || "none")}
+                                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                                  acc.historical_intelligence_status === "active"
+                                    ? 'bg-blue-600 hover:bg-blue-700'
+                                    : 'bg-slate-200 hover:bg-slate-300'
+                                }`}
+                                style={{ minHeight: "20px" }}
+                              >
+                                <span
+                                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                                    acc.historical_intelligence_status === "active" ? 'translate-x-4' : 'translate-x-0'
+                                  }`}
+                                />
+                              </button>
+                            </div>
                           </div>
                         )}
                       </div>

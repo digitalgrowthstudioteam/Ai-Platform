@@ -392,7 +392,7 @@ async def get_overview_analytics(
     from app.services.entitlement_engine import EntitlementEngine
 
     # Enforce plan historical days date capping
-    start_date = await EntitlementEngine.enforce_historical_days(start_date, user, db)
+    start_date = await EntitlementEngine.enforce_historical_days(start_date, user, db, ad_account_id)
 
     # 1. Resolve Active Ad Account
     accessible_ids = await EntitlementEngine.get_accessible_user_ids(user, db)
@@ -566,7 +566,7 @@ async def get_chart_analytics(
     from app.services.entitlement_engine import EntitlementEngine
 
     # Enforce plan historical days date capping
-    start_date = await EntitlementEngine.enforce_historical_days(start_date, user, db)
+    start_date = await EntitlementEngine.enforce_historical_days(start_date, user, db, ad_account_id)
 
     # Resolve Active Ad Account
     accessible_ids = await EntitlementEngine.get_accessible_user_ids(user, db)

@@ -24,12 +24,12 @@ export default function AdsPage() {
       </span>
     );
   };
-  
+
   // State for subscription and upgrade limits
   const [subscription, setSubscription] = useState<any>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [upgradeModalMessage, setUpgradeModalMessage] = useState("");
-  
+
   // State for date presets
   const [datePreset, setDatePreset] = useState<string>("today");
   const [customStartDate, setCustomStartDate] = useState<string>(() => {
@@ -68,6 +68,9 @@ export default function AdsPage() {
   }, []);
 
   const getSubscriptionLimit = () => {
+    if (selectedAccount?.historical_intelligence_status === "active") {
+      return 99999;
+    }
     let limit = 7; // default trial
     if (subscription) {
       if (subscription.status === "trialing") {
@@ -87,7 +90,7 @@ export default function AdsPage() {
     const diffTime = Math.abs(end.getTime() - start.getTime());
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     const limit = getSubscriptionLimit();
-    
+
     let nextPlan = "Starter";
     if (subscription) {
       if (subscription.status === "trialing") {
@@ -113,7 +116,7 @@ export default function AdsPage() {
   const getDates = (preset: string, customStart?: string, customEnd?: string) => {
     const end = new Date();
     const start = new Date();
-    
+
     switch (preset) {
       case "today":
         break;
@@ -203,7 +206,7 @@ export default function AdsPage() {
     if (cached) {
       try {
         setAds(JSON.parse(cached));
-      } catch (e) {}
+      } catch (e) { }
     }
 
     try {
@@ -252,6 +255,11 @@ export default function AdsPage() {
       if (sortBy === "name") {
         valA = a.name.toLowerCase();
         valB = b.name.toLowerCase();
+      } else if (sortBy === "purchases") {
+        const isConvA = a.performance_goal?.toUpperCase().includes("CONVERSATION") || false;
+        valA = isConvA ? (a.metrics.conversations || 0) : a.metrics.purchases;
+        const isConvB = b.performance_goal?.toUpperCase().includes("CONVERSATION") || false;
+        valB = isConvB ? (b.metrics.conversations || 0) : b.metrics.purchases;
       } else {
         valA = a.metrics[sortBy] || 0;
         valB = b.metrics[sortBy] || 0;
@@ -283,9 +291,9 @@ export default function AdsPage() {
           {/* Custom Date Range Select Inputs */}
           {datePreset === "custom" && (
             <div className="flex items-center gap-2">
-              <input 
-                type="date" 
-                value={customStartDate} 
+              <input
+                type="date"
+                value={customStartDate}
                 min={(() => {
                   const limit = getSubscriptionLimit();
                   if (limit >= 99999) return undefined;
@@ -300,13 +308,13 @@ export default function AdsPage() {
                   if (val && customEndDate) {
                     checkDateRangeLimit(new Date(val), new Date(customEndDate));
                   }
-                }} 
+                }}
                 className="btn btn-outline py-1.5 px-3 border border-border text-xs font-semibold rounded-md bg-white outline-none cursor-pointer"
               />
               <span className="text-slate-400 font-bold text-xs">to</span>
-              <input 
-                type="date" 
-                value={customEndDate} 
+              <input
+                type="date"
+                value={customEndDate}
                 min={(() => {
                   const limit = getSubscriptionLimit();
                   if (limit >= 99999) return undefined;
@@ -321,7 +329,7 @@ export default function AdsPage() {
                   if (customStartDate && val) {
                     checkDateRangeLimit(new Date(customStartDate), new Date(val));
                   }
-                }} 
+                }}
                 className="btn btn-outline py-1.5 px-3 border border-border text-xs font-semibold rounded-md bg-white outline-none cursor-pointer"
               />
             </div>
@@ -462,7 +470,9 @@ export default function AdsPage() {
                 <option value="spend">Spend</option>
                 <option value="impressions">Impressions</option>
                 <option value="clicks">Clicks</option>
-                <option value="purchases">Conversions</option>
+                <option value="purchases">
+                  {ads.some(ad => ad.performance_goal?.toUpperCase().includes("CONVERSATION")) ? "Conversations" : "Conversions"}
+                </option>
                 <option value="ctr">CTR</option>
                 <option value="cpc">CPC</option>
                 <option value="roas">ROAS</option>
@@ -481,7 +491,7 @@ export default function AdsPage() {
               <table className="min-w-full text-xs text-left divide-y divide-border">
                 <thead className="bg-slate-50/50">
                   <tr className="text-subtle font-bold uppercase tracking-wider border-b border-border select-none">
-                    <th 
+                    <th
                       onClick={() => handleAdsHeaderSort("name")}
                       className="p-4 cursor-pointer hover:bg-slate-100 transition group"
                     >
@@ -492,7 +502,7 @@ export default function AdsPage() {
                         </span>
                       </div>
                     </th>
-                    <th 
+                    <th
                       onClick={() => handleAdsHeaderSort("spend")}
                       className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
                     >
@@ -503,7 +513,7 @@ export default function AdsPage() {
                         </span>
                       </div>
                     </th>
-                    <th 
+                    <th
                       onClick={() => handleAdsHeaderSort("impressions")}
                       className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
                     >
@@ -514,7 +524,7 @@ export default function AdsPage() {
                         </span>
                       </div>
                     </th>
-                    <th 
+                    <th
                       onClick={() => handleAdsHeaderSort("clicks")}
                       className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
                     >
@@ -525,18 +535,18 @@ export default function AdsPage() {
                         </span>
                       </div>
                     </th>
-                    <th 
+                    <th
                       onClick={() => handleAdsHeaderSort("purchases")}
                       className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
                     >
                       <div className="flex items-center justify-end gap-1">
-                        <span>Conversions</span>
-                        <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${sortBy === "purchases" ? "font-bold text-blue-600" : ""}`}>
+                        <span>{filteredAndSortedAds.some(ad => ad.performance_goal?.toUpperCase().includes("CONVERSATION")) ? "Conversations" : "Conversions"}</span>
+                        <span className={`text-[10px] text-slate-400 group-hover:text-slate-650 transition ${sortBy === "purchases" ? "font-bold text-blue-600" : ""}`}>
                           {sortBy === "purchases" ? (sortOrder === "asc" ? "↑" : "↓") : "↑↓"}
                         </span>
                       </div>
                     </th>
-                    <th 
+                    <th
                       onClick={() => handleAdsHeaderSort("ctr")}
                       className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
                     >
@@ -547,7 +557,7 @@ export default function AdsPage() {
                         </span>
                       </div>
                     </th>
-                    <th 
+                    <th
                       onClick={() => handleAdsHeaderSort("cpc")}
                       className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
                     >
@@ -558,7 +568,7 @@ export default function AdsPage() {
                         </span>
                       </div>
                     </th>
-                    <th 
+                    <th
                       onClick={() => handleAdsHeaderSort("roas")}
                       className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
                     >
@@ -574,11 +584,11 @@ export default function AdsPage() {
                 <tbody className="divide-y divide-border font-medium text-slate-700">
                   {filteredAndSortedAds.map((ad, idx) => {
                     const cr = ad.creative;
-                    
+
                     return (
-                      <tr 
-                        key={idx} 
-                        onClick={() => setSelectedAd(ad)} 
+                      <tr
+                        key={idx}
+                        onClick={() => setSelectedAd(ad)}
                         className="hover:bg-slate-50 transition cursor-pointer"
                       >
                         <td className="p-4 flex items-center gap-3">
@@ -605,9 +615,8 @@ export default function AdsPage() {
                               </div>
                             )}
                             <div className="flex items-center gap-2 mt-1.5">
-                              <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${
-                                ad.status === "ACTIVE" ? "text-green-600 bg-green-50" : "text-slate-500 bg-slate-100"
-                              }`}>
+                              <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${ad.status === "ACTIVE" ? "text-green-600 bg-green-50" : "text-slate-500 bg-slate-100"
+                                }`}>
                                 {ad.status}
                               </span>
                               <span className="text-[9px] text-slate-400 font-bold truncate max-w-[120px]">
@@ -629,8 +638,11 @@ export default function AdsPage() {
                           {renderTrend(ad.metrics.clicks_trend)}
                         </td>
                         <td className="p-4 text-right">
-                          {formatNumber(ad.metrics.purchases)}
-                          {renderTrend(ad.metrics.purchases_trend)}
+                          {(() => {
+                            const isConv = ad.performance_goal?.toUpperCase().includes("CONVERSATION");
+                            return formatNumber(isConv ? (ad.metrics.conversations || 0) : ad.metrics.purchases);
+                          })()}
+                          {renderTrend(ad.performance_goal?.toUpperCase().includes("CONVERSATION") ? 0 : ad.metrics.purchases_trend)}
                         </td>
                         <td className="p-4 text-right">
                           {formatPercent(ad.metrics.ctr)}
@@ -659,9 +671,9 @@ export default function AdsPage() {
         <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-200">
           {/* Backdrop Click Closes Drawer */}
           <div className="absolute inset-0" onClick={() => setSelectedAd(null)} />
-          
+
           <div className="relative bg-white w-full max-w-lg h-full shadow-2xl flex flex-col justify-between animate-in slide-in-from-right duration-300 overflow-y-auto border-l border-border p-6 space-y-6">
-            
+
             {/* Drawer Header */}
             <div className="flex justify-between items-start border-b border-border pb-4">
               <div>
@@ -678,7 +690,7 @@ export default function AdsPage() {
                   </span>
                 </div>
               </div>
-              <button 
+              <button
                 onClick={() => setSelectedAd(null)}
                 className="p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition cursor-pointer"
               >
@@ -766,7 +778,7 @@ export default function AdsPage() {
                       const pros = [];
                       const m = selectedAd.metrics;
                       if (m.roas >= 2.0) pros.push(`Profitable ROAS delivery at ${m.roas.toFixed(2)}x.`);
-                      if (m.ctr >= 1.5) pros.push(`Strong copy resonance (CTR: ${(m.ctr).toFixed(2)}%).`);
+                      if (m.ctr >= 0.015) pros.push(`Strong copy resonance (CTR: ${(m.ctr * 100).toFixed(2)}%).`);
                       if (m.cpc > 0 && m.cpc < 4.0) pros.push(`Highly efficient Cost Per Click (₹${m.cpc.toFixed(2)}).`);
                       if (m.purchases >= 5) pros.push(`Stable conversion pool with ${m.purchases} total purchases.`);
                       if (pros.length === 0) pros.push("Ad impressions are stable and delivery budget is processing normally.");
@@ -785,7 +797,7 @@ export default function AdsPage() {
                       const cons = [];
                       const m = selectedAd.metrics;
                       if (m.roas > 0 && m.roas < 1.0) cons.push(`ROAS of ${m.roas.toFixed(2)}x represents a net revenue loss.`);
-                      if (m.ctr > 0 && m.ctr < 0.8) cons.push(`Low CTR (${(m.ctr).toFixed(2)}%) indicates weak creative engagement.`);
+                      if (m.ctr > 0 && m.ctr < 0.008) cons.push(`Low CTR (${(m.ctr * 100).toFixed(2)}%) indicates weak creative engagement.`);
                       if (m.cpc > 10.0) cons.push(`Elevated Cost Per Click (₹${m.cpc.toFixed(2)}) increases cost of audience acquisition.`);
                       if (m.purchases === 0 && m.spend > 400) cons.push(`Zero conversions generated despite ₹${m.spend.toFixed(2)} ad spend.`);
                       if (cons.length === 0) cons.push("No critical budget leaks or audience targeting defects detected.");
@@ -802,14 +814,14 @@ export default function AdsPage() {
                 <Sparkles size={14} className="text-yellow-500" />
                 AI-Triggered Optimization Suggestions
               </h3>
-              
+
               {(() => {
-                const linkedRecs = recs.filter(r => 
-                  r.entity_id === selectedAd.id || 
+                const linkedRecs = recs.filter(r =>
+                  r.entity_id === selectedAd.id ||
                   r.title.toLowerCase().includes(selectedAd.name.toLowerCase()) ||
                   r.description.toLowerCase().includes(selectedAd.name.toLowerCase())
                 );
-                
+
                 if (linkedRecs.length === 0) {
                   return (
                     <div className="bg-slate-50 border border-slate-100 rounded-lg p-4 text-center text-xs text-slate-500">
@@ -817,7 +829,7 @@ export default function AdsPage() {
                     </div>
                   );
                 }
-                
+
                 return (
                   <div className="space-y-3">
                     {linkedRecs.map((r, idx) => (
@@ -842,10 +854,10 @@ export default function AdsPage() {
                 );
               })()}
             </div>
-            
+
             {/* Close Button Footer */}
             <div className="border-t border-border pt-4">
-              <button 
+              <button
                 onClick={() => setSelectedAd(null)}
                 className="w-full btn btn-outline py-2.5 font-bold text-sm text-slate-700 hover:bg-slate-50 border border-border rounded-lg cursor-pointer transition text-center block animate-pulse"
               >

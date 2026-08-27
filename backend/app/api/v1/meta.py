@@ -690,13 +690,16 @@ async def trigger_sync(
         
     for acc in accounts:
         # 1. Trigger Celery (if Celery worker and Redis are active in production environment)
+        celery_triggered = False
         try:
             sync_ad_account_task.delay(str(acc.id))
+            celery_triggered = True
         except Exception:
             pass
             
         # 2. Trigger inline BackgroundTask inside FastAPI process (guaranteed to run without Redis/Celery!)
-        background_tasks.add_task(run_sync_inline, str(acc.id))
+        if not celery_triggered:
+            background_tasks.add_task(run_sync_inline, str(acc.id))
         
     return {
         "status": "success", 

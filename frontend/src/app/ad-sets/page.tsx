@@ -24,12 +24,12 @@ export default function AdSetsPage() {
       </span>
     );
   };
-  
+
   // State for subscription and upgrade limits
   const [subscription, setSubscription] = useState<any>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [upgradeModalMessage, setUpgradeModalMessage] = useState("");
-  
+
   // State for date presets
   const [datePreset, setDatePreset] = useState<string>("today");
   const [customStartDate, setCustomStartDate] = useState<string>(() => {
@@ -289,6 +289,9 @@ export default function AdSetsPage() {
   }, []);
 
   const getSubscriptionLimit = () => {
+    if (selectedAccount?.historical_intelligence_status === "active") {
+      return 99999;
+    }
     let limit = 7; // default trial
     if (subscription) {
       if (subscription.status === "trialing") {
@@ -308,7 +311,7 @@ export default function AdSetsPage() {
     const diffTime = Math.abs(end.getTime() - start.getTime());
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     const limit = getSubscriptionLimit();
-    
+
     let nextPlan = "Starter";
     if (subscription) {
       if (subscription.status === "trialing") {
@@ -334,7 +337,7 @@ export default function AdSetsPage() {
   const getDates = (preset: string, customStart?: string, customEnd?: string) => {
     const end = new Date();
     const start = new Date();
-    
+
     switch (preset) {
       case "today":
         break;
@@ -422,9 +425,9 @@ export default function AdSetsPage() {
     setAdSetPerformance(null);
     setPerfError(null);
     setAdSetAds([]);
-    
+
     if (!selectedAccount) return;
-    
+
     const { startStr, endStr } = getDates(datePreset, customStartDate, customEndDate);
     setLoadingPerf(true);
     try {
@@ -452,7 +455,7 @@ export default function AdSetsPage() {
     if (cached) {
       try {
         setAdsets(JSON.parse(cached));
-      } catch (e) {}
+      } catch (e) { }
     }
 
     try {
@@ -501,6 +504,11 @@ export default function AdSetsPage() {
       if (sortBy === "name") {
         valA = a.name.toLowerCase();
         valB = b.name.toLowerCase();
+      } else if (sortBy === "purchases") {
+        const isConvA = a.optimization_goal?.toUpperCase().includes("CONVERSATION") || false;
+        valA = isConvA ? (a.metrics.conversations || 0) : a.metrics.purchases;
+        const isConvB = b.optimization_goal?.toUpperCase().includes("CONVERSATION") || false;
+        valB = isConvB ? (b.metrics.conversations || 0) : b.metrics.purchases;
       } else {
         valA = a.metrics[sortBy] || 0;
         valB = b.metrics[sortBy] || 0;
@@ -533,9 +541,9 @@ export default function AdSetsPage() {
             {/* Custom Date Range Select Inputs */}
             {datePreset === "custom" && (
               <div className="flex items-center gap-2">
-                <input 
-                  type="date" 
-                  value={customStartDate} 
+                <input
+                  type="date"
+                  value={customStartDate}
                   min={(() => {
                     const limit = getSubscriptionLimit();
                     if (limit >= 99999) return undefined;
@@ -550,13 +558,13 @@ export default function AdSetsPage() {
                     if (val && customEndDate) {
                       checkDateRangeLimit(new Date(val), new Date(customEndDate));
                     }
-                  }} 
+                  }}
                   className="btn btn-outline py-1.5 px-3 border border-border text-xs font-semibold rounded-md bg-white outline-none cursor-pointer"
                 />
                 <span className="text-slate-400 font-bold text-xs">to</span>
-                <input 
-                  type="date" 
-                  value={customEndDate} 
+                <input
+                  type="date"
+                  value={customEndDate}
                   min={(() => {
                     const limit = getSubscriptionLimit();
                     if (limit >= 99999) return undefined;
@@ -571,7 +579,7 @@ export default function AdSetsPage() {
                     if (customStartDate && val) {
                       checkDateRangeLimit(new Date(customStartDate), new Date(val));
                     }
-                  }} 
+                  }}
                   className="btn btn-outline py-1.5 px-3 border border-border text-xs font-semibold rounded-md bg-white outline-none cursor-pointer"
                 />
               </div>
@@ -752,33 +760,29 @@ export default function AdSetsPage() {
             <div className="flex border-b border-slate-200 gap-6 mt-2">
               <button
                 onClick={() => setAdSetTab("overview")}
-                className={`py-2 text-xs font-bold border-b-2 cursor-pointer transition ${
-                  adSetTab === "overview" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-400 hover:text-slate-600"
-                }`}
+                className={`py-2 text-xs font-bold border-b-2 cursor-pointer transition ${adSetTab === "overview" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-400 hover:text-slate-600"
+                  }`}
               >
                 Goal Dashboard
               </button>
               <button
                 onClick={() => setAdSetTab("ads")}
-                className={`py-2 text-xs font-bold border-b-2 cursor-pointer transition ${
-                  adSetTab === "ads" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-400 hover:text-slate-600"
-                }`}
+                className={`py-2 text-xs font-bold border-b-2 cursor-pointer transition ${adSetTab === "ads" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-400 hover:text-slate-600"
+                  }`}
               >
                 Ads ({adSetAds.length})
               </button>
               <button
                 onClick={() => setAdSetTab("breakdowns")}
-                className={`py-2 text-xs font-bold border-b-2 cursor-pointer transition ${
-                  adSetTab === "breakdowns" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-400 hover:text-slate-600"
-                }`}
+                className={`py-2 text-xs font-bold border-b-2 cursor-pointer transition ${adSetTab === "breakdowns" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-400 hover:text-slate-600"
+                  }`}
               >
                 Breakdowns
               </button>
               <button
                 onClick={() => setAdSetTab("aidiagnosis")}
-                className={`py-2 text-xs font-bold border-b-2 cursor-pointer transition ${
-                  adSetTab === "aidiagnosis" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-400 hover:text-slate-600"
-                }`}
+                className={`py-2 text-xs font-bold border-b-2 cursor-pointer transition ${adSetTab === "aidiagnosis" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-400 hover:text-slate-600"
+                  }`}
               >
                 AI Diagnosis
               </button>
@@ -799,10 +803,9 @@ export default function AdSetsPage() {
                         </div>
 
                         <div className="relative flex items-center justify-center">
-                          <div className={`w-28 h-28 rounded-full border-8 flex flex-col items-center justify-center ${
-                            adSetPerformance.health_score.status === "good" ? "border-emerald-500/15 text-emerald-600" :
-                            adSetPerformance.health_score.status === "warning" ? "border-amber-500/15 text-amber-600" : "border-rose-500/15 text-rose-600"
-                          }`}>
+                          <div className={`w-28 h-28 rounded-full border-8 flex flex-col items-center justify-center ${adSetPerformance.health_score.status === "good" ? "border-emerald-500/15 text-emerald-600" :
+                              adSetPerformance.health_score.status === "warning" ? "border-amber-500/15 text-amber-600" : "border-rose-500/15 text-rose-600"
+                            }`}>
                             <span className="text-3xl font-black">{adSetPerformance.health_score.score}</span>
                             <span className="text-[8px] font-bold uppercase tracking-wider">{adSetPerformance.health_score.status}</span>
                           </div>
@@ -838,15 +841,14 @@ export default function AdSetsPage() {
                                 {k.metric.includes("spend") || k.metric.includes("cost_") || k.metric === "cpc" || k.metric === "cpa" || k.metric === "cpm"
                                   ? formatCurrency(k.value)
                                   : k.metric.includes("rate") || k.metric.includes("ctr")
-                                  ? formatPercent(k.value)
-                                  : formatNumber(k.value)}
+                                    ? formatPercent(k.value)
+                                    : formatNumber(k.value)}
                               </div>
 
                               {k.change_percent !== null ? (
-                                <div className={`flex items-center gap-0.5 text-[10px] font-black px-2 py-0.5 rounded-lg w-fit ${
-                                  k.status === "good" ? "text-emerald-700 bg-emerald-50" :
-                                  k.status === "critical" ? "text-rose-700 bg-rose-50" : "text-slate-600 bg-slate-50"
-                                }`}>
+                                <div className={`flex items-center gap-0.5 text-[10px] font-black px-2 py-0.5 rounded-lg w-fit ${k.status === "good" ? "text-emerald-700 bg-emerald-50" :
+                                    k.status === "critical" ? "text-rose-700 bg-rose-50" : "text-slate-600 bg-slate-50"
+                                  }`}>
                                   {k.trend === "improving" ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
                                   {k.change_percent > 0 ? "+" : ""}{k.change_percent.toFixed(1)}%
                                 </div>
@@ -903,8 +905,8 @@ export default function AdSetsPage() {
                                   {m.metric.includes("spend") || m.metric.includes("cost_") || m.metric === "cpc" || m.metric === "cpa" || m.metric === "cpm"
                                     ? formatCurrency(m.value)
                                     : m.metric.includes("rate") || m.metric.includes("ctr")
-                                    ? formatPercent(m.value)
-                                    : formatNumber(m.value)}
+                                      ? formatPercent(m.value)
+                                      : formatNumber(m.value)}
                                 </div>
                                 {m.change_percent !== null && (
                                   <div className={`text-[8px] font-bold mt-0.5 ${m.status === "good" ? "text-emerald-600" : m.status === "critical" ? "text-rose-600" : "text-slate-500"}`}>
@@ -984,7 +986,7 @@ export default function AdSetsPage() {
                                   const pros = [];
                                   const m = selectedAdSet.metrics;
                                   if (m.roas >= 2.0) pros.push(`Profitable ROAS at ${m.roas.toFixed(2)}x.`);
-                                  if (m.ctr >= 1.5) pros.push(`Strong CTR (${(m.ctr).toFixed(2)}%).`);
+                                  if (m.ctr >= 0.015) pros.push(`Strong CTR (${(m.ctr * 100).toFixed(2)}%).`);
                                   if (m.cpc > 0 && m.cpc < 4.0) pros.push(`CPC: ₹${m.cpc.toFixed(2)}.`);
                                   if (m.purchases >= 5) pros.push(`${m.purchases} total purchases.`);
                                   if (pros.length === 0) pros.push("Ad Set reach is stable.");
@@ -1001,7 +1003,7 @@ export default function AdSetsPage() {
                                   const cons = [];
                                   const m = selectedAdSet.metrics;
                                   if (m.roas > 0 && m.roas < 1.0) cons.push(`ROAS of ${m.roas.toFixed(2)}x represents net loss.`);
-                                  if (m.ctr > 0 && m.ctr < 0.8) cons.push(`Low CTR (${(m.ctr).toFixed(2)}%).`);
+                                  if (m.ctr > 0 && m.ctr < 0.008) cons.push(`Low CTR (${(m.ctr * 100).toFixed(2)}%).`);
                                   if (m.cpc > 10.0) cons.push(`High CPC (₹${m.cpc.toFixed(2)}).`);
                                   if (m.purchases === 0 && m.spend > 400) cons.push(`Zero conversions despite spending ₹${m.spend.toFixed(2)}.`);
                                   if (cons.length === 0) cons.push("No critical budget leaks.");
@@ -1075,7 +1077,7 @@ export default function AdSetsPage() {
                                 const pros = [];
                                 const m = selectedAdSet.metrics;
                                 if (m.roas >= 2.0) pros.push(`Profitable ROAS at ${m.roas.toFixed(2)}x.`);
-                                if (m.ctr >= 1.5) pros.push(`Strong CTR (${(m.ctr).toFixed(2)}%).`);
+                                if (m.ctr >= 0.015) pros.push(`Strong CTR (${(m.ctr * 100).toFixed(2)}%).`);
                                 if (m.cpc > 0 && m.cpc < 4.0) pros.push(`CPC: ₹${m.cpc.toFixed(2)}.`);
                                 if (pros.length === 0) pros.push("Ad Set reach is stable.");
                                 return pros.map((p, i) => <li key={i}>{p}</li>);
@@ -1091,7 +1093,7 @@ export default function AdSetsPage() {
                                 const cons = [];
                                 const m = selectedAdSet.metrics;
                                 if (m.roas > 0 && m.roas < 1.0) cons.push(`ROAS of ${m.roas.toFixed(2)}x represents net loss.`);
-                                if (m.ctr > 0 && m.ctr < 0.8) cons.push(`Low CTR (${(m.ctr).toFixed(2)}%).`);
+                                if (m.ctr > 0 && m.ctr < 0.008) cons.push(`Low CTR (${(m.ctr * 100).toFixed(2)}%).`);
                                 if (cons.length === 0) cons.push("No critical budget leaks.");
                                 return cons.map((c, i) => <li key={i}>{c}</li>);
                               })()}
@@ -1135,7 +1137,7 @@ export default function AdSetsPage() {
                       <table className="min-w-full text-xs text-left divide-y divide-border">
                         <thead className="bg-slate-50/50">
                           <tr className="text-slate-400 font-bold uppercase border-b border-border select-none">
-                            <th 
+                            <th
                               onClick={() => handleAdHeaderSort("name")}
                               className="p-4 cursor-pointer hover:bg-slate-100 transition group"
                             >
@@ -1146,7 +1148,7 @@ export default function AdSetsPage() {
                                 </span>
                               </div>
                             </th>
-                            <th 
+                            <th
                               onClick={() => handleAdHeaderSort("status")}
                               className="p-4 cursor-pointer hover:bg-slate-100 transition group"
                             >
@@ -1157,7 +1159,7 @@ export default function AdSetsPage() {
                                 </span>
                               </div>
                             </th>
-                            <th 
+                            <th
                               onClick={() => handleAdHeaderSort("spend")}
                               className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
                             >
@@ -1168,7 +1170,7 @@ export default function AdSetsPage() {
                                 </span>
                               </div>
                             </th>
-                            <th 
+                            <th
                               onClick={() => handleAdHeaderSort("ctr")}
                               className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
                             >
@@ -1179,7 +1181,7 @@ export default function AdSetsPage() {
                                 </span>
                               </div>
                             </th>
-                            <th 
+                            <th
                               onClick={() => handleAdHeaderSort("roas")}
                               className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
                             >
@@ -1194,37 +1196,37 @@ export default function AdSetsPage() {
                         </thead>
                         <tbody className="divide-y divide-border font-medium text-slate-700">
                           {sortedAds.map((ad, idx) => (
-                        <tr key={idx} className="hover:bg-slate-50 transition">
-                          <td className="p-4 flex items-center gap-3">
-                            {ad.creative?.image_url ? (
-                              <img src={ad.creative.image_url} alt="" className="w-10 h-10 object-cover rounded border border-border shrink-0" />
-                            ) : (
-                              <div className="w-10 h-10 bg-slate-100 rounded border border-border flex items-center justify-center shrink-0 text-slate-400">
-                                <ImageIcon size={16} />
-                              </div>
-                            )}
-                            <div>
-                              <div className="font-bold text-slate-800">{ad.name}</div>
-                              <div className="text-[10px] text-slate-400 mt-0.5">ID: {ad.meta_ad_id}</div>
-                            </div>
-                          </td>
-                          <td className="p-4">
-                            <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${ad.status === "ACTIVE" ? "text-green-600 bg-green-50" : "text-slate-500 bg-slate-100"}`}>
-                              {ad.status}
-                            </span>
-                          </td>
-                          <td className="p-4 text-right font-semibold">{formatCurrency(ad.metrics.spend)}</td>
-                          <td className="p-4 text-right text-slate-500">{formatPercent(ad.metrics.ctr)}</td>
-                          <td className="p-4 text-right text-green-600 font-bold">{ad.metrics.roas > 0 ? `${ad.metrics.roas.toFixed(2)}x` : "—"}</td>
-                        </tr>
-                      ))}
-                      {adSetAds.length === 0 && (
-                        <tr>
-                          <td colSpan={5} className="p-8 text-center text-slate-400">No active ads in this ad set.</td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
+                            <tr key={idx} className="hover:bg-slate-50 transition">
+                              <td className="p-4 flex items-center gap-3">
+                                {ad.creative?.image_url ? (
+                                  <img src={ad.creative.image_url} alt="" className="w-10 h-10 object-cover rounded border border-border shrink-0" />
+                                ) : (
+                                  <div className="w-10 h-10 bg-slate-100 rounded border border-border flex items-center justify-center shrink-0 text-slate-400">
+                                    <ImageIcon size={16} />
+                                  </div>
+                                )}
+                                <div>
+                                  <div className="font-bold text-slate-800">{ad.name}</div>
+                                  <div className="text-[10px] text-slate-400 mt-0.5">ID: {ad.meta_ad_id}</div>
+                                </div>
+                              </td>
+                              <td className="p-4">
+                                <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${ad.status === "ACTIVE" ? "text-green-600 bg-green-50" : "text-slate-500 bg-slate-100"}`}>
+                                  {ad.status}
+                                </span>
+                              </td>
+                              <td className="p-4 text-right font-semibold">{formatCurrency(ad.metrics.spend)}</td>
+                              <td className="p-4 text-right text-slate-500">{formatPercent(ad.metrics.ctr)}</td>
+                              <td className="p-4 text-right text-green-600 font-bold">{ad.metrics.roas > 0 ? `${ad.metrics.roas.toFixed(2)}x` : "—"}</td>
+                            </tr>
+                          ))}
+                          {adSetAds.length === 0 && (
+                            <tr>
+                              <td colSpan={5} className="p-8 text-center text-slate-400">No active ads in this ad set.</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
                     );
                   })()}
                 </div>
@@ -1240,25 +1242,25 @@ export default function AdSetsPage() {
               return (
                 <div className="space-y-4">
                   <div className="flex border-b border-slate-100 gap-4 text-xs font-bold text-slate-400">
-                    <button 
+                    <button
                       onClick={() => setBreakdownView("placement")}
                       className={`pb-2 border-b-2 transition ${breakdownView === "placement" ? "border-primary text-slate-700" : "border-transparent"}`}
                     >
                       Placements Breakdown
                     </button>
-                    <button 
+                    <button
                       onClick={() => setBreakdownView("platform")}
                       className={`pb-2 border-b-2 transition ${breakdownView === "platform" ? "border-primary text-slate-700" : "border-transparent"}`}
                     >
                       Platform Breakdown
                     </button>
-                    <button 
+                    <button
                       onClick={() => setBreakdownView("demographic")}
                       className={`pb-2 border-b-2 transition ${breakdownView === "demographic" ? "border-primary text-slate-700" : "border-transparent"}`}
                     >
                       Demographics Breakdown
                     </button>
-                    <button 
+                    <button
                       onClick={() => setBreakdownView("region")}
                       className={`pb-2 border-b-2 transition ${breakdownView === "region" ? "border-primary text-slate-700" : "border-transparent"}`}
                     >
@@ -1275,7 +1277,7 @@ export default function AdSetsPage() {
                         <table className="min-w-full text-xs text-left divide-y divide-border">
                           <thead className="bg-slate-50/50">
                             <tr className="text-subtle font-bold uppercase tracking-wider border-b border-border select-none">
-                              <th 
+                              <th
                                 onClick={() => handleBreakdownHeaderSort("name")}
                                 className="p-4 cursor-pointer hover:bg-slate-100 transition group"
                               >
@@ -1286,7 +1288,7 @@ export default function AdSetsPage() {
                                   </span>
                                 </div>
                               </th>
-                              <th 
+                              <th
                                 onClick={() => handleBreakdownHeaderSort("spend")}
                                 className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
                               >
@@ -1297,7 +1299,7 @@ export default function AdSetsPage() {
                                   </span>
                                 </div>
                               </th>
-                              <th 
+                              <th
                                 onClick={() => handleBreakdownHeaderSort("ctr")}
                                 className="p-4 text-right cursor-pointer hover:bg-slate-100 transition select-none group"
                               >
@@ -1308,7 +1310,7 @@ export default function AdSetsPage() {
                                   </span>
                                 </div>
                               </th>
-                              <th 
+                              <th
                                 onClick={() => handleBreakdownHeaderSort("results")}
                                 className="p-4 text-right cursor-pointer hover:bg-slate-100 transition select-none group"
                               >
@@ -1319,7 +1321,7 @@ export default function AdSetsPage() {
                                   </span>
                                 </div>
                               </th>
-                              <th 
+                              <th
                                 onClick={() => handleBreakdownHeaderSort("roas")}
                                 className="p-4 text-right cursor-pointer hover:bg-slate-100 transition select-none group"
                               >
@@ -1347,8 +1349,8 @@ export default function AdSetsPage() {
                               </tr>
                             ) : (
                               sortedPlacements.map((p, idx) => {
-                                const friendlyName = p.platform_position 
-                                  ? p.platform_position.split("_").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ") 
+                                const friendlyName = p.platform_position
+                                  ? p.platform_position.split("_").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")
                                   : p.publisher_platform.charAt(0).toUpperCase() + p.publisher_platform.slice(1);
                                 const spendPct = selectedAdSet.metrics.spend > 0 ? (p.spend / selectedAdSet.metrics.spend) : 0;
                                 return (
@@ -1358,7 +1360,7 @@ export default function AdSetsPage() {
                                     <td className="p-4 text-right">{p.ctr.toFixed(2)}%</td>
                                     <td className="p-4 text-right">{p.results}</td>
                                     <td className="p-4 text-right text-green-600 font-bold">
-                                      {isRoas 
+                                      {isRoas
                                         ? `${p.roas.toFixed(2)}x`
                                         : (p.results > 0 ? formatCurrency(p.spend / p.results) : "—")
                                       }
@@ -1382,7 +1384,7 @@ export default function AdSetsPage() {
                         <table className="min-w-full text-xs text-left divide-y divide-border">
                           <thead className="bg-slate-50/50">
                             <tr className="text-subtle font-bold uppercase tracking-wider border-b border-border select-none">
-                              <th 
+                              <th
                                 onClick={() => handleBreakdownHeaderSort("name")}
                                 className="p-4 cursor-pointer hover:bg-slate-100 transition group"
                               >
@@ -1393,7 +1395,7 @@ export default function AdSetsPage() {
                                   </span>
                                 </div>
                               </th>
-                              <th 
+                              <th
                                 onClick={() => handleBreakdownHeaderSort("spend")}
                                 className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
                               >
@@ -1404,7 +1406,7 @@ export default function AdSetsPage() {
                                   </span>
                                 </div>
                               </th>
-                              <th 
+                              <th
                                 onClick={() => handleBreakdownHeaderSort("ctr")}
                                 className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
                               >
@@ -1415,7 +1417,7 @@ export default function AdSetsPage() {
                                   </span>
                                 </div>
                               </th>
-                              <th 
+                              <th
                                 onClick={() => handleBreakdownHeaderSort("results")}
                                 className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
                               >
@@ -1426,7 +1428,7 @@ export default function AdSetsPage() {
                                   </span>
                                 </div>
                               </th>
-                              <th 
+                              <th
                                 onClick={() => handleBreakdownHeaderSort("roas")}
                                 className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
                               >
@@ -1463,7 +1465,7 @@ export default function AdSetsPage() {
                                     <td className="p-4 text-right">{p.ctr.toFixed(2)}%</td>
                                     <td className="p-4 text-right">{p.results}</td>
                                     <td className="p-4 text-right text-green-600 font-bold">
-                                      {isRoas 
+                                      {isRoas
                                         ? `${p.roas.toFixed(2)}x`
                                         : (p.results > 0 ? formatCurrency(p.spend / p.results) : "—")
                                       }
@@ -1487,65 +1489,65 @@ export default function AdSetsPage() {
                         </div>
                         <div className="overflow-x-auto">
                           <table className="min-w-full text-xs text-left divide-y divide-border">
-                          <thead className="bg-slate-50/50">
-                            <tr className="text-subtle font-bold uppercase tracking-wider border-b border-border select-none">
-                              <th 
-                                onClick={() => handleBreakdownHeaderSort("name")}
-                                className="p-4 cursor-pointer hover:bg-slate-100 transition group"
-                              >
-                                <div className="flex items-center gap-1">
-                                  <span>Age Segment</span>
-                                  <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${breakdownSortBy === "name" ? "font-bold text-blue-600" : ""}`}>
-                                    {breakdownSortBy === "name" ? (breakdownSortOrder === "asc" ? "↑" : "↓") : "↑↓"}
-                                  </span>
-                                </div>
-                              </th>
-                              <th 
-                                onClick={() => handleBreakdownHeaderSort("spend")}
-                                className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
-                              >
-                                <div className="flex items-center justify-end gap-1">
-                                  <span>Spend Contribution</span>
-                                  <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${breakdownSortBy === "spend" ? "font-bold text-blue-600" : ""}`}>
-                                    {breakdownSortBy === "spend" ? (breakdownSortOrder === "asc" ? "↑" : "↓") : "↑↓"}
-                                  </span>
-                                </div>
-                              </th>
-                              <th 
-                                onClick={() => handleBreakdownHeaderSort("ctr")}
-                                className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
-                              >
-                                <div className="flex items-center justify-end gap-1">
-                                  <span>CTR</span>
-                                  <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${breakdownSortBy === "ctr" ? "font-bold text-blue-600" : ""}`}>
-                                    {breakdownSortBy === "ctr" ? (breakdownSortOrder === "asc" ? "↑" : "↓") : "↑↓"}
-                                  </span>
-                                </div>
-                              </th>
-                              <th 
-                                onClick={() => handleBreakdownHeaderSort("results")}
-                                className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
-                              >
-                                <div className="flex items-center justify-end gap-1">
-                                  <span>{resultLabel}</span>
-                                  <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${breakdownSortBy === "results" ? "font-bold text-blue-600" : ""}`}>
-                                    {breakdownSortBy === "results" ? (breakdownSortOrder === "asc" ? "↑" : "↓") : "↑↓"}
-                                  </span>
-                                </div>
-                              </th>
-                              <th 
-                                onClick={() => handleBreakdownHeaderSort("roas")}
-                                className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
-                              >
-                                <div className="flex items-center justify-end gap-1">
-                                  <span>{isRoas ? "ROAS" : "Cost Per Result"}</span>
-                                  <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${breakdownSortBy === "roas" ? "font-bold text-blue-600" : ""}`}>
-                                    {breakdownSortBy === "roas" ? (breakdownSortOrder === "asc" ? "↑" : "↓") : "↑↓"}
-                                  </span>
-                                </div>
-                              </th>
-                            </tr>
-                          </thead>
+                            <thead className="bg-slate-50/50">
+                              <tr className="text-subtle font-bold uppercase tracking-wider border-b border-border select-none">
+                                <th
+                                  onClick={() => handleBreakdownHeaderSort("name")}
+                                  className="p-4 cursor-pointer hover:bg-slate-100 transition group"
+                                >
+                                  <div className="flex items-center gap-1">
+                                    <span>Age Segment</span>
+                                    <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${breakdownSortBy === "name" ? "font-bold text-blue-600" : ""}`}>
+                                      {breakdownSortBy === "name" ? (breakdownSortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                                    </span>
+                                  </div>
+                                </th>
+                                <th
+                                  onClick={() => handleBreakdownHeaderSort("spend")}
+                                  className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
+                                >
+                                  <div className="flex items-center justify-end gap-1">
+                                    <span>Spend Contribution</span>
+                                    <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${breakdownSortBy === "spend" ? "font-bold text-blue-600" : ""}`}>
+                                      {breakdownSortBy === "spend" ? (breakdownSortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                                    </span>
+                                  </div>
+                                </th>
+                                <th
+                                  onClick={() => handleBreakdownHeaderSort("ctr")}
+                                  className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
+                                >
+                                  <div className="flex items-center justify-end gap-1">
+                                    <span>CTR</span>
+                                    <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${breakdownSortBy === "ctr" ? "font-bold text-blue-600" : ""}`}>
+                                      {breakdownSortBy === "ctr" ? (breakdownSortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                                    </span>
+                                  </div>
+                                </th>
+                                <th
+                                  onClick={() => handleBreakdownHeaderSort("results")}
+                                  className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
+                                >
+                                  <div className="flex items-center justify-end gap-1">
+                                    <span>{resultLabel}</span>
+                                    <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${breakdownSortBy === "results" ? "font-bold text-blue-600" : ""}`}>
+                                      {breakdownSortBy === "results" ? (breakdownSortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                                    </span>
+                                  </div>
+                                </th>
+                                <th
+                                  onClick={() => handleBreakdownHeaderSort("roas")}
+                                  className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
+                                >
+                                  <div className="flex items-center justify-end gap-1">
+                                    <span>{isRoas ? "ROAS" : "Cost Per Result"}</span>
+                                    <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${breakdownSortBy === "roas" ? "font-bold text-blue-600" : ""}`}>
+                                      {breakdownSortBy === "roas" ? (breakdownSortOrder === "asc" ? "↑" : "↓") : "↑↓"}
+                                    </span>
+                                  </div>
+                                </th>
+                              </tr>
+                            </thead>
                             <tbody className="divide-y divide-border font-medium text-slate-700">
                               {loadingBreakdowns ? (
                                 <tr>
@@ -1569,7 +1571,7 @@ export default function AdSetsPage() {
                                       <td className="p-4 text-right">{d.ctr.toFixed(2)}%</td>
                                       <td className="p-4 text-right">{d.results}</td>
                                       <td className="p-4 text-right text-green-600 font-bold">
-                                        {isRoas 
+                                        {isRoas
                                           ? `${d.roas.toFixed(2)}x`
                                           : (d.results > 0 ? formatCurrency(d.spend / d.results) : "—")
                                         }
@@ -1592,7 +1594,7 @@ export default function AdSetsPage() {
                           <table className="min-w-full text-xs text-left divide-y divide-border">
                             <thead className="bg-slate-50/50">
                               <tr className="text-subtle font-bold uppercase tracking-wider border-b border-border select-none">
-                                <th 
+                                <th
                                   onClick={() => handleBreakdownHeaderSort("name")}
                                   className="p-4 cursor-pointer hover:bg-slate-100 transition group"
                                 >
@@ -1603,7 +1605,7 @@ export default function AdSetsPage() {
                                     </span>
                                   </div>
                                 </th>
-                                <th 
+                                <th
                                   onClick={() => handleBreakdownHeaderSort("spend")}
                                   className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
                                 >
@@ -1614,7 +1616,7 @@ export default function AdSetsPage() {
                                     </span>
                                   </div>
                                 </th>
-                                <th 
+                                <th
                                   onClick={() => handleBreakdownHeaderSort("ctr")}
                                   className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
                                 >
@@ -1625,7 +1627,7 @@ export default function AdSetsPage() {
                                     </span>
                                   </div>
                                 </th>
-                                <th 
+                                <th
                                   onClick={() => handleBreakdownHeaderSort("results")}
                                   className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
                                 >
@@ -1636,7 +1638,7 @@ export default function AdSetsPage() {
                                     </span>
                                   </div>
                                 </th>
-                                <th 
+                                <th
                                   onClick={() => handleBreakdownHeaderSort("roas")}
                                   className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
                                 >
@@ -1672,7 +1674,7 @@ export default function AdSetsPage() {
                                       <td className="p-4 text-right">{d.ctr.toFixed(2)}%</td>
                                       <td className="p-4 text-right">{d.results}</td>
                                       <td className="p-4 text-right text-green-600 font-bold">
-                                        {isRoas 
+                                        {isRoas
                                           ? `${d.roas.toFixed(2)}x`
                                           : (d.results > 0 ? formatCurrency(d.spend / d.results) : "—")
                                         }
@@ -1730,7 +1732,7 @@ export default function AdSetsPage() {
                                     <td className="p-4 text-right">{r.ctr.toFixed(2)}%</td>
                                     <td className="p-4 text-right">{r.results}</td>
                                     <td className="p-4 text-right text-green-600 font-bold">
-                                      {isRoas 
+                                      {isRoas
                                         ? `${r.roas.toFixed(2)}x`
                                         : (r.results > 0 ? formatCurrency(r.spend / r.results) : "—")
                                       }
@@ -1755,15 +1757,14 @@ export default function AdSetsPage() {
                     <Sparkles size={16} className="text-blue-600 animate-pulse" />
                     <h3 className="text-base font-bold text-slate-800">AI Optimization Diagnostics</h3>
                   </div>
-                  
+
                   {recs.filter(r => r.entity_id === selectedAdSet.id || r.meta_entity_id === selectedAdSet.meta_adset_id).length > 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {recs.filter(r => r.entity_id === selectedAdSet.id || r.meta_entity_id === selectedAdSet.meta_adset_id).map((r, idx) => (
                         <div key={idx} className="border border-border rounded-xl p-5 bg-slate-50/50 hover:bg-slate-50 transition space-y-3">
                           <div className="flex justify-between items-start">
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                              r.impact_level === "CRITICAL" ? "text-red-700 bg-red-50 border border-red-200" : "text-amber-700 bg-amber-50 border border-amber-200"
-                            }`}>
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${r.impact_level === "CRITICAL" ? "text-red-700 bg-red-50 border border-red-200" : "text-amber-700 bg-amber-50 border border-amber-200"
+                              }`}>
                               {r.impact_level} Suggestions
                             </span>
                             <span className="text-[10px] font-semibold text-slate-400">{r.type}</span>
@@ -1845,7 +1846,9 @@ export default function AdSetsPage() {
                 <option value="spend">Spend</option>
                 <option value="impressions">Impressions</option>
                 <option value="clicks">Clicks</option>
-                <option value="purchases">Conversions</option>
+                <option value="purchases">
+                  {adsets.some(as => as.optimization_goal?.toUpperCase().includes("CONVERSATION")) ? "Conversations" : "Conversions"}
+                </option>
                 <option value="ctr">CTR</option>
                 <option value="cpc">CPC</option>
                 <option value="roas">ROAS</option>
@@ -1864,7 +1867,7 @@ export default function AdSetsPage() {
               <table className="min-w-full text-xs text-left divide-y divide-border">
                 <thead className="bg-slate-50/50">
                   <tr className="text-subtle font-bold uppercase tracking-wider border-b border-border select-none">
-                    <th 
+                    <th
                       onClick={() => handleAdSetsHeaderSort("name")}
                       className="p-4 cursor-pointer hover:bg-slate-100 transition group"
                     >
@@ -1876,7 +1879,7 @@ export default function AdSetsPage() {
                       </div>
                     </th>
                     <th className="p-4">Campaign</th>
-                    <th 
+                    <th
                       onClick={() => handleAdSetsHeaderSort("spend")}
                       className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
                     >
@@ -1887,7 +1890,7 @@ export default function AdSetsPage() {
                         </span>
                       </div>
                     </th>
-                    <th 
+                    <th
                       onClick={() => handleAdSetsHeaderSort("impressions")}
                       className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
                     >
@@ -1898,7 +1901,7 @@ export default function AdSetsPage() {
                         </span>
                       </div>
                     </th>
-                    <th 
+                    <th
                       onClick={() => handleAdSetsHeaderSort("clicks")}
                       className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
                     >
@@ -1909,18 +1912,18 @@ export default function AdSetsPage() {
                         </span>
                       </div>
                     </th>
-                    <th 
+                    <th
                       onClick={() => handleAdSetsHeaderSort("purchases")}
                       className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
                     >
                       <div className="flex items-center justify-end gap-1">
-                        <span>Conversions</span>
-                        <span className={`text-[10px] text-slate-400 group-hover:text-slate-600 transition ${sortBy === "purchases" ? "font-bold text-blue-600" : ""}`}>
+                        <span>{filteredAndSortedAdSets.some(as => as.optimization_goal?.toUpperCase().includes("CONVERSATION")) ? "Conversations" : "Conversions"}</span>
+                        <span className={`text-[10px] text-slate-400 group-hover:text-slate-650 transition ${sortBy === "purchases" ? "font-bold text-blue-600" : ""}`}>
                           {sortBy === "purchases" ? (sortOrder === "asc" ? "↑" : "↓") : "↑↓"}
                         </span>
                       </div>
                     </th>
-                    <th 
+                    <th
                       onClick={() => handleAdSetsHeaderSort("ctr")}
                       className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
                     >
@@ -1931,7 +1934,7 @@ export default function AdSetsPage() {
                         </span>
                       </div>
                     </th>
-                    <th 
+                    <th
                       onClick={() => handleAdSetsHeaderSort("cpc")}
                       className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
                     >
@@ -1942,7 +1945,7 @@ export default function AdSetsPage() {
                         </span>
                       </div>
                     </th>
-                    <th 
+                    <th
                       onClick={() => handleAdSetsHeaderSort("roas")}
                       className="p-4 text-right cursor-pointer hover:bg-slate-100 transition group"
                     >
@@ -1957,9 +1960,9 @@ export default function AdSetsPage() {
                 </thead>
                 <tbody className="divide-y divide-border font-medium text-slate-700">
                   {filteredAndSortedAdSets.map((as, idx) => (
-                    <tr 
-                      key={idx} 
-                      onClick={() => handleSelectAdSet(as)} 
+                    <tr
+                      key={idx}
+                      onClick={() => handleSelectAdSet(as)}
                       className="hover:bg-slate-50 transition cursor-pointer"
                     >
                       <td className="p-4">
@@ -1990,8 +1993,11 @@ export default function AdSetsPage() {
                         {renderTrend(as.metrics.clicks_trend)}
                       </td>
                       <td className="p-4 text-right">
-                        {formatNumber(as.metrics.purchases)}
-                        {renderTrend(as.metrics.purchases_trend)}
+                        {(() => {
+                          const isConv = as.optimization_goal?.toUpperCase().includes("CONVERSATION");
+                          return formatNumber(isConv ? (as.metrics.conversations || 0) : as.metrics.purchases);
+                        })()}
+                        {renderTrend(as.optimization_goal?.toUpperCase().includes("CONVERSATION") ? 0 : as.metrics.purchases_trend)}
                       </td>
                       <td className="p-4 text-right">
                         {formatPercent(as.metrics.ctr)}

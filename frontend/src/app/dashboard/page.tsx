@@ -104,6 +104,9 @@ export default function OverviewPage() {
   }, []);
 
   const getSubscriptionLimit = () => {
+    if (selectedAccount?.historical_intelligence_status === "active") {
+      return 99999;
+    }
     let limit = 7; // default trial
     if (subscription) {
       if (subscription.status === "trialing") {
