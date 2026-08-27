@@ -936,7 +936,7 @@ async def get_account_health_score(
     else:
         positives.append("Healthy outbound CTR above 1%")
 
-    if rates["lpv_rate"] < 60.0:
+    if rates["lpv_rate"] < 0.60:
         funnel_score -= 20
         negatives.append("Landing Page View rate below 60% compared to link clicks")
         risks.append("Slow loading landing page or high bounce rate")
