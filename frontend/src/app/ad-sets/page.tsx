@@ -986,7 +986,7 @@ export default function AdSetsPage() {
                                   const pros = [];
                                   const m = selectedAdSet.metrics;
                                   if (m.roas >= 2.0) pros.push(`Profitable ROAS at ${m.roas.toFixed(2)}x.`);
-                                  if (m.ctr >= 0.015) pros.push(`Strong CTR (${(m.ctr * 100).toFixed(2)}%).`);
+                                  if (m.ctr >= 1.5) pros.push(`Strong CTR (${m.ctr.toFixed(2)}%).`);
                                   if (m.cpc > 0 && m.cpc < 4.0) pros.push(`CPC: ₹${m.cpc.toFixed(2)}.`);
                                   if (m.purchases >= 5) pros.push(`${m.purchases} total purchases.`);
                                   if (pros.length === 0) pros.push("Ad Set reach is stable.");
@@ -1003,7 +1003,7 @@ export default function AdSetsPage() {
                                   const cons = [];
                                   const m = selectedAdSet.metrics;
                                   if (m.roas > 0 && m.roas < 1.0) cons.push(`ROAS of ${m.roas.toFixed(2)}x represents net loss.`);
-                                  if (m.ctr > 0 && m.ctr < 0.008) cons.push(`Low CTR (${(m.ctr * 100).toFixed(2)}%).`);
+                                  if (m.ctr > 0 && m.ctr < 0.8) cons.push(`Low CTR (${m.ctr.toFixed(2)}%).`);
                                   if (m.cpc > 10.0) cons.push(`High CPC (₹${m.cpc.toFixed(2)}).`);
                                   if (m.purchases === 0 && m.spend > 400) cons.push(`Zero conversions despite spending ₹${m.spend.toFixed(2)}.`);
                                   if (cons.length === 0) cons.push("No critical budget leaks.");
@@ -1077,7 +1077,7 @@ export default function AdSetsPage() {
                                 const pros = [];
                                 const m = selectedAdSet.metrics;
                                 if (m.roas >= 2.0) pros.push(`Profitable ROAS at ${m.roas.toFixed(2)}x.`);
-                                if (m.ctr >= 0.015) pros.push(`Strong CTR (${(m.ctr * 100).toFixed(2)}%).`);
+                                if (m.ctr >= 1.5) pros.push(`Strong CTR (${m.ctr.toFixed(2)}%).`);
                                 if (m.cpc > 0 && m.cpc < 4.0) pros.push(`CPC: ₹${m.cpc.toFixed(2)}.`);
                                 if (pros.length === 0) pros.push("Ad Set reach is stable.");
                                 return pros.map((p, i) => <li key={i}>{p}</li>);
@@ -1093,7 +1093,7 @@ export default function AdSetsPage() {
                                 const cons = [];
                                 const m = selectedAdSet.metrics;
                                 if (m.roas > 0 && m.roas < 1.0) cons.push(`ROAS of ${m.roas.toFixed(2)}x represents net loss.`);
-                                if (m.ctr > 0 && m.ctr < 0.008) cons.push(`Low CTR (${(m.ctr * 100).toFixed(2)}%).`);
+                                if (m.ctr > 0 && m.ctr < 0.8) cons.push(`Low CTR (${m.ctr.toFixed(2)}%).`);
                                 if (cons.length === 0) cons.push("No critical budget leaks.");
                                 return cons.map((c, i) => <li key={i}>{c}</li>);
                               })()}
