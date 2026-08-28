@@ -65,6 +65,13 @@ class Settings(BaseSettings):
     SYNC_COOLDOWN_MINUTES: int = Field(default=15, description="Minimum minutes between manual syncs")
     INITIAL_SYNC_DAYS: int = Field(default=365, description="Days of historical data for initial sync")
 
+    # SMTP / Brevo Mail Integration
+    SMTP_HOST: Optional[str] = Field(default=None, description="SMTP server host")
+    SMTP_PORT: int = Field(default=587, description="SMTP server port")
+    SMTP_USER: Optional[str] = Field(default=None, description="SMTP server user username")
+    SMTP_PASSWORD: Optional[str] = Field(default=None, description="SMTP server password")
+    SMTP_FROM: str = Field(default="noreply@digitalgrowthstudio.in", description="SMTP sender address")
+
     @property
     def cors_origins(self) -> list[str]:
         """Parse comma-separated CORS origins into a list."""
