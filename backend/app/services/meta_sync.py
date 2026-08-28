@@ -650,7 +650,7 @@ class MetaSyncService:
         api_ver = settings.META_API_VERSION
         account_id = ad_acc.meta_account_id
 
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=60.0) as client:
             # 1. Fetch campaigns
             camp_url = f"https://graph.facebook.com/{api_ver}/{account_id}/campaigns?fields=id,name,objective,status,buying_type,daily_budget,lifetime_budget&limit=250"
             r = await client.get(camp_url, headers=headers)

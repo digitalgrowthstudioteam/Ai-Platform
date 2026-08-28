@@ -146,11 +146,15 @@ async def trigger_all_active_syncs_async():
                 
                 should_sync = True
                 if conn and conn.last_sync_at:
-                    now = datetime.now(timezone.utc)
-                    last_sync = conn.last_sync_at.replace(tzinfo=timezone.utc) if conn.last_sync_at.tzinfo is None else conn.last_sync_at
-                    if now - last_sync < timedelta(hours=interval_hours):
-                        should_sync = False
-                        logger.info("sync_skipped_within_interval", ad_account_id=acc.meta_account_id, interval_hours=interval_hours)
+                    if conn.last_sync_status == "failed":
+                        should_sync = True
+                        logger.info("sync_failed_previously_retrying", ad_account_id=acc.meta_account_id)
+                    else:
+                        now = datetime.now(timezone.utc)
+                        last_sync = conn.last_sync_at.replace(tzinfo=timezone.utc) if conn.last_sync_at.tzinfo is None else conn.last_sync_at
+                        if now - last_sync < timedelta(hours=interval_hours):
+                            should_sync = False
+                            logger.info("sync_skipped_within_interval", ad_account_id=acc.meta_account_id, interval_hours=interval_hours)
                 
                 if should_sync:
                     logger.info("triggering_overdue_sync", ad_account_id=acc.meta_account_id, interval_hours=interval_hours)
