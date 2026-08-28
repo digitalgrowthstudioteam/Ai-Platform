@@ -437,6 +437,22 @@ async def verify_billing_payment(
                 db.add(txn)
                 
                 await db.commit()
+
+                # Send payment confirmation email
+                try:
+                    from app.services.email_service import EmailService
+                    await EmailService.send_template_email(
+                        to_email=user.email,
+                        trigger_key="payment_confirmation",
+                        variables={
+                            "order_id": req.razorpay_payment_id or req.razorpay_order_id,
+                            "item_name": f"{credits_to_grant} AI Credits Pack"
+                        },
+                        db=db
+                    )
+                except Exception as mail_err:
+                    logger.error("credits_payment_email_dispatch_failed", error=str(mail_err), user_id=user.id)
+
                 logger.info("credits_pack_purchased_successfully", user_id=user.id, addon_id=req.addon_id, credits=credits_to_grant)
                 return {"status": "success", "message": f"Successfully added {credits_to_grant} AI credits to your account."}
             
@@ -471,6 +487,23 @@ async def verify_billing_payment(
                     db.add(addon)
                     
                 await db.commit()
+
+                # Send payment confirmation email
+                try:
+                    from app.services.email_service import EmailService
+                    item_desc = f"{req.addon_id.replace('_', ' ').title()} Add-on"
+                    await EmailService.send_template_email(
+                        to_email=user.email,
+                        trigger_key="payment_confirmation",
+                        variables={
+                            "order_id": req.razorpay_payment_id or req.razorpay_order_id,
+                            "item_name": item_desc
+                        },
+                        db=db
+                    )
+                except Exception as mail_err:
+                    logger.error("addon_payment_email_dispatch_failed", error=str(mail_err), user_id=user.id)
+
                 logger.info("addon_registered_successfully", user_id=user.id, addon_id=req.addon_id, quantity=req.quantity)
                 return {"status": "success", "message": f"Successfully activated add-on: {req.addon_id}."}
             
@@ -501,6 +534,21 @@ async def verify_billing_payment(
             )
             db.add(notif)
             await db.commit()
+
+            # Send payment confirmation email
+            try:
+                from app.services.email_service import EmailService
+                await EmailService.send_template_email(
+                    to_email=user.email,
+                    trigger_key="payment_confirmation",
+                    variables={
+                        "order_id": req.razorpay_payment_id or req.razorpay_order_id,
+                        "item_name": f"{req.plan_id.upper()} Subscription Plan"
+                    },
+                    db=db
+                )
+            except Exception as mail_err:
+                logger.error("plan_payment_email_dispatch_failed", error=str(mail_err), user_id=user.id)
  
             logger.info("subscription_plan_activated", user_id=user.id, plan=req.plan_id)
             return {"status": "success", "message": f"Successfully upgraded plan to {req.plan_id}."}

@@ -95,6 +95,28 @@ class MetaSyncService:
             await db.commit()
             logger.info("meta_sync_success", ad_account_id=ad_acc.meta_account_id)
 
+            # Send sync success email
+            try:
+                from app.models.user import User
+                stmt_user = select(User).where(User.id == conn.user_id)
+                res_user = await db.execute(stmt_user)
+                sync_user = res_user.scalar_one_or_none()
+                if sync_user and sync_user.email:
+                    from app.services.email_service import EmailService
+                    from app.config import get_settings
+                    settings = get_settings()
+                    await EmailService.send_template_email(
+                        to_email=sync_user.email,
+                        trigger_key="sync_completed",
+                        variables={
+                            "account_name": ad_acc.account_name or ad_acc.meta_account_id,
+                            "dashboard_link": f"{settings.FRONTEND_URL}/dashboard"
+                        },
+                        db=db
+                    )
+            except Exception as mail_err:
+                logger.error("sync_completed_email_dispatch_failed", error=str(mail_err), user_id=conn.user_id)
+
         except Exception as e:
             # Revert to error status on exception
             conn.last_sync_status = "failed"

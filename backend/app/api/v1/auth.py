@@ -69,6 +69,22 @@ async def schedule_account_deletion(
     user.status = "deletion_scheduled"
     user.deletion_scheduled_at = datetime.utcnow()
     await db.commit()
+
+    # Send account deletion scheduled email
+    try:
+        from app.services.email_service import EmailService
+        from app.config import get_settings
+        settings = get_settings()
+        await EmailService.send_template_email(
+            to_email=user.email,
+            trigger_key="account_deleted",
+            variables={
+                "cancel_link": f"{settings.FRONTEND_URL}/settings/account"
+            },
+            db=db
+        )
+    except Exception as mail_err:
+        logger.error("account_deletion_email_dispatch_failed", error=str(mail_err), user_id=user.id)
     
     logger.info("account_deletion_scheduled", user_id=user.id)
     return {"status": "success", "message": "Account scheduled for deletion successfully."}

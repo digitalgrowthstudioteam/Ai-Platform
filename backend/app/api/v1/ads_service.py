@@ -545,6 +545,23 @@ async def public_verify_quotation_payment(
     await grant_starter_plan_bonus(user, db, days=30)
     
     await db.commit()
+
+    # Send payment confirmation email
+    try:
+        from app.services.email_service import EmailService
+        item_desc = "Meta Ads Service Pack" if not is_promo else "Promotional Ad Management Offer"
+        await EmailService.send_template_email(
+            to_email=user.email,
+            trigger_key="payment_confirmation",
+            variables={
+                "order_id": req.razorpay_payment_id or req.razorpay_order_id,
+                "item_name": item_desc
+            },
+            db=db
+        )
+    except Exception as mail_err:
+        logger.error("quotation_payment_email_dispatch_failed", error=str(mail_err), user_id=user.id)
+
     await db.refresh(pack)
     
     return {
@@ -1029,6 +1046,23 @@ async def verify_service_payment(
     await grant_starter_plan_bonus(user, db, days=30)
 
     await db.commit()
+
+    # Send payment confirmation email
+    try:
+        from app.services.email_service import EmailService
+        item_desc = "Meta Ads Service Pack" if not is_promo else "Promotional Ad Management Offer"
+        await EmailService.send_template_email(
+            to_email=user.email,
+            trigger_key="payment_confirmation",
+            variables={
+                "order_id": req.razorpay_payment_id or req.razorpay_order_id,
+                "item_name": item_desc
+            },
+            db=db
+        )
+    except Exception as mail_err:
+        logger.error("request_payment_email_dispatch_failed", error=str(mail_err), user_id=user.id)
+
     await db.refresh(pack)
 
     return {

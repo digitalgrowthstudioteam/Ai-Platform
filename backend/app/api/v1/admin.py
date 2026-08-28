@@ -1129,6 +1129,25 @@ async def admin_raise_quotation(
     db.add(quote)
     await db.commit()
 
+    # Send quotation created email
+    try:
+        from app.services.email_service import EmailService
+        from app.config import get_settings
+        settings = get_settings()
+        formatted_amount = f"₹{quote.final_total / 100:.2f}"
+        await EmailService.send_template_email(
+            to_email=target_user.email,
+            trigger_key="quotation_created",
+            variables={
+                "quote_id": str(quote.id),
+                "amount": formatted_amount,
+                "quote_link": f"{settings.FRONTEND_URL}/pay-quotation/{str(quote.id)}"
+            },
+            db=db
+        )
+    except Exception as mail_err:
+        logger.error("quotation_created_email_dispatch_failed", error=str(mail_err), user_id=target_user_id)
+
     logger.info("admin_quotation_raised", user_id=target_user_id, quote_id=quote.id, total=final_total_paise)
     return {
         "status": "success",
