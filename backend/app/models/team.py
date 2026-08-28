@@ -35,6 +35,16 @@ class TeamMember(BaseModel):
         nullable=False,
         default="pending",  # active, pending
     )
+    allowed_tabs: Mapped[str] = mapped_column(
+        String(1000),
+        nullable=True,
+        default="/dashboard,/briefs/daily,/briefs/weekly,/campaigns,/ad-sets,/ads",
+    )
+    allowed_ad_accounts: Mapped[str] = mapped_column(
+        String(1000),
+        nullable=True,
+        default="",
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

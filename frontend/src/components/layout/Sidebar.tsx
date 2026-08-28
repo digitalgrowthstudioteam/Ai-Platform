@@ -158,6 +158,17 @@ export default function Sidebar() {
       items = items.filter((item) => !item.label.includes("Get Ads"));
     }
 
+    // Filter by allowed_tabs for team members
+    if (profile?.is_team_member && profile?.allowed_tabs) {
+      const allowed = profile.allowed_tabs;
+      items = items.filter((item) => {
+        if (item.href.startsWith("/settings") || item.href === "/help-support" || item.href === "#assistant") {
+          return true;
+        }
+        return allowed.includes(item.href);
+      });
+    }
+
     if (section.label === "SETTINGS" && isAdmin) {
       // Add Super Admin menu item if not already present
       const hasAdminItem = items.some((item) => item.href === "/settings/admin");

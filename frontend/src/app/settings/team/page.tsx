@@ -16,6 +16,16 @@ export default function TeamPage() {
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [role, setRole] = useState("member");
+  const [allowedTabs, setAllowedTabs] = useState<string[]>([
+    "/dashboard",
+    "/briefs/daily",
+    "/briefs/weekly",
+    "/campaigns",
+    "/ad-sets",
+    "/ads"
+  ]);
+  const [allowedAdAccounts, setAllowedAdAccounts] = useState<string[]>([]);
+  const [adAccountsList, setAdAccountsList] = useState<any[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -27,12 +37,14 @@ export default function TeamPage() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [membersData, subData] = await Promise.all([
+      const [membersData, subData, accountsData] = await Promise.all([
         api.getTeamMembers(),
         api.getSubscription(),
+        api.getMetaAccounts().catch(() => []),
       ]);
       setMembers(membersData);
       setSubscription(subData);
+      setAdAccountsList(accountsData.filter(a => a.is_connected));
     } catch (e) {
       console.error("Failed to load team data:", e);
     } finally {
@@ -53,10 +65,19 @@ export default function TeamPage() {
     try {
       setActionLoading("invite");
       setNotification(null);
-      await api.inviteTeamMember(email, name || undefined, role);
+      await api.inviteTeamMember(email, name || undefined, role, allowedTabs, allowedAdAccounts);
       setEmail("");
       setName("");
       setRole("member");
+      setAllowedAdAccounts([]);
+      setAllowedTabs([
+        "/dashboard",
+        "/briefs/daily",
+        "/briefs/weekly",
+        "/campaigns",
+        "/ad-sets",
+        "/ads"
+      ]);
       setNotification({
         type: "success",
         message: `Successfully invited ${email} to the team!`,
@@ -296,6 +317,89 @@ export default function TeamPage() {
                       <option value="viewer">Viewer (Read-Only)</option>
                       <option value="admin">Administrator</option>
                     </select>
+                  </div>
+
+                  {/* Toggles for allowed pages/tabs */}
+                  <div className="space-y-2">
+                    <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                      Page Access Restrictions
+                    </label>
+                    <p className="text-[10px] text-slate-400 leading-normal mb-2">
+                      Toggle pages this member is permitted to access. Default is Campaigns and Dashboard access only.
+                    </p>
+                    <div className="grid grid-cols-2 gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                      {[
+                        { label: "Dashboard", href: "/dashboard" },
+                        { label: "Daily Brief", href: "/briefs/daily" },
+                        { label: "Weekly Brief", href: "/briefs/weekly" },
+                        { label: "Campaigns", href: "/campaigns" },
+                        { label: "Adsets", href: "/ad-sets" },
+                        { label: "Ads", href: "/ads" },
+                        { label: "Recommendations", href: "/recommendations" },
+                        { label: "Decision Center", href: "/insights" },
+                        { label: "Creative Intelligence", href: "/creative-analyzer" },
+                        { label: "AI Optimization", href: "/ai-optimization" },
+                      ].map((item) => {
+                        const isChecked = allowedTabs.includes(item.href);
+                        return (
+                          <label key={item.href} className="flex items-center gap-2 p-1.5 hover:bg-white rounded-lg transition cursor-pointer text-[11px] text-slate-700 font-semibold select-none">
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setAllowedTabs([...allowedTabs, item.href]);
+                                } else {
+                                  setAllowedTabs(allowedTabs.filter(t => t !== item.href));
+                                }
+                              }}
+                              className="rounded text-blue-600 focus:ring-blue-500"
+                              style={{ accentColor: primaryColor }}
+                            />
+                            <span className="truncate">{item.label}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Toggles for ad accounts */}
+                  <div className="space-y-2">
+                    <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                      Meta Ad Account Access
+                    </label>
+                    <p className="text-[10px] text-slate-400 leading-normal mb-2">
+                      Grant access to specific ad accounts. Default is no access.
+                    </p>
+                    {adAccountsList.length === 0 ? (
+                      <p className="text-[10px] text-slate-400 italic p-2 bg-slate-50 rounded-lg border border-slate-100 text-center">
+                        No connected Meta Ad Accounts found.
+                      </p>
+                    ) : (
+                      <div className="max-h-36 overflow-y-auto space-y-1.5 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                        {adAccountsList.map((acc) => {
+                          const isChecked = allowedAdAccounts.includes(acc.id);
+                          return (
+                            <label key={acc.id} className="flex items-center gap-2 p-1.5 hover:bg-white rounded-lg transition cursor-pointer text-[11px] text-slate-700 font-semibold select-none">
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setAllowedAdAccounts([...allowedAdAccounts, acc.id]);
+                                  } else {
+                                    setAllowedAdAccounts(allowedAdAccounts.filter(id => id !== acc.id));
+                                  }
+                                }}
+                                className="rounded text-blue-600 focus:ring-blue-500"
+                                style={{ accentColor: primaryColor }}
+                              />
+                              <span className="truncate">{acc.name}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
 
                   <div className="pt-2">

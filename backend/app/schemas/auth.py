@@ -13,3 +13,6 @@ class UserMeResponse(BaseModel):
     picture: Optional[str] = None
     status: Optional[str] = None
     deletion_scheduled_at: Optional[str] = None
+    is_team_member: bool = False
+    allowed_tabs: Optional[list[str]] = None
+    allowed_ad_accounts: Optional[list[str]] = None

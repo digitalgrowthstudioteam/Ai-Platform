@@ -17,6 +17,7 @@ interface DashboardLayoutProps {
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [sub, setSub] = useState<any>(null);
   const [userStatus, setUserStatus] = useState<string>("active");
+  const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const pathname = usePathname();
   const router = useRouter();
@@ -29,6 +30,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       ]);
       setSub(subRes);
       setUserStatus(meRes.status);
+      setProfile(meRes);
     } catch (err) {
       console.error("Failed to fetch subscription or user details for layout:", err);
     } finally {
@@ -65,6 +67,21 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
   // If trial is expired and they are NOT on an unlocked path, and they are NOT an admin, show lock screen
   const shouldShowLockScreen = isTrialExpired && !isUnlockedPath && !isAdmin;
+
+  const isAllowedPath = (() => {
+    if (!profile?.is_team_member) return true;
+    
+    if (
+      pathname.startsWith("/settings") || 
+      pathname === "/help-support" || 
+      pathname === "/login"
+    ) {
+      return true;
+    }
+    
+    const allowed = profile.allowed_tabs || ["/dashboard", "/briefs/daily", "/briefs/weekly", "/campaigns", "/ad-sets", "/ads"];
+    return allowed.some((p: string) => pathname === p || pathname.startsWith(p + "/"));
+  })();
 
   return (
     <div className="dashboard-layout">
@@ -120,6 +137,33 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                     className="w-full py-3.5 bg-slate-950 hover:bg-slate-850 border border-slate-800 text-slate-300 font-bold text-sm rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer"
                   >
                     Log Out
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : !isAllowedPath ? (
+            <div className="absolute inset-0 bg-slate-950/95 flex items-center justify-center p-6 z-50 animate-fade-in">
+              <div className="bg-slate-900 border border-amber-500/30 rounded-3xl p-8 max-w-md w-full text-center space-y-6 shadow-2xl relative overflow-hidden">
+                <div className="absolute -top-12 -left-12 w-40 h-40 bg-amber-600/10 rounded-full blur-2xl pointer-events-none" />
+                <div className="absolute -bottom-12 -right-12 w-40 h-40 bg-amber-900/10 rounded-full blur-2xl pointer-events-none" />
+                
+                <div className="mx-auto w-16 h-16 bg-amber-500/10 text-amber-400 border border-amber-500/30 rounded-2xl flex items-center justify-center shadow-lg shadow-amber-500/5">
+                  <Lock size={32} className="text-amber-500 animate-pulse" />
+                </div>
+                
+                <div className="space-y-2">
+                  <h2 className="text-2xl font-black text-white tracking-tight">Permission Required</h2>
+                  <p className="text-amber-200/70 text-sm leading-relaxed">
+                    You do not have administrative permission to view this section of the workspace. Please ask the owner to grant access.
+                  </p>
+                </div>
+
+                <div className="pt-4 border-t border-slate-800">
+                  <button
+                    onClick={() => router.push("/dashboard")}
+                    className="w-full py-3.5 bg-slate-950 hover:bg-slate-850 border border-slate-800 text-slate-300 font-bold text-sm rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer animate-pulse"
+                  >
+                    Go to Workspace Dashboard
                   </button>
                 </div>
               </div>

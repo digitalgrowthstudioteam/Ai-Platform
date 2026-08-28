@@ -27,6 +27,8 @@ class TeamMemberInviteRequest(BaseModel):
     email: EmailStr
     name: Optional[str] = None
     role: str = "member"  # admin, member, viewer
+    allowed_tabs: Optional[List[str]] = None
+    allowed_ad_accounts: Optional[List[str]] = None
 
 
 class TeamMemberResponse(BaseModel):
@@ -35,6 +37,8 @@ class TeamMemberResponse(BaseModel):
     name: Optional[str] = None
     role: str
     status: str
+    allowed_tabs: Optional[List[str]] = None
+    allowed_ad_accounts: Optional[List[str]] = None
     created_at: datetime
 
 
@@ -61,7 +65,22 @@ async def list_team_members(
     stmt = select(TeamMember).where(TeamMember.user_id == workspace_owner_id).order_by(TeamMember.created_at.desc())
     res = await db.execute(stmt)
     members = res.scalars().all()
-    return members
+    
+    resp = []
+    for m in members:
+        tabs_list = m.allowed_tabs.split(",") if m.allowed_tabs else ["/dashboard", "/briefs/daily", "/briefs/weekly", "/campaigns", "/ad-sets", "/ads"]
+        accounts_list = m.allowed_ad_accounts.split(",") if m.allowed_ad_accounts else []
+        resp.append(TeamMemberResponse(
+            id=m.id,
+            email=m.email,
+            name=m.name,
+            role=m.role,
+            status=m.status,
+            allowed_tabs=tabs_list,
+            allowed_ad_accounts=accounts_list,
+            created_at=m.created_at
+        ))
+    return resp
 
 
 @router.post("/invite", response_model=TeamMemberResponse, summary="Invite a team member")
@@ -111,12 +130,16 @@ async def invite_team_member(
         )
 
     # 4. Create team member
+    allowed_str = ",".join(req.allowed_tabs) if req.allowed_tabs is not None else "/dashboard,/briefs/daily,/briefs/weekly,/campaigns,/ad-sets,/ads"
+    allowed_accounts_str = ",".join(req.allowed_ad_accounts) if req.allowed_ad_accounts is not None else ""
     member = TeamMember(
         user_id=workspace_owner_id,
         email=req.email.lower(),
         name=req.name,
         role=req.role,
         status="pending",
+        allowed_tabs=allowed_str,
+        allowed_ad_accounts=allowed_accounts_str,
     )
     db.add(member)
     await db.commit()
@@ -133,7 +156,19 @@ async def invite_team_member(
     )
 
     logger.info("team_member_invited", owner_id=workspace_owner_id, member_id=member.id, email=member.email)
-    return member
+    
+    tabs_list = member.allowed_tabs.split(",") if member.allowed_tabs else ["/dashboard", "/briefs/daily", "/briefs/weekly", "/campaigns", "/ad-sets", "/ads"]
+    accounts_list = member.allowed_ad_accounts.split(",") if member.allowed_ad_accounts else []
+    return TeamMemberResponse(
+        id=member.id,
+        email=member.email,
+        name=member.name,
+        role=member.role,
+        status=member.status,
+        allowed_tabs=tabs_list,
+        allowed_ad_accounts=accounts_list,
+        created_at=member.created_at
+    )
 
 
 @router.delete("/{member_id}", summary="Remove a team member")

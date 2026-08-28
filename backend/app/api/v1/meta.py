@@ -291,12 +291,12 @@ async def get_connection_status(
     meta_name = f"Meta Account ({connection.meta_user_id})"
     return MetaConnectionStatus(
         connected=True,
-        meta_user_name=meta_name,
+meta_user_name=meta_name,
         last_sync_at=connection.last_sync_at,
     )
 
 
-@router.get("/accounts", response_model=List[MetaAdAccountResponse], summary="Retrieve available Meta Ad Accounts")
+@router.get("/accounts", response_model=List[MetaAdAccountResponse], summary="List available ad accounts")
 async def get_ad_accounts(
     claims: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -307,6 +307,39 @@ async def get_ad_accounts(
     """
     user = await get_db_user_from_claims(claims, db)
     
+    # Resolve if user is a team member
+    from app.models.team import TeamMember
+    stmt_member = select(TeamMember).where(TeamMember.email == user.email.lower())
+    res_member = await db.execute(stmt_member)
+    member_record = res_member.scalar_one_or_none()
+    
+    if member_record:
+        # Resolve owner connected ad accounts
+        stmt = select(MetaAdAccount).where(MetaAdAccount.user_id == member_record.user_id)
+        result = await db.execute(stmt)
+        synced_accounts = result.scalars().all()
+        
+        # Filter by allowed_ad_accounts
+        allowed_list = member_record.allowed_ad_accounts.split(",") if member_record.allowed_ad_accounts else []
+        
+        out_list = []
+        for acc in synced_accounts:
+            if acc.meta_account_id in allowed_list:
+                out_list.append(
+                    MetaAdAccountResponse(
+                        id=acc.meta_account_id,
+                        name=acc.account_name,
+                        currency=acc.currency,
+                        timezone=acc.timezone,
+                        account_status=acc.account_status,
+                        is_connected=True,
+                        industry=acc.industry,
+                        ai_intelligence_status=acc.ai_intelligence_status,
+                        historical_intelligence_status=acc.historical_intelligence_status,
+                    )
+                )
+        return out_list
+
     stmt = select(MetaConnection).where(MetaConnection.user_id == user.id)
     result = await db.execute(stmt)
     connection = result.scalar_one_or_none()

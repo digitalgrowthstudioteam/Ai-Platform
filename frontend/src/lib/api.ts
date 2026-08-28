@@ -748,10 +748,22 @@ class ApiClient {
     return this.request<any[]>("/team");
   }
 
-  async inviteTeamMember(email: string, name?: string, role: string = "member") {
+  async inviteTeamMember(
+    email: string, 
+    name?: string, 
+    role: string = "member", 
+    allowedTabs?: string[], 
+    allowedAdAccounts?: string[]
+  ) {
     return this.request<any>("/team/invite", {
       method: "POST",
-      body: { email, name, role },
+      body: { 
+        email, 
+        name, 
+        role, 
+        allowed_tabs: allowedTabs, 
+        allowed_ad_accounts: allowedAdAccounts 
+      },
     });
   }
 
