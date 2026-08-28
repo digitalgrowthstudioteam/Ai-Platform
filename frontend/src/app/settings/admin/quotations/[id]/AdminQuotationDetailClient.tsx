@@ -311,7 +311,7 @@ export default function AdminQuotationDetailClient() {
                     rel="noreferrer"
                     className="font-bold text-blue-600 hover:underline flex items-center gap-1"
                   >
-                    <MessageSquare size={12} /> Message WhatsApp &rarr;
+                    <MessageSquare size={12} /> Message WhatsApp ({data.whatsapp_number}) &rarr;
                   </a>
                 ) : (
                   <span className="text-slate-400 italic">Not Provided</span>
