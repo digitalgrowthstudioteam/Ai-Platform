@@ -75,7 +75,7 @@ PLANS_CONFIG = {
     },
     "pro": {
         "max_meta_accounts": 10,
-        "historical_days": 99999,
+        "historical_days": 180,
         "sync_interval_hours": 6,
         "max_team_members": 10,
         "ai_recommendations_limit": 999999,
@@ -94,7 +94,7 @@ PLANS_CONFIG = {
     },
     "agency": {
         "max_meta_accounts": 25,
-        "historical_days": 99999,
+        "historical_days": 365,
         "sync_interval_hours": 6,
         "max_team_members": 25,
         "ai_recommendations_limit": 999999,
@@ -425,14 +425,20 @@ class EntitlementEngine:
         sync_interval_hours = 3 if has_faster_sync else base_config["sync_interval_hours"]
 
         # Resolve dynamic historical days limits
-        if is_trial_active:
-            historical_days = 7
+        has_lifetime_history = any(a.addon_id in ["lifetime_history_monthly", "lifetime_history_annual"] for a in addons)
+
+        if has_lifetime_history:
+            historical_days = 99999
+        elif is_trial_active:
+            historical_days = 30
         elif plan_id == "starter":
             historical_days = 30
         elif plan_id == "growth":
             historical_days = 90
-        elif plan_id in ["pro", "agency"]:
-            historical_days = 99999
+        elif plan_id == "pro":
+            historical_days = 180
+        elif plan_id == "agency":
+            historical_days = 365
         else:
             historical_days = base_config["historical_days"]
 
@@ -633,7 +639,8 @@ class EntitlementEngine:
         ent = await cls.resolve_entitlements(user, db)
         historical_days = ent.get("historical_days", 30)
         
-        if historical_days < 99999 and ad_account_id:
+        # If we have a specific ad account, check assignment status
+        if ad_account_id:
             import uuid
             from app.models.meta import MetaAdAccount
             stmt = select(MetaAdAccount).where(MetaAdAccount.user_id == user.id)
@@ -644,8 +651,26 @@ class EntitlementEngine:
                 stmt = stmt.where(MetaAdAccount.meta_account_id == ad_account_id)
             res = await db.execute(stmt)
             acc = res.scalar_one_or_none()
+            
             if acc and acc.historical_intelligence_status == "active":
                 historical_days = 99999
+            else:
+                # If not active/assigned, cap at base plan limit (Trial=30, Starter=30, Growth=90, Pro=180, Agency=365)
+                plan_id = user.plan_id or "free"
+                is_trial_active = False
+                if user.trial_status == "active" and user.trial_ends_at:
+                    is_trial_active = user.trial_ends_at.replace(tzinfo=timezone.utc) > datetime.now(timezone.utc)
+                
+                if is_trial_active or plan_id == "starter":
+                    historical_days = 30
+                elif plan_id == "growth":
+                    historical_days = 90
+                elif plan_id == "pro":
+                    historical_days = 180
+                elif plan_id == "agency":
+                    historical_days = 365
+                else:
+                    historical_days = 30
 
         if historical_days > 3650:
             return start_date

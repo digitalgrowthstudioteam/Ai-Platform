@@ -801,7 +801,7 @@ class MetaSyncService:
             from datetime import date, timedelta
             historical_days = 30  # Default fallback
             if ad_acc.historical_intelligence_status == "active":
-                historical_days = 1095  # 3 years for Lifetime History
+                historical_days = 1825  # 5 years for Lifetime History
             else:
                 from app.models.user import User
                 from app.services.entitlement_engine import EntitlementEngine
@@ -812,7 +812,7 @@ class MetaSyncService:
                     ent = await EntitlementEngine.resolve_entitlements(user, db)
                     raw_days = ent.get("historical_days", 30)
                     if raw_days >= 99999:
-                        historical_days = 1095  # Cap at 3 years max
+                        historical_days = 1825  # Cap at 5 years max
                     else:
                         historical_days = max(30, raw_days)  # Minimum 30 days
 

@@ -52,7 +52,7 @@ async def test_base_entitlements_by_plan(db):
     assert ent_starter["plan_id"] == "starter"
     assert ent_starter["max_meta_accounts"] == 1
     assert ent_starter["sync_interval_hours"] == 48
-    assert ent_starter["historical_days"] == 7
+    assert ent_starter["historical_days"] == 30
     assert ent_starter["feature_gates"]["creative_analysis"] is True
 
 
