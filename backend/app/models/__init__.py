@@ -33,9 +33,11 @@ from app.models.ai_usage import AIUsageRecord
 from app.models.funnel import FunnelRecommendation, FunnelAudit, FunnelEvent
 from app.models.ads_service import MetaAdServiceRequest, AdPack, ServiceQuotation, CampaignPlan
 from app.models.manual_expense import ManualExpense
+from app.models.email_config import EmailTemplateConfig
 
 __all__ = [
     "BaseModel",
+    "EmailTemplateConfig",
     "User",
     "Subscription",
     "SubscriptionAddOn",

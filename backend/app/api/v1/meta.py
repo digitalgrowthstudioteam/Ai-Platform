@@ -103,6 +103,23 @@ async def get_db_user_from_claims(claims: dict, db: AsyncSession) -> User:
         )
         db.add(welcome)
         await db.commit()
+
+        # Send Brevo Welcome Email
+        try:
+            from app.services.email_service import EmailService
+            from app.config import get_settings
+            settings = get_settings()
+            await EmailService.send_template_email(
+                to_email=user.email,
+                trigger_key="welcome_user",
+                variables={
+                    "user_name": user.name or "User",
+                    "login_link": f"{settings.FRONTEND_URL}/login"
+                },
+                db=db
+            )
+        except Exception as welcome_err:
+            logger.error("welcome_email_dispatch_failed", error=str(welcome_err), user_id=user.id)
     else:
         # JIT Permanent deletion cleanup after 7 days grace period
         if user.status == "deletion_scheduled" and user.deletion_scheduled_at:

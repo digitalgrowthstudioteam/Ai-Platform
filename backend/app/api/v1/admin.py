@@ -1867,3 +1867,70 @@ async def delete_user(
 
     logger.info("admin_delete_user_success", user_id=user_id, email=user.email)
     return {"status": "success", "message": f"Successfully permanently deleted user {user.email} and all associated data."}
+
+
+class EmailTemplateUpdate(BaseModel):
+    is_enabled: Optional[bool] = None
+    subject_template: Optional[str] = None
+    body_template: Optional[str] = None
+
+
+class EmailTemplateResponse(BaseModel):
+    trigger_key: str
+    is_enabled: bool
+    subject_template: str
+    body_template: str
+
+
+@router.get("/email-templates", response_model=List[EmailTemplateResponse], summary="List all email notification templates")
+async def list_email_templates(
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    verify_admin(claims)
+    from app.models.email_config import EmailTemplateConfig
+    stmt = select(EmailTemplateConfig).order_by(EmailTemplateConfig.trigger_key.asc())
+    res = await db.execute(stmt)
+    configs = res.scalars().all()
+    return [
+        EmailTemplateResponse(
+            trigger_key=c.trigger_key,
+            is_enabled=c.is_enabled,
+            subject_template=c.subject_template,
+            body_template=c.body_template
+        ) for c in configs
+    ]
+
+
+@router.put("/email-templates/{trigger_key}", response_model=EmailTemplateResponse, summary="Update an email notification template")
+async def update_email_template(
+    trigger_key: str,
+    payload: EmailTemplateUpdate,
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    verify_admin(claims)
+    from app.models.email_config import EmailTemplateConfig
+    stmt = select(EmailTemplateConfig).where(EmailTemplateConfig.trigger_key == trigger_key)
+    res = await db.execute(stmt)
+    config = res.scalar_one_or_none()
+    if not config:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Email template config not found for key: {trigger_key}"
+        )
+    if payload.is_enabled is not None:
+        config.is_enabled = payload.is_enabled
+    if payload.subject_template is not None:
+        config.subject_template = payload.subject_template
+    if payload.body_template is not None:
+        config.body_template = payload.body_template
+    db.add(config)
+    await db.commit()
+    await db.refresh(config)
+    return EmailTemplateResponse(
+        trigger_key=config.trigger_key,
+        is_enabled=config.is_enabled,
+        subject_template=config.subject_template,
+        body_template=config.body_template
+    )

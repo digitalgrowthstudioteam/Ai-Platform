@@ -156,7 +156,8 @@ async def invite_team_member(
         to_email=req.email.lower(),
         invitee_name=req.name,
         inviter_name=user.name or user.email,
-        invite_link=invite_link
+        invite_link=invite_link,
+        db=db
     )
 
     logger.info("team_member_invited", owner_id=workspace_owner_id, member_id=member.id, email=member.email)

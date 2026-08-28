@@ -119,6 +119,75 @@ DEFAULT_CONFIGS = {
 }
 
 
+DEFAULT_EMAIL_TEMPLATES = {
+    "sync_completed": {
+        "subject": "Data Sync Complete: Meta Ad Account {account_name} is updated ✅",
+        "body": """<div style="font-family: sans-serif; padding: 24px; color: #334155;">
+  <h2>Your Daily Performance Metrics are Ready</h2>
+  <p>We have successfully synchronized <b>{account_name}</b> performance statistics. All charts, briefs, and recommendations are up to date.</p>
+  <br/>
+  <a href="{dashboard_link}" style="background: #2563EB; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">View Analytics</a>
+</div>"""
+    },
+    "welcome_user": {
+        "subject": "Welcome to Digital Growth Studio! 🚀",
+        "body": """<div style="font-family: sans-serif; padding: 24px; color: #334155;">
+  <h2>Welcome to Digital Growth Studio, {user_name}!</h2>
+  <p>Your account is active. Connect your Meta Ad Account to unlock AI optimization, placement heatmaps, and weekly briefs.</p>
+  <br/>
+  <a href="{login_link}" style="background: #2563EB; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; margin-top: 16px;">Go to Dashboard</a>
+</div>"""
+    },
+    "quotation_created": {
+        "subject": "Action Required: Your Custom Meta Ads Quotation is Ready 📝",
+        "body": """<div style="font-family: sans-serif; padding: 24px; color: #334155;">
+  <h2>Your Custom Service Quotation is Ready</h2>
+  <p>Review and complete your checkout below to activate your requested service pack:</p>
+  <div style="background: #F8FAFC; border: 1px solid #E2E8F0; padding: 16px; border-radius: 12px; margin: 16px 0;">
+    <b>Quotation ID:</b> {quote_id}<br/>
+    <b>Amount:</b> {amount}
+  </div>
+  <br/>
+  <a href="{quote_link}" style="background: #2563EB; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">Review & Pay</a>
+</div>"""
+    },
+    "payment_confirmation": {
+        "subject": "Receipt: Payment Confirmed for Order {order_id} 🧾",
+        "body": """<div style="font-family: sans-serif; padding: 24px; color: #334155;">
+  <h2>Thank you for your purchase!</h2>
+  <p>We received your payment for the following order:</p>
+  <div style="background: #F8FAFC; border: 1px solid #E2E8F0; padding: 16px; border-radius: 12px; margin: 16px 0;">
+    <b>Order ID:</b> {order_id}<br/>
+    <b>Plan/Add-on:</b> {item_name}<br/>
+    <b>Status:</b> Completed
+  </div>
+</div>"""
+    },
+    "account_deleted": {
+        "subject": "Important: Your Account Deletion is Scheduled ⚠️",
+        "body": """<div style="font-family: sans-serif; padding: 24px; color: #334155;">
+  <h2>Account Deletion Scheduled</h2>
+  <p>We are writing to confirm that deletion has been scheduled for your account. All connected Meta credentials, historical metrics, and configurations will be permanently removed in 7 days.</p>
+  <p>If this was a mistake, cancel the deletion request from your Account Settings panel: </p>
+  <br/>
+  <a href="{cancel_link}" style="background: #2563EB; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">Cancel Deletion Request</a>
+</div>"""
+    },
+    "team_invitation": {
+        "subject": "You've been invited to join {inviter_name}'s workspace on Digital Growth Studio",
+        "body": """<div style="font-family: sans-serif; padding: 24px; color: #334155;">
+  <h2>Hello {invitee_name},</h2>
+  <p>{inviter_name} has invited you to join their workspace on Digital Growth Studio — AI Ads Optimizer.</p>
+  <p>Click the link below to accept the invitation and set up your account:</p>
+  <br/>
+  <a href="{invite_link}" style="background: #2563EB; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">Accept Invitation</a>
+  <br/><br/>
+  <p>Welcome to the team!<br/>The Digital Growth Studio Team</p>
+</div>"""
+    }
+}
+
+
 async def seed_admin_configs(db: AsyncSession) -> None:
     """
     Checks if configurations are seeded in the database. If not, seeds them.
@@ -139,6 +208,30 @@ async def seed_admin_configs(db: AsyncSession) -> None:
             config_record.value = value
             db.add(config_record)
             
+    # Seed default email configurations
+    from app.models.email_config import EmailTemplateConfig
+    for trigger, template in DEFAULT_EMAIL_TEMPLATES.items():
+        stmt_mail = select(EmailTemplateConfig).where(EmailTemplateConfig.trigger_key == trigger)
+        res_mail = await db.execute(stmt_mail)
+        mail_record = res_mail.scalar_one_or_none()
+        
+        if not mail_record:
+            logger.info("seeding_email_template_key", trigger_key=trigger)
+            new_mail = EmailTemplateConfig(
+                trigger_key=trigger,
+                is_enabled=True,
+                subject_template=template["subject"],
+                body_template=template["body"]
+            )
+            db.add(new_mail)
+        else:
+            if not mail_record.subject_template:
+                mail_record.subject_template = template["subject"]
+                db.add(mail_record)
+            if not mail_record.body_template:
+                mail_record.body_template = template["body"]
+                db.add(mail_record)
+
     await db.commit()
     logger.info("admin_configs_seeding_complete")
 

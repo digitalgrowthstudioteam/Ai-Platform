@@ -586,7 +586,7 @@ function GetAdsPageContent() {
             }
           }
           if (existingPaid) {
-            setCurrentStep(6);
+            setCurrentStep(5);
           }
         }
       } catch (err) {
@@ -868,7 +868,7 @@ function GetAdsPageContent() {
   const handlePrevStep = () => {
     const isRestrictedBack = isNew && activeRequest && activeRequest.status !== "draft" && currentStep <= 5;
     if (currentStep > 0 && !isRestrictedBack) {
-      if (isExistingPaidUser && currentStep <= 6) {
+      if (isExistingPaidUser && currentStep <= 5) {
         return;
       }
       setCurrentStep(currentStep - 1);
@@ -1943,7 +1943,7 @@ function GetAdsPageContent() {
             <div className="pt-6 border-t border-slate-100 flex justify-between items-center flex-wrap gap-4">
               <button
                 onClick={handlePrevStep}
-                disabled={currentStep === 0 || (isNew && activeRequest && activeRequest.status !== "draft" && currentStep <= 5) || (isExistingPaidUser && currentStep <= 6)}
+                disabled={currentStep === 0 || (isNew && activeRequest && activeRequest.status !== "draft" && currentStep <= 5) || (isExistingPaidUser && currentStep <= 5)}
                 className="inline-flex items-center gap-1 hover:text-slate-600 transition disabled:opacity-30 font-bold text-xs"
               >
                 <ArrowLeft size={13} /> Back
