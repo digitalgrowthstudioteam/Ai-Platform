@@ -243,6 +243,7 @@ function GetAdsPageContent() {
   const isNew = searchParams.get("new") === "true";
   const { user, loginWithGoogle, isAuthenticated, logout } = useAuth();
   const [currentStep, setCurrentStep] = useState(0);
+  const [isExistingPaidUser, setIsExistingPaidUser] = useState(false);
   const [loading, setLoading] = useState(true);
   const [config, setConfig] = useState<ServicePricing | null>(null);
   const [activeRequest, setActiveRequest] = useState<any>(null);
@@ -421,6 +422,7 @@ function GetAdsPageContent() {
           setEmail((prev) => prev || user.email || "");
 
           // Load connected meta account from backend
+          let metaAccountsList: any[] = [];
           try {
             const accounts = await api.getMetaAccounts();
             if (accounts && accounts.length > 0) {
@@ -428,6 +430,7 @@ function GetAdsPageContent() {
               setConnectedMetaAccount(accounts[0]);
               setSelectedMetaAdAccountId(accounts[0].id);
               setMetaAccountExists(true);
+              metaAccountsList = accounts;
             } else {
               setMetaAccountExists(false);
             }
@@ -442,7 +445,17 @@ function GetAdsPageContent() {
             intro_offer_eligible: true,
             ...(latest.user_eligibility || {})
           });
-          
+
+          // Fetch subscription to check plan level
+          const subData = await api.getSubscription().catch(() => null);
+          const hasPaidPlan = subData && subData.plan && !["trial", "free", "none"].includes(subData.plan.toLowerCase()) && subData.status === "active";
+          const hasAddons = subData && subData.active_addons_list && subData.active_addons_list.length > 0;
+          const hasMeta = metaAccountsList.length > 0;
+          const hasPaidAdsRequest = latest?.request && latest.request.status !== "draft";
+
+          const existingPaid = !!(hasPaidPlan || hasAddons || hasMeta || hasPaidAdsRequest);
+          setIsExistingPaidUser(existingPaid);
+
           let hasExistingRequest = false;
           if (latest.request) {
             hasExistingRequest = true;
@@ -571,6 +584,9 @@ function GetAdsPageContent() {
             } catch (e) {
               console.error("Failed to auto-submit guest draft request on login:", e);
             }
+          }
+          if (existingPaid) {
+            setCurrentStep(6);
           }
         }
       } catch (err) {
@@ -852,6 +868,9 @@ function GetAdsPageContent() {
   const handlePrevStep = () => {
     const isRestrictedBack = isNew && activeRequest && activeRequest.status !== "draft" && currentStep <= 5;
     if (currentStep > 0 && !isRestrictedBack) {
+      if (isExistingPaidUser && currentStep <= 6) {
+        return;
+      }
       setCurrentStep(currentStep - 1);
       setNotification(null);
     }
@@ -1924,7 +1943,7 @@ function GetAdsPageContent() {
             <div className="pt-6 border-t border-slate-100 flex justify-between items-center flex-wrap gap-4">
               <button
                 onClick={handlePrevStep}
-                disabled={currentStep === 0 || (isNew && activeRequest && activeRequest.status !== "draft" && currentStep <= 5)}
+                disabled={currentStep === 0 || (isNew && activeRequest && activeRequest.status !== "draft" && currentStep <= 5) || (isExistingPaidUser && currentStep <= 6)}
                 className="inline-flex items-center gap-1 hover:text-slate-600 transition disabled:opacity-30 font-bold text-xs"
               >
                 <ArrowLeft size={13} /> Back
