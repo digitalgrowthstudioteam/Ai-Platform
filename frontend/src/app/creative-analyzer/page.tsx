@@ -23,6 +23,37 @@ import {
 import Link from "next/link";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/utils";
 
+const HOOK_PATTERNS = {
+  problem: [/struggling/i, /tired of/i, /frustrated/i, /problem/i, /pain/i, /sick of/i, /stop wasting/i],
+  benefit: [/get more/i, /increase/i, /boost/i, /improve/i, /unlock/i, /achieve/i, /grow/i],
+  question: [/^(are you|do you|have you|what if|why|how|did you)/i, /\?/],
+  statistic: [/\d+%/i, /\d+x/i, /\d+ out of/i, /studies show/i],
+  story: [/i was/i, /we were/i, /our journey/i, /i remember/i, /when i/i],
+  urgency: [/limited/i, /last chance/i, /ends today/i, /hurry/i, /only \d+/i, /don't miss/i],
+};
+
+const OFFER_PATTERNS = [/off/i, /discount/i, /sale/i, /deal/i, /offer/i, /free/i, /bonus/i, /save/i];
+const PRICE_PATTERNS = [/₹\d+/i, /\$\d+/i, /rs\.?\s?\d+/i, /price/i, /cost/i, /starting at/i];
+const SOCIAL_PROOF_PATTERNS = [/\d+ (customers|users|people|businesses)/i, /trusted by/i, /rated/i, /reviews/i, /testimonial/i, /★/];
+
+const classifyHookType = (text: string): string => {
+  if (!text) return "direct";
+  const textLower = text.toLowerCase().trim();
+  for (const [hookType, patterns] of Object.entries(HOOK_PATTERNS)) {
+    for (const pattern of patterns) {
+      if (pattern.test(textLower)) {
+        return hookType;
+      }
+    }
+  }
+  return "direct";
+};
+
+const detectTextFeature = (text: string, patterns: RegExp[]): boolean => {
+  if (!text) return false;
+  return patterns.some(pattern => pattern.test(text));
+};
+
 export default function CreativeAnalyzerPage() {
   const { selectedAccount, loadingAccounts } = useAdAccount();
   const [loading, setLoading] = useState(false);
@@ -318,13 +349,28 @@ export default function CreativeAnalyzerPage() {
           const formatLabel = cType === "IMAGE" ? "Single Image" : (cType === "VIDEO" ? "Short-form video" : (cType === "CAROUSEL" ? "Carousel" : cType));
           const aspectLabel = cType === "VIDEO" ? "9:16 (Vertical)" : "1:1 (Square)";
           const durationLabel = adFeature?.creative_length ? `${adFeature.creative_length}s` : "N/A";
-          const hookLabel = adFeature?.hook_type ? `${adFeature.hook_type.charAt(0).toUpperCase() + adFeature.hook_type.slice(1)}-focused` : "N/A";
+          
+          // Classify hook dynamically if database record is missing
+          let rawHook = "direct";
+          if (adFeature?.hook_type) {
+            rawHook = adFeature.hook_type;
+          } else if (cr.primary_text) {
+            rawHook = classifyHookType(cr.primary_text);
+          } else if (cr.headline) {
+            rawHook = classifyHookType(cr.headline);
+          }
+          const hookLabel = `${rawHook.charAt(0).toUpperCase() + rawHook.slice(1)}-focused`;
           
           const visualsList = adFeature?.creative_type === "VIDEO" 
             ? ["UGC style", "Reels optimized"] 
             : (adFeature?.creative_type === "CAROUSEL" ? ["Swipe cards"] : ["Static image layout"]);
 
           if (!creativeGroups[cId]) {
+            const combinedText = `${cr.headline || ''} ${cr.primary_text || ''}`;
+            const hasSocialProof = adFeature ? adFeature.has_social_proof : detectTextFeature(combinedText, SOCIAL_PROOF_PATTERNS);
+            const hasPrice = adFeature ? adFeature.has_price : detectTextFeature(combinedText, PRICE_PATTERNS);
+            const hasOffer = adFeature ? adFeature.has_offer : detectTextFeature(combinedText, OFFER_PATTERNS);
+
             const resolvedDna = {
               format: formatLabel,
               aspect: aspectLabel,
@@ -332,9 +378,9 @@ export default function CreativeAnalyzerPage() {
               hook: hookLabel,
               visuals: visualsList,
               copy: {
-                hook: adFeature?.hook_type ? `${adFeature.hook_type.charAt(0).toUpperCase() + adFeature.hook_type.slice(1)} Hook` : "N/A",
-                benefit: adFeature?.has_social_proof ? "Social Proof element present" : (adFeature?.has_price ? "Price detail highlighted" : "N/A"),
-                offer: adFeature?.has_offer ? "Offer details configured" : "N/A",
+                hook: `${rawHook.charAt(0).toUpperCase() + rawHook.slice(1)} Hook`,
+                benefit: hasSocialProof ? "Social Proof element present" : (hasPrice ? "Price detail highlighted" : "N/A"),
+                offer: hasOffer ? "Offer details configured" : "N/A",
                 cta: cr.call_to_action || "Learn More"
               }
             };

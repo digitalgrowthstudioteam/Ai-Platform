@@ -75,6 +75,15 @@ class MetaSyncService:
             conn.last_sync_error = None
             ad_acc.updated_at = datetime.now(timezone.utc)
             
+            # Ingest/extract ML features for today and yesterday so feature store is populated
+            try:
+                from app.services.ml_feature_extractor import MLFeatureExtractor
+                from datetime import date, timedelta
+                await MLFeatureExtractor.extract_features_for_account(db, ad_acc.id, date.today())
+                await MLFeatureExtractor.extract_features_for_account(db, ad_acc.id, date.today() - timedelta(days=1))
+            except Exception as fe:
+                logger.error("failed_to_extract_ml_features_during_sync", ad_account_id=ad_acc.meta_account_id, error=str(fe))
+            
             # Create success notification
             notif = Notification(
                 user_id=conn.user_id,
