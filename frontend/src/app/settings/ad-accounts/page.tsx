@@ -5,6 +5,7 @@ import { Megaphone, CheckCircle2, AlertCircle, Loader2, RefreshCw, LogOut, Check
 import { api } from "@/lib/api";
 import { auth } from "@/lib/firebase";
 import { useAdAccount } from "@/context/AdAccountContext";
+import SettingsNavigation from "@/components/shared/SettingsNavigation";
 
 interface AdAccount {
   id: string;
@@ -285,6 +286,8 @@ export default function AdAccountsPage() {
           <p className="page-subtitle">Manage your connected Meta Ads accounts and select active pipelines</p>
         </div>
       </div>
+
+      <SettingsNavigation />
 
       {/* Error Alert Banner */}
       {error && (

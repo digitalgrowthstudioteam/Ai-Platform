@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import SettingsNavigation from "@/components/shared/SettingsNavigation";
 import {
   CreditCard,
   Check,
@@ -347,6 +348,8 @@ export default function BillingPage() {
           </p>
         </div>
       </div>
+
+      <SettingsNavigation />
 
       {/* Floating Notifications */}
       {notification && (

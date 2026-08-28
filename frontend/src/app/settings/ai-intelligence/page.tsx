@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useAdAccount } from "@/context/AdAccountContext";
+import SettingsNavigation from "@/components/shared/SettingsNavigation";
 import {
   Sparkles,
   Zap,
@@ -218,6 +219,7 @@ export default function AIIntelligenceHub() {
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto px-4 py-8">
+      <SettingsNavigation />
       {/* Top Header Card */}
       <div className="relative overflow-hidden rounded-3xl bg-slate-950 p-8 text-white border border-slate-800 shadow-2xl">
         <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/20 via-purple-500/20 to-emerald-500/20 opacity-30 animate-pulse" />

@@ -7,6 +7,7 @@ import { User, Key, Shield, Award, Loader2, AlertCircle, CheckCircle, Trash2, Ca
 import { updateProfile } from "firebase/auth";
 import { trackAccountDeletion } from "@/lib/analytics";
 import { useTheme } from "@/context/ThemeContext";
+import SettingsNavigation from "@/components/shared/SettingsNavigation";
 
 const THEME_PRESETS = [
   { name: "Classic Blue", primary: "#2563EB", sidebar: "#0F172A" },
@@ -204,6 +205,8 @@ export default function AccountSettingsPage() {
         </div>
       </div>
 
+      <SettingsNavigation />
+
       {notification && (
         <div className={`p-4 rounded-xl flex items-start gap-2.5 text-xs font-semibold ${
           notification.type === "success" 
@@ -253,7 +256,7 @@ export default function AccountSettingsPage() {
         <div className="md:col-span-2 space-y-6">
           <div className="bg-white border border-slate-150 rounded-2xl p-6 shadow-xs">
             <h3 className="text-sm font-bold text-slate-900 mb-4 flex items-center gap-1.5 border-b border-slate-100 pb-3">
-              <User size={16} className="text-blue-600" /> Personal Information
+              <User size={16} style={{ color: primaryColor }} /> Personal Information
             </h3>
             
             {/* Display profile photo fetched directly from Google / Firebase Auth (zero local server storage) */}
@@ -262,10 +265,11 @@ export default function AccountSettingsPage() {
                 <img 
                   src={user.photoURL} 
                   alt="Google Profile" 
-                  className="w-14 h-14 rounded-full border-2 border-blue-500 shadow-sm object-cover" 
+                  className="w-14 h-14 rounded-full border-2 shadow-sm object-cover" 
+                  style={{ borderColor: primaryColor }}
                 />
               ) : (
-                <div className="w-14 h-14 rounded-full border-2 border-blue-500 bg-blue-50 text-blue-600 font-extrabold text-sm flex items-center justify-center shadow-sm uppercase">
+                <div className="w-14 h-14 rounded-full border-2 bg-slate-50 font-extrabold text-sm flex items-center justify-center shadow-sm uppercase" style={{ borderColor: primaryColor, color: primaryColor }}>
                   {initials}
                 </div>
               )}
@@ -308,7 +312,8 @@ export default function AccountSettingsPage() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+                  className="px-4 py-2 hover:opacity-90 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+                  style={{ backgroundColor: primaryColor }}
                 >
                   {loading && <Loader2 size={12} className="animate-spin" />}
                   Save Profile Settings
@@ -320,7 +325,7 @@ export default function AccountSettingsPage() {
           {/* Security & Password Card */}
           <div className="bg-white border border-slate-150 rounded-2xl p-6 shadow-xs">
             <h3 className="text-sm font-bold text-slate-900 mb-4 flex items-center gap-1.5 border-b border-slate-100 pb-3">
-              <Key size={16} className="text-blue-600" /> Credentials & Password
+              <Key size={16} style={{ color: primaryColor }} /> Credentials & Password
             </h3>
             <p className="text-slate-500 text-xs leading-relaxed mb-4">
               To update your login credentials securely, request a password configuration reset email. 
@@ -383,18 +388,18 @@ export default function AccountSettingsPage() {
           <div className="bg-white border border-slate-150 rounded-2xl p-6 shadow-xs flex flex-col justify-between">
             <div>
               <h3 className="text-sm font-bold text-slate-900 mb-4 flex items-center gap-1.5 border-b border-slate-100 pb-3">
-                <Award size={16} className="text-blue-600" /> Account Plan
+                <Award size={16} style={{ color: primaryColor }} /> Account Plan
               </h3>
               
               <div className="space-y-3.5">
-                <div className="p-3 bg-blue-50/50 border border-blue-100 rounded-xl flex items-center justify-between">
+                <div className="p-3 border rounded-xl flex items-center justify-between" style={{ backgroundColor: `${primaryColor}08`, borderColor: `${primaryColor}20` }}>
                   <div>
-                    <div className="text-[10px] text-blue-600 font-bold uppercase tracking-wider">Active Plan</div>
+                    <div className="text-[10px] font-bold uppercase tracking-wider" style={{ color: primaryColor }}>Active Plan</div>
                     <div className="text-sm font-extrabold text-slate-900 mt-0.5">
                       {subscription?.plan ? subscription.plan.replace("_", " ").toUpperCase() : "PRO EARLY ACCESS"}
                     </div>
                   </div>
-                  <Shield size={20} className="text-blue-600 shrink-0" />
+                  <Shield size={20} className="shrink-0" style={{ color: primaryColor }} />
                 </div>
 
                 <div className="text-xs space-y-2">
@@ -419,7 +424,8 @@ export default function AccountSettingsPage() {
             <div className="pt-6 border-t border-slate-100 mt-6">
               <a
                 href="/settings/billing"
-                className="w-full text-center block py-2 border border-blue-600 text-blue-600 hover:bg-blue-50/30 rounded-xl text-xs font-bold transition"
+                className="w-full text-center block py-2 border text-xs font-bold transition rounded-xl"
+                style={{ borderColor: primaryColor, color: primaryColor }}
               >
                 Manage Billing & Upgrades
               </a>
@@ -429,7 +435,7 @@ export default function AccountSettingsPage() {
           {/* Dashboard Theme Card */}
           <div className="bg-white border border-slate-150 rounded-2xl p-6 shadow-xs">
             <h3 className="text-sm font-bold text-slate-900 mb-4 flex items-center gap-1.5 border-b border-slate-100 pb-3">
-              <Palette size={16} className="text-blue-600" /> Dashboard Appearance
+              <Palette size={16} style={{ color: primaryColor }} /> Dashboard Appearance
             </h3>
             
             <p className="text-slate-500 text-[11px] leading-relaxed mb-4">

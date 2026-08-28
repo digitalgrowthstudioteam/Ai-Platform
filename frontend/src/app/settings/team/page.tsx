@@ -4,9 +4,12 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
 import { Users, UserPlus, Trash2, Mail, ShieldAlert, Loader2, AlertCircle, CheckCircle } from "lucide-react";
+import { useTheme } from "@/context/ThemeContext";
+import SettingsNavigation from "@/components/shared/SettingsNavigation";
 
 export default function TeamPage() {
   const { user } = useAuth();
+  const { primaryColor } = useTheme();
   const [members, setMembers] = useState<any[]>([]);
   const [subscription, setSubscription] = useState<any>(null);
 
@@ -104,6 +107,8 @@ export default function TeamPage() {
         </div>
       </div>
 
+      <SettingsNavigation />
+
       {notification && (
         <div className={`p-4 rounded-xl flex items-start gap-2.5 text-xs font-semibold ${
           notification.type === "success" 
@@ -121,7 +126,7 @@ export default function TeamPage() {
 
       {loading ? (
         <div className="card py-16 flex justify-center">
-          <Loader2 size={32} className="animate-spin text-blue-600" />
+          <Loader2 size={32} className="animate-spin" style={{ color: primaryColor }} />
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -130,7 +135,7 @@ export default function TeamPage() {
             <div className="bg-white border border-slate-150 rounded-2xl p-6 shadow-xs">
               <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
                 <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
-                  <Users size={16} className="text-blue-600" /> Workspace Team
+                  <Users size={16} style={{ color: primaryColor }} /> Workspace Team
                 </h3>
                 <span className="text-[10px] bg-slate-100 font-bold px-2 py-0.5 rounded-full text-slate-500">
                   {seatsOccupied} / {maxSeats} seats occupied
@@ -141,10 +146,11 @@ export default function TeamPage() {
               <div className="mb-6">
                 <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
                   <div 
-                    className={`h-full transition-all duration-500 rounded-full ${
-                      progressPercent >= 100 ? "bg-amber-500" : "bg-blue-600"
-                    }`}
-                    style={{ width: `${progressPercent}%` }}
+                    className="h-full transition-all duration-500 rounded-full"
+                    style={{ 
+                      width: `${progressPercent}%`, 
+                      backgroundColor: progressPercent >= 100 ? "#F59E0B" : primaryColor 
+                    }}
                   />
                 </div>
                 {progressPercent >= 100 && (
@@ -174,7 +180,7 @@ export default function TeamPage() {
                       </td>
                       <td className="py-3.5 text-slate-500">{user?.email}</td>
                       <td className="py-3.5">
-                        <span className="bg-blue-50 text-blue-700 text-[9px] font-bold px-2 py-0.5 rounded-md uppercase">
+                        <span className="text-[9px] font-bold px-2 py-0.5 rounded-md uppercase" style={{ backgroundColor: `${primaryColor}15`, color: primaryColor }}>
                           Owner
                         </span>
                       </td>
@@ -233,7 +239,7 @@ export default function TeamPage() {
           <div>
             <div className="bg-white border border-slate-150 rounded-2xl p-6 shadow-xs space-y-4">
               <h3 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-3 flex items-center gap-1.5">
-                <UserPlus size={16} className="text-blue-600" /> Invite Colleague
+                <UserPlus size={16} style={{ color: primaryColor }} /> Invite Colleague
               </h3>
 
               {seatsOccupied >= maxSeats ? (
@@ -296,7 +302,8 @@ export default function TeamPage() {
                     <button
                       type="submit"
                       disabled={actionLoading !== null}
-                      className="w-full py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm"
+                      className="w-full py-2 hover:opacity-90 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm"
+                      style={{ backgroundColor: primaryColor }}
                     >
                       {actionLoading === "invite" && <Loader2 size={12} className="animate-spin" />}
                       Send Invitation
