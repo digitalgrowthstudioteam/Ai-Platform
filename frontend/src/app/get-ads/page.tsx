@@ -298,8 +298,8 @@ function GetAdsPageContent() {
     let validity = 30;
     let matchedPackId = "";
 
-    // 1. If qty is 1 and intro offer is active & eligible
-    if (qty === 1 && eligibleState?.intro_offer_eligible && firstAdOffer?.active) {
+    // 1. If qty is 1 and intro offer is active & eligible & not an existing paid user
+    if (qty === 1 && eligibleState?.intro_offer_eligible && firstAdOffer?.active && !isExistingPaidUser) {
       unitPrice = firstAdOffer.offer_price || 333;
       validity = firstAdOffer.validity_days || 30;
       return {
@@ -1749,10 +1749,10 @@ function GetAdsPageContent() {
                                     {range}
                                   </span>
                                   <span className="text-sm font-black text-slate-800 block mt-1 font-sans">
-                                    {pack.ad_quantity === 1 && eligibleState?.intro_offer_eligible ? "₹333" : `₹${pack.price_per_ad || pack.offer_price}`}
+                                    {pack.ad_quantity === 1 && eligibleState?.intro_offer_eligible && !isExistingPaidUser ? "₹333" : `₹${pack.price_per_ad || pack.offer_price}`}
                                   </span>
                                   <span className="text-[8px] text-slate-400 font-semibold block mt-0.5 uppercase">
-                                    {pack.ad_quantity === 1 && eligibleState?.intro_offer_eligible ? "Intro Offer" : desc}
+                                    {pack.ad_quantity === 1 && eligibleState?.intro_offer_eligible && !isExistingPaidUser ? "Intro Offer" : desc}
                                   </span>
                                 </div>
                               );
