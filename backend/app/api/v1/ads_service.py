@@ -697,9 +697,11 @@ async def create_public_service_request(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Validates a guest Meta Ads service request without creating any User or Request record in the database.
+    Creates or registers a service request onboarding form for guests (non-authenticated).
     """
-    from app.services.ads_service_eligibility import check_text_restrictions
+    from app.services.ads_service_eligibility import check_text_restrictions, evaluate_service_eligibility
+    
+    # 1. First run text restrictions checks on inputs
     texts = [
         payload.industry,
         payload.industry_other or "",
@@ -715,11 +717,70 @@ async def create_public_service_request(
                 detail=f"Prohibited category detected (matched keyword: '{matched}')"
             )
 
+    email_clean = payload.email.strip().lower() if payload.email else f"guest_{uuid.uuid4().hex[:8]}@digitalgrowthstudio.in"
+    
+    # 2. Resolve or create guest user
+    stmt_user = select(User).where(User.email == email_clean)
+    res_user = await db.execute(stmt_user)
+    user = res_user.scalar_one_or_none()
+    
+    if not user:
+        user = User(
+            firebase_uid=f"placeholder_{uuid.uuid4().hex}",
+            email=email_clean,
+            name=payload.full_name or email_clean.split("@")[0],
+            status="active"
+        )
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+
+    # 3. Run full eligibility validator
+    eligibility = await evaluate_service_eligibility(db, user, payload.dict())
+    if not eligibility["eligible"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=eligibility["reason"]
+        )
+
+    # 4. Check if request exists
+    stmt_exists = (
+        select(MetaAdServiceRequest)
+        .where(MetaAdServiceRequest.user_id == user.id)
+        .where(MetaAdServiceRequest.status.in_([
+            "draft", "submitted", "eligibility_review", "eligible",
+            "quotation_generated"
+        ]))
+        .limit(1)
+    )
+    res_exists = await db.execute(stmt_exists)
+    existing_request = res_exists.scalar_one_or_none()
+
+    status_to_save = "draft"
+
+    if existing_request:
+        for field, val in payload.dict().items():
+            if field != "status":
+                setattr(existing_request, field, val)
+        existing_request.status = status_to_save
+        existing_request.updated_at = datetime.utcnow()
+        req = existing_request
+    else:
+        req = MetaAdServiceRequest(
+            user_id=user.id,
+            status=status_to_save,
+            **payload.dict(exclude={"status"})
+        )
+        db.add(req)
+
+    await db.commit()
+    await db.refresh(req)
+
     return {
         "status": "success",
-        "message": "Service request validated successfully.",
-        "request_id": "guest_draft_placeholder",
-        "service_status": "draft"
+        "message": "Service request registered successfully as draft.",
+        "request_id": str(req.id),
+        "service_status": req.status
     }
 
 
