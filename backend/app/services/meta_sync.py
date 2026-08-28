@@ -796,11 +796,48 @@ class MetaSyncService:
                     )
                     await db.execute(cr_stmt)
 
-            # 4. Ingest Historical Insights (last 30 days + today)
+            # 4. Ingest Historical Insights based on dynamic time chunks (batching to prevent Meta timeout/memory limits)
+            # Determine maximum history allowed for this account based on entitlements
+            from datetime import date, timedelta
+            historical_days = 30  # Default fallback
+            if ad_acc.historical_intelligence_status == "active":
+                historical_days = 1095  # 3 years for Lifetime History
+            else:
+                from app.models.user import User
+                from app.services.entitlement_engine import EntitlementEngine
+                stmt_user = select(User).where(User.id == ad_acc.user_id)
+                res_user = await db.execute(stmt_user)
+                user = res_user.scalar_one_or_none()
+                if user:
+                    ent = await EntitlementEngine.resolve_entitlements(user, db)
+                    raw_days = ent.get("historical_days", 30)
+                    if raw_days >= 99999:
+                        historical_days = 1095  # Cap at 3 years max
+                    else:
+                        historical_days = max(30, raw_days)  # Minimum 30 days
+
+            today_val = date.today()
+            start_date = today_val - timedelta(days=historical_days)
+
+            # Generate time chunks (e.g. presets for <= 30 days, or 90-day intervals for larger ranges)
+            time_chunks = []
+            if historical_days <= 30:
+                time_chunks = [("preset", "last_30d"), ("preset", "today")]
+            else:
+                current_start = start_date
+                while current_start < today_val:
+                    current_end = min(current_start + timedelta(days=90), today_val)
+                    time_chunks.append(("range", current_start.strftime("%Y-%m-%d"), current_end.strftime("%Y-%m-%d")))
+                    current_start = current_end + timedelta(days=1)
+
             # Level: Campaign
             c_insights = []
-            for preset in ("last_30d", "today"):
-                ins_url = f"https://graph.facebook.com/{api_ver}/{account_id}/insights?time_increment=1&level=campaign&date_preset={preset}&fields=campaign_id,date_start,spend,impressions,reach,frequency,clicks,actions,action_values&limit=500"
+            for chunk in time_chunks:
+                if chunk[0] == "preset":
+                    time_param = f"date_preset={chunk[1]}"
+                else:
+                    time_param = f"time_range=%7B%22since%22%3A%22{chunk[1]}%22%2C%22until%22%3A%22{chunk[2]}%22%7D"
+                ins_url = f"https://graph.facebook.com/{api_ver}/{account_id}/insights?time_increment=1&level=campaign&{time_param}&fields=campaign_id,date_start,spend,impressions,reach,frequency,clicks,actions,action_values&limit=500"
                 r = await client.get(ins_url, headers=headers)
                 r.raise_for_status()
                 c_insights.extend(r.json().get("data", []))
@@ -808,8 +845,12 @@ class MetaSyncService:
 
             # Level: AdSet
             a_insights = []
-            for preset in ("last_30d", "today"):
-                ins_url = f"https://graph.facebook.com/{api_ver}/{account_id}/insights?time_increment=1&level=adset&date_preset={preset}&fields=adset_id,date_start,spend,impressions,reach,frequency,clicks,actions,action_values&limit=500"
+            for chunk in time_chunks:
+                if chunk[0] == "preset":
+                    time_param = f"date_preset={chunk[1]}"
+                else:
+                    time_param = f"time_range=%7B%22since%22%3A%22{chunk[1]}%22%2C%22until%22%3A%22{chunk[2]}%22%7D"
+                ins_url = f"https://graph.facebook.com/{api_ver}/{account_id}/insights?time_increment=1&level=adset&{time_param}&fields=adset_id,date_start,spend,impressions,reach,frequency,clicks,actions,action_values&limit=500"
                 r = await client.get(ins_url, headers=headers)
                 r.raise_for_status()
                 a_insights.extend(r.json().get("data", []))
@@ -817,8 +858,12 @@ class MetaSyncService:
 
             # Level: Ad
             ad_insights = []
-            for preset in ("last_30d", "today"):
-                ins_url = f"https://graph.facebook.com/{api_ver}/{account_id}/insights?time_increment=1&level=ad&date_preset={preset}&fields=ad_id,date_start,spend,impressions,reach,frequency,clicks,actions,action_values&limit=500"
+            for chunk in time_chunks:
+                if chunk[0] == "preset":
+                    time_param = f"date_preset={chunk[1]}"
+                else:
+                    time_param = f"time_range=%7B%22since%22%3A%22{chunk[1]}%22%2C%22until%22%3A%22{chunk[2]}%22%7D"
+                ins_url = f"https://graph.facebook.com/{api_ver}/{account_id}/insights?time_increment=1&level=ad&{time_param}&fields=ad_id,date_start,spend,impressions,reach,frequency,clicks,actions,action_values&limit=500"
                 r = await client.get(ins_url, headers=headers)
                 r.raise_for_status()
                 ad_insights.extend(r.json().get("data", []))
