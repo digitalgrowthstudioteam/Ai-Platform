@@ -307,9 +307,9 @@ async def get_ad_accounts(
     """
     user = await get_db_user_from_claims(claims, db)
     
-    # Resolve if user is a team member
+    # Resolve if user is a team member (exclude workspace owners accessing their own workspace)
     from app.models.team import TeamMember
-    stmt_member = select(TeamMember).where(TeamMember.email == user.email.lower())
+    stmt_member = select(TeamMember).where(TeamMember.email == user.email.lower()).where(TeamMember.user_id != user.id)
     res_member = await db.execute(stmt_member)
     member_record = res_member.scalar_one_or_none()
     
@@ -319,8 +319,9 @@ async def get_ad_accounts(
         result = await db.execute(stmt)
         synced_accounts = result.scalars().all()
         
-        # Filter by allowed_ad_accounts
-        allowed_list = member_record.allowed_ad_accounts.split(",") if member_record.allowed_ad_accounts else []
+        # Filter by allowed_ad_accounts safely
+        allowed_val = getattr(member_record, 'allowed_ad_accounts', None)
+        allowed_list = allowed_val.split(",") if allowed_val else []
         
         out_list = []
         for acc in synced_accounts:

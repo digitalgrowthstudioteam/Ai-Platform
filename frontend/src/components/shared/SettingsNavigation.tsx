@@ -13,7 +13,6 @@ export default function SettingsNavigation() {
     { label: "Account Settings", href: "/settings/account", icon: Settings },
     { label: "Ad Accounts", href: "/settings/ad-accounts", icon: Megaphone },
     { label: "Team Members", href: "/settings/team", icon: Users },
-    { label: "AI Intelligence Hub", href: "/settings/ai-intelligence", icon: Brain },
     { label: "Billing & Plans", href: "/settings/billing", icon: CreditCard },
   ];
 

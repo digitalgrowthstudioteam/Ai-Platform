@@ -28,16 +28,20 @@ async def get_my_profile(
     logger.info("get_profile_called", uid=claims.get("uid"))
     user = await get_db_user_from_claims(claims, db)
     
-    # Resolve team membership status
+    # Resolve team membership status (exclude workspace owners accessing their own workspace)
     from app.models.team import TeamMember
     from sqlalchemy import select
-    stmt_member = select(TeamMember).where(TeamMember.email == user.email.lower())
+    stmt_member = select(TeamMember).where(TeamMember.email == user.email.lower()).where(TeamMember.user_id != user.id)
     res_member = await db.execute(stmt_member)
     member_record = res_member.scalar_one_or_none()
     
     is_team_member = member_record is not None
-    allowed_tabs_list = member_record.allowed_tabs.split(",") if (member_record and member_record.allowed_tabs) else None
-    allowed_accounts_list = member_record.allowed_ad_accounts.split(",") if (member_record and member_record.allowed_ad_accounts) else None
+    
+    tabs_val = getattr(member_record, 'allowed_tabs', None)
+    allowed_tabs_list = tabs_val.split(",") if tabs_val else None
+    
+    accounts_val = getattr(member_record, 'allowed_ad_accounts', None)
+    allowed_accounts_list = accounts_val.split(",") if accounts_val else None
     
     return {
         "uid": claims.get("uid"),

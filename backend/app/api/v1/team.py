@@ -68,8 +68,12 @@ async def list_team_members(
     
     resp = []
     for m in members:
-        tabs_list = m.allowed_tabs.split(",") if m.allowed_tabs else ["/dashboard", "/briefs/daily", "/briefs/weekly", "/campaigns", "/ad-sets", "/ads"]
-        accounts_list = m.allowed_ad_accounts.split(",") if m.allowed_ad_accounts else []
+        tabs_val = getattr(m, 'allowed_tabs', None)
+        tabs_list = tabs_val.split(",") if tabs_val else ["/dashboard", "/briefs/daily", "/briefs/weekly", "/campaigns", "/ad-sets", "/ads"]
+        
+        accounts_val = getattr(m, 'allowed_ad_accounts', None)
+        accounts_list = accounts_val.split(",") if accounts_val else []
+        
         resp.append(TeamMemberResponse(
             id=m.id,
             email=m.email,
@@ -157,8 +161,12 @@ async def invite_team_member(
 
     logger.info("team_member_invited", owner_id=workspace_owner_id, member_id=member.id, email=member.email)
     
-    tabs_list = member.allowed_tabs.split(",") if member.allowed_tabs else ["/dashboard", "/briefs/daily", "/briefs/weekly", "/campaigns", "/ad-sets", "/ads"]
-    accounts_list = member.allowed_ad_accounts.split(",") if member.allowed_ad_accounts else []
+    tabs_val = getattr(member, 'allowed_tabs', None)
+    tabs_list = tabs_val.split(",") if tabs_val else ["/dashboard", "/briefs/daily", "/briefs/weekly", "/campaigns", "/ad-sets", "/ads"]
+    
+    accounts_val = getattr(member, 'allowed_ad_accounts', None)
+    accounts_list = accounts_val.split(",") if accounts_val else []
+    
     return TeamMemberResponse(
         id=member.id,
         email=member.email,
