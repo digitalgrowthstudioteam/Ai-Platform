@@ -841,14 +841,19 @@ class MetaSyncService:
             today_val = date.today()
             start_date = today_val - timedelta(days=historical_days)
 
-            # Generate time chunks (e.g. presets for <= 30 days, or 90-day intervals for larger ranges)
+            # Meta Graph API only retains performance metrics for up to 37 months (1110 days).
+            # Requesting dates older than 37 months throws a 400 Bad Request.
+            max_meta_retention_days = 37 * 30  # 1110 days
+            start_date = max(start_date, today_val - timedelta(days=max_meta_retention_days))
+
+            # Generate time chunks (e.g. presets for <= 30 days, or 30-day intervals for larger ranges)
             time_chunks = []
             if historical_days <= 30:
                 time_chunks = [("preset", "last_30d"), ("preset", "today")]
             else:
                 current_start = start_date
                 while current_start < today_val:
-                    current_end = min(current_start + timedelta(days=90), today_val)
+                    current_end = min(current_start + timedelta(days=30), today_val)
                     time_chunks.append(("range", current_start.strftime("%Y-%m-%d"), current_end.strftime("%Y-%m-%d")))
                     current_start = current_end + timedelta(days=1)
 

@@ -38,8 +38,14 @@ export default function TeamPage() {
     try {
       setLoading(true);
       const [membersData, subData, accountsData] = await Promise.all([
-        api.getTeamMembers(),
-        api.getSubscription(),
+        api.getTeamMembers().catch((err) => {
+          console.error("Failed to load team members:", err);
+          return [];
+        }),
+        api.getSubscription().catch((err) => {
+          console.error("Failed to load subscription in team settings:", err);
+          return null;
+        }),
         api.getMetaAccounts().catch(() => []),
       ]);
       setMembers(membersData);
