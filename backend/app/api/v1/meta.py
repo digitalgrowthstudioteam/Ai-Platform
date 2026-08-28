@@ -382,6 +382,11 @@ async def get_ad_accounts(
 
 
 async def run_sync_inline(ad_account_uuid: str):
+    """
+    Inline sync runner with automatic retry (3 attempts, exponential backoff)
+    and per-connection sequential queuing to prevent collisions.
+    """
+    import asyncio
     import structlog
     from app.services.meta_sync import MetaSyncService
     from app.services.recommendation_engine import RecommendationEngine
@@ -390,21 +395,57 @@ async def run_sync_inline(ad_account_uuid: str):
     
     log = structlog.get_logger()
     log.info("inline_sync_started", ad_account_uuid=ad_account_uuid)
-    try:
-        async with async_session_factory() as db:
-            service = MetaSyncService()
-            acc_uuid = uuid.UUID(ad_account_uuid)
-            stmt = select(MetaAdAccount).where(MetaAdAccount.id == acc_uuid)
-            res = await db.execute(stmt)
-            ad_acc = res.scalar_one_or_none()
-            if ad_acc:
-                await service.sync_ad_account(db, str(ad_acc.id))
+
+    MAX_RETRIES = 3
+    BACKOFF_BASE = 5  # seconds
+
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            async with async_session_factory() as db:
+                # Acquire per-connection sequential lock to prevent collisions
+                acc_uuid = uuid.UUID(ad_account_uuid)
+                stmt = select(MetaAdAccount).where(MetaAdAccount.id == acc_uuid)
+                res = await db.execute(stmt)
+                ad_acc = res.scalar_one_or_none()
+
+                if not ad_acc:
+                    log.error("inline_sync_account_not_found", ad_account_uuid=ad_account_uuid)
+                    return
+
+                # Check if another sync is already in progress for this connection
+                from app.models.meta import MetaConnection
+                stmt_conn = select(MetaConnection).where(MetaConnection.id == ad_acc.meta_connection_id)
+                res_conn = await db.execute(stmt_conn)
+                conn = res_conn.scalar_one_or_none()
+
+                if conn and conn.last_sync_status == "in_progress" and conn.last_sync_at:
+                    from datetime import timezone as tz
+                    last_sync_time = conn.last_sync_at
+                    if last_sync_time.tzinfo is None:
+                        last_sync_time = last_sync_time.replace(tzinfo=tz.utc)
+                    elapsed = (datetime.now(tz.utc) - last_sync_time).total_seconds()
+                    if elapsed < 600:
+                        # Another sync is actively running — wait and retry
+                        wait_time = min(30, BACKOFF_BASE * (2 ** (attempt - 1)))
+                        log.info("inline_sync_queued_waiting", ad_account_uuid=ad_account_uuid, attempt=attempt, wait_seconds=wait_time)
+                        await asyncio.sleep(wait_time)
+                        continue
+
+                service = MetaSyncService()
+                is_final_attempt = (attempt == MAX_RETRIES)
+                await service.sync_ad_account(db, str(ad_acc.id), suppress_failure_notification=not is_final_attempt)
                 await RecommendationEngine.compile_recommendations(db, ad_acc.id, ad_acc.user_id)
-                log.info("inline_sync_completed", ad_account_uuid=ad_account_uuid)
+                log.info("inline_sync_completed", ad_account_uuid=ad_account_uuid, attempt=attempt)
+                return  # Success — exit retry loop
+
+        except Exception as e:
+            log.error("inline_sync_attempt_failed", ad_account_uuid=ad_account_uuid, attempt=attempt, max_retries=MAX_RETRIES, error=str(e))
+            if attempt < MAX_RETRIES:
+                wait_time = BACKOFF_BASE * (2 ** (attempt - 1))  # 5s, 10s
+                log.info("inline_sync_retrying", ad_account_uuid=ad_account_uuid, next_attempt=attempt + 1, wait_seconds=wait_time)
+                await asyncio.sleep(wait_time)
             else:
-                log.error("inline_sync_account_not_found", ad_account_uuid=ad_account_uuid)
-    except Exception as e:
-        log.error("inline_sync_failed", ad_account_uuid=ad_account_uuid, error=str(e))
+                log.error("inline_sync_all_retries_exhausted", ad_account_uuid=ad_account_uuid, error=str(e))
 
 
 @router.post("/accounts/select", summary="Save active ad account selections")

@@ -13,17 +13,20 @@ from app.models.meta import MetaAdAccount, MetaConnection
 logger = structlog.get_logger()
 
 
-@celery_app.task(name="app.workers.tasks.sync_ad_account_task")
-def sync_ad_account_task(ad_account_id: str):
+@celery_app.task(name="app.workers.tasks.sync_ad_account_task", bind=True, max_retries=3, default_retry_delay=10)
+def sync_ad_account_task(self, ad_account_id: str):
     """
     Celery task to trigger marketing sync for a specific ad account.
-    Runs async sync logic inside synchronous task context.
+    Includes auto-retry (3 attempts with exponential backoff) and
+    sequential queue collision detection.
     """
     # Inline import to avoid circular dependency
     from app.services.meta_sync import MetaSyncService
     from app.services.recommendation_engine import RecommendationEngine
+    from datetime import datetime, timezone, timedelta
+    import time
 
-    logger.info("celery_sync_task_started", ad_account_id=ad_account_id)
+    logger.info("celery_sync_task_started", ad_account_id=ad_account_id, attempt=self.request.retries + 1)
 
     async def _run():
         async with async_session_factory() as db:
@@ -40,20 +43,40 @@ def sync_ad_account_task(ad_account_id: str):
             res = await db.execute(stmt)
             ad_acc = res.scalar_one_or_none()
             
-            if ad_acc:
-                await service.sync_ad_account(db, str(ad_acc.id))
-                await RecommendationEngine.compile_recommendations(db, ad_acc.id, ad_acc.user_id)
-            else:
+            if not ad_acc:
                 logger.error("celery_sync_ad_account_not_found", ad_account_id=ad_account_id)
+                return
+
+            # Sequential queue check: if another sync is in progress, wait
+            stmt_conn = select(MetaConnection).where(MetaConnection.id == ad_acc.meta_connection_id)
+            res_conn = await db.execute(stmt_conn)
+            conn = res_conn.scalar_one_or_none()
+
+            if conn and conn.last_sync_status == "in_progress" and conn.last_sync_at:
+                last_sync_time = conn.last_sync_at
+                if last_sync_time.tzinfo is None:
+                    last_sync_time = last_sync_time.replace(tzinfo=timezone.utc)
+                elapsed = (datetime.now(timezone.utc) - last_sync_time).total_seconds()
+                if elapsed < 600:
+                    raise Exception(f"Another sync is in progress (started {int(elapsed)}s ago). Queuing retry.")
+
+            is_final_attempt = (self.request.retries >= self.max_retries)
+            await service.sync_ad_account(db, str(ad_acc.id), suppress_failure_notification=not is_final_attempt)
+            await RecommendationEngine.compile_recommendations(db, ad_acc.id, ad_acc.user_id)
 
     try:
-        # Run async coroutine in thread event loop
         asyncio.run(_run())
         logger.info("celery_sync_task_completed", ad_account_id=ad_account_id)
         return {"status": "success", "ad_account_id": ad_account_id}
     except Exception as e:
-        logger.error("celery_sync_task_failed", ad_account_id=ad_account_id, error=str(e))
-        return {"status": "failed", "ad_account_id": ad_account_id, "error": str(e)}
+        logger.error("celery_sync_task_failed", ad_account_id=ad_account_id, attempt=self.request.retries + 1, error=str(e))
+        # Auto-retry with exponential backoff: 10s, 20s, 40s
+        retry_delay = 10 * (2 ** self.request.retries)
+        try:
+            raise self.retry(exc=e, countdown=retry_delay)
+        except self.MaxRetriesExceededError:
+            logger.error("celery_sync_all_retries_exhausted", ad_account_id=ad_account_id, error=str(e))
+            return {"status": "failed", "ad_account_id": ad_account_id, "error": str(e)}
 
 
 @celery_app.task(name="app.workers.tasks.trigger_all_active_syncs")

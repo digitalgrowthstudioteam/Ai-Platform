@@ -26,10 +26,14 @@ class MetaSyncService:
     Ingests and synchronizes Meta Ads entities and historical performance metrics.
     """
 
-    async def sync_ad_account(self, db: AsyncSession, ad_account_id: str) -> None:
+    async def sync_ad_account(self, db: AsyncSession, ad_account_id: str, suppress_failure_notification: bool = False) -> None:
         """
         Runs the full sync cycle for a specific ad account.
         Downloads marketing campaign structures and 30-day daily metrics.
+        
+        Args:
+            suppress_failure_notification: If True, skip creating a user-facing failure notification.
+                Used by retry callers so that only the final exhausted retry notifies the user.
         """
         # 1. Look up the ad account
         ad_acc = None
@@ -87,14 +91,15 @@ class MetaSyncService:
             conn.last_sync_status = "failed"
             conn.last_sync_error = str(e)
             
-            # Create failure notification
-            notif = Notification(
-                user_id=conn.user_id,
-                title="Meta Sync Failed",
-                message=f"Sync failed for ad account {ad_acc.account_name or ad_acc.meta_account_id}: {str(e)[:100]}.",
-                read=False
-            )
-            db.add(notif)
+            if not suppress_failure_notification:
+                # Create failure notification only on final attempt
+                notif = Notification(
+                    user_id=conn.user_id,
+                    title="Meta Sync Failed",
+                    message=f"Sync failed for ad account {ad_acc.account_name or ad_acc.meta_account_id}: {str(e)[:100]}.",
+                    read=False
+                )
+                db.add(notif)
             await db.commit()
             logger.error("meta_sync_failed", ad_account_id=ad_acc.meta_account_id, error=str(e))
             raise e
