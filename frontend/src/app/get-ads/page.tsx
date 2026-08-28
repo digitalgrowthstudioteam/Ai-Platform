@@ -1552,7 +1552,7 @@ function GetAdsPageContent() {
               {/* STEP 5: NUMBER OF ADS */}
               {currentStep === 5 && (
                 <div className="space-y-6 text-left">
-                  {eligibleState?.intro_offer_eligible ? (
+                  {eligibleState?.intro_offer_eligible && !isExistingPaidUser ? (
                     <div className="space-y-6 animate-in fade-in duration-200">
                       <div className="space-y-1">
                         <h2 className="text-2xl font-black text-slate-900">Special Promotion Active!</h2>
