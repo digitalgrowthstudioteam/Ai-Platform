@@ -258,15 +258,17 @@ export default function Topbar() {
             <span>Sync failed. Retry?</span>
           </button>
         ) : (
-          <div 
-            className={`topbar-sync ${syncClass} flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border border-border`} 
+          <button 
+            onClick={handleRetrySync}
+            className={`topbar-sync ${syncClass} flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border border-border cursor-pointer hover:bg-slate-50 transition outline-none`} 
             id="sync-status"
-            title={`Auto-syncs based on your plan interval`}
+            title="Click to sync Meta data now"
           >
             {syncIcon}
             <span>{syncLabel}</span>
-          </div>
+          </button>
         )}
+
 
         {/* Notifications */}
         <div className="relative" ref={notificationRef}>
