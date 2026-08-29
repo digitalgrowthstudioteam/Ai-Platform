@@ -62,7 +62,8 @@ class EmailService:
         smtp_port = int(current_settings.SMTP_PORT or os.environ.get("SMTP_PORT") or 587)
         smtp_user = current_settings.SMTP_USER or os.environ.get("SMTP_USER")
         smtp_password = current_settings.SMTP_PASSWORD or os.environ.get("SMTP_PASSWORD")
-        smtp_from = current_settings.SMTP_FROM or os.environ.get("SMTP_FROM") or "digitalgrowthstudioteam@digitalgrowthstudio.in"
+        smtp_from = current_settings.SMTP_FROM or os.environ.get("SMTP_FROM") or "noreply@digitalgrowthstudio.in"
+
 
         if smtp_user and smtp_password:
             logger.info("dispatching_smtp_email", to=to_email, host=smtp_host, port=smtp_port, sender=smtp_from)
