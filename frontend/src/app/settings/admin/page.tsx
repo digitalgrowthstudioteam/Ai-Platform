@@ -37,11 +37,11 @@ export default function AdminPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const [activeTab, setActiveTab] = useState<"overview" | "users" | "tickets" | "ads_services" | "ads_orders" | "ads_leads" | "finance">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "users" | "tickets" | "ads_services" | "ads_orders" | "ads_leads" | "finance" | "notifications">("overview");
 
   useEffect(() => {
     const tabParam = searchParams.get("tab");
-    if (tabParam && ["overview", "users", "tickets", "ads_services", "ads_orders", "ads_leads", "finance"].includes(tabParam)) {
+    if (tabParam && ["overview", "users", "tickets", "ads_services", "ads_orders", "ads_leads", "finance", "notifications"].includes(tabParam)) {
       setActiveTab(tabParam as any);
     }
   }, [searchParams]);
@@ -50,6 +50,15 @@ export default function AdminPage() {
   const [ticketsList, setTicketsList] = useState<any[]>([]);
   const [adsRequestsList, setAdsRequestsList] = useState<any[]>([]);
   const [adsOrdersList, setAdsOrdersList] = useState<any[]>([]);
+
+  // Email Notification Templates state
+  const [emailTemplates, setEmailTemplates] = useState<any[]>([]);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
+  const [editingTemplateKey, setEditingTemplateKey] = useState<string | null>(null);
+  const [editSubject, setEditSubject] = useState("");
+  const [editBody, setEditBody] = useState("");
+  const [editIsEnabled, setEditIsEnabled] = useState(true);
+
 
   // Ads Service filter states
   const [searchQuery, setSearchQuery] = useState("");
@@ -291,11 +300,52 @@ export default function AdminPage() {
     }
   };
 
+  const loadEmailTemplates = async () => {
+    try {
+      setTemplatesLoading(true);
+      const res = await api.getAdminEmailTemplates();
+      setEmailTemplates(res);
+    } catch (err) {
+      console.error("Failed to load email templates:", err);
+    } finally {
+      setTemplatesLoading(false);
+    }
+  };
+
+  const handleSaveTemplate = async (key: string) => {
+    try {
+      setActionLoading(`save_template_${key}`);
+      await api.updateAdminEmailTemplate(key, {
+        is_enabled: editIsEnabled,
+        subject_template: editSubject,
+        body_template: editBody,
+      });
+      setNotification({
+        type: "success",
+        message: "Successfully updated email template configuration!",
+      });
+      setEditingTemplateKey(null);
+      await loadEmailTemplates();
+    } catch (err: any) {
+      console.error(err);
+      setNotification({
+        type: "error",
+        message: err.message || "Failed to update email template.",
+      });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   useEffect(() => {
     if (activeTab === "finance" && isAdmin) {
       loadFinanceStats(financeStartDate, financeEndDate);
     }
+    if (activeTab === "notifications" && isAdmin) {
+      loadEmailTemplates();
+    }
   }, [activeTab, financeStartDate, financeEndDate, isAdmin]);
+
 
   useEffect(() => {
     if (!loadingAuth) {
@@ -477,7 +527,17 @@ export default function AdminPage() {
         >
           Finance Dashboard
         </button>
+        <button
+          onClick={() => setActiveTab("notifications")}
+          className={`pb-2.5 text-xs font-bold transition-all border-b-2 px-1 flex items-center gap-1.5 ${
+            activeTab === "notifications" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-400"
+          }`}
+        >
+          <Mail size={13} />
+          Email Notifications
+        </button>
       </div>
+
 
       {/* TAB CONTENT: Super Admin Dashboard */}
       {activeTab === "overview" && stats && (
@@ -2203,6 +2263,201 @@ export default function AdminPage() {
           )}
         </div>
       )}
+
+
+      {/* TAB CONTENT: Email Notifications Setup */}
+      {activeTab === "notifications" && (
+        <div className="space-y-6 text-left">
+          <div className="bg-white border border-slate-150 rounded-2xl p-6 shadow-xs">
+            <h3 className="text-sm font-extrabold text-slate-900 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+              <Mail size={16} className="text-blue-600" />
+              SaaS Email Notifications Setup
+            </h3>
+            <p className="text-xs text-slate-500 font-sans">
+              Configure transactional HTML email templates sent to clients through Brevo. You can enable/disable triggers, customize subjects, and format body templates.
+            </p>
+          </div>
+
+          {templatesLoading ? (
+            <div className="flex h-64 items-center justify-center bg-white border border-slate-150 rounded-2xl">
+              <Loader2 className="animate-spin text-blue-600" size={24} />
+              <span className="ml-2 text-xs text-slate-500 font-medium">Fetching active templates...</span>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 font-sans">
+              {/* Left Side: Templates List */}
+              <div className="lg:col-span-1 space-y-4">
+                <div className="bg-slate-50 border border-slate-150 rounded-2xl p-4">
+                  <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3">
+                    Available Email Triggers ({emailTemplates.length})
+                  </h4>
+                  <div className="space-y-3">
+                    {emailTemplates.map((template) => {
+                      const triggerKey = template.trigger_key;
+                      const friendlyNameMap: Record<string, string> = {
+                        welcome_user: "User Welcome Onboarding",
+                        team_invitation: "Workspace Team Invitation",
+                        sync_completed: "Ad Sync Success Notification",
+                        quotation_created: "Meta Ads Quote Generated",
+                        payment_confirmation: "Subscription Billing Success",
+                        account_deleted: "Account Deletion Warning",
+                      };
+                      const friendlyName = friendlyNameMap[triggerKey] || triggerKey;
+
+                      const isSelected = editingTemplateKey === triggerKey;
+
+
+                      return (
+                        <div
+                          key={triggerKey}
+                          onClick={() => {
+                            setEditingTemplateKey(triggerKey);
+                            setEditSubject(template.subject_template);
+                            setEditBody(template.body_template);
+                            setEditIsEnabled(template.is_enabled);
+                          }}
+                          className={`p-4 border rounded-xl transition cursor-pointer text-left bg-white ${
+                            isSelected 
+                              ? "border-blue-600 ring-2 ring-blue-55 shadow-xs" 
+                              : "border-slate-150 hover:border-blue-300"
+                          }`}
+                        >
+                          <div className="flex justify-between items-start gap-2">
+                            <span className="text-xs font-bold text-slate-800 block">{friendlyName}</span>
+                            <span className={`px-2 py-0.5 border rounded-full text-[8px] font-extrabold uppercase shrink-0 ${
+                              template.is_enabled 
+                                ? "bg-emerald-55 text-emerald-800 border-emerald-100" 
+                                : "bg-slate-100 text-slate-500 border-slate-200"
+                            }`}>
+                              {template.is_enabled ? "Enabled" : "Disabled"}
+                            </span>
+                          </div>
+                          <span className="text-[9px] font-mono text-slate-400 block mt-1">trigger: {triggerKey}</span>
+                          <span className="text-[10px] text-slate-500 mt-2 block truncate font-medium">
+                            {template.subject_template}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Side: Detailed Editor */}
+              <div className="lg:col-span-2">
+                {editingTemplateKey ? (
+                  <div className="bg-white border border-slate-150 rounded-2xl p-6 shadow-xs space-y-5 text-left">
+                    <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                      <div>
+                        <h4 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider">
+                          Edit Template Configuration
+                        </h4>
+                        <span className="text-[10px] font-mono text-slate-400 block mt-0.5">
+                          Trigger Key: {editingTemplateKey}
+                        </span>
+                      </div>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={editIsEnabled}
+                          onChange={(e) => setEditIsEnabled(e.target.checked)}
+                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
+                        />
+                        <span className="text-xs font-bold text-slate-700 select-none">Enable Email Delivery</span>
+                      </label>
+                    </div>
+
+                    <div className="space-y-4">
+                      {/* Supported Variables Guide */}
+                      <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-4 space-y-1.5">
+                        <span className="text-[10px] font-extrabold text-blue-700 uppercase tracking-wide block">
+                          Supported Format Placeholders
+                        </span>
+                        <p className="text-[10px] text-blue-600 leading-relaxed font-medium">
+                          These fields will be resolved dynamically at sending time. Do not modify the names inside curly brackets:
+                        </p>
+                        <div className="flex flex-wrap gap-1.5 pt-1">
+                          {((
+                            {
+                              welcome_user: ["user_name", "login_link"],
+                              team_invitation: ["invitee_name", "inviter_name", "invite_link"],
+                              sync_completed: ["account_name", "dashboard_link"],
+                              quotation_created: ["client_name", "quotation_link"],
+                              payment_confirmation: ["user_name", "plan_name", "amount_inr"],
+                              account_deleted: ["user_name"],
+                            } as Record<string, string[]>
+                          )[editingTemplateKey] || []).map((v) => (
+                            <code key={v} className="bg-blue-100/70 border border-blue-150 text-[9px] font-bold text-blue-800 px-2 py-0.5 rounded font-mono">
+                              {"{" + v + "}"}
+                            </code>
+                          ))}
+                        </div>
+
+                      </div>
+
+                      {/* Subject Input */}
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
+                          Email Subject Template *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={editSubject}
+                          onChange={(e) => setEditSubject(e.target.value)}
+                          placeholder="e.g. Welcome to Digital Growth Studio, {user_name}!"
+                          className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-xs bg-white font-bold text-slate-800 focus:ring-1 focus:ring-blue-500 outline-none"
+                        />
+                      </div>
+
+                      {/* Body Input */}
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
+                          Email HTML Body Template *
+                        </label>
+                        <textarea
+                          rows={12}
+                          required
+                          value={editBody}
+                          onChange={(e) => setEditBody(e.target.value)}
+                          placeholder="<h1>Hello {user_name}</h1>..."
+                          className="w-full border border-slate-200 rounded-xl p-4 text-xs font-mono bg-slate-50 text-slate-800 focus:ring-1 focus:ring-blue-500 outline-none leading-relaxed"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end gap-3 border-t border-slate-100 pt-4">
+                      <button
+                        onClick={() => setEditingTemplateKey(null)}
+                        className="border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold px-4 py-2 rounded-xl text-[10px] uppercase tracking-wider cursor-pointer transition"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => handleSaveTemplate(editingTemplateKey)}
+                        disabled={actionLoading === `save_template_${editingTemplateKey}`}
+                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-2 rounded-xl text-[10px] uppercase tracking-wider cursor-pointer transition disabled:opacity-50 flex items-center gap-1.5"
+                      >
+                        {actionLoading === `save_template_${editingTemplateKey}` && <Loader2 size={12} className="animate-spin" />}
+                        Save Configuration
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-slate-50/50 border border-slate-150 border-dashed rounded-2xl p-12 text-center text-slate-400 h-full flex flex-col items-center justify-center min-h-[400px]">
+                    <Mail className="text-slate-300 mb-3" size={48} />
+                    <p className="text-xs font-bold text-slate-700">No Email Template Selected</p>
+                    <p className="text-[10px] text-slate-500 mt-1 max-w-xs">
+                      Select any of the transactional triggers from the left panel to configure its HTML templates.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
 
       {/* Manual Expense Form Modal */}
       {showAddExpenseModal && (

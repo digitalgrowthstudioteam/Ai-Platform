@@ -1,3 +1,4 @@
+import asyncio
 import smtplib
 import structlog
 from email.mime.text import MIMEText
@@ -9,9 +10,85 @@ from app.config import get_settings
 logger = structlog.get_logger()
 settings = get_settings()
 
+
+def _send_smtp_blocking(
+    smtp_host: str,
+    smtp_port: int,
+    smtp_user: str,
+    smtp_password: str,
+    smtp_from: str,
+    to_email: str,
+    subject: str,
+    content: str,
+    is_html: bool = False
+) -> bool:
+    """
+    Synchronous SMTP helper executed in a worker thread with strict 10s socket timeout.
+    """
+    try:
+        msg = MIMEMultipart()
+        msg['From'] = smtp_from
+        msg['To'] = to_email
+        msg['Subject'] = subject
+        msg.attach(MIMEText(content, 'html' if is_html else 'plain'))
+
+        server = smtplib.SMTP(smtp_host, int(smtp_port), timeout=10)
+        server.starttls()
+        server.login(smtp_user, smtp_password)
+        server.sendmail(smtp_from, to_email, msg.as_string())
+        server.close()
+        logger.info("smtp_email_sent_successfully", to=to_email, subject=subject)
+        return True
+    except Exception as e:
+        logger.error("smtp_delivery_failed", error=str(e), to=to_email, host=smtp_host, port=smtp_port)
+        return False
+
+
 class EmailService:
     @classmethod
-    async def send_invitation_email(cls, to_email: str, invitee_name: str, inviter_name: str, invite_link: str, db: Optional[AsyncSession] = None) -> bool:
+    async def _dispatch_smtp(
+        cls,
+        to_email: str,
+        subject: str,
+        content: str,
+        is_html: bool = False
+    ) -> bool:
+        """
+        Helper method to dispatch emails via non-blocking worker thread pool.
+        """
+        smtp_host = getattr(settings, "SMTP_HOST", None)
+        smtp_port = getattr(settings, "SMTP_PORT", 587)
+        smtp_user = getattr(settings, "SMTP_USER", None)
+        smtp_password = getattr(settings, "SMTP_PASSWORD", None)
+        smtp_from = getattr(settings, "SMTP_FROM", "noreply@digitalgrowthstudio.in")
+
+        if smtp_host and smtp_user and smtp_password:
+            logger.info("dispatching_smtp_email", to=to_email, host=smtp_host, port=smtp_port, sender=smtp_from)
+            return await asyncio.to_thread(
+                _send_smtp_blocking,
+                smtp_host,
+                smtp_port,
+                smtp_user,
+                smtp_password,
+                smtp_from,
+                to_email,
+                subject,
+                content,
+                is_html
+            )
+        else:
+            logger.info("smtp_not_configured_logging_body", to=to_email, subject=subject, content_snippet=content[:100])
+            return True
+
+    @classmethod
+    async def send_invitation_email(
+        cls,
+        to_email: str,
+        invitee_name: str,
+        inviter_name: str,
+        invite_link: str,
+        db: Optional[AsyncSession] = None
+    ) -> bool:
         if db:
             return await cls.send_template_email(
                 to_email=to_email,
@@ -25,8 +102,7 @@ class EmailService:
             )
 
         subject = f"You've been invited to join {inviter_name}'s workspace on Digital Growth Studio"
-        body = f"""
-Hello {invitee_name or 'Colleague'},
+        body = f"""Hello {invitee_name or 'Colleague'},
 
 {inviter_name} has invited you to join their workspace on Digital Growth Studio — AI Ads Optimizer.
 
@@ -36,37 +112,7 @@ Click the link below to accept the invitation and set up your account:
 Welcome to the team!
 The Digital Growth Studio Team
 """
-        
-        logger.info("sending_invitation_email_fallback", to=to_email, subject=subject, inviter=inviter_name)
-        
-        # Check SMTP settings in config
-        smtp_host = getattr(settings, "SMTP_HOST", None)
-        smtp_port = getattr(settings, "SMTP_PORT", 587)
-        smtp_user = getattr(settings, "SMTP_USER", None)
-        smtp_password = getattr(settings, "SMTP_PASSWORD", None)
-        smtp_from = getattr(settings, "SMTP_FROM", "noreply@digitalgrowthstudio.in")
-
-        if smtp_host and smtp_user and smtp_password:
-            try:
-                msg = MIMEMultipart()
-                msg['From'] = smtp_from
-                msg['To'] = to_email
-                msg['Subject'] = subject
-                msg.attach(MIMEText(body, 'plain'))
-                
-                server = smtplib.SMTP(smtp_host, smtp_port)
-                server.starttls()
-                server.login(smtp_user, smtp_password)
-                server.sendmail(smtp_from, to_email, msg.as_string())
-                server.close()
-                logger.info("email_sent_successfully", to=to_email)
-                return True
-            except Exception as e:
-                logger.error("email_smtp_failed", error=str(e), to=to_email)
-                return False
-        else:
-            logger.info("email_smtp_not_configured_logging_body", body=body)
-            return True
+        return await cls._dispatch_smtp(to_email, subject, body, is_html=False)
 
     @staticmethod
     async def send_status_update_email(
@@ -77,7 +123,6 @@ The Digital Growth Studio Team
         new_status: str,
         order_id: str
     ) -> bool:
-        # Friendly status names mapping
         status_names = {
             "whatsapp_pending": "WhatsApp Connection Pending",
             "whatsapp_connected": "Connected on WhatsApp",
@@ -106,35 +151,7 @@ Please log into your Digital Growth Studio dashboard to view the latest details:
 Best regards,
 The Digital Growth Studio Team
 """
-        logger.info("sending_status_update_email", to=to_email, subject=subject, order_id=order_id)
-
-        smtp_host = getattr(settings, "SMTP_HOST", None)
-        smtp_port = getattr(settings, "SMTP_PORT", 587)
-        smtp_user = getattr(settings, "SMTP_USER", None)
-        smtp_password = getattr(settings, "SMTP_PASSWORD", None)
-        smtp_from = getattr(settings, "SMTP_FROM", "noreply@digitalgrowthstudio.in")
-
-        if smtp_host and smtp_user and smtp_password:
-            try:
-                msg = MIMEMultipart()
-                msg['From'] = smtp_from
-                msg['To'] = to_email
-                msg['Subject'] = subject
-                msg.attach(MIMEText(body, 'plain'))
-
-                server = smtplib.SMTP(smtp_host, smtp_port)
-                server.starttls()
-                server.login(smtp_user, smtp_password)
-                server.sendmail(smtp_from, to_email, msg.as_string())
-                server.close()
-                logger.info("status_update_email_sent_successfully", to=to_email)
-                return True
-            except Exception as e:
-                logger.error("status_update_email_smtp_failed", error=str(e), to=to_email)
-                return False
-        else:
-            logger.info("status_update_email_smtp_not_configured_logging_body", body=body)
-            return True
+        return await EmailService._dispatch_smtp(to_email, subject, body, is_html=False)
 
     @classmethod
     async def send_template_email(
@@ -150,7 +167,7 @@ The Digital Growth Studio Team
         """
         from app.models.email_config import EmailTemplateConfig
         from sqlalchemy import select
-        
+
         # 1. Query DB template
         try:
             stmt = select(EmailTemplateConfig).where(EmailTemplateConfig.trigger_key == trigger_key)
@@ -171,7 +188,6 @@ The Digital Growth Studio Team
             subject = config.subject_template
             body = config.body_template
         else:
-            # Fallbacks matching config_seeder defaults
             from app.services.config_seeder import DEFAULT_EMAIL_TEMPLATES
             fallback = DEFAULT_EMAIL_TEMPLATES.get(trigger_key)
             if fallback:
@@ -189,36 +205,5 @@ The Digital Growth Studio Team
             logger.error("failed_formatting_email_template", trigger_key=trigger_key, error=str(fmt_err))
             pass
 
-        # 4. Ingress SMTP delivery
-        smtp_host = getattr(settings, "SMTP_HOST", None)
-        smtp_port = getattr(settings, "SMTP_PORT", 587)
-        smtp_user = getattr(settings, "SMTP_USER", None)
-        smtp_password = getattr(settings, "SMTP_PASSWORD", None)
-        smtp_from = getattr(settings, "SMTP_FROM", "noreply@digitalgrowthstudio.in")
-
-        logger.info("dispatching_template_email", to=to_email, trigger_key=trigger_key, subject=subject)
-
-        if smtp_host and smtp_user and smtp_password:
-            try:
-                msg = MIMEMultipart()
-                msg['From'] = smtp_from
-                msg['To'] = to_email
-                msg['Subject'] = subject
-                
-                # HTML template injection
-                msg.attach(MIMEText(body, 'html'))
-                
-                server = smtplib.SMTP(smtp_host, smtp_port)
-                server.starttls()
-                server.login(smtp_user, smtp_password)
-                server.sendmail(smtp_from, to_email, msg.as_string())
-                server.close()
-                logger.info("template_email_sent_successfully", to=to_email, trigger_key=trigger_key)
-                return True
-            except Exception as e:
-                logger.error("template_email_smtp_failed", error=str(e), to=to_email, trigger_key=trigger_key)
-                return False
-        else:
-            logger.info("template_email_smtp_not_configured_logging_body", trigger_key=trigger_key, body=body)
-            return True
-
+        # 4. Non-blocking Async SMTP Delivery
+        return await cls._dispatch_smtp(to_email, subject, body, is_html=True)

@@ -797,6 +797,19 @@ class ApiClient {
     });
   }
 
+  // Admin Email Templates Endpoints
+  async getAdminEmailTemplates() {
+    return this.request<any[]>("/admin/email-templates");
+  }
+
+  async updateAdminEmailTemplate(triggerKey: string, payload: { is_enabled?: boolean; subject_template?: string; body_template?: string }) {
+    return this.request<any>(`/admin/email-templates/${triggerKey}`, {
+      method: "PUT",
+      body: payload,
+    });
+  }
+
+
   // Notifications Endpoints
   async getNotifications() {
     return this.request<any[]>("/notifications");
