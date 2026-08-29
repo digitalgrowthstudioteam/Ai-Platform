@@ -1,4 +1,5 @@
 import asyncio
+import os
 import smtplib
 import structlog
 from email.mime.text import MIMEText
@@ -8,7 +9,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import get_settings
 
 logger = structlog.get_logger()
-settings = get_settings()
 
 
 def _send_smtp_blocking(
@@ -56,13 +56,15 @@ class EmailService:
         """
         Helper method to dispatch emails via non-blocking worker thread pool.
         """
-        smtp_host = getattr(settings, "SMTP_HOST", None)
-        smtp_port = getattr(settings, "SMTP_PORT", 587)
-        smtp_user = getattr(settings, "SMTP_USER", None)
-        smtp_password = getattr(settings, "SMTP_PASSWORD", None)
-        smtp_from = getattr(settings, "SMTP_FROM", "noreply@digitalgrowthstudio.in")
+        current_settings = get_settings()
 
-        if smtp_host and smtp_user and smtp_password:
+        smtp_host = current_settings.SMTP_HOST or os.environ.get("SMTP_HOST") or "smtp-relay.brevo.com"
+        smtp_port = int(current_settings.SMTP_PORT or os.environ.get("SMTP_PORT") or 587)
+        smtp_user = current_settings.SMTP_USER or os.environ.get("SMTP_USER")
+        smtp_password = current_settings.SMTP_PASSWORD or os.environ.get("SMTP_PASSWORD")
+        smtp_from = current_settings.SMTP_FROM or os.environ.get("SMTP_FROM") or "digitalgrowthstudioteam@digitalgrowthstudio.in"
+
+        if smtp_user and smtp_password:
             logger.info("dispatching_smtp_email", to=to_email, host=smtp_host, port=smtp_port, sender=smtp_from)
             return await asyncio.to_thread(
                 _send_smtp_blocking,
@@ -77,8 +79,8 @@ class EmailService:
                 is_html
             )
         else:
-            logger.info("smtp_not_configured_logging_body", to=to_email, subject=subject, content_snippet=content[:100])
-            return True
+            logger.error("smtp_credentials_missing_on_server", to=to_email, subject=subject, user_present=bool(smtp_user), pass_present=bool(smtp_password))
+            return False
 
     @classmethod
     async def send_invitation_email(
@@ -146,7 +148,7 @@ Previous Status: {old_str}
 Current Status: {new_str}
 
 Please log into your Digital Growth Studio dashboard to view the latest details:
-{getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')}/dashboard/orders
+{getattr(get_settings(), 'FRONTEND_URL', 'https://digitalgrowthstudio.in')}/dashboard/orders
 
 Best regards,
 The Digital Growth Studio Team
