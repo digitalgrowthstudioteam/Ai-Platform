@@ -75,7 +75,7 @@ async def list_team_members(
     Returns list of invited team members for the currently logged in workspace owner.
     """
     user = await get_db_user_from_claims(claims, db)
-    workspace_owner_id = await resolve_workspace_owner_id(user, db)
+    workspace_owner_id = user.id
 
     stmt = select(TeamMember).where(TeamMember.user_id == workspace_owner_id).order_by(TeamMember.created_at.desc())
 
@@ -113,11 +113,9 @@ async def invite_team_member(
     Invites a team member under plan entitlements seat caps.
     """
     user = await get_db_user_from_claims(claims, db)
-    workspace_owner_id = await resolve_workspace_owner_id(user, db)
-    
-    stmt_owner_user = select(User).where(User.id == workspace_owner_id)
-    res_owner_user = await db.execute(stmt_owner_user)
-    workspace_owner = res_owner_user.scalar_one()
+    workspace_owner_id = user.id
+    workspace_owner = user
+
 
 
     # 1. Resolve plan entitlements for team members limit
@@ -207,8 +205,8 @@ async def remove_team_member(
     """
     Revokes team access and deletes the team member record.
     """
-    user = await get_db_user_from_claims(claims, db)
-    workspace_owner_id = await resolve_workspace_owner_id(user, db)
+    workspace_owner_id = user.id
+
 
 
     stmt = select(TeamMember).where(TeamMember.id == member_id).where(TeamMember.user_id == workspace_owner_id)
