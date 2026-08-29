@@ -963,10 +963,7 @@ export default function LandingPage() {
                   <Check size={14} className="text-blue-600 shrink-0" />
                   <span>Fatigue & Anomaly Detection</span>
                 </li>
-                <li className="flex items-center gap-2">
-                  <Check size={14} className="text-blue-600 shrink-0" />
-                  <span>3 Team Members</span>
-                </li>
+
               </ul>
             </div>
             <Link
@@ -1015,10 +1012,7 @@ export default function LandingPage() {
                   <Check size={14} className="text-indigo-600 shrink-0" />
                   <span>Industry Benchmarking</span>
                 </li>
-                <li className="flex items-center gap-2">
-                  <Check size={14} className="text-indigo-600 shrink-0" />
-                  <span>10 Team Members</span>
-                </li>
+
               </ul>
             </div>
             <Link
@@ -1063,10 +1057,7 @@ export default function LandingPage() {
                   <Check size={14} className="text-purple-600 shrink-0" />
                   <span>Cross-Client Portfolio Analytics</span>
                 </li>
-                <li className="flex items-center gap-2">
-                  <Check size={14} className="text-purple-600 shrink-0" />
-                  <span>25 Team Members</span>
-                </li>
+
               </ul>
             </div>
             <Link

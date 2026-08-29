@@ -12,9 +12,9 @@ export default function SettingsNavigation() {
   const tabs = [
     { label: "Account Settings", href: "/settings/account", icon: Settings },
     { label: "Ad Accounts", href: "/settings/ad-accounts", icon: Megaphone },
-    { label: "Team Members", href: "/settings/team", icon: Users },
     { label: "Billing & Plans", href: "/settings/billing", icon: CreditCard },
   ];
+
 
   return (
     <div className="flex flex-wrap items-center gap-1.5 border-b border-slate-100 pb-3 mb-6">

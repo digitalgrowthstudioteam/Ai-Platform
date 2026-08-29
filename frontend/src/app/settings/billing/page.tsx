@@ -424,12 +424,7 @@ export default function BillingPage() {
                   </div>
                 </div>
 
-                <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl space-y-0.5">
-                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Team Members</div>
-                  <div className="text-base font-extrabold text-slate-900">
-                    {sub.resolved_entitlements?.max_team_members} Seats
-                  </div>
-                </div>
+
               </div>
 
               {/* Active Add-Ons List */}
@@ -596,10 +591,7 @@ export default function BillingPage() {
                       <Check size={13} className="text-blue-600 shrink-0" />
                       <span>Fatigue & Anomaly Detection</span>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <Check size={13} className="text-blue-600 shrink-0" />
-                      <span>3 Team Members</span>
-                    </div>
+
                   </div>
                 </div>
 
@@ -658,10 +650,7 @@ export default function BillingPage() {
                       <Check size={13} className="text-indigo-600 shrink-0" />
                       <span>Industry Benchmarking</span>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <Check size={13} className="text-indigo-600 shrink-0" />
-                      <span>10 Team Members</span>
-                    </div>
+
                   </div>
                 </div>
 
@@ -716,10 +705,7 @@ export default function BillingPage() {
                       <Check size={13} className="text-purple-600 shrink-0" />
                       <span>Cross-Client Portfolio Analytics</span>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <Check size={13} className="text-purple-600 shrink-0" />
-                      <span>25 Team Members</span>
-                    </div>
+
                   </div>
                 </div>
 
@@ -929,51 +915,7 @@ export default function BillingPage() {
                 </button>
               </div>
 
-              {/* Addon 5: Additional Team Member */}
-              <div className="bg-white border border-slate-200 p-6 rounded-2xl shadow-xs space-y-4 flex flex-col justify-between">
-                <div className="space-y-2">
-                  <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl w-fit">
-                    <Users size={20} />
-                  </div>
-                  <h3 className="text-sm font-bold text-slate-900">Additional Team Member</h3>
-                  <div className="text-xl font-extrabold text-slate-950">
-                    ₹199 <span className="text-xs text-slate-400 font-normal">/ month / member</span>
-                  </div>
-                  <p className="text-xs text-slate-500 leading-relaxed font-normal">
-                    Adds 1 additional team seat beyond your subscription plan's included limit.
-                  </p>
-                </div>
 
-                <div className="space-y-3 pt-2">
-                  <div className="flex items-center justify-between text-xs font-semibold">
-                    <span className="text-slate-600">Quantity:</span>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => setAddonQuantities(q => ({ ...q, additional_team_member: Math.max(1, (q.additional_team_member || 1) - 1) }))}
-                        className="w-7 h-7 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md font-bold flex items-center justify-center"
-                      >
-                        -
-                      </button>
-                      <span className="w-6 text-center font-bold">{addonQuantities.additional_team_member || 1}</span>
-                      <button
-                        onClick={() => setAddonQuantities(q => ({ ...q, additional_team_member: (q.additional_team_member || 1) + 1 }))}
-                        className="w-7 h-7 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md font-bold flex items-center justify-center"
-                      >
-                        +
-                      </button>
-                    </div>
-                  </div>
-
-                  <button
-                    disabled={actionLoading === "addon_additional_team_member"}
-                    onClick={() => handleAddonCheckout("additional_team_member")}
-                    className="w-full py-2.5 rounded-xl font-bold text-xs bg-slate-900 hover:bg-slate-800 text-white transition flex items-center justify-center gap-1.5 shadow-xs"
-                  >
-                    {actionLoading === "addon_additional_team_member" && <Loader2 size={12} className="animate-spin" />}
-                    <span>Add +{addonQuantities.additional_team_member || 1} Team Seat</span>
-                  </button>
-                </div>
-              </div>
             </div>
           </div>
 
