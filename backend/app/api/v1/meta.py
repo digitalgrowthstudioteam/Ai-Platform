@@ -770,7 +770,9 @@ async def trigger_sync(
                 conn.last_sync_error = "Sync timed out / aborted"
                 await db.commit()
     
-    stmt = select(MetaAdAccount).where(MetaAdAccount.user_id == user.id)
+    accessible_ids = await EntitlementEngine.get_accessible_user_ids(user, db)
+    stmt = select(MetaAdAccount).where(MetaAdAccount.user_id.in_(accessible_ids))
+
     if payload and payload.ad_account_id:
         # Match either UUID or Meta Ad account ID string
         stmt = stmt.where(
