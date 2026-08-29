@@ -672,6 +672,33 @@ class MetaSyncService:
 
         await db.commit()
 
+    async def _fetch_meta_json_with_fallback(
+        self,
+        client: httpx.AsyncClient,
+        primary_url: str,
+        fallback_url: str,
+        headers: dict
+    ) -> list:
+        try:
+            r = await client.get(primary_url, headers=headers)
+            r.raise_for_status()
+            return r.json().get("data", [])
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code in (400, 403) and fallback_url:
+                logger.warning(
+                    "meta_api_extended_fields_failed_trying_fallback",
+                    primary=primary_url,
+                    fallback=fallback_url,
+                    status=e.response.status_code
+                )
+                try:
+                    r_fb = await client.get(fallback_url, headers=headers)
+                    r_fb.raise_for_status()
+                    return r_fb.json().get("data", [])
+                except Exception as fb_err:
+                    logger.error("meta_api_fallback_also_failed", error=str(fb_err))
+            raise e
+
     async def _sync_live_data(self, db: AsyncSession, ad_acc: MetaAdAccount, token: str) -> None:
         """
         Performs HTTP API requests against Meta Marketing Graph API.
@@ -682,11 +709,10 @@ class MetaSyncService:
         account_id = ad_acc.meta_account_id
 
         async with httpx.AsyncClient(timeout=60.0) as client:
-            # 1. Fetch campaigns
-            camp_url = f"https://graph.facebook.com/{api_ver}/{account_id}/campaigns?fields=id,name,objective,status,buying_type,daily_budget,lifetime_budget&limit=250"
-            r = await client.get(camp_url, headers=headers)
-            r.raise_for_status()
-            campaigns_list = r.json().get("data", [])
+            # 1. Fetch campaigns with field fallback
+            camp_url_primary = f"https://graph.facebook.com/{api_ver}/{account_id}/campaigns?fields=id,name,objective,status,buying_type,daily_budget,lifetime_budget&limit=250"
+            camp_url_fallback = f"https://graph.facebook.com/{api_ver}/{account_id}/campaigns?fields=id,name,objective,status&limit=250"
+            campaigns_list = await self._fetch_meta_json_with_fallback(client, camp_url_primary, camp_url_fallback, headers)
 
             campaign_map = {}
             for mc in campaigns_list:
@@ -712,11 +738,10 @@ class MetaSyncService:
                 res = await db.execute(stmt)
                 campaign_map[mc["id"]] = res.scalar()
 
-            # 2. Fetch ad sets with Performance Goal fields
-            adsets_url = f"https://graph.facebook.com/{api_ver}/{account_id}/adsets?fields=id,name,campaign{{id}},status,optimization_goal,billing_event,destination_type,promoted_object,daily_budget,lifetime_budget&limit=250"
-            r = await client.get(adsets_url, headers=headers)
-            r.raise_for_status()
-            adsets_list = r.json().get("data", [])
+            # 2. Fetch ad sets with Performance Goal fields & fallback
+            adsets_url_primary = f"https://graph.facebook.com/{api_ver}/{account_id}/adsets?fields=id,name,campaign{{id}},status,optimization_goal,billing_event,destination_type,promoted_object,daily_budget,lifetime_budget&limit=250"
+            adsets_url_fallback = f"https://graph.facebook.com/{api_ver}/{account_id}/adsets?fields=id,name,campaign{{id}},status&limit=250"
+            adsets_list = await self._fetch_meta_json_with_fallback(client, adsets_url_primary, adsets_url_fallback, headers)
 
             adset_map = {}
             for ma in adsets_list:
@@ -760,11 +785,11 @@ class MetaSyncService:
                 res = await db.execute(stmt)
                 adset_map[ma["id"]] = res.scalar()
 
-            # 3. Fetch Ads and Creatives
-            ads_url = f"https://graph.facebook.com/{api_ver}/{account_id}/ads?fields=id,name,adset{{id}},status,creative{{id,title,body,image_url,url_tags}}&limit=250"
-            r = await client.get(ads_url, headers=headers)
-            r.raise_for_status()
-            ads_list = r.json().get("data", [])
+            # 3. Fetch Ads and Creatives with field fallback
+            ads_url_primary = f"https://graph.facebook.com/{api_ver}/{account_id}/ads?fields=id,name,adset{{id}},status,creative{{id,title,body,image_url,url_tags}}&limit=250"
+            ads_url_fallback = f"https://graph.facebook.com/{api_ver}/{account_id}/ads?fields=id,name,adset{{id}},status&limit=250"
+            ads_list = await self._fetch_meta_json_with_fallback(client, ads_url_primary, ads_url_fallback, headers)
+
 
             ad_map = {}
             for ma in ads_list:

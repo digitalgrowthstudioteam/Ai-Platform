@@ -142,7 +142,8 @@ async def trigger_all_active_syncs_async():
             
             if user:
                 entitlements = await EntitlementEngine.resolve_entitlements(user, db)
-                interval_hours = entitlements.get("sync_interval_hours", 48)
+                interval_hours = min(entitlements.get("sync_interval_hours", 2), 2)
+
                 
                 should_sync = True
                 if conn and conn.last_sync_at:
