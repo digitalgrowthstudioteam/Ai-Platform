@@ -1,6 +1,8 @@
+import asyncio
 import uuid
 import structlog
 from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr
 from sqlalchemy import select, func
@@ -149,16 +151,19 @@ async def invite_team_member(
     await db.commit()
     await db.refresh(member)
 
-    # 5. Send Email Invitation
+    # 5. Send Email Invitation in non-blocking background task
     settings = get_settings()
     invite_link = f"{settings.FRONTEND_URL}/login"
-    await EmailService.send_invitation_email(
-        to_email=req.email.lower(),
-        invitee_name=req.name,
-        inviter_name=user.name or user.email,
-        invite_link=invite_link,
-        db=db
+    asyncio.create_task(
+        EmailService.send_invitation_email(
+            to_email=req.email.lower(),
+            invitee_name=req.name or "Colleague",
+            inviter_name=user.name or user.email,
+            invite_link=invite_link,
+            db=None
+        )
     )
+
 
     logger.info("team_member_invited", owner_id=workspace_owner_id, member_id=member.id, email=member.email)
     
