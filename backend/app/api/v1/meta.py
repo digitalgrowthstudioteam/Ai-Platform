@@ -6,7 +6,8 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query, status, BackgroundTasks
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
-from sqlalchemy import select, delete, update, String
+from sqlalchemy import select, delete, update, String, func
+
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 
@@ -320,24 +321,16 @@ async def get_ad_accounts(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Retrieves available ad accounts for current user or team member with flexible filtering.
+    Retrieves available ad accounts for current user.
+    If no ad accounts exist in DB yet, queries Meta Graph API live to discover and register them.
     """
     user = await get_db_user_from_claims(claims, db)
-    from app.services.entitlement_engine import EntitlementEngine
-    accessible_ids = await EntitlementEngine.get_accessible_user_ids(user, db)
     
-    # Check if user is a team member in another workspace
-    from app.models.team import TeamMember
-    stmt_member = select(TeamMember).where(func.lower(TeamMember.email) == user.email.lower()).where(TeamMember.user_id != user.id)
-    res_member = await db.execute(stmt_member)
-    member_record = res_member.scalar_one_or_none()
-
-    stmt_conn = select(MetaConnection).where(MetaConnection.user_id.in_(accessible_ids))
+    stmt_conn = select(MetaConnection).where(MetaConnection.user_id == user.id)
     res_conn = await db.execute(stmt_conn)
     connection = res_conn.scalars().first()
 
-    # Query synced ad accounts across all accessible workspace owner IDs
-    stmt = select(MetaAdAccount).where(MetaAdAccount.user_id.in_(accessible_ids))
+    stmt = select(MetaAdAccount).where(MetaAdAccount.user_id == user.id)
     result = await db.execute(stmt)
     synced_accounts = result.scalars().all()
 
@@ -355,7 +348,6 @@ async def get_ad_accounts(
                         meta_acc_id = acc_data["id"]
                         acc_name = acc_data.get("name", f"Ad Account {meta_acc_id}")
                         
-                        # Avoid duplicates
                         stmt_existing = select(MetaAdAccount).where(MetaAdAccount.meta_account_id == meta_acc_id)
                         res_existing = await db.execute(stmt_existing)
                         existing_acc = res_existing.scalar_one_or_none()
@@ -380,44 +372,24 @@ async def get_ad_accounts(
             import structlog
             structlog.get_logger().warning("live_meta_adaccounts_fetch_failed", error=str(err))
 
-
-    # Parse allowed ad accounts filter
-    allowed_list = []
-    if member_record:
-        allowed_val = getattr(member_record, 'allowed_ad_accounts', None)
-        if allowed_val:
-            allowed_list = [x.strip().lower().replace("act_", "") for x in allowed_val.split(",") if x.strip()]
-
     out_list = []
     for acc in synced_accounts:
-        # Flexible matching: if allowed_list is empty, all workspace accounts are allowed.
-        acc_raw_id = (acc.meta_account_id or "").lower().replace("act_", "")
-        acc_name = (acc.account_name or "").lower()
-        acc_uuid = str(acc.id).lower()
-
-        is_allowed = (
-            not member_record or
-            not allowed_list or
-            acc_raw_id in allowed_list or
-            acc_name in allowed_list or
-            acc_uuid in allowed_list
-        )
-        if is_allowed:
-            out_list.append(
-                MetaAdAccountResponse(
-                    id=acc.meta_account_id,
-                    name=acc.account_name,
-                    currency=acc.currency,
-                    timezone=acc.timezone,
-                    account_status=acc.account_status,
-                    is_connected=True,
-                    industry=acc.industry,
-                    ai_intelligence_status=acc.ai_intelligence_status,
-                    historical_intelligence_status=acc.historical_intelligence_status,
-                )
+        out_list.append(
+            MetaAdAccountResponse(
+                id=acc.meta_account_id,
+                name=acc.account_name,
+                currency=acc.currency,
+                timezone=acc.timezone,
+                account_status=acc.account_status,
+                is_connected=True,
+                industry=acc.industry,
+                ai_intelligence_status=acc.ai_intelligence_status,
+                historical_intelligence_status=acc.historical_intelligence_status,
             )
+        )
 
     return out_list
+
 
 
 @router.get("/lifetime-history/status", summary="Get lifetime history status")
