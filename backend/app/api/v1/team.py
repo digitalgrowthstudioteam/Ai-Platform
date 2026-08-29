@@ -48,6 +48,24 @@ class TeamMemberResponse(BaseModel):
 # Routes
 # ──────────────────────────────────────────────
 
+async def resolve_workspace_owner_id(user: User, db: AsyncSession) -> uuid.UUID:
+    """
+    Resolves the effective workspace owner ID for a user.
+    If the user is an active team member of another workspace (status='active' and user_id != user.id),
+    returns that workspace owner's ID.
+    Otherwise, returns user.id (they are the workspace owner).
+    """
+    stmt = (
+        select(TeamMember.user_id)
+        .where(TeamMember.email == user.email.lower())
+        .where(TeamMember.status == "active")
+        .where(TeamMember.user_id != user.id)
+    )
+    res = await db.execute(stmt)
+    owner_id = res.scalars().first()
+    return owner_id if owner_id else user.id
+
+
 @router.get("", response_model=List[TeamMemberResponse], summary="List all team members")
 async def list_team_members(
     claims: dict = Depends(get_current_user),
@@ -57,14 +75,10 @@ async def list_team_members(
     Returns list of invited team members for the currently logged in workspace owner.
     """
     user = await get_db_user_from_claims(claims, db)
-    
-    # Resolve workspace owner ID
-    stmt_owner = select(TeamMember.user_id).where(TeamMember.email == user.email.lower())
-    res_owner = await db.execute(stmt_owner)
-    owner_id = res_owner.scalar_one_or_none()
-    workspace_owner_id = owner_id if owner_id else user.id
+    workspace_owner_id = await resolve_workspace_owner_id(user, db)
 
     stmt = select(TeamMember).where(TeamMember.user_id == workspace_owner_id).order_by(TeamMember.created_at.desc())
+
     res = await db.execute(stmt)
     members = res.scalars().all()
     
@@ -99,16 +113,12 @@ async def invite_team_member(
     Invites a team member under plan entitlements seat caps.
     """
     user = await get_db_user_from_claims(claims, db)
-
-    # Resolve workspace owner
-    stmt_owner = select(TeamMember.user_id).where(TeamMember.email == user.email.lower())
-    res_owner = await db.execute(stmt_owner)
-    owner_id = res_owner.scalar_one_or_none()
-    workspace_owner_id = owner_id if owner_id else user.id
+    workspace_owner_id = await resolve_workspace_owner_id(user, db)
     
     stmt_owner_user = select(User).where(User.id == workspace_owner_id)
     res_owner_user = await db.execute(stmt_owner_user)
     workspace_owner = res_owner_user.scalar_one()
+
 
     # 1. Resolve plan entitlements for team members limit
     entitlements = await EntitlementEngine.resolve_entitlements(workspace_owner, db)
@@ -198,12 +208,8 @@ async def remove_team_member(
     Revokes team access and deletes the team member record.
     """
     user = await get_db_user_from_claims(claims, db)
-    
-    # Resolve workspace owner ID
-    stmt_owner = select(TeamMember.user_id).where(TeamMember.email == user.email.lower())
-    res_owner = await db.execute(stmt_owner)
-    owner_id = res_owner.scalar_one_or_none()
-    workspace_owner_id = owner_id if owner_id else user.id
+    workspace_owner_id = await resolve_workspace_owner_id(user, db)
+
 
     stmt = select(TeamMember).where(TeamMember.id == member_id).where(TeamMember.user_id == workspace_owner_id)
     res = await db.execute(stmt)
