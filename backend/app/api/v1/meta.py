@@ -336,13 +336,19 @@ async def get_ad_accounts(
         result = await db.execute(stmt)
         synced_accounts = result.scalars().all()
         
-        # Filter by allowed_ad_accounts safely
+        # Filter by allowed_ad_accounts safely (supports meta_account_id, id, and account_name)
         allowed_val = getattr(member_record, 'allowed_ad_accounts', None)
-        allowed_list = allowed_val.split(",") if allowed_val else []
+        allowed_list = [x.strip() for x in allowed_val.split(",") if x.strip()] if allowed_val else []
         
         out_list = []
         for acc in synced_accounts:
-            if acc.meta_account_id in allowed_list:
+            is_allowed = (
+                not allowed_list or
+                acc.meta_account_id in allowed_list or
+                str(acc.id) in allowed_list or
+                acc.account_name in allowed_list
+            )
+            if is_allowed:
                 out_list.append(
                     MetaAdAccountResponse(
                         id=acc.meta_account_id,
@@ -357,6 +363,7 @@ async def get_ad_accounts(
                     )
                 )
         return out_list
+
 
     stmt = select(MetaConnection).where(MetaConnection.user_id == user.id)
     result = await db.execute(stmt)

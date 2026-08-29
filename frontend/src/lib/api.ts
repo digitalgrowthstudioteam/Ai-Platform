@@ -773,6 +773,18 @@ class ApiClient {
     });
   }
 
+  async getInviteInfo(token: string) {
+    return this.request<any>(`/team/invite-info?token=${encodeURIComponent(token)}`);
+  }
+
+  async acceptInvite(token: string) {
+    return this.request<{ status: string; message: string; workspace_owner?: string; role?: string }>("/team/accept-invite", {
+      method: "POST",
+      body: { token },
+    });
+  }
+
+
   // Help & Support Endpoints
   async getSupportTickets() {
     return this.request<any[]>("/support/tickets");

@@ -302,3 +302,24 @@ The Digital Growth Studio Team
 
         # 4. Non-blocking Async SMTP / REST API Delivery
         return await cls._dispatch_smtp(to_email, subject, body, is_html=True)
+
+    @classmethod
+    async def send_invitation_accepted_email(
+        cls,
+        to_email: str,
+        invitee_name: str,
+        invitee_email: str
+    ) -> bool:
+        subject = f"{invitee_name or invitee_email} has accepted your workspace invitation 🎉"
+        body = f"""Hello,
+
+Great news! {invitee_name or invitee_email} ({invitee_email}) has accepted your invitation and is now an active member of your workspace on Digital Growth Studio.
+
+You can manage team seats and permissions anytime in your Workspace Team Settings:
+{getattr(get_settings(), 'FRONTEND_URL', 'https://digitalgrowthstudio.in')}/settings/team
+
+Best regards,
+The Digital Growth Studio Team
+"""
+        return await cls._dispatch_smtp(to_email, subject, body, is_html=False)
+
