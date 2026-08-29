@@ -296,10 +296,13 @@ async def get_connection_status(
     Returns connection details of current user's Meta profile integration.
     """
     user = await get_db_user_from_claims(claims, db)
+    from app.services.entitlement_engine import EntitlementEngine
+    accessible_ids = await EntitlementEngine.get_accessible_user_ids(user, db)
     
-    stmt = select(MetaConnection).where(MetaConnection.user_id == user.id)
+    stmt = select(MetaConnection).where(MetaConnection.user_id.in_(accessible_ids))
     result = await db.execute(stmt)
-    connection = result.scalar_one_or_none()
+    connection = result.scalars().first()
+
 
     if not connection or connection.status != "connected":
         return MetaConnectionStatus(connected=False)
@@ -365,9 +368,12 @@ async def get_ad_accounts(
         return out_list
 
 
-    stmt = select(MetaConnection).where(MetaConnection.user_id == user.id)
+    from app.services.entitlement_engine import EntitlementEngine
+    accessible_ids = await EntitlementEngine.get_accessible_user_ids(user, db)
+
+    stmt = select(MetaConnection).where(MetaConnection.user_id.in_(accessible_ids))
     result = await db.execute(stmt)
-    connection = result.scalar_one_or_none()
+    connection = result.scalars().first()
 
     if not connection or connection.status != "connected":
         raise HTTPException(
@@ -375,11 +381,12 @@ async def get_ad_accounts(
             detail="Meta account is not connected. Connect via OAuth first."
         )
 
-    # Retrieve already synced ad accounts for this user
-    stmt = select(MetaAdAccount).where(MetaAdAccount.user_id == user.id)
+    # Retrieve already synced ad accounts for accessible workspace
+    stmt = select(MetaAdAccount).where(MetaAdAccount.user_id.in_(accessible_ids))
     result = await db.execute(stmt)
     synced_accounts = result.scalars().all()
     synced_accounts_map = {acc.meta_account_id: acc for acc in synced_accounts}
+
 
     try:
         async with httpx.AsyncClient() as client:
