@@ -58,6 +58,8 @@ export default function AdminPage() {
   const [editSubject, setEditSubject] = useState("");
   const [editBody, setEditBody] = useState("");
   const [editIsEnabled, setEditIsEnabled] = useState(true);
+  const [testEmailAddress, setTestEmailAddress] = useState("digitalgrowthstudioteam@gmail.com");
+
 
 
   // Ads Service filter states
@@ -336,6 +338,33 @@ export default function AdminPage() {
       setActionLoading(null);
     }
   };
+
+  const handleTestEmailSend = async () => {
+    if (!testEmailAddress) return;
+    try {
+      setActionLoading("test_email");
+      const res = await api.sendAdminTestEmail(testEmailAddress);
+      if (res.status === "success") {
+        setNotification({
+          type: "success",
+          message: res.message,
+        });
+      } else {
+        setNotification({
+          type: "error",
+          message: res.message + (res.debug ? ` — Debug: ${JSON.stringify(res.debug)}` : ""),
+        });
+      }
+    } catch (err: any) {
+      setNotification({
+        type: "error",
+        message: err.message || "Failed to trigger test email delivery.",
+      });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
 
   useEffect(() => {
     if (activeTab === "finance" && isAdmin) {
@@ -2268,15 +2297,37 @@ export default function AdminPage() {
       {/* TAB CONTENT: Email Notifications Setup */}
       {activeTab === "notifications" && (
         <div className="space-y-6 text-left">
-          <div className="bg-white border border-slate-150 rounded-2xl p-6 shadow-xs">
-            <h3 className="text-sm font-extrabold text-slate-900 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-              <Mail size={16} className="text-blue-600" />
-              SaaS Email Notifications Setup
-            </h3>
-            <p className="text-xs text-slate-500 font-sans">
-              Configure transactional HTML email templates sent to clients through Brevo. You can enable/disable triggers, customize subjects, and format body templates.
-            </p>
+          <div className="bg-white border border-slate-150 rounded-2xl p-6 shadow-xs flex flex-wrap justify-between items-center gap-4">
+            <div>
+              <h3 className="text-sm font-extrabold text-slate-900 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                <Mail size={16} className="text-blue-600" />
+                SaaS Email Notifications Setup
+              </h3>
+              <p className="text-xs text-slate-500 font-sans">
+                Configure transactional HTML email templates sent to clients through Brevo. You can enable/disable triggers, customize subjects, and test delivery.
+              </p>
+            </div>
+
+            {/* Live Test Email Bar */}
+            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 p-2 rounded-xl shrink-0">
+              <input
+                type="email"
+                value={testEmailAddress}
+                onChange={(e) => setTestEmailAddress(e.target.value)}
+                placeholder="Target email for test..."
+                className="border border-slate-200 rounded-lg px-3 py-1.5 text-xs bg-white font-bold text-slate-800 outline-none w-56"
+              />
+              <button
+                onClick={handleTestEmailSend}
+                disabled={actionLoading === "test_email"}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-[10px] uppercase tracking-wider px-3.5 py-2 rounded-lg transition cursor-pointer disabled:opacity-50 flex items-center gap-1.5 shrink-0"
+              >
+                {actionLoading === "test_email" && <Loader2 size={12} className="animate-spin" />}
+                Send Test Email
+              </button>
+            </div>
           </div>
+
 
           {templatesLoading ? (
             <div className="flex h-64 items-center justify-center bg-white border border-slate-150 rounded-2xl">

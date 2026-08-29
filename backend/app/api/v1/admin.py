@@ -1953,3 +1953,59 @@ async def update_email_template(
         subject_template=config.subject_template,
         body_template=config.body_template
     )
+
+
+@router.post("/test-email", summary="Send a test transactional email and return debug info")
+async def send_test_email(
+    to_email: str = "digitalgrowthstudioteam@gmail.com",
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    verify_admin(claims)
+    import os
+    from app.config import get_settings
+    from app.services.email_service import EmailService
+    current_settings = get_settings()
+
+    smtp_host = current_settings.SMTP_HOST or os.environ.get("SMTP_HOST") or "smtp-relay.brevo.com"
+    smtp_port = int(current_settings.SMTP_PORT or os.environ.get("SMTP_PORT") or 587)
+    smtp_user = current_settings.SMTP_USER or os.environ.get("SMTP_USER")
+    smtp_password = current_settings.SMTP_PASSWORD or os.environ.get("SMTP_PASSWORD")
+    smtp_from = current_settings.SMTP_FROM or os.environ.get("SMTP_FROM") or "noreply@digitalgrowthstudio.in"
+
+    debug_info = {
+        "smtp_host": smtp_host,
+        "smtp_port": smtp_port,
+        "smtp_user": smtp_user[:8] + "..." if smtp_user else None,
+        "smtp_password_present": bool(smtp_password),
+        "smtp_from": smtp_from,
+        "to_email": to_email
+    }
+
+    if not smtp_user or not smtp_password:
+        return {
+            "status": "error",
+            "message": "SMTP credentials (SMTP_USER / SMTP_PASSWORD) are missing in the live server environment variables!",
+            "debug": debug_info
+        }
+
+    success = await EmailService._dispatch_smtp(
+        to_email=to_email,
+        subject="[Test Email] Brevo Delivery Verification from Admin Console",
+        content="<h1>Brevo Verification Successful!</h1><p>This email confirms your Brevo SMTP integration is working on Digital Growth Studio.</p>",
+        is_html=True
+    )
+
+    if success:
+        return {
+            "status": "success",
+            "message": f"Successfully sent test email to {to_email}!",
+            "debug": debug_info
+        }
+    else:
+        return {
+            "status": "error",
+            "message": f"Failed to deliver email to {to_email}. Check Brevo credentials and IP security permissions.",
+            "debug": debug_info
+        }
+

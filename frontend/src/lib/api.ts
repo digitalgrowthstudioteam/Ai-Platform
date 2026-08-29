@@ -809,6 +809,13 @@ class ApiClient {
     });
   }
 
+  async sendAdminTestEmail(toEmail: string) {
+    return this.request<{ status: string; message: string; debug?: any }>(`/admin/test-email?to_email=${encodeURIComponent(toEmail)}`, {
+      method: "POST",
+    });
+  }
+
+
 
   // Notifications Endpoints
   async getNotifications() {
