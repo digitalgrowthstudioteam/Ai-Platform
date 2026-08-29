@@ -1989,7 +1989,7 @@ async def send_test_email(
             "debug": debug_info
         }
 
-    success = await EmailService._dispatch_smtp(
+    success, err_detail = await EmailService._dispatch_smtp_detailed(
         to_email=to_email,
         subject="[Test Email] Brevo Delivery Verification from Admin Console",
         content="<h1>Brevo Verification Successful!</h1><p>This email confirms your Brevo SMTP integration is working on Digital Growth Studio.</p>",
@@ -2005,7 +2005,8 @@ async def send_test_email(
     else:
         return {
             "status": "error",
-            "message": f"Failed to deliver email to {to_email}. Check Brevo credentials and IP security permissions.",
+            "message": f"Failed: {err_detail or 'Check Brevo credentials and IP security'}",
             "debug": debug_info
         }
+
 

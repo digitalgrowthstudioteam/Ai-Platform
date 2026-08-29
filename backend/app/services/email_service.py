@@ -7,7 +7,7 @@ import json
 import ssl
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from typing import Optional
+from typing import Optional, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import get_settings
 
@@ -21,7 +21,7 @@ def _send_brevo_api_blocking(
     subject: str,
     content: str,
     is_html: bool = False
-) -> bool:
+) -> Tuple[bool, Optional[str]]:
     """
     Sends email via Brevo v3 HTTPS REST API endpoint.
     """
@@ -57,10 +57,10 @@ def _send_brevo_api_blocking(
         with urllib.request.urlopen(req, context=ctx, timeout=10) as response:
             if response.status in (200, 201, 202):
                 logger.info("brevo_api_email_sent_successfully", to=to_email, subject=subject)
-                return True
+                return True, None
             else:
                 logger.error("brevo_api_unexpected_status", status=response.status)
-                return False
+                return False, f"Brevo API returned HTTP status {response.status}"
     except Exception as e:
         err_msg = str(e)
         if hasattr(e, 'read'):
@@ -69,7 +69,7 @@ def _send_brevo_api_blocking(
             except Exception:
                 pass
         logger.error("brevo_api_delivery_failed", error=err_msg, to=to_email)
-        return False
+        return False, err_msg
 
 
 def _send_smtp_blocking(
@@ -82,7 +82,7 @@ def _send_smtp_blocking(
     subject: str,
     content: str,
     is_html: bool = False
-) -> bool:
+) -> Tuple[bool, Optional[str]]:
     """
     Synchronous SMTP helper executed in a worker thread with strict 10s socket timeout.
     """
@@ -99,42 +99,36 @@ def _send_smtp_blocking(
         server.sendmail(smtp_from, to_email, msg.as_string())
         server.close()
         logger.info("smtp_email_sent_successfully", to=to_email, subject=subject)
-        return True
+        return True, None
     except smtplib.SMTPResponseException as e:
-        if e.smtp_code == 525 or "5.7.1" in str(e.smtp_error):
-            logger.error(
-                "brevo_unauthorized_ip_error",
-                error=str(e),
-                code=e.smtp_code,
-                to=to_email,
-                hint="Your server IP is not authorized in Brevo SMTP settings. Add 0.0.0.0/0 under Brevo Authorized IPs, or generate a v3 API Key (xkeysib-...) for BREVO_API_KEY."
-            )
-        else:
-            logger.error("smtp_response_error", code=e.smtp_code, error=str(e), to=to_email)
-        return False
+        err = f"SMTP {e.smtp_code}: {e.smtp_error.decode('utf-8', errors='ignore') if isinstance(e.smtp_error, bytes) else str(e.smtp_error)}"
+        if e.smtp_code == 525 or "5.7.1" in err:
+            err += " (Unauthorized IP — add server IP or generate a v3 API key xkeysib-... in Brevo)"
+        logger.error("smtp_response_error", code=e.smtp_code, error=err, to=to_email)
+        return False, err
     except Exception as e:
-        logger.error("smtp_delivery_failed", error=str(e), to=to_email, host=smtp_host, port=smtp_port)
-        return False
+        err = str(e)
+        logger.error("smtp_delivery_failed", error=err, to=to_email, host=smtp_host, port=smtp_port)
+        return False, err
 
 
 class EmailService:
     @classmethod
-    async def _dispatch_smtp(
+    async def _dispatch_smtp_detailed(
         cls,
         to_email: str,
         subject: str,
         content: str,
         is_html: bool = False
-    ) -> bool:
+    ) -> Tuple[bool, Optional[str]]:
         """
-        Helper method to dispatch emails via Brevo HTTPS REST API or SMTP worker pool.
+        Dispatches email and returns (success: bool, error_message: Optional[str]).
         """
         current_settings = get_settings()
 
         brevo_api_key = os.environ.get("BREVO_API_KEY") or current_settings.SMTP_PASSWORD
-        smtp_from = current_settings.SMTP_FROM or os.environ.get("SMTP_FROM") or "digitalgrowthstudioteam@digitalgrowthstudio.in"
+        smtp_from = current_settings.SMTP_FROM or os.environ.get("SMTP_FROM") or "noreply@digitalgrowthstudio.in"
 
-        # 1. Try Brevo v3 HTTPS REST API first if key starts with xkeysib-
         if brevo_api_key and brevo_api_key.startswith("xkeysib-"):
             logger.info("dispatching_via_brevo_api", to=to_email, sender=smtp_from)
             return await asyncio.to_thread(
@@ -147,7 +141,6 @@ class EmailService:
                 is_html
             )
 
-        # 2. Fallback to standard SMTP (for xsmtpsib- keys)
         smtp_host = current_settings.SMTP_HOST or os.environ.get("SMTP_HOST") or "smtp-relay.brevo.com"
         smtp_port = int(current_settings.SMTP_PORT or os.environ.get("SMTP_PORT") or 587)
         smtp_user = current_settings.SMTP_USER or os.environ.get("SMTP_USER")
@@ -168,8 +161,18 @@ class EmailService:
                 is_html
             )
         else:
-            logger.error("smtp_credentials_missing_on_server", to=to_email, subject=subject)
-            return False
+            return False, "SMTP credentials (SMTP_USER / SMTP_PASSWORD) are missing on live server environment"
+
+    @classmethod
+    async def _dispatch_smtp(
+        cls,
+        to_email: str,
+        subject: str,
+        content: str,
+        is_html: bool = False
+    ) -> bool:
+        ok, _ = await cls._dispatch_smtp_detailed(to_email, subject, content, is_html)
+        return ok
 
     @classmethod
     async def send_invitation_email(
