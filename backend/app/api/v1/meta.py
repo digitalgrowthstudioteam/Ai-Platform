@@ -293,7 +293,7 @@ async def get_connection_status(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Returns connection details of current user's Meta profile integration.
+    Returns connection details of current user's (or workspace owner's) Meta profile integration.
     """
     user = await get_db_user_from_claims(claims, db)
     from app.services.entitlement_engine import EntitlementEngine
@@ -303,15 +303,13 @@ async def get_connection_status(
     result = await db.execute(stmt)
     connection = result.scalars().first()
 
-
     if not connection or connection.status != "connected":
         return MetaConnectionStatus(connected=False)
 
-    # Decode and fetch connection status name from access token or use static ID
     meta_name = f"Meta Account ({connection.meta_user_id})"
     return MetaConnectionStatus(
         connected=True,
-meta_user_name=meta_name,
+        meta_user_name=meta_name,
         last_sync_at=connection.last_sync_at,
     )
 
@@ -322,128 +320,73 @@ async def get_ad_accounts(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Calls Meta API and retrieves available ad accounts linked to connection token.
-    Lists which ones are already active in the local DB.
+    Retrieves available ad accounts for current user or team member with flexible filtering.
     """
     user = await get_db_user_from_claims(claims, db)
-    
-    # Resolve if user is a team member (exclude workspace owners accessing their own workspace)
-    from app.models.team import TeamMember
-    stmt_member = select(TeamMember).where(TeamMember.email == user.email.lower()).where(TeamMember.user_id != user.id)
-    res_member = await db.execute(stmt_member)
-    member_record = res_member.scalar_one_or_none()
-    
-    if member_record:
-        # Resolve owner connected ad accounts
-        stmt = select(MetaAdAccount).where(MetaAdAccount.user_id == member_record.user_id)
-        result = await db.execute(stmt)
-        synced_accounts = result.scalars().all()
-        
-        # Filter by allowed_ad_accounts safely (supports meta_account_id, id, and account_name)
-        allowed_val = getattr(member_record, 'allowed_ad_accounts', None)
-        allowed_list = [x.strip() for x in allowed_val.split(",") if x.strip()] if allowed_val else []
-        
-        out_list = []
-        for acc in synced_accounts:
-            is_allowed = (
-                not allowed_list or
-                acc.meta_account_id in allowed_list or
-                str(acc.id) in allowed_list or
-                acc.account_name in allowed_list
-            )
-            if is_allowed:
-                out_list.append(
-                    MetaAdAccountResponse(
-                        id=acc.meta_account_id,
-                        name=acc.account_name,
-                        currency=acc.currency,
-                        timezone=acc.timezone,
-                        account_status=acc.account_status,
-                        is_connected=True,
-                        industry=acc.industry,
-                        ai_intelligence_status=acc.ai_intelligence_status,
-                        historical_intelligence_status=acc.historical_intelligence_status,
-                    )
-                )
-        return out_list
-
-
     from app.services.entitlement_engine import EntitlementEngine
     accessible_ids = await EntitlementEngine.get_accessible_user_ids(user, db)
+    
+    # Check if user is a team member in another workspace
+    from app.models.team import TeamMember
+    stmt_member = select(TeamMember).where(func.lower(TeamMember.email) == user.email.lower()).where(TeamMember.user_id != user.id)
+    res_member = await db.execute(stmt_member)
+    member_record = res_member.scalar_one_or_none()
 
-    stmt = select(MetaConnection).where(MetaConnection.user_id.in_(accessible_ids))
-    result = await db.execute(stmt)
-    connection = result.scalars().first()
-
-    if not connection or connection.status != "connected":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Meta account is not connected. Connect via OAuth first."
-        )
-
-    # Retrieve already synced ad accounts for accessible workspace
+    # Query synced ad accounts across all accessible workspace owner IDs
     stmt = select(MetaAdAccount).where(MetaAdAccount.user_id.in_(accessible_ids))
     result = await db.execute(stmt)
     synced_accounts = result.scalars().all()
-    synced_accounts_map = {acc.meta_account_id: acc for acc in synced_accounts}
 
+    # Parse allowed ad accounts filter
+    allowed_list = []
+    if member_record:
+        allowed_val = getattr(member_record, 'allowed_ad_accounts', None)
+        if allowed_val:
+            allowed_list = [x.strip().lower().replace("act_", "") for x in allowed_val.split(",") if x.strip()]
 
-    try:
-        async with httpx.AsyncClient() as client:
-            # Call Meta Marketing API: /me/adaccounts
-            meta_url = (
-                f"https://graph.facebook.com/{settings.META_API_VERSION}/me/adaccounts"
-                f"?fields=id,name,currency,timezone,account_status"
-                f"&access_token={connection.access_token}"
+    out_list = []
+    for acc in synced_accounts:
+        # Flexible matching: if allowed_list is empty, all workspace accounts are allowed.
+        acc_raw_id = (acc.meta_account_id or "").lower().replace("act_", "")
+        acc_name = (acc.account_name or "").lower()
+        acc_uuid = str(acc.id).lower()
+
+        is_allowed = (
+            not member_record or
+            not allowed_list or
+            acc_raw_id in allowed_list or
+            acc_name in allowed_list or
+            acc_uuid in allowed_list
+        )
+        if is_allowed:
+            out_list.append(
+                MetaAdAccountResponse(
+                    id=acc.meta_account_id,
+                    name=acc.account_name,
+                    currency=acc.currency,
+                    timezone=acc.timezone,
+                    account_status=acc.account_status,
+                    is_connected=True,
+                    industry=acc.industry,
+                    ai_intelligence_status=acc.ai_intelligence_status,
+                    historical_intelligence_status=acc.historical_intelligence_status,
+                )
             )
-            r = await client.get(meta_url)
-            r.raise_for_status()
-            data = r.json().get("data", [])
 
-            out_list = []
-            for acc in data:
-                db_acc = synced_accounts_map.get(acc["id"])
-                out_list.append(
-                    MetaAdAccountResponse(
-                        id=acc["id"],
-                        name=acc.get("name", f"Account {acc['id']}"),
-                        currency=acc.get("currency", "INR"),
-                        timezone=acc.get("timezone", "Asia/Kolkata"),
-                        account_status=acc.get("account_status", 1),
-                        is_connected=db_acc is not None,
-                        industry=db_acc.industry if db_acc else None,
-                        ai_intelligence_status=db_acc.ai_intelligence_status if db_acc else "none",
-                        historical_intelligence_status=db_acc.historical_intelligence_status if db_acc else "none",
-                    )
-                )
-            return out_list
+    return out_list
 
-    except Exception as e:
-        import structlog
-        logger = structlog.get_logger()
-        logger.warning("failed_fetching_live_adaccounts", error=str(e))
-        
-        # Fallback: return already-synced accounts from database (real data)
-        if synced_accounts:
-            out_list = []
-            for acc in synced_accounts:
-                out_list.append(
-                    MetaAdAccountResponse(
-                        id=acc.meta_account_id,
-                        name=acc.account_name,
-                        currency=acc.currency,
-                        timezone=acc.timezone,
-                        account_status=acc.account_status,
-                        is_connected=True,
-                        industry=acc.industry,
-                        ai_intelligence_status=acc.ai_intelligence_status,
-                        historical_intelligence_status=acc.historical_intelligence_status,
-                    )
-                )
-            return out_list
 
-        # No synced accounts and API failed — return empty list, never mock data
-        return []
+@router.get("/lifetime-history/status", summary="Get lifetime history status")
+async def get_lifetime_history_status(
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return {
+        "individual_slots_total": 5,
+        "individual_slots_used": 0,
+        "individual_slots_available": 5
+    }
+
 
 
 async def run_sync_inline(ad_account_uuid: str):
