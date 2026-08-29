@@ -332,10 +332,54 @@ async def get_ad_accounts(
     res_member = await db.execute(stmt_member)
     member_record = res_member.scalar_one_or_none()
 
+    stmt_conn = select(MetaConnection).where(MetaConnection.user_id.in_(accessible_ids))
+    res_conn = await db.execute(stmt_conn)
+    connection = res_conn.scalars().first()
+
     # Query synced ad accounts across all accessible workspace owner IDs
     stmt = select(MetaAdAccount).where(MetaAdAccount.user_id.in_(accessible_ids))
     result = await db.execute(stmt)
     synced_accounts = result.scalars().all()
+
+    # If DB has no accounts for this connection, but we have an active access token, fetch live from Meta Marketing API!
+    if not synced_accounts and connection and connection.access_token:
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                api_ver = settings.META_API_VERSION
+                meta_url = f"https://graph.facebook.com/{api_ver}/me/adaccounts?fields=id,name,currency,timezone,account_status&access_token={connection.access_token}"
+                r = await client.get(meta_url)
+                if r.status_code == 200:
+                    data = r.json().get("data", [])
+                    owner_id = connection.user_id
+                    for acc_data in data:
+                        meta_acc_id = acc_data["id"]
+                        acc_name = acc_data.get("name", f"Ad Account {meta_acc_id}")
+                        
+                        # Avoid duplicates
+                        stmt_existing = select(MetaAdAccount).where(MetaAdAccount.meta_account_id == meta_acc_id)
+                        res_existing = await db.execute(stmt_existing)
+                        existing_acc = res_existing.scalar_one_or_none()
+                        
+                        if not existing_acc:
+                            new_acc = MetaAdAccount(
+                                user_id=owner_id,
+                                meta_connection_id=connection.id,
+                                meta_account_id=meta_acc_id,
+                                account_name=acc_name,
+                                currency=acc_data.get("currency", "INR"),
+                                timezone=acc_data.get("timezone", "Asia/Kolkata"),
+                                account_status=acc_data.get("account_status", 1),
+                            )
+                            db.add(new_acc)
+                    await db.commit()
+                    
+                    # Re-query
+                    result = await db.execute(stmt)
+                    synced_accounts = result.scalars().all()
+        except Exception as err:
+            import structlog
+            structlog.get_logger().warning("live_meta_adaccounts_fetch_failed", error=str(err))
+
 
     # Parse allowed ad accounts filter
     allowed_list = []

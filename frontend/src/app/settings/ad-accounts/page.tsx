@@ -61,12 +61,15 @@ export default function AdAccountsPage() {
         const accountsRes = await api.getMetaAccounts();
         setAccounts(accountsRes);
 
-        try {
-          const lhRes = await api.getLifetimeHistoryStatus();
-          setLifetimeHistoryStatus(lhRes);
-        } catch (lhErr) {
-          console.error("Failed to load lifetime history status:", lhErr);
+        if (typeof (api as any).getLifetimeHistoryStatus === "function") {
+          try {
+            const lhRes = await (api as any).getLifetimeHistoryStatus();
+            setLifetimeHistoryStatus(lhRes);
+          } catch (lhErr) {
+            console.error("Failed to load lifetime history status:", lhErr);
+          }
         }
+
         
         // Set initially connected accounts
         const connectedIds = accountsRes.filter(a => a.is_connected).map(a => a.id);
