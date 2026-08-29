@@ -39,7 +39,7 @@ PLANS_CONFIG = {
         "max_meta_accounts": 1,
         "historical_days": 30,
         "sync_interval_hours": 48,
-        "max_team_members": 3,
+        "max_team_members": 1,
         "ai_recommendations_limit": 999999,
         "ai_optimization_campaign_limit": 1,
         "monthly_credits": 25,
@@ -58,10 +58,11 @@ PLANS_CONFIG = {
         "max_meta_accounts": 3,
         "historical_days": 90,
         "sync_interval_hours": 12,
-        "max_team_members": 5,
+        "max_team_members": 3,
         "ai_recommendations_limit": 999999,
         "ai_optimization_campaign_limit": 3,
         "monthly_credits": 150,
+
 
         "feature_gates": {
             "creative_analysis": True,
