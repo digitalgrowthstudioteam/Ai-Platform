@@ -127,7 +127,8 @@ class EmailService:
         current_settings = get_settings()
 
         brevo_api_key = os.environ.get("BREVO_API_KEY") or current_settings.SMTP_PASSWORD
-        smtp_from = current_settings.SMTP_FROM or os.environ.get("SMTP_FROM") or "noreply@digitalgrowthstudio.in"
+        smtp_from = current_settings.SMTP_FROM or os.environ.get("SMTP_FROM") or "no-reply@digitalgrowthstudio.in"
+
 
         if brevo_api_key and brevo_api_key.startswith("xkeysib-"):
             logger.info("dispatching_via_brevo_api", to=to_email, sender=smtp_from)
