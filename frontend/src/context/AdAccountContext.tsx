@@ -55,7 +55,10 @@ export function AdAccountProvider({ children }: { children: React.ReactNode }) {
       if (activeAccounts.length > 0) {
         // Resolve default active selection
         const savedId = localStorage.getItem("dgs_active_ad_account_id");
-        const matched = activeAccounts.find((acc) => acc.id === savedId);
+        const cleanSaved = savedId ? savedId.replace("act_", "") : "";
+        const matched = activeAccounts.find((acc) => 
+          acc.id === savedId || acc.id.replace("act_", "") === cleanSaved
+        );
         
         if (matched) {
           setSelectedAccountState(matched);
@@ -93,7 +96,10 @@ export function AdAccountProvider({ children }: { children: React.ReactNode }) {
         if (Array.isArray(parsed) && parsed.length > 0) {
           setAdAccounts(parsed);
           const savedId = localStorage.getItem("dgs_active_ad_account_id");
-          const matched = parsed.find((acc) => acc.id === savedId);
+          const cleanSaved = savedId ? savedId.replace("act_", "") : "";
+          const matched = parsed.find((acc: AdAccount) => 
+            acc.id === savedId || acc.id.replace("act_", "") === cleanSaved
+          );
           setSelectedAccountState(matched || parsed[0]);
           setLoadingAccounts(false);
         }

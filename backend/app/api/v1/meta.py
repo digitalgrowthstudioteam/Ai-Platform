@@ -321,21 +321,32 @@ async def get_ad_accounts(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Retrieves available ad accounts for current user.
-    If no ad accounts exist in DB yet, queries Meta Graph API live to discover and register them.
+    Retrieves available ad accounts for current user/workspace.
+    Queries Meta Marketing API live when connected to surface all accessible ad accounts,
+    marking active DB accounts with is_connected=True and unselected ones as is_connected=False.
     """
     user = await get_db_user_from_claims(claims, db)
+    from app.services.entitlement_engine import EntitlementEngine
+    accessible_ids = await EntitlementEngine.get_accessible_user_ids(user, db)
     
-    stmt_conn = select(MetaConnection).where(MetaConnection.user_id == user.id)
+    stmt_conn = select(MetaConnection).where(MetaConnection.user_id.in_(accessible_ids))
     res_conn = await db.execute(stmt_conn)
     connection = res_conn.scalars().first()
 
-    stmt = select(MetaAdAccount).where(MetaAdAccount.user_id == user.id)
+    stmt = select(MetaAdAccount).where(MetaAdAccount.user_id.in_(accessible_ids))
     result = await db.execute(stmt)
     synced_accounts = result.scalars().all()
 
-    # If DB has no accounts for this connection, but we have an active access token, fetch live from Meta Marketing API!
-    if not synced_accounts and connection and connection.access_token:
+    # Map synced accounts by meta_account_id (both raw and stripped of act_)
+    synced_map = {}
+    for acc in synced_accounts:
+        synced_map[acc.meta_account_id] = acc
+        clean_id = acc.meta_account_id.replace("act_", "")
+        synced_map[clean_id] = acc
+        synced_map[f"act_{clean_id}"] = acc
+
+    # If connection exists, fetch live accounts from Meta Marketing API
+    if connection and connection.access_token:
         try:
             async with httpx.AsyncClient(timeout=15.0) as client:
                 api_ver = settings.META_API_VERSION
@@ -344,34 +355,104 @@ async def get_ad_accounts(
                 if r.status_code == 200:
                     data = r.json().get("data", [])
                     owner_id = connection.user_id
+                    
+                    # If DB has no accounts for this connection, auto-register discovered accounts into DB
+                    if not synced_accounts and data:
+                        for acc_data in data:
+                            meta_acc_id = acc_data["id"]
+                            acc_name = acc_data.get("name", f"Ad Account {meta_acc_id}")
+                            
+                            stmt_existing = select(MetaAdAccount).where(MetaAdAccount.meta_account_id == meta_acc_id)
+                            res_existing = await db.execute(stmt_existing)
+                            existing_acc = res_existing.scalar_one_or_none()
+                            
+                            if not existing_acc:
+                                new_acc = MetaAdAccount(
+                                    user_id=owner_id,
+                                    meta_connection_id=connection.id,
+                                    meta_account_id=meta_acc_id,
+                                    account_name=acc_name,
+                                    currency=acc_data.get("currency", "INR"),
+                                    timezone=acc_data.get("timezone", "Asia/Kolkata"),
+                                    account_status=acc_data.get("account_status", 1),
+                                )
+                                db.add(new_acc)
+                        await db.commit()
+                        
+                        # Re-query DB after auto-registration
+                        result = await db.execute(stmt)
+                        synced_accounts = result.scalars().all()
+                        synced_map = {}
+                        for acc in synced_accounts:
+                            synced_map[acc.meta_account_id] = acc
+                            clean_id = acc.meta_account_id.replace("act_", "")
+                            synced_map[clean_id] = acc
+                            synced_map[f"act_{clean_id}"] = acc
+
+                    # Construct response list combining live API data and DB status
+                    out_list = []
+                    seen_ids = set()
+                    
                     for acc_data in data:
                         meta_acc_id = acc_data["id"]
-                        acc_name = acc_data.get("name", f"Ad Account {meta_acc_id}")
+                        if meta_acc_id in seen_ids:
+                            continue
+                        seen_ids.add(meta_acc_id)
                         
-                        stmt_existing = select(MetaAdAccount).where(MetaAdAccount.meta_account_id == meta_acc_id)
-                        res_existing = await db.execute(stmt_existing)
-                        existing_acc = res_existing.scalar_one_or_none()
-                        
-                        if not existing_acc:
-                            new_acc = MetaAdAccount(
-                                user_id=owner_id,
-                                meta_connection_id=connection.id,
-                                meta_account_id=meta_acc_id,
-                                account_name=acc_name,
-                                currency=acc_data.get("currency", "INR"),
-                                timezone=acc_data.get("timezone", "Asia/Kolkata"),
-                                account_status=acc_data.get("account_status", 1),
+                        db_acc = synced_map.get(meta_acc_id)
+                        if db_acc:
+                            out_list.append(
+                                MetaAdAccountResponse(
+                                    id=db_acc.meta_account_id,
+                                    name=db_acc.account_name,
+                                    currency=db_acc.currency,
+                                    timezone=db_acc.timezone,
+                                    account_status=db_acc.account_status,
+                                    is_connected=True,
+                                    industry=db_acc.industry,
+                                    ai_intelligence_status=db_acc.ai_intelligence_status,
+                                    historical_intelligence_status=db_acc.historical_intelligence_status,
+                                )
                             )
-                            db.add(new_acc)
-                    await db.commit()
-                    
-                    # Re-query
-                    result = await db.execute(stmt)
-                    synced_accounts = result.scalars().all()
+                        else:
+                            out_list.append(
+                                MetaAdAccountResponse(
+                                    id=meta_acc_id,
+                                    name=acc_data.get("name", f"Ad Account {meta_acc_id}"),
+                                    currency=acc_data.get("currency", "INR"),
+                                    timezone=acc_data.get("timezone", "Asia/Kolkata"),
+                                    account_status=acc_data.get("account_status", 1),
+                                    is_connected=False,
+                                    industry=None,
+                                    ai_intelligence_status="none",
+                                    historical_intelligence_status="none",
+                                )
+                            )
+
+                    # Also include any DB accounts not present in live API data
+                    for acc in synced_accounts:
+                        if acc.meta_account_id not in seen_ids:
+                            seen_ids.add(acc.meta_account_id)
+                            out_list.append(
+                                MetaAdAccountResponse(
+                                    id=acc.meta_account_id,
+                                    name=acc.account_name,
+                                    currency=acc.currency,
+                                    timezone=acc.timezone,
+                                    account_status=acc.account_status,
+                                    is_connected=True,
+                                    industry=acc.industry,
+                                    ai_intelligence_status=acc.ai_intelligence_status,
+                                    historical_intelligence_status=acc.historical_intelligence_status,
+                                )
+                            )
+
+                    return out_list
         except Exception as err:
             import structlog
             structlog.get_logger().warning("live_meta_adaccounts_fetch_failed", error=str(err))
 
+    # Fallback to DB synced accounts if live Meta API call could not be completed
     out_list = []
     for acc in synced_accounts:
         out_list.append(
@@ -484,8 +565,10 @@ async def select_ad_accounts(
     Synchronizes them, deleting deselected ones, and inserting newly selected ones.
     """
     user = await get_db_user_from_claims(claims, db)
+    from app.services.entitlement_engine import EntitlementEngine
+    accessible_ids = await EntitlementEngine.get_accessible_user_ids(user, db)
     
-    stmt = select(MetaConnection).where(MetaConnection.user_id == user.id)
+    stmt = select(MetaConnection).where(MetaConnection.user_id.in_(accessible_ids))
     result = await db.execute(stmt)
     connection = result.scalar_one_or_none()
 
@@ -513,7 +596,7 @@ async def select_ad_accounts(
         logger.warning("failed_fetching_live_adaccounts_select", error=str(e))
         
         # Fallback: use already-synced accounts from database (real data)
-        stmt_synced = select(MetaAdAccount).where(MetaAdAccount.user_id == user.id)
+        stmt_synced = select(MetaAdAccount).where(MetaAdAccount.user_id.in_(accessible_ids))
         res_synced = await db.execute(stmt_synced)
         synced_accounts = res_synced.scalars().all()
         
@@ -603,13 +686,13 @@ async def select_ad_accounts(
 
     # 4. De-register accounts that are no longer selected
     delete_stmt = delete(MetaAdAccount).where(
-        MetaAdAccount.user_id == user.id,
+        MetaAdAccount.user_id.in_(accessible_ids),
         ~MetaAdAccount.meta_account_id.in_(payload.account_ids)
     )
     await db.execute(delete_stmt)
 
     # 5. Retrieve current registered accounts to prevent duplicate insert errors
-    stmt = select(MetaAdAccount).where(MetaAdAccount.user_id == user.id)
+    stmt = select(MetaAdAccount).where(MetaAdAccount.user_id.in_(accessible_ids))
     result = await db.execute(stmt)
     existing_meta_ids = {acc.meta_account_id for acc in result.scalars().all()}
 
@@ -631,7 +714,7 @@ async def select_ad_accounts(
             # Update industry for existing account
             update_stmt = (
                 update(MetaAdAccount)
-                .where(MetaAdAccount.user_id == user.id)
+                .where(MetaAdAccount.user_id.in_(accessible_ids))
                 .where(MetaAdAccount.meta_account_id == acc_id)
                 .values(industry=industry)
             )
@@ -640,7 +723,7 @@ async def select_ad_accounts(
         
         meta_acc_data = available_accounts[acc_id]
         new_account = MetaAdAccount(
-            user_id=user.id,
+            user_id=connection.user_id,
             meta_connection_id=connection.id,
             meta_account_id=acc_id,
             account_name=meta_acc_data.get("name", f"Account {acc_id}"),
@@ -654,7 +737,7 @@ async def select_ad_accounts(
     await db.commit()
 
     # Trigger inline sync in background thread immediately after saving selection
-    stmt_sync = select(MetaAdAccount).where(MetaAdAccount.user_id == user.id)
+    stmt_sync = select(MetaAdAccount).where(MetaAdAccount.user_id.in_(accessible_ids))
     res_sync = await db.execute(stmt_sync)
     selected_db_accounts = res_sync.scalars().all()
     for acc in selected_db_accounts:
@@ -672,14 +755,16 @@ async def disconnect_meta(
     Deletes the MetaConnection and cascades to clear MetaAdAccounts.
     """
     user = await get_db_user_from_claims(claims, db)
+    from app.services.entitlement_engine import EntitlementEngine
+    accessible_ids = await EntitlementEngine.get_accessible_user_ids(user, db)
     
     # Explicitly clear related MetaAdAccounts to guarantee cleanup on SQLite
     from app.models.meta import MetaAdAccount
-    delete_acc_stmt = delete(MetaAdAccount).where(MetaAdAccount.user_id == user.id)
+    delete_acc_stmt = delete(MetaAdAccount).where(MetaAdAccount.user_id.in_(accessible_ids))
     await db.execute(delete_acc_stmt)
     
     # Delete connection record
-    delete_stmt = delete(MetaConnection).where(MetaConnection.user_id == user.id)
+    delete_stmt = delete(MetaConnection).where(MetaConnection.user_id.in_(accessible_ids))
     await db.execute(delete_stmt)
     await db.commit()
     return {"status": "success", "message": "Meta account disconnected successfully."}
@@ -711,9 +796,11 @@ async def trigger_sync(
     from app.workers.tasks import sync_ad_account_task
 
     user = await get_db_user_from_claims(claims, db)
+    from app.services.entitlement_engine import EntitlementEngine
+    accessible_ids = await EntitlementEngine.get_accessible_user_ids(user, db)
     
     # Prevent concurrent syncs for the same connection
-    stmt_conn = select(MetaConnection).where(MetaConnection.user_id == user.id)
+    stmt_conn = select(MetaConnection).where(MetaConnection.user_id.in_(accessible_ids))
     res_conn = await db.execute(stmt_conn)
     conn = res_conn.scalar_one_or_none()
     
@@ -783,8 +870,10 @@ async def get_sync_status(
     Queries sync status, timestamps, and error logs of the Meta integration connection.
     """
     user = await get_db_user_from_claims(claims, db)
+    from app.services.entitlement_engine import EntitlementEngine
+    accessible_ids = await EntitlementEngine.get_accessible_user_ids(user, db)
     
-    stmt = select(MetaConnection).where(MetaConnection.user_id == user.id)
+    stmt = select(MetaConnection).where(MetaConnection.user_id.in_(accessible_ids))
     res = await db.execute(stmt)
     connection = res.scalar_one_or_none()
     

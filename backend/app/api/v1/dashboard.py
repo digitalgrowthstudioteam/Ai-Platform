@@ -399,9 +399,15 @@ async def get_overview_analytics(
     stmt = select(MetaAdAccount).where(MetaAdAccount.user_id.in_(accessible_ids))
     try:
         acc_uuid = uuid.UUID(ad_account_id)
-        stmt = stmt.where(MetaAdAccount.id == acc_uuid)
+        stmt = stmt.where((MetaAdAccount.id == acc_uuid) | (MetaAdAccount.meta_account_id == ad_account_id))
     except ValueError:
-        stmt = stmt.where(MetaAdAccount.meta_account_id == ad_account_id)
+        raw_id = ad_account_id
+        clean_id = raw_id.replace("act_", "")
+        stmt = stmt.where(
+            (MetaAdAccount.meta_account_id == raw_id) |
+            (MetaAdAccount.meta_account_id == f"act_{clean_id}") |
+            (MetaAdAccount.meta_account_id == clean_id)
+        )
 
     res = await db.execute(stmt)
     ad_acc = res.scalar_one_or_none()
@@ -573,9 +579,15 @@ async def get_chart_analytics(
     stmt = select(MetaAdAccount).where(MetaAdAccount.user_id.in_(accessible_ids))
     try:
         acc_uuid = uuid.UUID(ad_account_id)
-        stmt = stmt.where(MetaAdAccount.id == acc_uuid)
+        stmt = stmt.where((MetaAdAccount.id == acc_uuid) | (MetaAdAccount.meta_account_id == ad_account_id))
     except ValueError:
-        stmt = stmt.where(MetaAdAccount.meta_account_id == ad_account_id)
+        raw_id = ad_account_id
+        clean_id = raw_id.replace("act_", "")
+        stmt = stmt.where(
+            (MetaAdAccount.meta_account_id == raw_id) |
+            (MetaAdAccount.meta_account_id == f"act_{clean_id}") |
+            (MetaAdAccount.meta_account_id == clean_id)
+        )
 
     res = await db.execute(stmt)
     ad_acc = res.scalar_one_or_none()
@@ -695,9 +707,15 @@ async def get_account_health_score(
     stmt = select(MetaAdAccount).where(MetaAdAccount.user_id.in_(accessible_ids))
     try:
         acc_uuid = uuid.UUID(ad_account_id)
-        stmt = stmt.where(MetaAdAccount.id == acc_uuid)
+        stmt = stmt.where((MetaAdAccount.id == acc_uuid) | (MetaAdAccount.meta_account_id == ad_account_id))
     except ValueError:
-        stmt = stmt.where(MetaAdAccount.meta_account_id == ad_account_id)
+        raw_id = ad_account_id
+        clean_id = raw_id.replace("act_", "")
+        stmt = stmt.where(
+            (MetaAdAccount.meta_account_id == raw_id) |
+            (MetaAdAccount.meta_account_id == f"act_{clean_id}") |
+            (MetaAdAccount.meta_account_id == clean_id)
+        )
 
     res = await db.execute(stmt)
     ad_acc = res.scalar_one_or_none()

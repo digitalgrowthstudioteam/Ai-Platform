@@ -890,9 +890,12 @@ class MetaSyncService:
                 else:
                     time_param = f"time_range=%7B%22since%22%3A%22{chunk[1]}%22%2C%22until%22%3A%22{chunk[2]}%22%7D"
                 ins_url = f"https://graph.facebook.com/{api_ver}/{account_id}/insights?time_increment=1&level=campaign&{time_param}&fields=campaign_id,date_start,spend,impressions,reach,frequency,clicks,actions,action_values&limit=500"
-                r = await client.get(ins_url, headers=headers)
-                r.raise_for_status()
-                c_insights.extend(r.json().get("data", []))
+                while ins_url:
+                    r = await client.get(ins_url, headers=headers)
+                    r.raise_for_status()
+                    res_json = r.json()
+                    c_insights.extend(res_json.get("data", []))
+                    ins_url = res_json.get("paging", {}).get("next")
             await self._save_insights(db, c_insights, campaign_map, "campaign")
 
             # Level: AdSet
@@ -903,9 +906,12 @@ class MetaSyncService:
                 else:
                     time_param = f"time_range=%7B%22since%22%3A%22{chunk[1]}%22%2C%22until%22%3A%22{chunk[2]}%22%7D"
                 ins_url = f"https://graph.facebook.com/{api_ver}/{account_id}/insights?time_increment=1&level=adset&{time_param}&fields=adset_id,date_start,spend,impressions,reach,frequency,clicks,actions,action_values&limit=500"
-                r = await client.get(ins_url, headers=headers)
-                r.raise_for_status()
-                a_insights.extend(r.json().get("data", []))
+                while ins_url:
+                    r = await client.get(ins_url, headers=headers)
+                    r.raise_for_status()
+                    res_json = r.json()
+                    a_insights.extend(res_json.get("data", []))
+                    ins_url = res_json.get("paging", {}).get("next")
             await self._save_insights(db, a_insights, adset_map, "adset")
 
             # Level: Ad
@@ -916,9 +922,12 @@ class MetaSyncService:
                 else:
                     time_param = f"time_range=%7B%22since%22%3A%22{chunk[1]}%22%2C%22until%22%3A%22{chunk[2]}%22%7D"
                 ins_url = f"https://graph.facebook.com/{api_ver}/{account_id}/insights?time_increment=1&level=ad&{time_param}&fields=ad_id,date_start,spend,impressions,reach,frequency,clicks,actions,action_values&limit=500"
-                r = await client.get(ins_url, headers=headers)
-                r.raise_for_status()
-                ad_insights.extend(r.json().get("data", []))
+                while ins_url:
+                    r = await client.get(ins_url, headers=headers)
+                    r.raise_for_status()
+                    res_json = r.json()
+                    ad_insights.extend(res_json.get("data", []))
+                    ins_url = res_json.get("paging", {}).get("next")
             await self._save_insights(db, ad_insights, ad_map, "ad")
 
         await db.commit()

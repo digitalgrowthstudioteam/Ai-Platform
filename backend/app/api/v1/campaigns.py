@@ -93,9 +93,15 @@ async def list_campaigns(
     stmt = select(MetaAdAccount).where(MetaAdAccount.user_id.in_(accessible_ids))
     try:
         acc_uuid = uuid.UUID(ad_account_id)
-        stmt = stmt.where(MetaAdAccount.id == acc_uuid)
+        stmt = stmt.where((MetaAdAccount.id == acc_uuid) | (MetaAdAccount.meta_account_id == ad_account_id))
     except ValueError:
-        stmt = stmt.where(MetaAdAccount.meta_account_id == ad_account_id)
+        raw_id = ad_account_id
+        clean_id = raw_id.replace("act_", "")
+        stmt = stmt.where(
+            (MetaAdAccount.meta_account_id == raw_id) |
+            (MetaAdAccount.meta_account_id == f"act_{clean_id}") |
+            (MetaAdAccount.meta_account_id == clean_id)
+        )
 
     res = await db.execute(stmt)
     ad_acc = res.scalar_one_or_none()
@@ -162,7 +168,7 @@ async def list_campaigns(
         .outerjoin(metrics_subq, Campaign.id == metrics_subq.c.campaign_id)
         .outerjoin(prev_metrics_subq, Campaign.id == prev_metrics_subq.c.campaign_id)
         .join(MetaAdAccount, Campaign.ad_account_id == MetaAdAccount.id)
-        .where(MetaAdAccount.meta_account_id == ad_acc.meta_account_id)
+        .where((MetaAdAccount.meta_account_id == ad_acc.meta_account_id) | (MetaAdAccount.id == ad_acc.id))
         .order_by(func.coalesce(metrics_subq.c.spend, 0).desc(), Campaign.name.asc())
     )
     
@@ -174,7 +180,7 @@ async def list_campaigns(
         select(CampaignDailyMetrics.campaign_id, CampaignDailyMetrics.actions)
         .join(Campaign, CampaignDailyMetrics.campaign_id == Campaign.id)
         .join(MetaAdAccount, Campaign.ad_account_id == MetaAdAccount.id)
-        .where(MetaAdAccount.meta_account_id == ad_acc.meta_account_id)
+        .where((MetaAdAccount.meta_account_id == ad_acc.meta_account_id) | (MetaAdAccount.id == ad_acc.id))
         .where(CampaignDailyMetrics.date >= start_date)
         .where(CampaignDailyMetrics.date <= end_date)
     )

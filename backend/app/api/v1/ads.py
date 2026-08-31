@@ -163,9 +163,15 @@ async def list_ads(
     stmt = select(MetaAdAccount).where(MetaAdAccount.user_id.in_(accessible_ids))
     try:
         acc_uuid = uuid.UUID(ad_account_id)
-        stmt = stmt.where(MetaAdAccount.id == acc_uuid)
+        stmt = stmt.where((MetaAdAccount.id == acc_uuid) | (MetaAdAccount.meta_account_id == ad_account_id))
     except ValueError:
-        stmt = stmt.where(MetaAdAccount.meta_account_id == ad_account_id)
+        raw_id = ad_account_id
+        clean_id = raw_id.replace("act_", "")
+        stmt = stmt.where(
+            (MetaAdAccount.meta_account_id == raw_id) |
+            (MetaAdAccount.meta_account_id == f"act_{clean_id}") |
+            (MetaAdAccount.meta_account_id == clean_id)
+        )
 
     res = await db.execute(stmt)
     ad_acc = res.scalar_one_or_none()
@@ -237,7 +243,7 @@ async def list_ads(
         .outerjoin(Creative, Creative.ad_id == Ad.id)
         .outerjoin(metrics_subq, Ad.id == metrics_subq.c.ad_id)
         .outerjoin(prev_metrics_subq, Ad.id == prev_metrics_subq.c.ad_id)
-        .where(MetaAdAccount.meta_account_id == ad_acc.meta_account_id)
+        .where((MetaAdAccount.meta_account_id == ad_acc.meta_account_id) | (MetaAdAccount.id == ad_acc.id))
         .order_by(func.coalesce(metrics_subq.c.spend, 0).desc(), Ad.name.asc())
     )
     
@@ -251,7 +257,7 @@ async def list_ads(
         .join(AdSet, Ad.ad_set_id == AdSet.id)
         .join(Campaign, AdSet.campaign_id == Campaign.id)
         .join(MetaAdAccount, Campaign.ad_account_id == MetaAdAccount.id)
-        .where(MetaAdAccount.meta_account_id == ad_acc.meta_account_id)
+        .where((MetaAdAccount.meta_account_id == ad_acc.meta_account_id) | (MetaAdAccount.id == ad_acc.id))
         .where(AdDailyMetrics.date >= start_date)
         .where(AdDailyMetrics.date <= end_date)
     )
@@ -591,9 +597,15 @@ async def list_creatives(
     stmt = select(MetaAdAccount).where(MetaAdAccount.user_id.in_(accessible_ids))
     try:
         acc_uuid = uuid.UUID(ad_account_id)
-        stmt = stmt.where(MetaAdAccount.id == acc_uuid)
+        stmt = stmt.where((MetaAdAccount.id == acc_uuid) | (MetaAdAccount.meta_account_id == ad_account_id))
     except ValueError:
-        stmt = stmt.where(MetaAdAccount.meta_account_id == ad_account_id)
+        raw_id = ad_account_id
+        clean_id = raw_id.replace("act_", "")
+        stmt = stmt.where(
+            (MetaAdAccount.meta_account_id == raw_id) |
+            (MetaAdAccount.meta_account_id == f"act_{clean_id}") |
+            (MetaAdAccount.meta_account_id == clean_id)
+        )
 
     res = await db.execute(stmt)
     ad_acc = res.scalar_one_or_none()
@@ -610,7 +622,7 @@ async def list_creatives(
         .join(AdSet, Ad.ad_set_id == AdSet.id)
         .join(Campaign, AdSet.campaign_id == Campaign.id)
         .join(MetaAdAccount, Campaign.ad_account_id == MetaAdAccount.id)
-        .where(MetaAdAccount.meta_account_id == ad_acc.meta_account_id)
+        .where((MetaAdAccount.meta_account_id == ad_acc.meta_account_id) | (MetaAdAccount.id == ad_acc.id))
         .order_by(Creative.meta_creative_id.asc())
     )
     
