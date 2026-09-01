@@ -184,16 +184,38 @@ export default function PayQuotationClient() {
         handler: async (response: any) => {
           try {
             setPaying(true);
-            await api.publicVerifyQuotationPayment(quotationId, {
+            const verifyPayload = {
               razorpay_order_id: response.razorpay_order_id,
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_signature: response.razorpay_signature,
               email,
               name: fullName,
               phone: whatsapp,
-            });
-            setSuccess(true);
-            trackPurchase("quotation_" + quotationId, checkoutRes.amount / 100, checkoutRes.currency || "INR");
+            };
+
+            let verified = false;
+            let lastErr: any = null;
+
+            for (let attempt = 1; attempt <= 3; attempt++) {
+              try {
+                await api.publicVerifyQuotationPayment(quotationId, verifyPayload);
+                verified = true;
+                break;
+              } catch (err: any) {
+                lastErr = err;
+                console.warn(`Payment verification attempt ${attempt} failed:`, err);
+                if (attempt < 3) {
+                  await new Promise((res) => setTimeout(res, 1500 * attempt));
+                }
+              }
+            }
+
+            if (verified) {
+              setSuccess(true);
+              trackPurchase("quotation_" + quotationId, checkoutRes.amount / 100, checkoutRes.currency || "INR");
+            } else {
+              throw lastErr || new Error("Payment verification failed after retries.");
+            }
           } catch (verifyErr: any) {
             setNotification({
               type: "error",

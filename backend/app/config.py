@@ -55,6 +55,7 @@ class Settings(BaseSettings):
     # Razorpay (Phase 9)
     RAZORPAY_KEY_ID: Optional[str] = Field(default=None, description="Razorpay API Key ID")
     RAZORPAY_KEY_SECRET: Optional[str] = Field(default=None, description="Razorpay API Key Secret")
+    RAZORPAY_WEBHOOK_SECRET: Optional[str] = Field(default=None, description="Razorpay Webhook Secret for signature verification")
 
     # AI (Phase 8)
     AI_API_KEY: Optional[str] = Field(default=None, description="AI/LLM API Key")

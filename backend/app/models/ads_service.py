@@ -252,6 +252,11 @@ class ServiceQuotation(BaseModel):
         nullable=False,
         default=list,  # JSON list of line items
     )
+    razorpay_order_id: Mapped[Optional[str]] = mapped_column(
+        String(128),
+        nullable=True,
+        default=None,
+    )
     expires_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

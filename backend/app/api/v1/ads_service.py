@@ -2,9 +2,11 @@
 Digital Growth Studio — Meta Ads Service Acquisition Router
 """
 import uuid
+import hmac
+import hashlib
 import structlog
 from datetime import datetime, timedelta, timezone
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
 from sqlalchemy import select, update, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -416,6 +418,9 @@ async def public_quotation_checkout(
         
     await db.commit()
     
+    # Store the razorpay_order_id on the quotation for webhook reconciliation
+    order_id_to_store = None
+    
     amount = quote.final_total
     currency = quote.currency
     
@@ -428,6 +433,11 @@ async def public_quotation_checkout(
                 "receipt": f"receipt_ads_{str(quote.id)[:10]}"
             }
             order = client.order.create(data=order_data)
+            order_id_to_store = order["id"]
+            # Persist razorpay_order_id for webhook/reconciliation
+            quote.razorpay_order_id = order_id_to_store
+            db.add(quote)
+            await db.commit()
             return {
                 "order_id": order["id"],
                 "amount": order["amount"],
@@ -631,7 +641,17 @@ async def create_service_request(
         for field, val in payload.dict().items():
             if field != "status":
                 setattr(existing_request, field, val)
-        if payload.status:
+        # Protect against status regression: never downgrade a quotation_generated
+        # or later-stage request back to draft via auto-save
+        PROTECTED_STATUSES = {
+            "quotation_generated", "whatsapp_pending", "whatsapp_connected",
+            "partner_access_requested", "partner_access_granted",
+            "campaign_setup", "campaign_live", "completed"
+        }
+        if payload.status and existing_request.status not in PROTECTED_STATUSES:
+            existing_request.status = payload.status
+        elif payload.status and payload.status != "draft" and existing_request.status in PROTECTED_STATUSES:
+            # Allow explicit forward status transitions from admin/system, just not regression to draft
             existing_request.status = payload.status
         existing_request.updated_at = datetime.utcnow()
         req = existing_request
@@ -762,7 +782,14 @@ async def create_public_service_request(
         for field, val in payload.dict().items():
             if field != "status":
                 setattr(existing_request, field, val)
-        existing_request.status = status_to_save
+        # Protect against status regression: never downgrade a quotation_generated request back to draft
+        PROTECTED_STATUSES = {
+            "quotation_generated", "whatsapp_pending", "whatsapp_connected",
+            "partner_access_requested", "partner_access_granted",
+            "campaign_setup", "campaign_live", "completed"
+        }
+        if existing_request.status not in PROTECTED_STATUSES:
+            existing_request.status = status_to_save
         existing_request.updated_at = datetime.utcnow()
         req = existing_request
     else:
@@ -984,6 +1011,10 @@ async def purchase_service_pack(
                 "receipt": f"receipt_ads_{str(quote.id)[:10]}"
             }
             order = client.order.create(data=order_data)
+            # Persist razorpay_order_id for webhook/reconciliation
+            quote.razorpay_order_id = order["id"]
+            db.add(quote)
+            await db.commit()
             return {
                 "order_id": order["id"],
                 "amount": order["amount"],
@@ -2406,4 +2437,144 @@ async def admin_delete_quotation(
     await db.commit()
     logger.info("admin_quotation_deleted", quote_id=str(quotation_id))
     return {"status": "success", "message": "Successfully deleted quotation."}
+
+
+@router.post("/webhook/razorpay", summary="Razorpay webhook for automated payment processing")
+async def razorpay_webhook(
+    request: Request,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Server-side webhook for processing Razorpay payments automatically.
+    Ensures payment capture updates quotation & service request even if browser callback fails.
+    """
+    body_bytes = await request.body()
+    signature = request.headers.get("X-Razorpay-Signature")
+
+    # Verify webhook signature if secret is configured
+    if settings.RAZORPAY_WEBHOOK_SECRET and signature:
+        expected_sig = hmac.new(
+            settings.RAZORPAY_WEBHOOK_SECRET.encode("utf-8"),
+            body_bytes,
+            hashlib.sha256
+        ).hexdigest()
+
+        if not hmac.compare_digest(expected_sig, signature):
+            logger.error("razorpay_webhook_invalid_signature")
+            raise HTTPException(status_code=400, detail="Invalid webhook signature")
+
+    try:
+        import json
+        payload = json.loads(body_bytes.decode("utf-8"))
+    except Exception as e:
+        logger.error("razorpay_webhook_invalid_json", error=str(e))
+        raise HTTPException(status_code=400, detail="Invalid JSON payload")
+
+    event = payload.get("event")
+    logger.info("razorpay_webhook_received", event=event)
+
+    if event in ("payment.captured", "order.paid"):
+        payment_entity = payload.get("payload", {}).get("payment", {}).get("entity", {})
+        order_entity = payload.get("payload", {}).get("order", {}).get("entity", {})
+
+        order_id = payment_entity.get("order_id") or order_entity.get("id")
+        payment_id = payment_entity.get("id") or f"pay_wh_{uuid.uuid4().hex[:8]}"
+
+        if not order_id:
+            return {"status": "ignored", "reason": "No order_id found in event payload"}
+
+        # Find quotation by razorpay_order_id
+        stmt = select(ServiceQuotation).where(ServiceQuotation.razorpay_order_id == order_id)
+        res = await db.execute(stmt)
+        quote = res.scalar_one_or_none()
+
+        if quote:
+            if quote.status == "paid":
+                return {"status": "success", "message": "Quotation already marked as paid"}
+
+            # Fetch service request
+            stmt_req = select(MetaAdServiceRequest).where(MetaAdServiceRequest.id == quote.service_request_id)
+            res_req = await db.execute(stmt_req)
+            service_req = res_req.scalar_one_or_none()
+
+            if service_req:
+                stmt_user = select(User).where(User.id == quote.user_id)
+                res_user = await db.execute(stmt_user)
+                user = res_user.scalar_one_or_none()
+
+                # Mark quotation paid
+                quote.status = "paid"
+                db.add(quote)
+
+                # Provision AdPack
+                is_promo = any(item.get("service_type") == "ad_management_promo" for item in (quote.items or []))
+                ad_quantity = service_req.number_of_ads or 1
+
+                validity_days = 30
+                for item in (quote.items or []):
+                    if item.get("validity_days") and item.get("validity_days") > validity_days:
+                        validity_days = item["validity_days"]
+
+                # Check if pack already exists to prevent duplicate creation
+                stmt_pack = select(AdPack).where(AdPack.service_request_id == service_req.id)
+                res_pack = await db.execute(stmt_pack)
+                existing_pack = res_pack.scalar_one_or_none()
+
+                if not existing_pack:
+                    pack = AdPack(
+                        user_id=quote.user_id,
+                        service_request_id=service_req.id,
+                        pack_type="promo_1_ad" if is_promo else f"pack_{ad_quantity}",
+                        total_ad_credits=ad_quantity,
+                        used_ad_credits=0,
+                        remaining_ad_credits=ad_quantity,
+                        price_paid=quote.final_total,
+                        purchased_at=datetime.utcnow(),
+                        expires_at=datetime.utcnow() + timedelta(days=validity_days),
+                        status="active",
+                        non_refundable_terms_accepted=True,
+                        non_refundable_terms_accepted_at=datetime.utcnow()
+                    )
+                    db.add(pack)
+
+                if user:
+                    user.intro_offer_eligible = False
+                    user.intro_offer_used = True
+                    if not user.intro_offer_used_at:
+                        user.intro_offer_used_at = datetime.utcnow()
+                    if is_promo:
+                        user.intro_offer_service_request_id = service_req.id
+                    db.add(user)
+
+                    from app.services.subscription_bonus import grant_starter_plan_bonus
+                    await grant_starter_plan_bonus(user, db, days=30)
+
+                # Advance service request status
+                service_req.status = "whatsapp_pending"
+                db.add(service_req)
+
+                await db.commit()
+
+                # Send confirmation email
+                if user:
+                    try:
+                        from app.services.email_service import EmailService
+                        item_desc = "Meta Ads Service Pack" if not is_promo else "Promotional Ad Management Offer"
+                        await EmailService.send_template_email(
+                            to_email=user.email,
+                            trigger_key="payment_confirmation",
+                            variables={
+                                "order_id": payment_id,
+                                "item_name": item_desc
+                            },
+                            db=db
+                        )
+                    except Exception as mail_err:
+                        logger.error("webhook_quotation_payment_email_failed", error=str(mail_err), user_id=user.id)
+
+                logger.info("razorpay_webhook_processed_successfully", quotation_id=str(quote.id), order_id=order_id)
+                return {"status": "success", "message": "Quotation & service request payment processed successfully"}
+
+    return {"status": "ignored", "event": event}
+
 
