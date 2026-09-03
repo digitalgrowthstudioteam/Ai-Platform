@@ -348,7 +348,7 @@ async def get_ad_accounts(
     # If connection exists, fetch live accounts from Meta Marketing API
     if connection and connection.access_token:
         try:
-            async with httpx.AsyncClient(timeout=15.0) as client:
+            async with httpx.AsyncClient(timeout=5.0) as client:
                 api_ver = settings.META_API_VERSION
                 meta_url = f"https://graph.facebook.com/{api_ver}/me/adaccounts?fields=id,name,currency,timezone,account_status&access_token={connection.access_token}"
                 r = await client.get(meta_url)

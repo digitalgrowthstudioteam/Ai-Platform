@@ -51,28 +51,57 @@ export function AdAccountProvider({ children }: { children: React.ReactNode }) {
 
       setAdAccounts(activeAccounts);
       sessionStorage.setItem("dgs_cached_ad_accounts", JSON.stringify(activeAccounts));
+      localStorage.setItem("dgs_cached_ad_accounts_backup", JSON.stringify(activeAccounts));
 
       if (activeAccounts.length > 0) {
         // Resolve default active selection
         const savedId = localStorage.getItem("dgs_active_ad_account_id");
         const cleanSaved = savedId ? savedId.replace("act_", "") : "";
         const matched = activeAccounts.find((acc) => 
-          acc.id === savedId || acc.id.replace("act_", "") === cleanSaved
+          acc.id === savedId || 
+          acc.id.replace("act_", "") === cleanSaved ||
+          `act_${acc.id.replace("act_", "")}` === savedId
         );
         
-        if (matched) {
-          setSelectedAccountState(matched);
-        } else {
-          setSelectedAccountState(activeAccounts[0]);
-          localStorage.setItem("dgs_active_ad_account_id", activeAccounts[0].id);
-        }
+        const finalSelected = matched || activeAccounts[0];
+        setSelectedAccountState(finalSelected);
+        localStorage.setItem("dgs_active_ad_account_id", finalSelected.id);
       } else {
+        // Self-healing fallback: check if we have a valid backup cache before setting to null
+        const backup = localStorage.getItem("dgs_cached_ad_accounts_backup");
+        if (backup) {
+          try {
+            const parsed = JSON.parse(backup);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              setAdAccounts(parsed);
+              setSelectedAccountState(parsed[0]);
+              localStorage.setItem("dgs_active_ad_account_id", parsed[0].id);
+              return;
+            }
+          } catch (e) {}
+        }
         setSelectedAccountState(null);
       }
     } catch (err) {
       console.error("Failed to load connected Meta ad accounts:", err);
-      setAdAccounts([]);
-      setSelectedAccountState(null);
+      // Preserve existing cached ad accounts from sessionStorage/localStorage backup on failure
+      const cached = sessionStorage.getItem("dgs_cached_ad_accounts") || localStorage.getItem("dgs_cached_ad_accounts_backup");
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setAdAccounts(parsed);
+            const savedId = localStorage.getItem("dgs_active_ad_account_id");
+            const cleanSaved = savedId ? savedId.replace("act_", "") : "";
+            const matched = parsed.find((acc: AdAccount) => 
+              acc.id === savedId || acc.id.replace("act_", "") === cleanSaved
+            );
+            const fallbackAcc = matched || parsed[0];
+            setSelectedAccountState(fallbackAcc);
+            localStorage.setItem("dgs_active_ad_account_id", fallbackAcc.id);
+          }
+        } catch (e) {}
+      }
     } finally {
       setLoadingAccounts(false);
     }
@@ -87,9 +116,9 @@ export function AdAccountProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Load cached ad accounts from sessionStorage for instant page rendering
+  // Load cached ad accounts from sessionStorage / localStorage for instant rendering
   useEffect(() => {
-    const cached = sessionStorage.getItem("dgs_cached_ad_accounts");
+    const cached = sessionStorage.getItem("dgs_cached_ad_accounts") || localStorage.getItem("dgs_cached_ad_accounts_backup");
     if (cached) {
       try {
         const parsed = JSON.parse(cached);
@@ -109,18 +138,27 @@ export function AdAccountProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Listen to Firebase auth state to load connected accounts
+    let refreshTimer: NodeJS.Timeout | null = null;
     const unsubscribe = auth.onAuthStateChanged((user) => {
       if (user) {
         fetchAccounts();
+        // Background self-healing account check every 3 minutes
+        refreshTimer = setInterval(() => {
+          fetchAccounts();
+        }, 180000);
       } else {
         setAdAccounts([]);
         setSelectedAccountState(null);
         setLoadingAccounts(false);
         sessionStorage.removeItem("dgs_cached_ad_accounts");
+        if (refreshTimer) clearInterval(refreshTimer);
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      if (refreshTimer) clearInterval(refreshTimer);
+    };
   }, []);
 
   return (

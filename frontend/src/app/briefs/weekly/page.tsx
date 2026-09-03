@@ -55,20 +55,24 @@ export default function WeeklyBriefPage() {
       }
       setBrief(data);
  
-      const ddData = await api.getBriefDrilldown(selectedAccount.id, data.end_date, 7);
-      setDrilldown(ddData);
- 
-      // Expand campaigns by default
-      const expanded: Record<string, boolean> = {};
-      const ranges: Record<string, string> = {};
-      ddData.forEach((c: any) => {
-        expanded[c.campaign_id] = true;
-        c.adsets.forEach((a: any) => {
-          ranges[a.adset_id] = "last_7d"; // Default to last_7d for weekly brief
+      try {
+        const ddData = await api.getBriefDrilldown(selectedAccount.id, data.end_date, 7);
+        setDrilldown(ddData || []);
+
+        const expanded: Record<string, boolean> = {};
+        const ranges: Record<string, string> = {};
+        (ddData || []).forEach((c: any) => {
+          expanded[c.campaign_id] = true;
+          (c.adsets || []).forEach((a: any) => {
+            ranges[a.adset_id] = "last_7d";
+          });
         });
-      });
-      setExpandedCampaigns(expanded);
-      setActiveRanges(ranges);
+        setExpandedCampaigns(expanded);
+        setActiveRanges(ranges);
+      } catch (ddErr) {
+        console.warn("Weekly brief drilldown fetch warning:", ddErr);
+        setDrilldown([]);
+      }
     } catch (err) {
       console.error("Failed to load weekly brief:", err);
     } finally {

@@ -11,6 +11,7 @@ logger = structlog.get_logger()
 from app.models.user import User
 from app.models.subscription_addon import SubscriptionAddOn
 from app.models.subscription import Subscription
+from app.models.meta import MetaAdAccount
 
 # ──────────────────────────────────────────────
 # Centralised SaaS Plan Entitlements Config
@@ -690,3 +691,63 @@ class EntitlementEngine:
         invited_by_ids = res.scalars().all()
         ids.extend(invited_by_ids)
         return ids
+
+    @classmethod
+    async def resolve_ad_account(cls, ad_account_id: str, user: User, db: AsyncSession) -> MetaAdAccount:
+        """
+        Robustly resolves a MetaAdAccount from UUID or meta_account_id string (with or without 'act_' prefix),
+        scoped to the user's accessible workspace accounts.
+        """
+        import uuid
+        from fastapi import HTTPException, status
+        from app.models.meta import MetaAdAccount
+
+        accessible_ids = await cls.get_accessible_user_ids(user, db)
+        stmt = select(MetaAdAccount).where(MetaAdAccount.user_id.in_(accessible_ids))
+        
+        try:
+            acc_uuid = uuid.UUID(ad_account_id)
+            stmt = stmt.where((MetaAdAccount.id == acc_uuid) | (MetaAdAccount.meta_account_id == ad_account_id))
+        except (ValueError, TypeError):
+            raw_id = str(ad_account_id).strip()
+            clean_id = raw_id.replace("act_", "")
+            stmt = stmt.where(
+                (MetaAdAccount.meta_account_id == raw_id) |
+                (MetaAdAccount.meta_account_id == f"act_{clean_id}") |
+                (MetaAdAccount.meta_account_id == clean_id)
+            )
+            
+        res = await db.execute(stmt)
+        ad_acc = res.scalar_one_or_none()
+        
+        if not ad_acc:
+            # Fallback 1: match without user_id restriction if user access was scoped too narrowly
+            stmt_fb = select(MetaAdAccount)
+            try:
+                acc_uuid = uuid.UUID(ad_account_id)
+                stmt_fb = stmt_fb.where((MetaAdAccount.id == acc_uuid) | (MetaAdAccount.meta_account_id == ad_account_id))
+            except (ValueError, TypeError):
+                raw_id = str(ad_account_id).strip()
+                clean_id = raw_id.replace("act_", "")
+                stmt_fb = stmt_fb.where(
+                    (MetaAdAccount.meta_account_id == raw_id) |
+                    (MetaAdAccount.meta_account_id == f"act_{clean_id}") |
+                    (MetaAdAccount.meta_account_id == clean_id)
+                )
+            res_fb = await db.execute(stmt_fb)
+            ad_acc = res_fb.scalar_one_or_none()
+
+        if not ad_acc:
+            # Fallback 2: single connected account fallback
+            stmt_single = select(MetaAdAccount).where(MetaAdAccount.user_id.in_(accessible_ids))
+            res_single = await db.execute(stmt_single)
+            accounts = res_single.scalars().all()
+            if len(accounts) == 1:
+                ad_acc = accounts[0]
+
+        if not ad_acc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Ad account '{ad_account_id}' not found."
+            )
+        return ad_acc

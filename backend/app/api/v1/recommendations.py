@@ -19,6 +19,7 @@ from app.models.daily_brief import AIDailyBrief, AIWeeklyBrief
 from app.models.experiment import AccountMemory, AdExperiment
 from app.services.recommendation_engine import RecommendationEngine
 from app.services.brief_service import AIBriefService
+from app.services.entitlement_engine import EntitlementEngine
 from app.services.ml_feature_extractor import MLFeatureExtractor
 from app.models.ml_features import MLFeatureRecord, OptimizationAction
 from app.models.campaign import Campaign, AdSet, Ad
@@ -100,21 +101,7 @@ async def list_recommendations(
     """
     user = await get_db_user_from_claims(claims, db)
 
-    # Resolve Active Ad Account
-    stmt = select(MetaAdAccount).where(MetaAdAccount.user_id == user.id)
-    try:
-        acc_uuid = uuid.UUID(ad_account_id)
-        stmt = stmt.where(MetaAdAccount.id == acc_uuid)
-    except ValueError:
-        stmt = stmt.where(MetaAdAccount.meta_account_id == ad_account_id)
-
-    res = await db.execute(stmt)
-    ad_acc = res.scalar_one_or_none()
-    if not ad_acc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Active ad account not found."
-        )
+    ad_acc = await EntitlementEngine.resolve_ad_account(ad_account_id, user, db)
 
     # Fetch recommendations from DB (with filters)
     stmt = select(AIRecommendation).where(AIRecommendation.ad_account_id == ad_acc.id)
@@ -442,21 +429,7 @@ async def get_decision_center_summary(
     """
     user = await get_db_user_from_claims(claims, db)
 
-    # Resolve Active Ad Account
-    stmt = select(MetaAdAccount).where(MetaAdAccount.user_id == user.id)
-    try:
-        acc_uuid = uuid.UUID(ad_account_id)
-        stmt = stmt.where(MetaAdAccount.id == acc_uuid)
-    except ValueError:
-        stmt = stmt.where(MetaAdAccount.meta_account_id == ad_account_id)
-
-    res = await db.execute(stmt)
-    ad_acc = res.scalar_one_or_none()
-    if not ad_acc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Active ad account not found."
-        )
+    ad_acc = await EntitlementEngine.resolve_ad_account(ad_account_id, user, db)
 
     # Fetch active recommendations (new, viewed)
     stmt = (
@@ -1356,19 +1329,7 @@ async def get_daily_brief(
     Returns the daily brief summarizing performance trends and top priorities.
     """
     user = await get_db_user_from_claims(claims, db)
-
-    # Resolve Account
-    stmt = select(MetaAdAccount).where(MetaAdAccount.user_id == user.id)
-    try:
-        acc_uuid = uuid.UUID(ad_account_id)
-        stmt = stmt.where(MetaAdAccount.id == acc_uuid)
-    except ValueError:
-        stmt = stmt.where(MetaAdAccount.meta_account_id == ad_account_id)
-
-    res = await db.execute(stmt)
-    ad_acc = res.scalar_one_or_none()
-    if not ad_acc:
-        raise HTTPException(status_code=404, detail="Ad account not found.")
+    ad_acc = await EntitlementEngine.resolve_ad_account(ad_account_id, user, db)
 
     # Parse date
     if report_date:
@@ -1394,18 +1355,7 @@ async def refresh_daily_brief(
     Triggers recalculation and overwrites the Daily AI Brief.
     """
     user = await get_db_user_from_claims(claims, db)
-
-    stmt = select(MetaAdAccount).where(MetaAdAccount.user_id == user.id)
-    try:
-        acc_uuid = uuid.UUID(ad_account_id)
-        stmt = stmt.where(MetaAdAccount.id == acc_uuid)
-    except ValueError:
-        stmt = stmt.where(MetaAdAccount.meta_account_id == ad_account_id)
-
-    res = await db.execute(stmt)
-    ad_acc = res.scalar_one_or_none()
-    if not ad_acc:
-        raise HTTPException(status_code=404, detail="Ad account not found.")
+    ad_acc = await EntitlementEngine.resolve_ad_account(ad_account_id, user, db)
 
     if report_date:
         try:
@@ -1430,19 +1380,7 @@ async def get_weekly_brief(
     Returns the weekly brief summarizing learnings, winners, fatigue, and experiments.
     """
     user = await get_db_user_from_claims(claims, db)
-
-    # Resolve Account
-    stmt = select(MetaAdAccount).where(MetaAdAccount.user_id == user.id)
-    try:
-        acc_uuid = uuid.UUID(ad_account_id)
-        stmt = stmt.where(MetaAdAccount.id == acc_uuid)
-    except ValueError:
-        stmt = stmt.where(MetaAdAccount.meta_account_id == ad_account_id)
-
-    res = await db.execute(stmt)
-    ad_acc = res.scalar_one_or_none()
-    if not ad_acc:
-        raise HTTPException(status_code=404, detail="Ad account not found.")
+    ad_acc = await EntitlementEngine.resolve_ad_account(ad_account_id, user, db)
 
     if start_date:
         try:
@@ -1468,18 +1406,7 @@ async def refresh_weekly_brief(
     Triggers weekly recalculation and updates the Weekly Brief.
     """
     user = await get_db_user_from_claims(claims, db)
-
-    stmt = select(MetaAdAccount).where(MetaAdAccount.user_id == user.id)
-    try:
-        acc_uuid = uuid.UUID(ad_account_id)
-        stmt = stmt.where(MetaAdAccount.id == acc_uuid)
-    except ValueError:
-        stmt = stmt.where(MetaAdAccount.meta_account_id == ad_account_id)
-
-    res = await db.execute(stmt)
-    ad_acc = res.scalar_one_or_none()
-    if not ad_acc:
-        raise HTTPException(status_code=404, detail="Ad account not found.")
+    ad_acc = await EntitlementEngine.resolve_ad_account(ad_account_id, user, db)
 
     if start_date:
         try:

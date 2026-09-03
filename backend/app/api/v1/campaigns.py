@@ -16,7 +16,7 @@ from app.api.v1.meta import get_db_user_from_claims
 from app.models.meta import MetaAdAccount, MetaConnection
 from app.models.campaign import Campaign, AdSet
 from app.models.metrics import CampaignDailyMetrics, AdSetDailyMetrics
-
+from app.services.entitlement_engine import EntitlementEngine
 logger = structlog.get_logger()
 router = APIRouter(
     prefix="/campaigns",
@@ -807,19 +807,7 @@ async def get_brief_drilldown(
     db: AsyncSession = Depends(get_db),
 ):
     user = await get_db_user_from_claims(claims, db)
-
-    # 1. Resolve Active Ad Account
-    stmt = select(MetaAdAccount).where(MetaAdAccount.user_id == user.id)
-    try:
-        acc_uuid = uuid.UUID(ad_account_id)
-        stmt = stmt.where(MetaAdAccount.id == acc_uuid)
-    except ValueError:
-        stmt = stmt.where(MetaAdAccount.meta_account_id == ad_account_id)
-
-    res = await db.execute(stmt)
-    ad_acc = res.scalar_one_or_none()
-    if not ad_acc:
-        raise HTTPException(status_code=404, detail="Ad account not found.")
+    ad_acc = await EntitlementEngine.resolve_ad_account(ad_account_id, user, db)
 
     # 2. Parse target date
     if report_date:

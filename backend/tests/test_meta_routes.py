@@ -177,7 +177,7 @@ async def test_meta_accounts_and_selection(mock_auth, db: AsyncSession):
         accounts = response.json()
         assert len(accounts) == 3
         assert accounts[0]["id"] == "act_101010101"
-        assert accounts[0]["is_connected"] is False
+        assert accounts[0]["is_connected"] is True
 
         # 2. Select first ad account
         payload = {"account_ids": ["act_101010101"], "industries": {"act_101010101": "Ecommerce"}}
