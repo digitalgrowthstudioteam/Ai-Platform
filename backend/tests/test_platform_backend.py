@@ -597,7 +597,246 @@ async def test_platform_end_to_end_security_and_isolation():
         assert tamper_app_res.status_code == 400, "Must reject modifying app branding assets once development is set"
         assert "cannot be changed once submitted and development is set" in tamper_app_res.json()["detail"]
 
-        print("\nALL 16 MULTI-VENDOR ISOLATION, SECURITY, SHIPPING, MOV, ORDER TRACKING, ADMIN PLAN/ADDON DELETION, PRODUCT VARIANTS, BRAND NAME LOCK & APP ASSET IMMUTABILITY TESTS PASSED PERFECTLY!")
+        # ──────────────────────────────────────────────
+        # Test 17: One-Time Setup Fee Gate, Super Admin Pricing Control & Quotes
+        # ──────────────────────────────────────────────
+        # Check current setup fee status of new vendor
+        me_check = await client.get("/api/v1/platform/auth/me", headers=new_vendor_headers)
+        assert me_check.status_code == 200
+        assert me_check.json()["setup_fee_cleared"] is False
+        assert me_check.json()["setup_fee_paid"] is False
+
+        # Fetch setup fee quote
+        quote_res = await client.get("/api/v1/platform/payments/setup-fee-quote", headers=new_vendor_headers)
+        assert quote_res.status_code == 200
+        quote = quote_res.json()
+        assert quote["setup_fee_cleared"] is False
+        assert quote["base_price_inr"] == 2000.0
+        assert quote["sale_price_inr"] == 999.0
+        assert quote["final_price_inr"] == 999.0
+
+        # Super Admin updates plan pricing
+        plans_list = (await client.get("/api/v1/platform/admin/plans", headers=headers_admin)).json()
+        plan_id = plans_list[0]["id"]
+        admin_price_update = await client.patch(
+            f"/api/v1/platform/admin/plans/{plan_id}/pricing",
+            headers=headers_admin,
+            json={"setup_fee_sale_price_inr": 899.0, "monthly_price_inr": 499.0},
+        )
+        assert admin_price_update.status_code == 200
+
+        # Quote should now reflect updated plan sale price (899)
+        quote_res2 = await client.get("/api/v1/platform/payments/setup-fee-quote", headers=new_vendor_headers)
+        assert quote_res2.json()["sale_price_inr"] == 899.0
+        assert quote_res2.json()["final_price_inr"] == 899.0
+
+        # Super Admin sets custom price specifically for this vendor
+        vendor_id = me_check.json()["vendor_id"]
+        admin_custom_price = await client.patch(
+            f"/api/v1/platform/admin/vendors/{vendor_id}/setup-fee",
+            headers=headers_admin,
+            json={"custom_price_inr": 699.0},
+        )
+        assert admin_custom_price.status_code == 200
+        assert admin_custom_price.json()["custom_price_inr"] == 699.0
+
+        # Quote should now reflect custom price (699)
+        quote_res3 = await client.get("/api/v1/platform/payments/setup-fee-quote", headers=new_vendor_headers)
+        assert quote_res3.json()["custom_price_inr"] == 699.0
+        assert quote_res3.json()["final_price_inr"] == 699.0
+
+        # ──────────────────────────────────────────────
+        # Test 18: Coupon Generation, Validation & Razorpay Setup Fee Settlement
+        # ──────────────────────────────────────────────
+        # Admin generates a coupon: 200 INR discount
+        coupon_res = await client.post(
+            "/api/v1/platform/admin/coupons",
+            headers=headers_admin,
+            json={
+                "code": "LAUNCH200",
+                "discount_type": "FIXED_INR",
+                "discount_value": 200.0,
+                "valid_days": 15,
+                "applicable_to": "SETUP_FEE",
+                "max_uses": 50,
+            },
+        )
+        assert coupon_res.status_code == 201
+        coupon_data = coupon_res.json()
+        assert coupon_data["code"] == "LAUNCH200"
+
+        # Vendor validates coupon
+        val_res = await client.post(
+            "/api/v1/platform/payments/validate-coupon",
+            headers=new_vendor_headers,
+            json={"code": "LAUNCH200"},
+        )
+        assert val_res.status_code == 200
+        assert val_res.json()["valid"] is True
+        assert val_res.json()["discount_inr"] == 200.0
+        # 699 custom price - 200 coupon = 499
+        assert val_res.json()["new_total_inr"] == 499.0
+
+        # Create Razorpay setup fee order with coupon
+        order_res = await client.post(
+            "/api/v1/platform/payments/create-setup-fee-order",
+            headers=new_vendor_headers,
+            json={"coupon_code": "LAUNCH200"},
+        )
+        assert order_res.status_code == 200
+        order_data = order_res.json()
+        assert order_data["amount"] == 49900  # in paise
+        assert "order_id" in order_data
+
+        # Verify setup fee payment
+        verify_res = await client.post(
+            "/api/v1/platform/payments/verify-setup-fee",
+            headers=new_vendor_headers,
+            json={
+                "razorpay_order_id": order_data["order_id"],
+                "razorpay_payment_id": "pay_test_setup_001",
+                "razorpay_signature": "mock_signature_test",
+                "coupon_code": "LAUNCH200",
+            },
+        )
+        assert verify_res.status_code == 200
+        assert verify_res.json()["setup_fee_cleared"] is True
+
+        # Auth session now confirms vendor is cleared and allowed into dashboard
+        me_after_payment = await client.get("/api/v1/platform/auth/me", headers=new_vendor_headers)
+        assert me_after_payment.json()["setup_fee_cleared"] is True
+        assert me_after_payment.json()["setup_fee_paid"] is True
+
+        # Test Super Admin secret waiver on a secondary vendor
+        reg_waiver_vendor = await client.post("/api/v1/platform/auth/register", json={
+            "business_name": "Waiver Boutique",
+            "owner_name": "Anita Roy",
+            "email": "anita.waiver@example.com",
+            "phone": "+91 9999900001",
+            "password": "Password@123",
+            "category": "Fashion",
+            "store_slug": "waiver-boutique",
+        })
+        assert reg_waiver_vendor.status_code == 201
+        waiver_token = reg_waiver_vendor.json()["access_token"]
+        waiver_headers = {"Authorization": f"Bearer {waiver_token}"}
+        waiver_me = (await client.get("/api/v1/platform/auth/me", headers=waiver_headers)).json()
+        waiver_vendor_id = waiver_me["vendor_id"]
+
+        # Initially setup fee is not cleared
+        me_waiver_before = await client.get("/api/v1/platform/auth/me", headers=waiver_headers)
+        assert me_waiver_before.json()["setup_fee_cleared"] is False
+
+        # Admin waives setup fee secretly
+        waive_action = await client.patch(
+            f"/api/v1/platform/admin/vendors/{waiver_vendor_id}/setup-fee",
+            headers=headers_admin,
+            json={"waive_fee": True},
+        )
+        assert waive_action.status_code == 200
+        assert waive_action.json()["setup_fee_waived"] is True
+
+        # Vendor is now cleared without any public mention of waiver
+        me_waiver_after = await client.get("/api/v1/platform/auth/me", headers=waiver_headers)
+        assert me_waiver_after.json()["setup_fee_cleared"] is True
+
+        # ──────────────────────────────────────────────
+        # Test 19: Subscription Product Gating (Expired/Unpaid App Stops Showing Products)
+        # ──────────────────────────────────────────────
+        # Storefront endpoint for ABC Fashion (active subscription)
+        pub_prods_abc = await client.get("/api/store/abc/products")
+        assert pub_prods_abc.status_code == 200
+        assert len(pub_prods_abc.json()) > 0
+
+        # Set waiver boutique subscription to EXPIRED via direct admin / DB status simulation
+        from app.models.platform.subscription import PlatformSubscription
+        from sqlalchemy import update
+        import uuid as _uuid
+        async with test_sessionmaker() as db_session:
+            await db_session.execute(
+                update(PlatformSubscription)
+                .where(PlatformSubscription.vendor_id == _uuid.UUID(waiver_vendor_id))
+                .values(status="EXPIRED")
+            )
+            await db_session.commit()
+
+        # Public storefront & app endpoints must now return empty products list for expired subscription
+        pub_prods_expired = await client.get("/api/store/waiver-boutique/products")
+        assert pub_prods_expired.status_code == 200
+        assert pub_prods_expired.json() == [], "Expired subscription must hide all products from app and store"
+
+        # ──────────────────────────────────────────────
+        # Test 20: Add-on Platform Razorpay Purchase & Immediate Cloud Quota Allocation
+        # ──────────────────────────────────────────────
+        # Storage usage before addon
+        overview_before = (await client.get("/api/v1/platform/vendor/overview", headers=new_vendor_headers)).json()
+        limit_before = overview_before["storage_limit_bytes"]
+
+        # Fetch addons to get storage-5gb addon ID
+        addons_list = (await client.get("/api/v1/platform/admin/addons", headers=headers_admin)).json()
+        storage_addon = next(a for a in addons_list if a["code"] == "storage-5gb")
+
+        # Create Addon order for storage-5gb
+        addon_order_res = await client.post(
+            "/api/v1/platform/payments/create-addon-order",
+            headers=new_vendor_headers,
+            json={"addon_id": storage_addon["id"]},
+        )
+        assert addon_order_res.status_code == 200
+        addon_order = addon_order_res.json()
+        assert addon_order["addon_code"] == "storage-5gb"
+
+        # Verify Addon Payment
+        verify_addon = await client.post(
+            "/api/v1/platform/payments/verify-addon-payment",
+            headers=new_vendor_headers,
+            json={
+                "addon_id": storage_addon["id"],
+                "razorpay_order_id": addon_order["order_id"],
+                "razorpay_payment_id": "pay_test_addon_001",
+                "razorpay_signature": "mock_sig_addon",
+            },
+        )
+        assert verify_addon.status_code == 200
+        assert verify_addon.json()["success"] is True
+
+        # Check storage limit increased by 5GB (5368709120 bytes)
+        overview_after = (await client.get("/api/v1/platform/vendor/overview", headers=new_vendor_headers)).json()
+        assert overview_after["storage_limit_bytes"] == limit_before + (5 * 1024 * 1024 * 1024)
+
+        # ──────────────────────────────────────────────
+        # Test 21: APK Submission by Admin & Vendor Approval Starting ₹499/mo Auto-Debit
+        # ──────────────────────────────────────────────
+        # Admin marks build BUILT and supplies APK download URL
+        admin_build_res = await client.patch(
+            f"/api/v1/platform/admin/vendors/{vendor_id}/app-config",
+            headers=headers_admin,
+            json={
+                "app_build_status": "BUILT",
+                "apk_download_url": "https://storage.googleapis.com/dgs-builds/apex-trends-v1.0.0.apk",
+            },
+        )
+        assert admin_build_res.status_code == 200
+
+        # Vendor inspects app-config and sees the submitted APK download link
+        vendor_cfg_check = await client.get("/api/v1/platform/vendor/app-config", headers=new_vendor_headers)
+        assert vendor_cfg_check.status_code == 200
+        assert vendor_cfg_check.json()["app_build_status"] == "BUILT"
+        assert vendor_cfg_check.json()["apk_download_url"] == "https://storage.googleapis.com/dgs-builds/apex-trends-v1.0.0.apk"
+        assert vendor_cfg_check.json()["apk_user_approved"] is False
+
+        # Vendor tests the APK and approves it, activating ₹499/mo subscription auto-debit
+        approve_res = await client.post(
+            "/api/v1/platform/payments/approve-apk-and-activate-subscription",
+            headers=new_vendor_headers,
+        )
+        assert approve_res.status_code == 200
+        approve_data = approve_res.json()
+        assert approve_data["apk_user_approved"] is True
+        assert approve_data["subscription_status"] == "active"
+        assert approve_data["subscription_auto_debit_active"] is True
+
+        print("\nALL 21 MULTI-VENDOR ISOLATION, SECURITY, SETUP FEE GATE, RECURRING APP SUBSCRIPTIONS, AND PLATFORM RAZORPAY TESTS PASSED PERFECTLY!")
 
 
 if __name__ == "__main__":

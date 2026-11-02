@@ -48,6 +48,7 @@ async def seed_platform_database(db: AsyncSession):
             slug="starter-store",
             monthly_price_inr=499.0,
             setup_fee_inr=2000.0,
+            setup_fee_sale_price_inr=999.0,
             storage_limit_mb=1024,
             max_products=100,
             is_active=True,

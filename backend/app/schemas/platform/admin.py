@@ -58,6 +58,7 @@ class PlanCreateOrUpdateRequest(BaseModel):
     slug: str
     monthly_price_inr: float
     setup_fee_inr: float
+    setup_fee_sale_price_inr: Optional[float] = 999.0
     storage_limit_mb: int = 1024
     max_products: int = 100
     is_active: bool = True
@@ -70,6 +71,7 @@ class PlanResponse(BaseModel):
     slug: str
     monthly_price_inr: float
     setup_fee_inr: float
+    setup_fee_sale_price_inr: Optional[float] = 999.0
     storage_limit_mb: int
     max_products: int
     is_active: bool
@@ -103,6 +105,7 @@ class VendorAppStatusUpdateRequest(BaseModel):
     playstore_url: Optional[str] = None
     app_version: Optional[str] = None
     is_locked: Optional[bool] = None
+    apk_download_url: Optional[str] = None
 
 
 class VendorStorageLimitUpdateRequest(BaseModel):

@@ -20,6 +20,7 @@ from app.api.v1.ads_service import router as ads_service_router
 from app.api.platform.auth import router as platform_auth_router
 from app.api.platform.vendor import router as platform_vendor_router
 from app.api.platform.admin import router as platform_admin_router
+from app.api.platform.payments import router as platform_payments_router
 from app.api.store.endpoints import router as store_router
 
 api_v1_router = APIRouter()
@@ -42,6 +43,7 @@ api_v1_router.include_router(ads_service_router, tags=["Meta Ads Management Serv
 api_v1_router.include_router(platform_auth_router)
 api_v1_router.include_router(platform_vendor_router)
 api_v1_router.include_router(platform_admin_router)
+api_v1_router.include_router(platform_payments_router, prefix="/platform")
 api_v1_router.include_router(store_router)
 
 

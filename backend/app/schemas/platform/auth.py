@@ -59,4 +59,9 @@ class PlatformUserMeResponse(BaseModel):
     store_slug: Optional[str] = None
     store_name: Optional[str] = None
     status: str
+    setup_fee_cleared: bool = True
+    setup_fee_paid: bool = True
+    setup_fee_waived: bool = False
+    subscription_status: Optional[str] = None
+    apk_user_approved: bool = False
 

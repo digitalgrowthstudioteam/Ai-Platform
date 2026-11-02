@@ -12,6 +12,11 @@ export interface PlatformUser {
   store_slug?: string;
   store_name?: string;
   status: string;
+  setup_fee_cleared?: boolean;
+  setup_fee_paid?: boolean;
+  setup_fee_waived?: boolean;
+  subscription_status?: string;
+  apk_user_approved?: boolean;
 }
 
 export interface PlatformTokenResponse {
@@ -221,6 +226,49 @@ export interface AppConfig {
   playstore_url?: string;
   publication_status: 'UNPUBLISHED' | 'PENDING_REVIEW' | 'PUBLISHED';
   is_locked?: boolean;
+  apk_download_url?: string;
+  apk_submitted_at?: string;
+  apk_user_approved?: boolean;
+  apk_user_approved_at?: string;
+  subscription_auto_debit_active?: boolean;
+}
+
+export interface SetupFeeQuote {
+  plan_name: string;
+  base_price_inr: number;
+  sale_price_inr: number;
+  custom_price_inr?: number;
+  final_price_inr: number;
+  setup_fee_paid: boolean;
+  setup_fee_waived: boolean;
+  setup_fee_cleared: boolean;
+  key_id: string;
+  currency: string;
+  features: string[];
+}
+
+export interface CouponValidation {
+  valid: boolean;
+  code: string;
+  discount_type: string;
+  discount_value: number;
+  discount_inr: number;
+  new_total_inr: number;
+  message: string;
+}
+
+export interface PlatformCouponItem {
+  id: string;
+  code: string;
+  discount_type: string;
+  discount_value: number;
+  applicable_to: string;
+  vendor_id?: string;
+  max_uses: number;
+  used_count: number;
+  valid_until: string;
+  is_active: boolean;
+  created_at: string;
 }
 
 export interface SuperAdminOverview {
@@ -260,11 +308,60 @@ export interface Plan {
   slug: string;
   monthly_price_inr: number;
   setup_fee_inr: number;
+  setup_fee_sale_price_inr?: number;
   storage_limit_mb: number;
   max_products: number;
   is_active: boolean;
   features_json: string;
   created_at: string;
+}
+
+export interface VendorDetailFull {
+  id: string;
+  vendor_code: string;
+  status: string;
+  created_at: string;
+  business_name: string;
+  owner_name: string;
+  email: string;
+  phone: string;
+  category: string;
+  address?: string;
+  description?: string;
+  gst_number?: string;
+  logo_url?: string;
+  website?: string;
+  store_slug: string;
+  subdomain: string;
+  store_status: string;
+  store_created_at: string;
+  primary_color: string;
+  secondary_color: string;
+  cod_enabled: boolean;
+  razorpay_enabled: boolean;
+  razorpay_key_id?: string;
+  app_name: string;
+  app_logo_url?: string;
+  splash_screen_url?: string;
+  app_primary_color: string;
+  app_secondary_color: string;
+  package_id: string;
+  app_build_status: string;
+  app_version: string;
+  playstore_url?: string;
+  publication_status: string;
+  total_products: number;
+  total_orders: number;
+  storage_used_mb: number;
+  storage_limit_mb: number;
+  plan_name?: string;
+  subscription_status?: string;
+  renewal_date?: string;
+  setup_fee_paid: boolean;
+  setup_fee_waived: boolean;
+  setup_fee_custom_price_inr?: number;
+  apk_user_approved: boolean;
+  apk_download_url?: string;
 }
 
 export interface Addon {

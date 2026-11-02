@@ -17,6 +17,9 @@ import {
   VendorListItem,
   Plan,
   Addon,
+  SetupFeeQuote,
+  CouponValidation,
+  PlatformCouponItem,
 } from './types';
 import { demoSandbox, DEMO_USER } from './demo-sandbox';
 
@@ -535,6 +538,165 @@ class PlatformApiClient {
       return demoSandbox.getCustomerOrders(phone);
     }
     return this.request(`/api/store/${slug}/customer-orders?phone=${encodeURIComponent(phone)}`);
+  }
+
+  // ──────────────────────────────────────────────
+  // Platform Payments & Razorpay
+  // ──────────────────────────────────────────────
+  async getSetupFeeQuote(): Promise<SetupFeeQuote> {
+    if (this.isDemoMode()) {
+      return {
+        plan_name: "Starter Store Plan",
+        base_price_inr: 2000,
+        sale_price_inr: 999,
+        final_price_inr: 999,
+        setup_fee_paid: true,
+        setup_fee_waived: false,
+        setup_fee_cleared: true,
+        key_id: "rzp_test_platform_mock",
+        currency: "INR",
+        features: [
+          "Official Android Mobile Shopping App compilation & Play Store setup",
+          "Dedicated secure store subdomain (.digitalgrowthstudio.in)",
+          "Unlimited product catalog with variant & image gallery hosting",
+          "1GB High-Speed Cloud Storage CDN",
+          "Direct WhatsApp order alerts & automated notifications",
+        ],
+      };
+    }
+    return this.request<SetupFeeQuote>('/api/v1/platform/payments/setup-fee-quote');
+  }
+
+  async validateCoupon(code: string): Promise<CouponValidation> {
+    if (this.isDemoMode()) {
+      const is50 = code.toUpperCase().includes('50');
+      const discount = is50 ? 500 : 200;
+      return {
+        valid: true,
+        code: code.toUpperCase(),
+        discount_type: 'FIXED_INR',
+        discount_value: discount,
+        discount_inr: discount,
+        new_total_inr: Math.max(0, 999 - discount),
+        message: `Coupon '${code.toUpperCase()}' applied! You save ₹${discount}.`,
+      };
+    }
+    return this.request<CouponValidation>('/api/v1/platform/payments/validate-coupon', {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    });
+  }
+
+  async createSetupFeeOrder(couponCode?: string): Promise<any> {
+    if (this.isDemoMode()) {
+      return {
+        order_id: 'order_mock_setup_demo',
+        amount: 99900,
+        currency: 'INR',
+        key_id: 'rzp_test_platform_mock',
+        is_mock: true,
+      };
+    }
+    return this.request('/api/v1/platform/payments/create-setup-fee-order', {
+      method: 'POST',
+      body: JSON.stringify({ coupon_code: couponCode }),
+    });
+  }
+
+  async verifySetupFeePayment(payload: {
+    razorpay_order_id: string;
+    razorpay_payment_id: string;
+    razorpay_signature: string;
+    coupon_code?: string;
+  }): Promise<any> {
+    if (this.isDemoMode()) {
+      return { success: true, message: "Setup fee paid! Welcome to your dashboard.", setup_fee_cleared: true };
+    }
+    return this.request('/api/v1/platform/payments/verify-setup-fee', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async createAddonOrder(addonId: string): Promise<any> {
+    if (this.isDemoMode()) {
+      return {
+        order_id: `order_mock_addon_${addonId.slice(0, 6)}`,
+        amount: 49900,
+        currency: 'INR',
+        key_id: 'rzp_test_platform_mock',
+        is_mock: true,
+      };
+    }
+    return this.request('/api/v1/platform/payments/create-addon-order', {
+      method: 'POST',
+      body: JSON.stringify({ addon_id: addonId }),
+    });
+  }
+
+  async verifyAddonPayment(payload: {
+    addon_id: string;
+    razorpay_order_id: string;
+    razorpay_payment_id: string;
+    razorpay_signature: string;
+  }): Promise<any> {
+    if (this.isDemoMode()) {
+      return { success: true, message: "Add-on activated successfully in demo sandbox!" };
+    }
+    return this.request('/api/v1/platform/payments/verify-addon-payment', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async approveApkAndActivateSubscription(): Promise<any> {
+    if (this.isDemoMode()) {
+      demoSandbox.updateAppConfig({ apk_user_approved: true, subscription_auto_debit_active: true });
+      return { success: true, message: "APK approved! Monthly subscription started in demo sandbox." };
+    }
+    return this.request('/api/v1/platform/payments/approve-apk-and-activate-subscription', {
+      method: 'POST',
+    });
+  }
+
+  // Admin Setup Fee & Pricing controls
+  async updateVendorSetupFeeByAdmin(vendorId: string, payload: { waive_fee?: boolean; custom_price_inr?: number }): Promise<any> {
+    return this.request(`/api/v1/platform/admin/vendors/${vendorId}/setup-fee`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async updatePlanPricingByAdmin(planId: string, payload: { monthly_price_inr?: number; setup_fee_inr?: number; setup_fee_sale_price_inr?: number }): Promise<any> {
+    return this.request(`/api/v1/platform/admin/plans/${planId}/pricing`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async getAdminCoupons(): Promise<PlatformCouponItem[]> {
+    return this.request<PlatformCouponItem[]>('/api/v1/platform/admin/coupons');
+  }
+
+  async createAdminCoupon(payload: {
+    code: string;
+    discount_type: string;
+    discount_value: number;
+    applicable_to?: string;
+    vendor_id?: string;
+    max_uses?: number;
+    valid_days?: number;
+  }): Promise<PlatformCouponItem> {
+    return this.request<PlatformCouponItem>('/api/v1/platform/admin/coupons', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async deleteAdminCoupon(couponId: string): Promise<any> {
+    return this.request(`/api/v1/platform/admin/coupons/${couponId}`, {
+      method: 'DELETE',
+    });
   }
 }
 

@@ -283,6 +283,39 @@ export default function VendorAppConfigPage() {
             <ExternalLink className="w-4 h-4" />
             Open on Google Play Store
           </a>
+        ) : config?.apk_download_url ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <a
+              href={config.apk_download_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 text-white font-semibold text-xs shadow-xs hover:bg-slate-800 transition-colors"
+            >
+              <Smartphone className="w-4 h-4 text-emerald-400" />
+              Download APK
+            </a>
+            {!config.apk_user_approved ? (
+              <button
+                type="button"
+                onClick={async () => {
+                  if (window.confirm("Approve this Android APK build and activate the ₹499/mo recurring subscription?")) {
+                    await platformApi.approveApkAndActivateSubscription();
+                    const updated = await platformApi.getVendorAppConfig();
+                    setConfig(updated);
+                  }
+                }}
+                className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-blue-600 text-white font-bold text-xs shadow-xs hover:bg-blue-700 transition-colors cursor-pointer"
+              >
+                <Check className="w-3.5 h-3.5" />
+                Approve APK & Start ₹499/mo Plan
+              </button>
+            ) : (
+              <span className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold">
+                <Check className="w-3.5 h-3.5 text-emerald-600" />
+                APK Approved • ₹499/mo Active
+              </span>
+            )}
+          </div>
         ) : (
           <div className="text-xs text-slate-500 bg-slate-50 p-3 rounded-xl border border-slate-200 leading-relaxed max-w-sm">
             Android APK build compiled and published by Digital Growth Studio's Android engineers.

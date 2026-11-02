@@ -120,6 +120,11 @@ class PlatformVendorAppConfig(BaseModel):
     playstore_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     publication_status: Mapped[str] = mapped_column(String(50), nullable=False, default="UNPUBLISHED")  # UNPUBLISHED, PENDING_REVIEW, PUBLISHED
     is_locked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    apk_download_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    apk_submitted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    apk_user_approved: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    apk_user_approved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    subscription_auto_debit_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     vendor: Mapped["PlatformVendor"] = relationship("PlatformVendor", back_populates="app_config")
 

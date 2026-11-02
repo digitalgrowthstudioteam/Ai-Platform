@@ -6,7 +6,7 @@ import uuid
 import secrets
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select, func
+from sqlalchemy import select, func, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -471,12 +471,20 @@ async def get_my_platform_session(
     vendor_code = None
     store_slug = None
     store_name = None
+    setup_fee_cleared = True
+    setup_fee_paid = True
+    setup_fee_waived = False
+    subscription_status = "active"
+    apk_user_approved = False
 
     if user.role == "VENDOR_ADMIN":
         stmt = (
             select(PlatformVendor)
             .where(PlatformVendor.user_id == user.id)
-            .options(selectinload(PlatformVendor.store))
+            .options(
+                selectinload(PlatformVendor.store),
+                selectinload(PlatformVendor.app_config),
+            )
         )
         res = await db.execute(stmt)
         vendor = res.scalar_one_or_none()
@@ -486,6 +494,24 @@ async def get_my_platform_session(
             if vendor.store:
                 store_slug = vendor.store.store_slug
                 store_name = vendor.store.store_name
+            if vendor.app_config:
+                apk_user_approved = getattr(vendor.app_config, "apk_user_approved", False)
+
+            # Check setup fee and subscription status
+            sub_stmt = (
+                select(PlatformSubscription)
+                .where(PlatformSubscription.vendor_id == vendor.id)
+                .order_by(desc(PlatformSubscription.created_at))
+            )
+            sub = (await db.execute(sub_stmt)).scalars().first()
+            if sub:
+                setup_fee_paid = sub.setup_fee_paid
+                setup_fee_waived = sub.setup_fee_waived
+                setup_fee_cleared = sub.setup_fee_paid or sub.setup_fee_waived
+                subscription_status = sub.status
+            else:
+                setup_fee_cleared = False
+                setup_fee_paid = False
 
     return PlatformUserMeResponse(
         user_id=user.id,
@@ -497,4 +523,9 @@ async def get_my_platform_session(
         store_slug=store_slug,
         store_name=store_name,
         status=user.status,
+        setup_fee_cleared=setup_fee_cleared,
+        setup_fee_paid=setup_fee_paid,
+        setup_fee_waived=setup_fee_waived,
+        subscription_status=subscription_status,
+        apk_user_approved=apk_user_approved,
     )

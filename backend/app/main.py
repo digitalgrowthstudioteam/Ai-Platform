@@ -71,6 +71,18 @@ async def lifespan(app: FastAPI):
                 "ALTER TABLE platform_vendor_profiles ADD COLUMN IF NOT EXISTS has_payment_gateway VARCHAR(50) DEFAULT 'No';",
                 "ALTER TABLE platform_vendor_profiles ADD COLUMN IF NOT EXISTS needs_delivery_help VARCHAR(50) DEFAULT 'No';",
                 "ALTER TABLE platform_vendor_app_configs ADD COLUMN IF NOT EXISTS is_locked BOOLEAN NOT NULL DEFAULT FALSE;",
+                "ALTER TABLE platform_plans ADD COLUMN IF NOT EXISTS setup_fee_sale_price_inr DOUBLE PRECISION NOT NULL DEFAULT 999.0;",
+                "ALTER TABLE platform_subscriptions ADD COLUMN IF NOT EXISTS setup_fee_waived BOOLEAN NOT NULL DEFAULT FALSE;",
+                "ALTER TABLE platform_subscriptions ADD COLUMN IF NOT EXISTS setup_fee_custom_price_inr DOUBLE PRECISION;",
+                "ALTER TABLE platform_subscriptions ADD COLUMN IF NOT EXISTS setup_fee_paid_at TIMESTAMP WITH TIME ZONE;",
+                "ALTER TABLE platform_subscriptions ADD COLUMN IF NOT EXISTS razorpay_order_id VARCHAR(100);",
+                "ALTER TABLE platform_subscriptions ADD COLUMN IF NOT EXISTS razorpay_payment_id VARCHAR(100);",
+                "ALTER TABLE platform_subscriptions ADD COLUMN IF NOT EXISTS razorpay_subscription_id VARCHAR(100);",
+                "ALTER TABLE platform_vendor_app_configs ADD COLUMN IF NOT EXISTS apk_download_url VARCHAR(500);",
+                "ALTER TABLE platform_vendor_app_configs ADD COLUMN IF NOT EXISTS apk_submitted_at TIMESTAMP WITH TIME ZONE;",
+                "ALTER TABLE platform_vendor_app_configs ADD COLUMN IF NOT EXISTS apk_user_approved BOOLEAN NOT NULL DEFAULT FALSE;",
+                "ALTER TABLE platform_vendor_app_configs ADD COLUMN IF NOT EXISTS apk_user_approved_at TIMESTAMP WITH TIME ZONE;",
+                "ALTER TABLE platform_vendor_app_configs ADD COLUMN IF NOT EXISTS subscription_auto_debit_active BOOLEAN NOT NULL DEFAULT FALSE;",
             ]
             for stmt in migration_statements:
                 try:

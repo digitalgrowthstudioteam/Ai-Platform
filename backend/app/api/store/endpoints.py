@@ -173,6 +173,20 @@ async def get_store_products(
 ):
     """Fetch active products for this vendor."""
     store = await resolve_active_store(slug, db)
+
+    # Subscription Enforcement:
+    # If recurring monthly subscription is not paid / expired / suspended,
+    # stop showing up products on their app and storefront!
+    from app.models.platform.subscription import PlatformSubscription
+    sub_stmt = (
+        select(PlatformSubscription)
+        .where(PlatformSubscription.vendor_id == store.vendor_id)
+        .order_by(desc(PlatformSubscription.created_at))
+    )
+    sub = (await db.execute(sub_stmt)).scalars().first()
+    if sub and sub.status.upper() in ["EXPIRED", "PAST_DUE", "CANCELLED", "SUSPENDED", "UNPAID"]:
+        return []
+
     stmt = (
         select(PlatformProduct)
         .where(
@@ -231,6 +245,17 @@ async def get_store_product_detail(
 ):
     """Fetch details of a single product."""
     store = await resolve_active_store(slug, db)
+
+    from app.models.platform.subscription import PlatformSubscription
+    sub_stmt = (
+        select(PlatformSubscription)
+        .where(PlatformSubscription.vendor_id == store.vendor_id)
+        .order_by(desc(PlatformSubscription.created_at))
+    )
+    sub = (await db.execute(sub_stmt)).scalars().first()
+    if sub and sub.status.upper() in ["EXPIRED", "PAST_DUE", "CANCELLED", "SUSPENDED", "UNPAID"]:
+        raise HTTPException(status_code=403, detail="Store catalog is paused due to inactive subscription.")
+
     stmt = (
         select(PlatformProduct)
         .where(

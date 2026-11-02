@@ -136,4 +136,9 @@ class VendorDetailFullResponse(BaseModel):
     plan_name: Optional[str] = None
     subscription_status: Optional[str] = None
     renewal_date: Optional[datetime] = None
+    setup_fee_paid: bool = False
+    setup_fee_waived: bool = False
+    setup_fee_custom_price_inr: Optional[float] = None
+    apk_user_approved: bool = False
+    apk_download_url: Optional[str] = None
 

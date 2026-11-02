@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { usePlatformAuth } from "@/lib/app-platform/auth";
 import { useMobileNav } from "@/lib/app-platform/mobile-nav";
 import VendorSidebar from "@/components/app-platform/layout/VendorSidebar";
+import SetupFeeGate from "@/components/app-platform/payments/SetupFeeGate";
 import { Sparkles, RefreshCw, ArrowRight, Menu } from "lucide-react";
 
 export default function VendorDashboardLayout({ children }: { children: React.ReactNode }) {
@@ -23,6 +24,15 @@ export default function VendorDashboardLayout({ children }: { children: React.Re
     return (
       <div className="flex-1 flex items-center justify-center p-8">
         <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // Restrict access until one-time setup fee is cleared (paid or waived)
+  if (user.role === "VENDOR_ADMIN" && user.setup_fee_cleared === false && !isDemo) {
+    return (
+      <div className="flex-1 flex flex-col justify-center items-center p-4 sm:p-6 bg-slate-50 min-h-[85vh]">
+        <SetupFeeGate />
       </div>
     );
   }

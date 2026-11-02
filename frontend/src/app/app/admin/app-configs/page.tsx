@@ -15,6 +15,7 @@ export default function AdminAppConfigsPage() {
     publication_status: "PUBLISHED",
     playstore_url: "",
     app_version: "1.0.0",
+    apk_download_url: "",
   });
   const [submitting, setSubmitting] = useState(false);
 
@@ -42,6 +43,7 @@ export default function AdminAppConfigsPage() {
         publication_status: detail.publication_status || "UNPUBLISHED",
         playstore_url: detail.playstore_url || "",
         app_version: detail.app_version || "1.0.0",
+        apk_download_url: detail.apk_download_url || "",
       });
     } catch (e: any) {
       alert(e.message);
@@ -196,6 +198,20 @@ export default function AdminAppConfigsPage() {
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Final APK Download URL (Submitted to Vendor)</label>
+                <input
+                  type="url"
+                  value={formData.apk_download_url}
+                  onChange={(e) => setFormData({ ...formData, apk_download_url: e.target.value })}
+                  placeholder="https://... (APK download link)"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono"
+                />
+                <p className="text-[10px] text-slate-400 mt-0.5">
+                  When submitted with BUILT status, vendor can test and approve the build to activate ₹499/mo subscription.
+                </p>
               </div>
 
               <div className="flex justify-end gap-2 pt-4 border-t border-slate-100">

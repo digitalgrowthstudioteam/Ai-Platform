@@ -30,6 +30,8 @@ export default function AdminVendorsPage() {
   const [selectedVendorId, setSelectedVendorId] = useState<string | null>(null);
   const [vendorDetail, setVendorDetail] = useState<any>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [customPriceInput, setCustomPriceInput] = useState("");
+  const [updatingSetupFee, setUpdatingSetupFee] = useState(false);
 
   // Manual Provision Modal
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -66,10 +68,50 @@ export default function AdminVendorsPage() {
     try {
       const detail = await platformApi.getAdminVendorDetail(id);
       setVendorDetail(detail);
+      setCustomPriceInput(
+        detail.setup_fee_custom_price_inr !== undefined && detail.setup_fee_custom_price_inr !== null
+          ? String(detail.setup_fee_custom_price_inr)
+          : ""
+      );
     } catch (e: any) {
       alert(e.message || "Failed to load vendor details");
     } finally {
       setDetailLoading(false);
+    }
+  };
+
+  const handleWaiveSetupFee = async (vendorId: string) => {
+    if (!confirm("Are you sure you want to waive off the setup fee for this vendor? This will instantly unlock their dashboard access.")) return;
+    setUpdatingSetupFee(true);
+    try {
+      await platformApi.updateVendorSetupFeeByAdmin(vendorId, { waive_fee: true });
+      const updated = await platformApi.getAdminVendorDetail(vendorId);
+      setVendorDetail(updated);
+      loadVendors();
+      alert("Setup fee waived successfully! Vendor dashboard access unlocked.");
+    } catch (e: any) {
+      alert(e.message || "Failed to waive setup fee");
+    } finally {
+      setUpdatingSetupFee(false);
+    }
+  };
+
+  const handleSaveCustomPrice = async (vendorId: string) => {
+    const priceNum = parseFloat(customPriceInput);
+    if (isNaN(priceNum) || priceNum < 0) {
+      alert("Please enter a valid amount");
+      return;
+    }
+    setUpdatingSetupFee(true);
+    try {
+      await platformApi.updateVendorSetupFeeByAdmin(vendorId, { custom_price_inr: priceNum });
+      const updated = await platformApi.getAdminVendorDetail(vendorId);
+      setVendorDetail(updated);
+      alert(`Custom setup fee set to ₹${priceNum} for this vendor.`);
+    } catch (e: any) {
+      alert(e.message || "Failed to set custom setup fee");
+    } finally {
+      setUpdatingSetupFee(false);
     }
   };
 
@@ -380,6 +422,106 @@ export default function AdminVendorsPage() {
                         {vendorDetail.razorpay_enabled ? `Active (${vendorDetail.razorpay_key_id})` : "Not Configured"}
                       </p>
                     </div>
+                  </div>
+                </div>
+
+                {/* 5. Setup Fee & Subscription Gate Controls */}
+                <div className="p-4 bg-indigo-50/60 rounded-xl border border-indigo-100 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-bold text-indigo-950 uppercase tracking-wider text-xs flex items-center gap-1.5">
+                      <CreditCard className="w-4 h-4 text-indigo-600" />
+                      5. One-Time Setup Fee & App Subscription Gate
+                    </h4>
+                    {vendorDetail.setup_fee_paid || vendorDetail.setup_fee_waived ? (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
+                        <CheckCircle className="w-3.5 h-3.5" />
+                        {vendorDetail.setup_fee_waived ? "Waived (Cleared)" : "Paid (Cleared)"}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">
+                        <AlertCircle className="w-3.5 h-3.5" />
+                        Pending (Dashboard Blocked)
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    {/* Waive fee button */}
+                    <div className="bg-white p-3 rounded-lg border border-indigo-100 flex flex-col justify-between">
+                      <div>
+                        <p className="text-xs font-semibold text-slate-800">Setup Fee Waiver</p>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          {vendorDetail.setup_fee_waived
+                            ? "Fee has been waived off. Vendor has full dashboard access."
+                            : vendorDetail.setup_fee_paid
+                            ? "Vendor already paid the setup fee."
+                            : "Manually clear fee requirement to grant dashboard access immediately."}
+                        </p>
+                      </div>
+                      {!vendorDetail.setup_fee_paid && !vendorDetail.setup_fee_waived && (
+                        <button
+                          onClick={() => handleWaiveSetupFee(vendorDetail.id)}
+                          disabled={updatingSetupFee}
+                          className="mt-3 w-full py-1.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-medium transition cursor-pointer disabled:opacity-50"
+                        >
+                          {updatingSetupFee ? "Updating..." : "Waive Setup Fee for Vendor"}
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Custom discounted price for this user */}
+                    <div className="bg-white p-3 rounded-lg border border-indigo-100 flex flex-col justify-between">
+                      <div>
+                        <p className="text-xs font-semibold text-slate-800">Custom Setup Price for Vendor</p>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          Override general price and assign a tailored setup price in INR for this user.
+                        </p>
+                      </div>
+                      <div className="mt-3 flex items-center gap-2">
+                        <div className="relative flex-1">
+                          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs">₹</span>
+                          <input
+                            type="number"
+                            placeholder="e.g. 499"
+                            value={customPriceInput}
+                            onChange={(e) => setCustomPriceInput(e.target.value)}
+                            className="w-full pl-6 pr-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900"
+                          />
+                        </div>
+                        <button
+                          onClick={() => handleSaveCustomPrice(vendorDetail.id)}
+                          disabled={updatingSetupFee}
+                          className="py-1.5 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium transition cursor-pointer disabled:opacity-50"
+                        >
+                          Set Price
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Monthly App Subscription & APK Approval Status */}
+                  <div className="bg-white p-3 rounded-lg border border-indigo-100 text-xs">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="font-semibold text-slate-800">₹499/mo Android App Subscription:</span>
+                        <span className="ml-2 text-slate-600">
+                          {vendorDetail.apk_user_approved
+                            ? "Approved by User (Active Auto-Debit)"
+                            : "Awaiting User Testing & Approval"}
+                        </span>
+                      </div>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${vendorDetail.apk_user_approved ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                        {vendorDetail.apk_user_approved ? "RUNNING" : "PENDING APPROVAL"}
+                      </span>
+                    </div>
+                    {vendorDetail.apk_download_url && (
+                      <div className="mt-2 text-[11px] text-slate-500">
+                        APK Download Link:{" "}
+                        <a href={vendorDetail.apk_download_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline font-mono break-all">
+                          {vendorDetail.apk_download_url}
+                        </a>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
