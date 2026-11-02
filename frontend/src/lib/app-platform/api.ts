@@ -49,7 +49,15 @@ class PlatformApiClient {
       ...(options.headers || {}),
     };
 
-    const res = await fetch(url, { ...options, headers });
+    let res: Response;
+    try {
+      res = await fetch(url, { ...options, headers });
+    } catch (netErr: any) {
+      if (netErr?.message === 'Failed to fetch' || netErr?.name === 'TypeError') {
+        throw new Error('Unable to connect to platform server. Please check your internet or retry in a few moments.');
+      }
+      throw netErr;
+    }
     if (!res.ok) {
       let errorMsg = 'An error occurred';
       try {

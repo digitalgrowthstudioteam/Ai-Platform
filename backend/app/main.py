@@ -88,6 +88,11 @@ async def lifespan(app: FastAPI):
                 "ALTER TABLE platform_orders ADD COLUMN IF NOT EXISTS tracking_url VARCHAR(500);",
                 "ALTER TABLE platform_orders ADD COLUMN IF NOT EXISTS shipped_at TIMESTAMP WITH TIME ZONE;",
                 "ALTER TABLE platform_orders ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMP WITH TIME ZONE;",
+                "ALTER TABLE platform_vendor_profiles ALTER COLUMN logo_url TYPE TEXT;",
+                "ALTER TABLE platform_stores ALTER COLUMN logo_url TYPE TEXT;",
+                "ALTER TABLE platform_stores ALTER COLUMN banner_url TYPE TEXT;",
+                "ALTER TABLE platform_vendor_app_configs ALTER COLUMN app_logo_url TYPE TEXT;",
+                "ALTER TABLE platform_vendor_app_configs ALTER COLUMN splash_screen_url TYPE TEXT;",
             ]
             for stmt in migration_statements:
                 try:

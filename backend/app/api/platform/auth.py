@@ -90,6 +90,36 @@ async def register_vendor(payload: PlatformRegisterRequest, db: AsyncSession = D
     biz_phone = (payload.business_phone or phone_to_use).strip()
     brand_title = (payload.brand_name.strip() if payload.brand_name else payload.business_name.strip())
 
+    # Process logo if provided (support base64 upload to CDN or direct URL)
+    stored_logo_url = None
+    if payload.logo_url and payload.logo_url.strip():
+        raw_logo = payload.logo_url.strip()
+        if raw_logo.startswith("data:image/"):
+            try:
+                import base64
+                header, b64_str = raw_logo.split(";base64,", 1)
+                img_data = base64.b64decode(b64_str)
+                ext = "png"
+                if "jpeg" in header or "jpg" in header:
+                    ext = "jpg"
+                elif "svg" in header:
+                    ext = "svg"
+                elif "webp" in header:
+                    ext = "webp"
+                from app.services.bunny_storage import bunny_storage
+                uploaded = await bunny_storage.upload_file(
+                    vendor_id=str(vendor.id),
+                    file_bytes=img_data,
+                    filename=f"logo_{desired_slug}.{ext}",
+                    folder="app-assets",
+                )
+                stored_logo_url = uploaded.get("url")
+            except Exception as up_err:
+                logger.warning("logo_base64_upload_failed", error=str(up_err))
+                stored_logo_url = raw_logo
+        else:
+            stored_logo_url = raw_logo
+
     # 6. Create Profile
     profile = PlatformVendorProfile(
         vendor_id=vendor.id,
@@ -100,7 +130,7 @@ async def register_vendor(payload: PlatformRegisterRequest, db: AsyncSession = D
         category=payload.category.strip() or "General",
         address=payload.address.strip() if payload.address else None,
         description=payload.description.strip() if payload.description else None,
-        logo_url=payload.logo_url.strip() if payload.logo_url else None,
+        logo_url=stored_logo_url,
         brand_name=brand_title,
         brand_name_locked=True,
         whatsapp_number=payload.whatsapp_number.strip() if payload.whatsapp_number else phone_to_use,
@@ -123,7 +153,7 @@ async def register_vendor(payload: PlatformRegisterRequest, db: AsyncSession = D
         contact_phone=biz_phone,
         business_address=payload.address.strip() if payload.address else None,
         description=payload.description.strip() if payload.description else None,
-        logo_url=payload.logo_url.strip() if payload.logo_url else None,
+        logo_url=stored_logo_url,
     )
     db.add(store)
 
@@ -131,7 +161,7 @@ async def register_vendor(payload: PlatformRegisterRequest, db: AsyncSession = D
     app_config = PlatformVendorAppConfig(
         vendor_id=vendor.id,
         app_name=brand_title,
-        app_logo_url=payload.logo_url.strip() if payload.logo_url else None,
+        app_logo_url=stored_logo_url,
         package_id=f"in.digitalgrowthstudio.{desired_slug.replace('-', '_')}",
         app_build_status="NOT_REQUESTED",
     )

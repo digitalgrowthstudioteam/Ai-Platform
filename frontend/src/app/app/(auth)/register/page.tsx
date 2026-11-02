@@ -117,11 +117,44 @@ export default function PlatformRegisterPage() {
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
     const reader = new FileReader();
     reader.onload = (event) => {
-      if (event.target?.result) {
-        setFormData((prev) => ({ ...prev, logo_url: event.target?.result as string }));
-      }
+      const dataUrl = event.target?.result as string;
+      if (!dataUrl) return;
+
+      // Use a canvas to resize to max 512x512 to ensure fast, lightweight transmission
+      const img = new Image();
+      img.onload = () => {
+        const maxDim = 512;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxDim) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          }
+        } else {
+          if (height > maxDim) {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressed = canvas.toDataURL(file.type === "image/png" ? "image/png" : "image/jpeg", 0.85);
+          setFormData((prev) => ({ ...prev, logo_url: compressed }));
+        } else {
+          setFormData((prev) => ({ ...prev, logo_url: dataUrl }));
+        }
+      };
+      img.src = dataUrl;
     };
     reader.readAsDataURL(file);
   };
