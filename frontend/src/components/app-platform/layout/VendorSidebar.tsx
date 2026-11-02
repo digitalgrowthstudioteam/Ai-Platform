@@ -21,7 +21,7 @@ import {
 
 export default function VendorSidebar() {
   const pathname = usePathname();
-  const { user } = usePlatformAuth();
+  const { user, isDemo } = usePlatformAuth();
 
   const links = [
     { label: "Overview", href: "/app/dashboard", icon: LayoutDashboard },
@@ -31,7 +31,7 @@ export default function VendorSidebar() {
     { label: "Banners", href: "/app/dashboard/banners", icon: ImageIcon },
     { label: "Orders", href: "/app/dashboard/orders", icon: ShoppingCart },
     { label: "Customers", href: "/app/dashboard/customers", icon: Users },
-    { label: "Payment Settings", href: "/app/dashboard/payments", icon: CreditCard },
+    ...(!isDemo ? [{ label: "Payment Settings", href: "/app/dashboard/payments", icon: CreditCard }] : []),
     { label: "Shipping Settings", href: "/app/dashboard/shipping", icon: Truck },
     { label: "Subscription & Add-ons", href: "/app/dashboard/subscription", icon: Sparkles },
     { label: "Android App Config", href: "/app/dashboard/app-config", icon: Smartphone },

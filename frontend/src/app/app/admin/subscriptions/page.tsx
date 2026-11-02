@@ -4,13 +4,14 @@ import React, { useEffect, useState } from "react";
 import { platformApi } from "@/lib/app-platform/api";
 import { Plan } from "@/lib/app-platform/types";
 import StatusBadge from "@/components/app-platform/shared/StatusBadge";
-import { CreditCard, Plus, Edit2, Check, X, Sparkles, HardDrive, Package } from "lucide-react";
+import { CreditCard, Plus, Edit2, Trash2, Check, X, Sparkles, HardDrive, Package } from "lucide-react";
 
 export default function AdminSubscriptionsPage() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     slug: "",
@@ -93,16 +94,31 @@ export default function AdminSubscriptionsPage() {
     }
   };
 
+  const handleDelete = async (id: string, name: string) => {
+    if (!window.confirm(`Are you sure you want to permanently delete plan "${name}"?`)) {
+      return;
+    }
+    setDeletingId(id);
+    try {
+      await platformApi.deleteAdminPlan(id);
+      await loadPlans();
+    } catch (err: any) {
+      alert(err.message || "Failed to delete plan");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   return (
     <div className="space-y-6 max-w-5xl">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">Subscription Plans & Pricing</h1>
           <p className="text-sm text-slate-500">Configure monthly membership tiers, setup fees, and storage quotas dynamically</p>
         </div>
         <button
           onClick={openAdd}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-purple-600 text-white font-semibold text-xs shadow-xs hover:bg-purple-700 transition-colors"
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-purple-600 text-white font-semibold text-xs shadow-xs hover:bg-purple-700 transition-colors cursor-pointer self-start sm:self-auto"
         >
           <Plus className="w-4 h-4" />
           Create New Plan
@@ -111,16 +127,32 @@ export default function AdminSubscriptionsPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {plans.map((p) => (
-          <div key={p.id} className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs flex flex-col justify-between">
+          <div key={p.id} className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs flex flex-col justify-between hover:border-slate-300 transition-colors">
             <div>
               <div className="flex items-center justify-between mb-3">
                 <StatusBadge status={p.is_active ? "active" : "inactive"} />
-                <button
-                  onClick={() => openEdit(p)}
-                  className="p-1.5 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
-                >
-                  <Edit2 className="w-3.5 h-3.5" />
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => openEdit(p)}
+                    title="Edit Plan"
+                    className="p-1.5 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors cursor-pointer"
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(p.id, p.name)}
+                    disabled={deletingId === p.id}
+                    title="Delete Plan"
+                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors disabled:opacity-50 cursor-pointer"
+                  >
+                    {deletingId === p.id ? (
+                      <div className="w-3.5 h-3.5 border-2 border-rose-600 border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                    )}
+                  </button>
+                </div>
               </div>
 
               <h3 className="text-lg font-bold text-slate-900">{p.name}</h3>
@@ -148,8 +180,16 @@ export default function AdminSubscriptionsPage() {
               </div>
             </div>
 
-            <div className="mt-6 pt-4 border-t border-slate-100 text-[11px] text-slate-400 text-center">
-              Configured via Super Admin
+            <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-xs">
+              <span className="text-[11px] text-slate-400">Configured via Super Admin</span>
+              <button
+                type="button"
+                onClick={() => handleDelete(p.id, p.name)}
+                disabled={deletingId === p.id}
+                className="font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 px-2 py-1 rounded-lg transition-colors cursor-pointer"
+              >
+                Delete Plan
+              </button>
             </div>
           </div>
         ))}

@@ -370,6 +370,10 @@ class DemoSandboxStore {
   }
 
   // Products
+  getProduct(id: string): Product | undefined {
+    return this.products.find((p) => p.id === id || p.slug === id);
+  }
+
   getProducts(catId?: string, statusFilter?: string): Product[] {
     return this.products.filter((p) => {
       if (catId && p.category_id !== catId) return false;
@@ -565,6 +569,17 @@ class DemoSandboxStore {
 
     this.orders.unshift(newOrder);
     return newOrder;
+  }
+
+  getOrder(orderId: string): Order | undefined {
+    return this.orders.find((o) => o.id === orderId || o.order_number === orderId);
+  }
+
+  getCustomerOrders(phone: string): Order[] {
+    const clean = phone.replace(/\D/g, "");
+    return this.orders.filter((o) =>
+      o.customer_phone.replace(/\D/g, "").includes(clean)
+    );
   }
 
   // Customers

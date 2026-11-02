@@ -313,8 +313,96 @@ async def test_platform_end_to_end_security_and_isolation():
         order_data = order_res_below_mov.json()
         expected_total = round(p_price + 80.0 + 30.0, 2)
         assert order_data["total_amount"] == expected_total, f"Expected {expected_total}, got {order_data['total_amount']}"
+        ord_num = order_data["order_number"]
+        ord_id = order_data["id"]
 
-        print("\nALL 11 MULTI-VENDOR ISOLATION, SECURITY, SHIPPING & MOV TESTS PASSED PERFECTLY!")
+        # ──────────────────────────────────────────────
+        # Test 12: Individual Order Detail & Customer Account Orders
+        # ──────────────────────────────────────────────
+        # Lookup by UUID
+        res_by_uuid = await client.get(f"/api/store/abc/orders/{ord_id}")
+        assert res_by_uuid.status_code == 200
+        assert res_by_uuid.json()["order_number"] == ord_num
+
+        # Lookup by Order Number string
+        res_by_num = await client.get(f"/api/store/abc/orders/{ord_num}")
+        assert res_by_num.status_code == 200
+        assert res_by_num.json()["id"] == ord_id
+
+        # Lookup customer orders by phone
+        res_cust_orders = await client.get("/api/store/abc/customer-orders?phone=9998887776")
+        assert res_cust_orders.status_code == 200
+        cust_orders = res_cust_orders.json()
+        assert len(cust_orders) >= 1
+        assert cust_orders[0]["order_number"] == ord_num
+
+        # ──────────────────────────────────────────────
+        # Test 13: Super Admin Plan & Addon Management (Create, Update, Delete)
+        # ──────────────────────────────────────────────
+        # Create temporary plan
+        plan_res = await client.post(
+            "/api/v1/platform/admin/plans",
+            headers={"Authorization": f"Bearer {token_admin}"},
+            json={
+                "name": "Custom Enterprise Tier",
+                "slug": "custom-enterprise-test",
+                "monthly_price_inr": 2999.0,
+                "setup_fee_inr": 5000.0,
+                "storage_limit_mb": 5120,
+                "max_products": 500,
+                "is_active": True,
+            },
+        )
+        assert plan_res.status_code == 201
+        temp_plan_id = plan_res.json()["id"]
+
+        # Delete plan
+        del_plan_res = await client.delete(
+            f"/api/v1/platform/admin/plans/{temp_plan_id}",
+            headers={"Authorization": f"Bearer {token_admin}"},
+        )
+        assert del_plan_res.status_code == 200, f"Delete plan failed: {del_plan_res.text}"
+
+        # Create temporary addon
+        addon_res = await client.post(
+            "/api/v1/platform/admin/addons",
+            headers={"Authorization": f"Bearer {token_admin}"},
+            json={
+                "name": "Temporary Test Addon",
+                "code": "temp-test-addon",
+                "description": "Will be deleted",
+                "price_inr": 249.0,
+                "billing_type": "ONE_TIME",
+                "is_active": True,
+            },
+        )
+        assert addon_res.status_code == 201
+        temp_addon_id = addon_res.json()["id"]
+
+        # Update addon
+        update_addon_res = await client.put(
+            f"/api/v1/platform/admin/addons/{temp_addon_id}",
+            headers={"Authorization": f"Bearer {token_admin}"},
+            json={
+                "name": "Updated Temp Addon",
+                "code": "temp-test-addon",
+                "description": "Updated description",
+                "price_inr": 299.0,
+                "billing_type": "ONE_TIME",
+                "is_active": True,
+            },
+        )
+        assert update_addon_res.status_code == 200
+        assert update_addon_res.json()["price_inr"] == 299.0
+
+        # Delete addon
+        del_addon_res = await client.delete(
+            f"/api/v1/platform/admin/addons/{temp_addon_id}",
+            headers={"Authorization": f"Bearer {token_admin}"},
+        )
+        assert del_addon_res.status_code == 200, f"Delete addon failed: {del_addon_res.text}"
+
+        print("\nALL 13 MULTI-VENDOR ISOLATION, SECURITY, SHIPPING, MOV, ORDER TRACKING & ADMIN PLAN/ADDON DELETION TESTS PASSED PERFECTLY!")
 
 
 if __name__ == "__main__":

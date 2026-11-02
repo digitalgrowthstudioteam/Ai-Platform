@@ -6,7 +6,7 @@ import uuid
 from typing import List, Optional
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select, desc
+from sqlalchemy import select, desc, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -314,6 +314,21 @@ async def create_store_order(
             "total": line_total,
         })
 
+    # Apply vendor shipping policy and COD fees
+    shipping_fee = 0.0
+    if getattr(store, "shipping_enabled", True):
+        free_min = getattr(store, "free_shipping_min_order", 0.0) or 0.0
+        if free_min > 0 and calculated_total >= free_min:
+            shipping_fee = 0.0
+        else:
+            shipping_fee = getattr(store, "shipping_charge", 0.0) or 0.0
+
+    cod_fee = 0.0
+    if payload.payment_method.upper() == "COD":
+        cod_fee = getattr(store, "cod_charge", 0.0) or 0.0
+
+    order_final_total = round(calculated_total + shipping_fee + cod_fee, 2)
+
     # 3. Generate unique order number: ORD-{VENDOR_CODE}-{RANDOM}
     order_number = f"ORD-{store.vendor.vendor_code}-{uuid.uuid4().hex[:6].upper()}"
 
@@ -325,7 +340,7 @@ async def create_store_order(
         customer_phone=phone,
         customer_email=payload.customer_email.strip() if payload.customer_email else None,
         shipping_address=payload.shipping_address.strip(),
-        total_amount=calculated_total,
+        total_amount=order_final_total,
         payment_method=payload.payment_method.upper(),
         payment_status="PENDING",
         order_status="NEW",
@@ -351,7 +366,7 @@ async def create_store_order(
 
     # 4. Update customer stats
     customer.total_orders += 1
-    customer.total_spent += calculated_total
+    customer.total_spent += order_final_total
     customer.last_order_at = datetime.now(timezone.utc)
 
     await db.commit()
@@ -387,19 +402,23 @@ async def create_store_order(
 @router.get("/{slug}/orders/{order_id}", response_model=OrderResponse)
 async def get_store_order_status(
     slug: str,
-    order_id: uuid.UUID,
+    order_id: str,
     db: AsyncSession = Depends(get_db),
 ):
-    """Check order status for customers / Android app."""
+    """Check order status for customers / Android app by UUID or Order Number."""
     store = await resolve_active_store(slug, db)
-    stmt = (
-        select(PlatformOrder)
-        .where(
-            PlatformOrder.id == order_id,
-            PlatformOrder.vendor_id == store.vendor_id,
-        )
-        .options(selectinload(PlatformOrder.items))
-    )
+    parsed_uuid = None
+    try:
+        parsed_uuid = uuid.UUID(order_id)
+    except ValueError:
+        pass
+
+    stmt = select(PlatformOrder).where(PlatformOrder.vendor_id == store.vendor_id)
+    if parsed_uuid:
+        stmt = stmt.where(or_(PlatformOrder.id == parsed_uuid, PlatformOrder.order_number == order_id))
+    else:
+        stmt = stmt.where(PlatformOrder.order_number == order_id)
+    stmt = stmt.options(selectinload(PlatformOrder.items))
     order = (await db.execute(stmt)).scalar_one_or_none()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
@@ -430,4 +449,54 @@ async def get_store_order_status(
             ) for it in order.items
         ]
     )
+
+
+@router.get("/{slug}/customer-orders", response_model=List[OrderResponse])
+async def get_customer_orders(
+    slug: str,
+    phone: str = Query(..., description="Customer mobile phone number"),
+    db: AsyncSession = Depends(get_db),
+):
+    """Fetch all orders placed by a specific customer phone number under this vendor."""
+    store = await resolve_active_store(slug, db)
+    clean_phone = phone.strip()
+    stmt = (
+        select(PlatformOrder)
+        .where(
+            PlatformOrder.vendor_id == store.vendor_id,
+            PlatformOrder.customer_phone == clean_phone,
+        )
+        .options(selectinload(PlatformOrder.items))
+        .order_by(desc(PlatformOrder.created_at))
+    )
+    orders = (await db.execute(stmt)).scalars().all()
+    output = []
+    for order in orders:
+        output.append(OrderResponse(
+            id=order.id,
+            vendor_id=order.vendor_id,
+            order_number=order.order_number,
+            customer_name=order.customer_name,
+            customer_phone=order.customer_phone,
+            customer_email=order.customer_email,
+            shipping_address=order.shipping_address,
+            total_amount=order.total_amount,
+            payment_method=order.payment_method,
+            payment_status=order.payment_status,
+            order_status=order.order_status,
+            notes=order.notes,
+            created_at=order.created_at,
+            items=[
+                OrderItemResponse(
+                    id=it.id,
+                    product_id=it.product_id,
+                    product_name=it.product_name,
+                    product_sku=it.product_sku,
+                    price=it.price,
+                    quantity=it.quantity,
+                    total=it.total,
+                ) for it in order.items
+            ]
+        ))
+    return output
 

@@ -6,7 +6,7 @@ import uuid
 from typing import List, Optional
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select, func, desc, update
+from sqlalchemy import select, func, desc, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -463,6 +463,26 @@ async def update_plan(
     return plan
 
 
+@router.delete("/plans/{plan_id}")
+async def delete_plan(
+    plan_id: uuid.UUID,
+    admin: PlatformUser = Depends(require_super_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete a subscription plan."""
+    plan = (await db.execute(select(PlatformPlan).where(PlatformPlan.id == plan_id))).scalar_one_or_none()
+    if not plan:
+        raise HTTPException(status_code=404, detail="Plan not found")
+
+    active_subs = (await db.execute(select(func.count(PlatformSubscription.id)).where(PlatformSubscription.plan_id == plan_id))).scalar() or 0
+    if active_subs > 0:
+        raise HTTPException(status_code=400, detail=f"Cannot delete plan: {active_subs} vendor(s) are currently subscribed to this plan. Please deactivate it instead.")
+
+    await db.delete(plan)
+    await db.commit()
+    return {"message": "Plan deleted successfully", "id": str(plan_id)}
+
+
 # ──────────────────────────────────────────────
 # 4. Add-on Services Management
 # ──────────────────────────────────────────────
@@ -495,6 +515,49 @@ async def create_addon(
     await db.commit()
     await db.refresh(addon)
     return addon
+
+
+@router.put("/addons/{addon_id}", response_model=AddonResponse)
+@router.patch("/addons/{addon_id}", response_model=AddonResponse)
+async def update_addon(
+    addon_id: uuid.UUID,
+    payload: AddonCreateOrUpdateRequest,
+    admin: PlatformUser = Depends(require_super_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update an add-on service."""
+    addon = (await db.execute(select(PlatformAddon).where(PlatformAddon.id == addon_id))).scalar_one_or_none()
+    if not addon:
+        raise HTTPException(status_code=404, detail="Addon not found")
+
+    addon.name = payload.name
+    addon.code = payload.code.lower().strip()
+    addon.description = payload.description
+    addon.price_inr = payload.price_inr
+    addon.billing_type = payload.billing_type
+    addon.is_active = payload.is_active
+
+    await db.commit()
+    await db.refresh(addon)
+    return addon
+
+
+@router.delete("/addons/{addon_id}")
+async def delete_addon(
+    addon_id: uuid.UUID,
+    admin: PlatformUser = Depends(require_super_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete an add-on service."""
+    addon = (await db.execute(select(PlatformAddon).where(PlatformAddon.id == addon_id))).scalar_one_or_none()
+    if not addon:
+        raise HTTPException(status_code=404, detail="Addon not found")
+
+    # Clean up vendor addon links if any
+    await db.execute(delete(PlatformVendorAddon).where(PlatformVendorAddon.addon_id == addon_id))
+    await db.delete(addon)
+    await db.commit()
+    return {"message": "Addon deleted successfully", "id": str(addon_id)}
 
 
 # ──────────────────────────────────────────────

@@ -4,7 +4,7 @@ Digital Growth Studio — Platform Vendor, Profile, Store & App Models
 import uuid
 from typing import Optional, List
 from datetime import datetime
-from sqlalchemy import String, ForeignKey, Text, Boolean, Integer, BigInteger, DateTime
+from sqlalchemy import String, ForeignKey, Text, Boolean, Integer, BigInteger, DateTime, Float
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import BaseModel

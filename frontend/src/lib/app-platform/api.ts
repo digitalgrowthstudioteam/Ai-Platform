@@ -371,6 +371,12 @@ class PlatformApiClient {
     });
   }
 
+  async deleteAdminPlan(id: string): Promise<any> {
+    return this.request<any>(`/api/v1/platform/admin/plans/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
   async getAdminAddons(): Promise<Addon[]> {
     return this.request<Addon[]>('/api/v1/platform/admin/addons');
   }
@@ -379,6 +385,19 @@ class PlatformApiClient {
     return this.request<Addon>('/api/v1/platform/admin/addons', {
       method: 'POST',
       body: JSON.stringify(payload),
+    });
+  }
+
+  async updateAdminAddon(id: string, payload: Partial<Addon>): Promise<Addon> {
+    return this.request<Addon>(`/api/v1/platform/admin/addons/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async deleteAdminAddon(id: string): Promise<any> {
+    return this.request<any>(`/api/v1/platform/admin/addons/${id}`, {
+      method: 'DELETE',
     });
   }
 
@@ -435,6 +454,26 @@ class PlatformApiClient {
     return this.request(`/api/store/${slug}/products${qs}`);
   }
 
+  async getPublicStoreProduct(slug: string, productId: string): Promise<any> {
+    if (this.isDemoMode() || slug === 'demo' || slug === 'demo-store') {
+      const prod = demoSandbox.getProduct(productId);
+      if (prod) {
+        return {
+          ...prod,
+          effective_price: prod.sale_price && prod.sale_price > 0 ? prod.sale_price : prod.regular_price,
+          in_stock: prod.stock_quantity > 0 && prod.status === 'active',
+        };
+      }
+      const first = demoSandbox.getProducts()[0];
+      return {
+        ...first,
+        effective_price: first.sale_price && first.sale_price > 0 ? first.sale_price : first.regular_price,
+        in_stock: first.stock_quantity > 0 && first.status === 'active',
+      };
+    }
+    return this.request(`/api/store/${slug}/products/${productId}`);
+  }
+
   async getPublicStoreCategories(slug: string): Promise<any[]> {
     if (this.isDemoMode() || slug === 'demo' || slug === 'demo-store') {
       return demoSandbox.getCategories();
@@ -457,6 +496,22 @@ class PlatformApiClient {
       method: 'POST',
       body: JSON.stringify(payload),
     });
+  }
+
+  async getPublicStoreOrder(slug: string, orderId: string): Promise<any> {
+    if (this.isDemoMode() || slug === 'demo' || slug === 'demo-store') {
+      const ord = demoSandbox.getOrder(orderId);
+      if (ord) return ord;
+      return demoSandbox.getOrders()[0];
+    }
+    return this.request(`/api/store/${slug}/orders/${orderId}`);
+  }
+
+  async getPublicCustomerOrders(slug: string, phone: string): Promise<any[]> {
+    if (this.isDemoMode() || slug === 'demo' || slug === 'demo-store') {
+      return demoSandbox.getCustomerOrders(phone);
+    }
+    return this.request(`/api/store/${slug}/customer-orders?phone=${encodeURIComponent(phone)}`);
   }
 }
 
