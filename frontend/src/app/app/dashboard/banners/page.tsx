@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import { platformApi } from "@/lib/app-platform/api";
 import { Banner } from "@/lib/app-platform/types";
 import StatusBadge from "@/components/app-platform/shared/StatusBadge";
-import { Image as ImageIcon, Plus, Edit2, Trash2, X, AlertCircle } from "lucide-react";
+import { Image as ImageIcon, Plus, Edit2, Trash2, X, AlertCircle, Upload, Loader2, Check } from "lucide-react";
 
 export default function VendorBannersPage() {
   const [banners, setBanners] = useState<Banner[]>([]);
@@ -21,6 +21,22 @@ export default function VendorBannersPage() {
     is_active: true,
   });
   const [submitting, setSubmitting] = useState(false);
+  const [uploadingBanner, setUploadingBanner] = useState(false);
+
+  const handleBannerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingBanner(true);
+    try {
+      const res = await platformApi.uploadFile(file, "banners");
+      setFormData((prev) => ({ ...prev, image_url: res.url }));
+    } catch (err: any) {
+      alert(err.message || "Failed to upload banner image");
+    } finally {
+      setUploadingBanner(false);
+      e.target.value = "";
+    }
+  };
 
   const load = async () => {
     try {
@@ -223,16 +239,47 @@ export default function VendorBannersPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                  Banner Image URL (CDN / Web)
+                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
+                  Banner Photo (CDN Upload)
                 </label>
-                <input
-                  type="url"
-                  required
-                  value={formData.image_url}
-                  onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
-                  className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+                {formData.image_url ? (
+                  <div className="relative rounded-xl overflow-hidden border border-slate-200 mb-2 group">
+                    <img
+                      src={formData.image_url}
+                      alt="Banner Preview"
+                      className="w-full h-32 object-cover"
+                    />
+                    <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <label className="cursor-pointer px-3 py-1.5 bg-white/90 hover:bg-white text-slate-900 text-xs font-bold rounded-lg shadow-sm">
+                        <span>Change Photo</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleBannerUpload}
+                          className="hidden"
+                        />
+                      </label>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="border-2 border-dashed border-slate-300 rounded-xl p-4 text-center mb-2">
+                    <label className="cursor-pointer inline-flex flex-col items-center gap-1.5 text-xs text-slate-600 font-medium hover:text-blue-600 transition-colors">
+                      <Upload className="w-5 h-5 text-slate-400" />
+                      <span>{uploadingBanner ? "Uploading photo..." : "Upload Banner Photo"}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleBannerUpload}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                )}
+                {uploadingBanner && (
+                  <p className="text-xs text-blue-600 flex items-center gap-1">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" /> Uploading photo to high-speed CDN...
+                  </p>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-4">

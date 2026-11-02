@@ -543,17 +543,9 @@ export default function PlatformRegisterPage() {
                   )}
 
                   <div className="flex-1 space-y-1.5">
-                    <input
-                      type="url"
-                      name="logo_url"
-                      value={formData.logo_url}
-                      onChange={handleChange}
-                      placeholder="Paste logo image URL (https://...)"
-                      className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
                     <div className="flex items-center gap-2">
-                      <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold transition-colors">
-                        <span>Upload Logo File</span>
+                      <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold transition-colors">
+                        <span>Upload Logo Photo</span>
                         <input
                           type="file"
                           accept="image/*"
@@ -563,6 +555,11 @@ export default function PlatformRegisterPage() {
                       </label>
                       <span className="text-[10px] text-slate-400">PNG, JPG, SVG square recommended</span>
                     </div>
+                    {formData.logo_url && (
+                      <p className="text-[10px] text-emerald-600 font-medium truncate">
+                        ✓ Logo photo uploaded successfully
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>

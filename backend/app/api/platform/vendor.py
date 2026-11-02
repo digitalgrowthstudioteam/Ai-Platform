@@ -8,7 +8,7 @@ import json
 from typing import List, Optional
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
-from sqlalchemy import select, func, desc, update, delete
+from sqlalchemy import select, func, desc, update, delete, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -454,6 +454,67 @@ async def list_vendor_products(
             created_at=p.created_at,
         ))
     return output
+
+
+@router.get("/products/{product_id}", response_model=ProductResponse)
+async def get_vendor_product(
+    product_id: str,
+    current: CurrentVendor = Depends(require_vendor_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Retrieve a single product by UUID or slug under the authenticated vendor."""
+    vid = current.vendor.id
+    target_uuid = None
+    try:
+        target_uuid = uuid.UUID(product_id)
+    except (ValueError, AttributeError):
+        pass
+
+    stmt = (
+        select(PlatformProduct)
+        .where(
+            PlatformProduct.vendor_id == vid,
+            or_(PlatformProduct.id == target_uuid, PlatformProduct.slug == product_id)
+            if target_uuid
+            else PlatformProduct.slug == product_id,
+        )
+        .options(
+            selectinload(PlatformProduct.category),
+            selectinload(PlatformProduct.images),
+            selectinload(PlatformProduct.variants),
+        )
+    )
+    p = (await db.execute(stmt)).scalar_one_or_none()
+    if not p:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    return ProductResponse(
+        id=p.id,
+        vendor_id=p.vendor_id,
+        category_id=p.category_id,
+        category_name=p.category.name if p.category else None,
+        name=p.name,
+        slug=p.slug,
+        description=p.description,
+        regular_price=p.regular_price,
+        sale_price=p.sale_price,
+        sku=p.sku,
+        stock_quantity=p.stock_quantity,
+        status=p.status,
+        is_featured=p.is_featured,
+        has_variants=p.has_variants,
+        thumbnail_url=p.thumbnail_url,
+        images=[
+            ProductImageItem(
+                id=img.id,
+                image_url=img.image_url,
+                sort_order=img.sort_order,
+                is_thumbnail=img.is_thumbnail,
+            ) for img in sorted(p.images, key=lambda x: x.sort_order)
+        ],
+        variants=serialize_variants(p.variants or []),
+        created_at=p.created_at,
+    )
 
 
 @router.post("/products", response_model=ProductResponse, status_code=status.HTTP_201_CREATED)

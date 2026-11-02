@@ -205,6 +205,16 @@ class PlatformApiClient {
     return this.request<Product[]>(`/api/v1/platform/vendor/products${qs}`);
   }
 
+  async getProduct(id: string): Promise<Product> {
+    if (this.isDemoMode()) {
+      const found = demoSandbox.getProduct(id);
+      if (found) return found;
+      const list = demoSandbox.getProducts();
+      return list[0];
+    }
+    return this.request<Product>(`/api/v1/platform/vendor/products/${id}`);
+  }
+
   async createProduct(payload: Partial<Product> & { image_urls?: string[] }): Promise<Product> {
     if (this.isDemoMode()) return demoSandbox.createProduct(payload);
     return this.request<Product>('/api/v1/platform/vendor/products', {

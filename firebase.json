@@ -30,6 +30,18 @@
         "destination": "/settings/admin/quotations/placeholder.html"
       },
       {
+        "source": "/app/dashboard/products/new",
+        "destination": "/app/dashboard/products/new.html"
+      },
+      {
+        "source": "/app/dashboard/products/*/**",
+        "destination": "/app/dashboard/products/placeholder.html"
+      },
+      {
+        "source": "/app/dashboard/products/*",
+        "destination": "/app/dashboard/products/placeholder.html"
+      },
+      {
         "source": "/app/store/*/products/**",
         "destination": "/app/store/placeholder/products/sample.html"
       },
