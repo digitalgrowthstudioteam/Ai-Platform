@@ -184,6 +184,15 @@ class PlatformApiClient {
     });
   }
 
+  async submitVendorAppForDevelopment(): Promise<AppConfig> {
+    if (this.isDemoMode()) {
+      return demoSandbox.updateAppConfig({ is_locked: true, app_build_status: 'QUEUED' });
+    }
+    return this.request<AppConfig>('/api/v1/platform/vendor/app-config/submit', {
+      method: 'POST',
+    });
+  }
+
   async getProducts(params?: { category_id?: string; status?: string }): Promise<Product[]> {
     if (this.isDemoMode()) return demoSandbox.getProducts(params?.category_id, params?.status);
     const q = new URLSearchParams();

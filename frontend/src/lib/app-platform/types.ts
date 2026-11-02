@@ -220,6 +220,7 @@ export interface AppConfig {
   app_version: string;
   playstore_url?: string;
   publication_status: 'UNPUBLISHED' | 'PENDING_REVIEW' | 'PUBLISHED';
+  is_locked?: boolean;
 }
 
 export interface SuperAdminOverview {

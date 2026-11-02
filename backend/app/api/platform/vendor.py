@@ -226,8 +226,68 @@ async def update_vendor_app_config(
     if not cfg:
         raise HTTPException(status_code=404, detail="App config record not found")
 
-    for field, value in payload.model_dump(exclude_unset=True).items():
-        setattr(cfg, field, value)
+    # If build is set / development is underway / locked, disallow changes
+    development_active_statuses = {"QUEUED", "IN_DEVELOPMENT", "BUILT", "PUBLISHED"}
+    is_already_set = getattr(cfg, "is_locked", False) or (cfg.app_build_status in development_active_statuses)
+
+    dump = payload.model_dump(exclude_unset=True)
+    submit_dev = dump.pop("submit_for_development", False)
+    sync_personal = dump.pop("sync_with_personal_data", True)
+
+    # Reject if already set and attempting to modify branding assets
+    branding_fields = {"app_name", "app_logo_url", "splash_screen_url", "primary_color", "secondary_color"}
+    if is_already_set and any(f in dump for f in branding_fields):
+        raise HTTPException(
+            status_code=400,
+            detail="App branding and assets cannot be changed once submitted and development is set."
+        )
+
+    for field, value in dump.items():
+        if hasattr(cfg, field):
+            setattr(cfg, field, value)
+
+    if submit_dev:
+        cfg.is_locked = True
+        if cfg.app_build_status in ["NOT_REQUESTED", "FAILED"]:
+            cfg.app_build_status = "QUEUED"
+
+    # Make sure this is used in their personal data (Vendor Profile & Store Logo)
+    if sync_personal and cfg.app_logo_url:
+        if current.vendor.profile:
+            current.vendor.profile.logo_url = cfg.app_logo_url
+        if current.vendor.store:
+            current.vendor.store.logo_url = cfg.app_logo_url
+
+    await db.commit()
+    await db.refresh(cfg)
+    return cfg
+
+
+@router.post("/app-config/submit")
+async def submit_vendor_app_for_development(
+    current: CurrentVendor = Depends(require_vendor_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Submit app branding assets to queue Android build development. Locks assets permanently."""
+    cfg = current.vendor.app_config
+    if not cfg:
+        raise HTTPException(status_code=404, detail="App config record not found")
+
+    if not cfg.app_name:
+        raise HTTPException(status_code=400, detail="App Display Name is required before submitting.")
+    if not cfg.app_logo_url:
+        raise HTTPException(status_code=400, detail="App Launcher Icon is required before submitting.")
+
+    cfg.is_locked = True
+    if cfg.app_build_status in ["NOT_REQUESTED", "FAILED"]:
+        cfg.app_build_status = "QUEUED"
+
+    # Sync with personal data (Profile & Store)
+    if cfg.app_logo_url:
+        if current.vendor.profile:
+            current.vendor.profile.logo_url = cfg.app_logo_url
+        if current.vendor.store:
+            current.vendor.store.logo_url = cfg.app_logo_url
 
     await db.commit()
     await db.refresh(cfg)

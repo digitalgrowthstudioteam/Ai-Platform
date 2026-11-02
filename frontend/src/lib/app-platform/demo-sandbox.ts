@@ -339,6 +339,7 @@ const INITIAL_APP_CONFIG: AppConfig = {
   app_version: "1.0.0",
   playstore_url: "https://play.google.com/store/apps/details?id=in.digitalgrowthstudio.glowstyle",
   publication_status: "PENDING_REVIEW",
+  is_locked: true,
 };
 
 /**
@@ -432,6 +433,9 @@ class DemoSandboxStore {
   }
   updateAppConfig(payload: Partial<AppConfig>): AppConfig {
     this.appConfig = { ...this.appConfig, ...payload };
+    if (payload.app_logo_url) {
+      this.storeSettings.logo_url = payload.app_logo_url;
+    }
     return { ...this.appConfig };
   }
 

@@ -386,6 +386,12 @@ async def update_vendor_app_build_status(
     for field, val in payload.model_dump(exclude_unset=True).items():
         setattr(app_cfg, field, val)
 
+    # Automatically enforce lock when development/build is set, unless explicitly unlocked by admin
+    if payload.is_locked is None and app_cfg.app_build_status in {"QUEUED", "IN_DEVELOPMENT", "BUILT", "PUBLISHED"}:
+        app_cfg.is_locked = True
+    elif payload.is_locked is not None:
+        app_cfg.is_locked = payload.is_locked
+
     await db.commit()
     return {"message": "App build and publication configuration updated"}
 

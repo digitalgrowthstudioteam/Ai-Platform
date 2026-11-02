@@ -70,6 +70,7 @@ async def lifespan(app: FastAPI):
                 "ALTER TABLE platform_vendor_profiles ADD COLUMN IF NOT EXISTS business_phone VARCHAR(50);",
                 "ALTER TABLE platform_vendor_profiles ADD COLUMN IF NOT EXISTS has_payment_gateway VARCHAR(50) DEFAULT 'No';",
                 "ALTER TABLE platform_vendor_profiles ADD COLUMN IF NOT EXISTS needs_delivery_help VARCHAR(50) DEFAULT 'No';",
+                "ALTER TABLE platform_vendor_app_configs ADD COLUMN IF NOT EXISTS is_locked BOOLEAN NOT NULL DEFAULT FALSE;",
             ]
             for stmt in migration_statements:
                 try:

@@ -61,6 +61,9 @@ class VendorAppConfigUpdateRequest(BaseModel):
     secondary_color: Optional[str] = None
     package_id: Optional[str] = None
     app_version: Optional[str] = None
+    is_locked: Optional[bool] = None
+    submit_for_development: Optional[bool] = None
+    sync_with_personal_data: Optional[bool] = True
 
 
 class VendorDashboardOverviewResponse(BaseModel):

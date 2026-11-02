@@ -119,6 +119,7 @@ class PlatformVendorAppConfig(BaseModel):
     app_version: Mapped[str] = mapped_column(String(50), nullable=False, default="1.0.0")
     playstore_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     publication_status: Mapped[str] = mapped_column(String(50), nullable=False, default="UNPUBLISHED")  # UNPUBLISHED, PENDING_REVIEW, PUBLISHED
+    is_locked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     vendor: Mapped["PlatformVendor"] = relationship("PlatformVendor", back_populates="app_config")
 

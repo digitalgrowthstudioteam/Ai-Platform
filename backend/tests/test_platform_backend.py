@@ -549,7 +549,55 @@ async def test_platform_end_to_end_security_and_isolation():
         assert update_res.status_code == 200
         assert update_res.json()["address"] == "Suite 999, Indiranagar, Bengaluru 560038"
 
-        print("\nALL 15 MULTI-VENDOR ISOLATION, SECURITY, SHIPPING, MOV, ORDER TRACKING, ADMIN PLAN/ADDON DELETION, PRODUCT VARIANTS & BRAND NAME LOCK TESTS PASSED PERFECTLY!")
+        # ──────────────────────────────────────────────
+        # Test 16: Android App Visual Assets, Personal Data Sync & Immutability Once Development Is Set
+        # ──────────────────────────────────────────────
+        app_cfg_res = await client.get("/api/v1/platform/vendor/app-config", headers=new_vendor_headers)
+        assert app_cfg_res.status_code == 200
+        cfg_data = app_cfg_res.json()
+        assert cfg_data["app_build_status"] == "NOT_REQUESTED"
+
+        # Update draft visual assets before submission
+        update_cfg = await client.put(
+            "/api/v1/platform/vendor/app-config",
+            headers=new_vendor_headers,
+            json={
+                "app_name": "Apex Trends Official",
+                "app_logo_url": "https://cdn.example.com/apex-app-icon.png",
+                "splash_screen_url": "https://cdn.example.com/apex-splash.png",
+                "primary_color": "#1E40AF",
+            },
+        )
+        assert update_cfg.status_code == 200
+        updated_cfg = update_cfg.json()
+        assert updated_cfg["app_logo_url"] == "https://cdn.example.com/apex-app-icon.png"
+
+        # Verify logo asset is automatically synced with personal vendor profile & store data
+        store_res = await client.get("/api/v1/platform/vendor/store", headers=new_vendor_headers)
+        assert store_res.status_code == 200
+        assert store_res.json()["logo_url"] == "https://cdn.example.com/apex-app-icon.png"
+
+        prof_after = await client.get("/api/v1/platform/vendor/profile", headers=new_vendor_headers)
+        assert prof_after.status_code == 200
+        assert prof_after.json()["logo_url"] == "https://cdn.example.com/apex-app-icon.png"
+
+        # Submit app assets for development
+        submit_dev_res = await client.post("/api/v1/platform/vendor/app-config/submit", headers=new_vendor_headers)
+        assert submit_dev_res.status_code == 200
+        submitted_cfg = submit_dev_res.json()
+        assert submitted_cfg["is_locked"] is True
+        assert submitted_cfg["app_build_status"] == "QUEUED"
+
+        # Verify assets cannot be changed once submitted and development is set (HTTP 400)
+        tamper_app_res = await client.put(
+            "/api/v1/platform/vendor/app-config",
+            headers=new_vendor_headers,
+            json={"app_name": "Tampered App Name", "app_logo_url": "https://cdn.example.com/tampered.png"},
+        )
+        assert tamper_app_res.status_code == 400, "Must reject modifying app branding assets once development is set"
+        assert "cannot be changed once submitted and development is set" in tamper_app_res.json()["detail"]
+
+        print("\nALL 16 MULTI-VENDOR ISOLATION, SECURITY, SHIPPING, MOV, ORDER TRACKING, ADMIN PLAN/ADDON DELETION, PRODUCT VARIANTS, BRAND NAME LOCK & APP ASSET IMMUTABILITY TESTS PASSED PERFECTLY!")
 
 
 if __name__ == "__main__":

@@ -102,6 +102,7 @@ class VendorAppStatusUpdateRequest(BaseModel):
     publication_status: Optional[str] = None  # UNPUBLISHED, PENDING_REVIEW, PUBLISHED
     playstore_url: Optional[str] = None
     app_version: Optional[str] = None
+    is_locked: Optional[bool] = None
 
 
 class VendorStorageLimitUpdateRequest(BaseModel):
