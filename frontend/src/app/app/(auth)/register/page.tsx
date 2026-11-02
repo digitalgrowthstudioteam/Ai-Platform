@@ -13,13 +13,6 @@ import {
   ArrowRight,
   ArrowLeft,
   AlertCircle,
-  CheckCircle2,
-  Sparkles,
-  Smartphone,
-  ShieldCheck,
-  Building2,
-  MapPin,
-  FileText,
   CreditCard,
   Truck,
   Image as ImageIcon,
@@ -40,22 +33,27 @@ const COUNTRY_CODES = [
 export default function PlatformRegisterPage() {
   const { register, loginWithGoogle } = usePlatformAuth();
 
-  // Slide state: 1 for Owner/Credentials, 2 for Business Details
-  const [slide, setSlide] = useState<1 | 2>(1);
+  // Wizard Stage: "signup" (Sign up first) -> "step1" (Owner details) -> "step2" (Business details)
+  const [stage, setStage] = useState<"signup" | "step1" | "step2">("signup");
+
+  // Track if user manually overrode auto-fetched fields
+  const [brandNameManuallyEdited, setBrandNameManuallyEdited] = useState(false);
+  const [subdomainManuallyEdited, setSubdomainManuallyEdited] = useState(false);
 
   const [formData, setFormData] = useState({
-    // Slide 1: Owner Details
-    owner_name: "",
+    // Initial Sign Up credentials
     email: "",
     password: "",
+
+    // Step 1: Owner Details
+    owner_name: "",
     country_code: "+91",
     whatsapp_number: "",
 
-    // Slide 2: Business Details
+    // Step 2: Business Details
     business_name: "",
     business_phone: "",
-    category: "Clothing & Apparel",
-    whatsapp_business_name: "",
+    category: "General Retail",
     brand_name: "",
     description: "",
     logo_url: "",
@@ -68,6 +66,13 @@ export default function PlatformRegisterPage() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const slugify = (text: string) =>
+    text
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "");
 
   const handleGoogleSignUp = async () => {
     setError(null);
@@ -85,30 +90,25 @@ export default function PlatformRegisterPage() {
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
+
+    if (name === "brand_name") {
+      setBrandNameManuallyEdited(true);
+    }
+    if (name === "store_slug") {
+      setSubdomainManuallyEdited(true);
+    }
+
     setFormData((prev) => {
       const updated = { ...prev, [name]: value };
-      // Auto-suggest Brand Name & Subdomain if Business Name is typed
+
+      // Auto-fetch Brand Name and Subdomain from Business / Store Name!
       if (name === "business_name") {
-        if (!prev.brand_name) {
+        if (!brandNameManuallyEdited) {
           updated.brand_name = value;
         }
-        if (!prev.whatsapp_business_name) {
-          updated.whatsapp_business_name = value ? `${value} Official` : "";
+        if (!subdomainManuallyEdited) {
+          updated.store_slug = slugify(value);
         }
-        if (!prev.store_slug) {
-          updated.store_slug = value
-            .toLowerCase()
-            .replace(/[^a-z0-9]/g, "-")
-            .replace(/-+/g, "-")
-            .replace(/^-|-$/g, "");
-        }
-      }
-      if (name === "brand_name" && !prev.store_slug) {
-        updated.store_slug = value
-          .toLowerCase()
-          .replace(/[^a-z0-9]/g, "-")
-          .replace(/-+/g, "-")
-          .replace(/^-|-$/g, "");
       }
       return updated;
     });
@@ -123,7 +123,7 @@ export default function PlatformRegisterPage() {
       const dataUrl = event.target?.result as string;
       if (!dataUrl) return;
 
-      // Use a canvas to resize to max 512x512 to ensure fast, lightweight transmission
+      // Downscale to max 512x512 via HTML canvas to ensure fast and lightweight transfer
       const img = new Image();
       img.onload = () => {
         const maxDim = 512;
@@ -159,7 +159,26 @@ export default function PlatformRegisterPage() {
     reader.readAsDataURL(file);
   };
 
-  const handleNextToSlide2 = (e: React.FormEvent) => {
+  // Stage 1 Validation: Sign up with Email + Password first
+  const handleSignUpFirst = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    if (!formData.email.trim() || !formData.email.includes("@")) {
+      setError("Please enter a valid email address to sign up.");
+      return;
+    }
+    if (!formData.password || formData.password.length < 6) {
+      setError("Password must be at least 6 characters.");
+      return;
+    }
+
+    setStage("step1");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // Step 1 Validation: Owner details
+  const handleNextToStep2 = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
@@ -167,23 +186,16 @@ export default function PlatformRegisterPage() {
       setError("Please provide the Owner's Full Name.");
       return;
     }
-    if (!formData.email.trim()) {
-      setError("Please enter a valid email address.");
-      return;
-    }
-    if (!formData.password || formData.password.length < 6) {
-      setError("Password must be at least 6 characters.");
-      return;
-    }
     if (!formData.whatsapp_number.trim()) {
       setError("Please enter your WhatsApp Number for order updates.");
       return;
     }
 
-    setSlide(2);
+    setStage("step2");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  // Final Submission: Business details & Account creation
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -193,7 +205,7 @@ export default function PlatformRegisterPage() {
       return;
     }
     if (!formData.brand_name.trim()) {
-      setError("Please enter your Brand Name (will be locked once selected).");
+      setError("Please enter your Brand Name.");
       return;
     }
     if (!formData.store_slug.trim()) {
@@ -213,7 +225,6 @@ export default function PlatformRegisterPage() {
       business_name: formData.business_name.trim(),
       business_phone: formData.business_phone.trim() || fullWhatsappNumber,
       category: formData.category,
-      whatsapp_business_name: formData.whatsapp_business_name.trim() || formData.brand_name.trim(),
       brand_name: formData.brand_name.trim(),
       description: formData.description.trim() || undefined,
       logo_url: formData.logo_url.trim() || undefined,
@@ -241,25 +252,31 @@ export default function PlatformRegisterPage() {
           Launch Your Branded Android App
         </h2>
         <p className="mt-2 text-xs sm:text-sm text-slate-600 max-w-md mx-auto leading-relaxed">
-          Get your customized mobile shopping app and online storefront in 2 simple steps.
+          {stage === "signup"
+            ? "Sign up with your email to start setting up your customized mobile app and storefront."
+            : "Get your customized mobile shopping app and online storefront in 2 simple steps."}
         </p>
 
-        {/* Multi-Step Indicator Bar */}
-        <div className="mt-6 flex items-center justify-center gap-2 max-w-xs mx-auto">
-          <div
-            className={`flex-1 h-1.5 rounded-full transition-all ${
-              slide === 1 ? "bg-blue-600" : "bg-emerald-500"
-            }`}
-          />
-          <div
-            className={`flex-1 h-1.5 rounded-full transition-all ${
-              slide === 2 ? "bg-blue-600" : "bg-slate-200"
-            }`}
-          />
-        </div>
-        <p className="mt-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-          {slide === 1 ? "Step 1 of 2: Owner & Account Setup" : "Step 2 of 2: Business & App Details"}
-        </p>
+        {/* Multi-Step Indicator Bar (Only for Step 1 & Step 2) */}
+        {stage !== "signup" && (
+          <div className="mt-6 max-w-xs mx-auto">
+            <div className="flex items-center justify-center gap-2">
+              <div
+                className={`flex-1 h-1.5 rounded-full transition-all ${
+                  stage === "step1" ? "bg-blue-600" : "bg-emerald-500"
+                }`}
+              />
+              <div
+                className={`flex-1 h-1.5 rounded-full transition-all ${
+                  stage === "step2" ? "bg-blue-600" : "bg-slate-200"
+                }`}
+              />
+            </div>
+            <p className="mt-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+              {stage === "step1" ? "Step 1 of 2: Owner Details" : "Step 2 of 2: Business & App Details"}
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="mt-6 sm:mx-auto sm:w-full sm:max-w-xl">
@@ -272,11 +289,10 @@ export default function PlatformRegisterPage() {
           )}
 
           {/* ======================================================== */}
-          {/* SLIDE 1: OWNER FULL NAME, EMAIL, PASSWORD, WHATSAPP */}
+          {/* STAGE 0: SIGN UP FIRST                                   */}
           {/* ======================================================== */}
-          {slide === 1 && (
-            <form onSubmit={handleNextToSlide2} className="space-y-5">
-              {/* Optional 1-Click Google Sign Up */}
+          {stage === "signup" && (
+            <form onSubmit={handleSignUpFirst} className="space-y-5">
               <div>
                 <button
                   type="button"
@@ -306,7 +322,7 @@ export default function PlatformRegisterPage() {
                       />
                     </svg>
                   )}
-                  <span>{googleLoading ? "Connecting with Google..." : "Fast sign-up with Google"}</span>
+                  <span>{googleLoading ? "Connecting with Google..." : "Sign up with Google"}</span>
                 </button>
 
                 <div className="relative my-5 flex items-center justify-center">
@@ -314,11 +330,65 @@ export default function PlatformRegisterPage() {
                     <div className="w-full border-t border-slate-200" />
                   </div>
                   <div className="relative bg-white px-3 text-[11px] uppercase tracking-wider text-slate-400 font-bold">
-                    or fill owner credentials
+                    or sign up with email
                   </div>
                 </div>
               </div>
 
+              {/* Email Address */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Email Address <span className="text-rose-500">*</span>
+                </label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
+                  <input
+                    type="email"
+                    required
+                    name="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    placeholder="e.g. vendor@example.com"
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              {/* Password */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Create Password <span className="text-rose-500">*</span>
+                </label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
+                  <input
+                    type="password"
+                    required
+                    name="password"
+                    value={formData.password}
+                    onChange={handleChange}
+                    placeholder="••••••••••••"
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1">At least 6 characters.</p>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full mt-6 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-xs transition-colors cursor-pointer"
+              >
+                Sign Up & Start Setup
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </form>
+          )}
+
+          {/* ======================================================== */}
+          {/* STEP 1: OWNER FULL NAME, EMAIL, WHATSAPP                 */}
+          {/* ======================================================== */}
+          {stage === "step1" && (
+            <form onSubmit={handleNextToStep2} className="space-y-5">
               {/* Owner Full Name */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
@@ -338,7 +408,7 @@ export default function PlatformRegisterPage() {
                 </div>
               </div>
 
-              {/* Email Address */}
+              {/* Email Address (Pre-filled from Sign up) */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                   Email Address <span className="text-rose-500">*</span>
@@ -351,30 +421,7 @@ export default function PlatformRegisterPage() {
                     name="email"
                     value={formData.email}
                     onChange={handleChange}
-                    placeholder="e.g. ananya@mybrand.com"
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <p className="text-[11px] text-slate-400 mt-1">
-                  Used to log in to your store portal and receive order confirmations.
-                </p>
-              </div>
-
-              {/* Password */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Create Portal Password <span className="text-rose-500">*</span>
-                </label>
-                <div className="relative">
-                  <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
-                  <input
-                    type="password"
-                    required
-                    minLength={6}
-                    name="password"
-                    value={formData.password}
-                    onChange={handleChange}
-                    placeholder="•••••••• (Min 6 characters)"
+                    placeholder="vendor@example.com"
                     className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -390,10 +437,10 @@ export default function PlatformRegisterPage() {
                     name="country_code"
                     value={formData.country_code}
                     onChange={handleChange}
-                    className="w-36 px-2.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-36 px-2.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     {COUNTRY_CODES.map((c) => (
-                      <option key={`${c.code}-${c.country}`} value={c.code}>
+                      <option key={c.code} value={c.code}>
                         {c.flag} {c.code} ({c.country})
                       </option>
                     ))}
@@ -416,20 +463,31 @@ export default function PlatformRegisterPage() {
                 </p>
               </div>
 
-              <button
-                type="submit"
-                className="w-full mt-6 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-xs transition-colors cursor-pointer"
-              >
-                Continue to Business Details
-                <ArrowRight className="w-4 h-4" />
-              </button>
+              <div className="flex items-center justify-between gap-3 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setStage("signup")}
+                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors cursor-pointer"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  Back
+                </button>
+
+                <button
+                  type="submit"
+                  className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-xs transition-colors cursor-pointer"
+                >
+                  Continue to Business Details
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
             </form>
           )}
 
           {/* ======================================================== */}
-          {/* SLIDE 2: BUSINESS & STORE DETAILS */}
+          {/* STEP 2: BUSINESS & STORE DETAILS                         */}
           {/* ======================================================== */}
-          {slide === 2 && (
+          {stage === "step2" && (
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Business/Store Name */}
@@ -451,14 +509,14 @@ export default function PlatformRegisterPage() {
                   </div>
                 </div>
 
-                {/* Brand Name (Permanent Lock) */}
+                {/* Brand Name (Fetched from Business Name + Editable + Admin Approval Notice) */}
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
                     <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
                       Brand Name <span className="text-rose-500">*</span>
                     </label>
-                    <span className="text-[10px] bg-amber-50 text-amber-800 border border-amber-200 px-1.5 py-0.5 rounded font-bold flex items-center gap-1">
-                      <Lock className="w-2.5 h-2.5" /> Permanent
+                    <span className="text-[10px] bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded font-bold flex items-center gap-1">
+                      <Lock className="w-2.5 h-2.5" /> Changing requires Admin Approval
                     </span>
                   </div>
                   <div className="relative">
@@ -469,12 +527,12 @@ export default function PlatformRegisterPage() {
                       name="brand_name"
                       value={formData.brand_name}
                       onChange={handleChange}
-                      placeholder="e.g. ABC Luxe"
+                      placeholder="e.g. ABC Fashion"
                       className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-amber-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
-                  <p className="text-[10px] text-amber-700 mt-1">
-                    Cannot be changed once selected. Appears on your Android app build.
+                  <p className="text-[10px] text-amber-800 mt-1">
+                    Auto-fetched from Store Name. Editable now, but changing Brand Name later will need Admin Approval.
                   </p>
                 </div>
               </div>
@@ -521,21 +579,6 @@ export default function PlatformRegisterPage() {
                 </div>
               </div>
 
-              {/* Business WhatsApp Name */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Business WhatsApp Name <span className="text-[11px] text-slate-400 font-normal">(shown on WhatsApp profile)</span>
-                </label>
-                <input
-                  type="text"
-                  name="whatsapp_business_name"
-                  value={formData.whatsapp_business_name}
-                  onChange={handleChange}
-                  placeholder="e.g. ABC Fashion Support"
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
               {/* Business Description */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
@@ -546,12 +589,12 @@ export default function PlatformRegisterPage() {
                   name="description"
                   value={formData.description}
                   onChange={handleChange}
-                  placeholder="Briefly describe what your brand specializes in..."
+                  placeholder="Briefly describe what your store specializes in..."
                   className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
-              {/* Brand Logo Upload / URL */}
+              {/* Brand Logo Upload */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                   Brand Logo
@@ -612,74 +655,41 @@ export default function PlatformRegisterPage() {
                 />
               </div>
 
-              {/* Two Questions: Payment Gateway & Delivery Partner Help */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
-                {/* Do You have any Payment Gateway? */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-800 mb-1.5 flex items-center gap-1.5">
-                    <CreditCard className="w-3.5 h-3.5 text-blue-600" />
-                    Do You have a Payment Gateway?
-                  </label>
-                  <div className="flex items-center gap-4 text-xs font-semibold">
-                    <label className="flex items-center gap-1.5 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="has_payment_gateway"
-                        value="Yes"
-                        checked={formData.has_payment_gateway === "Yes"}
-                        onChange={() => setFormData((prev) => ({ ...prev, has_payment_gateway: "Yes" }))}
-                        className="text-blue-600"
-                      />
-                      <span>Yes (Razorpay/Paytm)</span>
-                    </label>
-                    <label className="flex items-center gap-1.5 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="has_payment_gateway"
-                        value="No"
-                        checked={formData.has_payment_gateway === "No"}
-                        onChange={() => setFormData((prev) => ({ ...prev, has_payment_gateway: "No" }))}
-                        className="text-blue-600"
-                      />
-                      <span>No (COD / Assisted)</span>
-                    </label>
-                  </div>
-                </div>
-
-                {/* Will you need help to register with any Delivery Partner? */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-800 mb-1.5 flex items-center gap-1.5">
-                    <Truck className="w-3.5 h-3.5 text-blue-600" />
-                    Need Delivery Partner Help?
-                  </label>
-                  <div className="flex items-center gap-4 text-xs font-semibold">
-                    <label className="flex items-center gap-1.5 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="needs_delivery_help"
-                        value="Yes"
-                        checked={formData.needs_delivery_help === "Yes"}
-                        onChange={() => setFormData((prev) => ({ ...prev, needs_delivery_help: "Yes" }))}
-                        className="text-blue-600"
-                      />
-                      <span>Yes (Shiprocket help)</span>
-                    </label>
-                    <label className="flex items-center gap-1.5 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="needs_delivery_help"
-                        value="No"
-                        checked={formData.needs_delivery_help === "No"}
-                        onChange={() => setFormData((prev) => ({ ...prev, needs_delivery_help: "No" }))}
-                        className="text-blue-600"
-                      />
-                      <span>No (Self managed)</span>
-                    </label>
-                  </div>
-                </div>
+              {/* Dropdown 1: Do You have any Payment Gateway? (1 question on 1 line) */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                  <CreditCard className="w-3.5 h-3.5 text-blue-600" />
+                  Do You have any Payment Gateway?
+                </label>
+                <select
+                  name="has_payment_gateway"
+                  value={formData.has_payment_gateway}
+                  onChange={handleChange}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="No">No (COD / Assisted)</option>
+                  <option value="Yes">Yes (Razorpay / Paytm / PhonePe)</option>
+                </select>
               </div>
 
-              {/* Desired Store Subdomain */}
+              {/* Dropdown 2: Will you need help to register with any Delivery Partner? (1 question on 1 line) */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                  <Truck className="w-3.5 h-3.5 text-blue-600" />
+                  Will you need help to register with any Delivery Partner?
+                </label>
+                <select
+                  name="needs_delivery_help"
+                  value={formData.needs_delivery_help}
+                  onChange={handleChange}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="No">No (Self managed / Own delivery)</option>
+                  <option value="Yes">Yes (Shiprocket / Delivery Partner help)</option>
+                </select>
+              </div>
+
+              {/* Desired Store Subdomain (Auto-fetched from Business Name + Editable) */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                   Desired Store Subdomain <span className="text-rose-500">*</span>
@@ -698,13 +708,16 @@ export default function PlatformRegisterPage() {
                     .digitalgrowthstudio.in
                   </span>
                 </div>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Auto-fetched from Store Name and fully editable.
+                </p>
               </div>
 
               {/* Action Buttons */}
               <div className="flex items-center justify-between gap-3 pt-3">
                 <button
                   type="button"
-                  onClick={() => setSlide(1)}
+                  onClick={() => setStage("step1")}
                   className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors cursor-pointer"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" />
