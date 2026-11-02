@@ -6,12 +6,16 @@ import { signInWithPopup, GoogleAuthProvider } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { PlatformUser } from "./types";
 import { platformApi } from "./api";
+import { DEMO_USER } from "./demo-sandbox";
 
 interface PlatformAuthContextType {
   user: PlatformUser | null;
   loading: boolean;
+  isDemo: boolean;
   login: (email: string, pass: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
+  enterDemoSandbox: () => void;
+  resetDemoSandbox: () => void;
   register: (payload: any) => Promise<void>;
   logout: () => void;
   refreshUser: () => Promise<void>;
@@ -59,9 +63,12 @@ export function AppPlatformAuthProvider({ children }: { children: React.ReactNod
     }
   };
 
+  const isDemo = typeof window !== "undefined" && localStorage.getItem("dgs_platform_is_demo") === "true";
+
   const loginWithGoogle = async () => {
     setLoading(true);
     try {
+      platformApi.setDemoMode(false);
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: "select_account" });
       const credential = await signInWithPopup(auth, provider);
@@ -79,7 +86,22 @@ export function AppPlatformAuthProvider({ children }: { children: React.ReactNod
     }
   };
 
+  const enterDemoSandbox = () => {
+    platformApi.setDemoMode(true);
+    platformApi.resetDemo();
+    setUser(DEMO_USER);
+    router.push("/app/dashboard");
+  };
+
+  const resetDemoSandbox = () => {
+    platformApi.resetDemo();
+    if (typeof window !== "undefined") {
+      window.location.reload();
+    }
+  };
+
   const register = async (payload: any) => {
+    platformApi.setDemoMode(false);
     await platformApi.register(payload);
     const profile = await platformApi.getMe();
     setUser(profile);
@@ -93,7 +115,20 @@ export function AppPlatformAuthProvider({ children }: { children: React.ReactNod
   };
 
   return (
-    <PlatformAuthContext.Provider value={{ user, loading, login, loginWithGoogle, register, logout, refreshUser }}>
+    <PlatformAuthContext.Provider
+      value={{
+        user,
+        loading,
+        isDemo,
+        login,
+        loginWithGoogle,
+        enterDemoSandbox,
+        resetDemoSandbox,
+        register,
+        logout,
+        refreshUser,
+      }}
+    >
       {children}
     </PlatformAuthContext.Provider>
   );

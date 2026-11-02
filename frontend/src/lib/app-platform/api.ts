@@ -17,6 +17,7 @@ import {
   Plan,
   Addon,
 } from './types';
+import { demoSandbox, DEMO_USER } from './demo-sandbox';
 
 const getPlatformBaseUrl = (): string => {
   if (typeof window !== 'undefined') {
@@ -102,13 +103,36 @@ class PlatformApiClient {
     return res;
   }
 
+  isDemoMode(): boolean {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('dgs_platform_is_demo') === 'true';
+  }
+
+  setDemoMode(enabled: boolean) {
+    if (typeof window !== 'undefined') {
+      if (enabled) {
+        localStorage.setItem('dgs_platform_is_demo', 'true');
+        localStorage.setItem('dgs_platform_token', 'demo_sandbox_token');
+      } else {
+        localStorage.removeItem('dgs_platform_is_demo');
+        localStorage.removeItem('dgs_platform_token');
+      }
+    }
+  }
+
+  resetDemo() {
+    demoSandbox.reset();
+  }
+
   async getMe(): Promise<PlatformUser> {
+    if (this.isDemoMode()) return DEMO_USER;
     return this.request<PlatformUser>('/api/v1/platform/auth/me');
   }
 
   logout() {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('dgs_platform_token');
+      localStorage.removeItem('dgs_platform_is_demo');
     }
   }
 
@@ -116,14 +140,17 @@ class PlatformApiClient {
   // Vendor Dashboard APIs
   // ──────────────────────────────────────────────
   async getVendorOverview(): Promise<VendorOverview> {
+    if (this.isDemoMode()) return demoSandbox.getOverview();
     return this.request<VendorOverview>('/api/v1/platform/vendor/overview');
   }
 
   async getVendorStore(): Promise<StoreSettings> {
+    if (this.isDemoMode()) return demoSandbox.getStore();
     return this.request<StoreSettings>('/api/v1/platform/vendor/store');
   }
 
   async updateVendorStore(payload: Partial<StoreSettings>): Promise<StoreSettings> {
+    if (this.isDemoMode()) return demoSandbox.updateStore(payload);
     return this.request<StoreSettings>('/api/v1/platform/vendor/store', {
       method: 'PUT',
       body: JSON.stringify(payload),
@@ -131,10 +158,12 @@ class PlatformApiClient {
   }
 
   async getVendorAppConfig(): Promise<AppConfig> {
+    if (this.isDemoMode()) return demoSandbox.getAppConfig();
     return this.request<AppConfig>('/api/v1/platform/vendor/app-config');
   }
 
   async updateVendorAppConfig(payload: Partial<AppConfig>): Promise<AppConfig> {
+    if (this.isDemoMode()) return demoSandbox.updateAppConfig(payload);
     return this.request<AppConfig>('/api/v1/platform/vendor/app-config', {
       method: 'PUT',
       body: JSON.stringify(payload),
@@ -142,6 +171,7 @@ class PlatformApiClient {
   }
 
   async getProducts(params?: { category_id?: string; status?: string }): Promise<Product[]> {
+    if (this.isDemoMode()) return demoSandbox.getProducts(params?.category_id, params?.status);
     const q = new URLSearchParams();
     if (params?.category_id) q.set('category_id', params.category_id);
     if (params?.status) q.set('status_filter', params.status);
@@ -150,6 +180,7 @@ class PlatformApiClient {
   }
 
   async createProduct(payload: Partial<Product> & { image_urls?: string[] }): Promise<Product> {
+    if (this.isDemoMode()) return demoSandbox.createProduct(payload);
     return this.request<Product>('/api/v1/platform/vendor/products', {
       method: 'POST',
       body: JSON.stringify(payload),
@@ -157,6 +188,7 @@ class PlatformApiClient {
   }
 
   async updateProduct(id: string, payload: Partial<Product> & { image_urls?: string[] }): Promise<Product> {
+    if (this.isDemoMode()) return demoSandbox.updateProduct(id, payload);
     return this.request<Product>(`/api/v1/platform/vendor/products/${id}`, {
       method: 'PUT',
       body: JSON.stringify(payload),
@@ -164,16 +196,19 @@ class PlatformApiClient {
   }
 
   async deleteProduct(id: string): Promise<{ message: string }> {
+    if (this.isDemoMode()) return demoSandbox.deleteProduct(id);
     return this.request<{ message: string }>(`/api/v1/platform/vendor/products/${id}`, {
       method: 'DELETE',
     });
   }
 
   async getCategories(): Promise<Category[]> {
+    if (this.isDemoMode()) return demoSandbox.getCategories();
     return this.request<Category[]>('/api/v1/platform/vendor/categories');
   }
 
   async createCategory(payload: Partial<Category>): Promise<Category> {
+    if (this.isDemoMode()) return demoSandbox.createCategory(payload);
     return this.request<Category>('/api/v1/platform/vendor/categories', {
       method: 'POST',
       body: JSON.stringify(payload),
@@ -181,6 +216,7 @@ class PlatformApiClient {
   }
 
   async updateCategory(id: string, payload: Partial<Category>): Promise<Category> {
+    if (this.isDemoMode()) return demoSandbox.updateCategory(id, payload);
     return this.request<Category>(`/api/v1/platform/vendor/categories/${id}`, {
       method: 'PUT',
       body: JSON.stringify(payload),
@@ -188,16 +224,19 @@ class PlatformApiClient {
   }
 
   async deleteCategory(id: string): Promise<{ message: string }> {
+    if (this.isDemoMode()) return demoSandbox.deleteCategory(id);
     return this.request<{ message: string }>(`/api/v1/platform/vendor/categories/${id}`, {
       method: 'DELETE',
     });
   }
 
   async getBanners(): Promise<Banner[]> {
+    if (this.isDemoMode()) return demoSandbox.getBanners();
     return this.request<Banner[]>('/api/v1/platform/vendor/banners');
   }
 
   async createBanner(payload: Partial<Banner>): Promise<Banner> {
+    if (this.isDemoMode()) return demoSandbox.createBanner(payload);
     return this.request<Banner>('/api/v1/platform/vendor/banners', {
       method: 'POST',
       body: JSON.stringify(payload),
@@ -205,6 +244,7 @@ class PlatformApiClient {
   }
 
   async updateBanner(id: string, payload: Partial<Banner>): Promise<Banner> {
+    if (this.isDemoMode()) return demoSandbox.updateBanner(id, payload);
     return this.request<Banner>(`/api/v1/platform/vendor/banners/${id}`, {
       method: 'PUT',
       body: JSON.stringify(payload),
@@ -212,17 +252,20 @@ class PlatformApiClient {
   }
 
   async deleteBanner(id: string): Promise<{ message: string }> {
+    if (this.isDemoMode()) return demoSandbox.deleteBanner(id);
     return this.request<{ message: string }>(`/api/v1/platform/vendor/banners/${id}`, {
       method: 'DELETE',
     });
   }
 
   async getOrders(statusFilter?: string): Promise<Order[]> {
+    if (this.isDemoMode()) return demoSandbox.getOrders(statusFilter);
     const qs = statusFilter ? `?status_filter=${statusFilter}` : '';
     return this.request<Order[]>(`/api/v1/platform/vendor/orders${qs}`);
   }
 
   async updateOrderStatus(orderId: string, payload: { order_status?: string; payment_status?: string }): Promise<any> {
+    if (this.isDemoMode()) return demoSandbox.updateOrderStatus(orderId, payload);
     return this.request(`/api/v1/platform/vendor/orders/${orderId}/status`, {
       method: 'PATCH',
       body: JSON.stringify(payload),
@@ -230,14 +273,23 @@ class PlatformApiClient {
   }
 
   async getCustomers(): Promise<Customer[]> {
+    if (this.isDemoMode()) return demoSandbox.getCustomers();
     return this.request<Customer[]>('/api/v1/platform/vendor/customers');
   }
 
   async getSubscriptionInfo(): Promise<any> {
+    if (this.isDemoMode()) return demoSandbox.getSubscriptionInfo();
     return this.request('/api/v1/platform/vendor/subscription');
   }
 
   async uploadFile(file: File, folder = 'products'): Promise<{ url: string; size_bytes: number; filename: string }> {
+    if (this.isDemoMode()) {
+      return {
+        url: URL.createObjectURL(file),
+        size_bytes: file.size,
+        filename: file.name,
+      };
+    }
     const formData = new FormData();
     formData.append('file', file);
     formData.append('folder', folder);
@@ -338,23 +390,69 @@ class PlatformApiClient {
   // Public Store & Android App APIs
   // ──────────────────────────────────────────────
   async getPublicStoreConfig(slug: string): Promise<any> {
+    if (this.isDemoMode() || slug === 'demo' || slug === 'demo-store') {
+      const s = demoSandbox.getStore();
+      return {
+        store_name: s.store_name,
+        store_slug: s.store_slug,
+        subdomain: s.subdomain,
+        description: s.description,
+        primary_color: s.primary_color,
+        secondary_color: s.secondary_color,
+        logo_url: s.logo_url,
+        banner_url: s.banner_url,
+        contact_email: s.contact_email,
+        contact_phone: s.contact_phone,
+        business_address: s.business_address,
+        opening_hours: s.opening_hours,
+        cod_enabled: s.cod_enabled,
+        razorpay_enabled: false,
+        razorpay_key_id: undefined,
+        app_version: "1.0.0",
+        shipping_enabled: s.shipping_enabled ?? true,
+        shipping_charge: s.shipping_charge ?? 0,
+        free_shipping_min_order: s.free_shipping_min_order ?? 999,
+        cod_charge: s.cod_charge ?? 0,
+        estimated_delivery_days: s.estimated_delivery_days ?? "3-5 Business Days",
+        allowed_countries: s.allowed_countries ?? "India",
+        serviceable_pincodes_type: s.serviceable_pincodes_type ?? "all",
+        serviceable_pincodes: s.serviceable_pincodes,
+      };
+    }
     return this.request(`/api/store/${slug}/config`);
   }
 
   async getPublicStoreProducts(slug: string, categoryId?: string): Promise<any[]> {
+    if (this.isDemoMode() || slug === 'demo' || slug === 'demo-store') {
+      const prods = demoSandbox.getProducts(categoryId);
+      return prods.map((p) => ({
+        ...p,
+        effective_price: p.sale_price && p.sale_price > 0 ? p.sale_price : p.regular_price,
+        in_stock: p.stock_quantity > 0 && p.status === 'active',
+      }));
+    }
     const qs = categoryId ? `?category_id=${categoryId}` : '';
     return this.request(`/api/store/${slug}/products${qs}`);
   }
 
   async getPublicStoreCategories(slug: string): Promise<any[]> {
+    if (this.isDemoMode() || slug === 'demo' || slug === 'demo-store') {
+      return demoSandbox.getCategories();
+    }
     return this.request(`/api/store/${slug}/categories`);
   }
 
   async getPublicStoreBanners(slug: string): Promise<any[]> {
+    if (this.isDemoMode() || slug === 'demo' || slug === 'demo-store') {
+      return demoSandbox.getBanners();
+    }
     return this.request(`/api/store/${slug}/banners`);
   }
 
   async createPublicOrder(slug: string, payload: any): Promise<any> {
+    if (this.isDemoMode() || slug === 'demo' || slug === 'demo-store') {
+      return demoSandbox.createPublicOrder(payload);
+    }
     return this.request(`/api/store/${slug}/orders`, {
       method: 'POST',
       body: JSON.stringify(payload),

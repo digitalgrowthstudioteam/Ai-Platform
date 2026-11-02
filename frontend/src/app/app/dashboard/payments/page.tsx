@@ -2,10 +2,12 @@
 
 import React, { useEffect, useState } from "react";
 import { platformApi } from "@/lib/app-platform/api";
+import { usePlatformAuth } from "@/lib/app-platform/auth";
 import { StoreSettings } from "@/lib/app-platform/types";
 import { CreditCard, Banknote, ShieldCheck, Check, AlertCircle, Save } from "lucide-react";
 
 export default function VendorPaymentSettingsPage() {
+  const { isDemo } = usePlatformAuth();
   const [store, setStore] = useState<StoreSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -100,51 +102,53 @@ export default function VendorPaymentSettingsPage() {
           </p>
         </div>
 
-        {/* Razorpay Online Payment */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-blue-50 text-blue-600">
-                <CreditCard className="w-5 h-5" />
+        {/* Razorpay Online Payment (Hidden in Dummy Store Sandbox) */}
+        {!isDemo && (
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-blue-50 text-blue-600">
+                  <CreditCard className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Razorpay Gateway Integration</h3>
+                  <p className="text-xs text-slate-500">Accept UPI, Credit/Debit cards, Net Banking & Wallets</p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-base font-bold text-slate-900">Razorpay Gateway Integration</h3>
-                <p className="text-xs text-slate-500">Accept UPI, Credit/Debit cards, Net Banking & Wallets</p>
-              </div>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={store?.razorpay_enabled || false}
-                onChange={(e) => setStore((prev) => (prev ? { ...prev, razorpay_enabled: e.target.checked } : null))}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-            </label>
-          </div>
-
-          <div className="pt-2 space-y-3">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                Razorpay Key ID (Public Client Key)
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={store?.razorpay_enabled || false}
+                  onChange={(e) => setStore((prev) => (prev ? { ...prev, razorpay_enabled: e.target.checked } : null))}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
               </label>
-              <input
-                type="text"
-                placeholder="rzp_test_..."
-                value={store?.razorpay_key_id || ""}
-                onChange={(e) => setStore((prev) => (prev ? { ...prev, razorpay_key_id: e.target.value } : null))}
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
             </div>
 
-            <div className="p-3.5 bg-blue-50/60 rounded-xl border border-blue-100 flex items-start gap-2.5 text-xs text-blue-800">
-              <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+            <div className="pt-2 space-y-3">
               <div>
-                <span className="font-semibold">Security Guarantee:</span> Razorpay Secret Keys are never exposed in frontend code. Account verification and webhook setups are handled securely by Digital Growth Studio’s backend team.
+                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                  Razorpay Key ID (Public Client Key)
+                </label>
+                <input
+                  type="text"
+                  placeholder="rzp_live_..."
+                  value={store?.razorpay_key_id || ""}
+                  onChange={(e) => setStore((prev) => (prev ? { ...prev, razorpay_key_id: e.target.value } : null))}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="p-3.5 bg-blue-50/60 rounded-xl border border-blue-100 flex items-start gap-2.5 text-xs text-blue-800">
+                <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-semibold">Security Guarantee:</span> Razorpay Secret Keys are never exposed in frontend code. Account verification and webhook setups are handled securely by Digital Growth Studio’s backend team.
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
 
         <div className="flex justify-end">
           <button

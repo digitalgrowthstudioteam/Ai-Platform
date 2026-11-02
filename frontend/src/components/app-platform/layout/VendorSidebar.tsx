@@ -13,6 +13,7 @@ import {
   ShoppingCart,
   Users,
   CreditCard,
+  Truck,
   Sparkles,
   Smartphone,
   ExternalLink,
@@ -31,6 +32,7 @@ export default function VendorSidebar() {
     { label: "Orders", href: "/app/dashboard/orders", icon: ShoppingCart },
     { label: "Customers", href: "/app/dashboard/customers", icon: Users },
     { label: "Payment Settings", href: "/app/dashboard/payments", icon: CreditCard },
+    { label: "Shipping Settings", href: "/app/dashboard/shipping", icon: Truck },
     { label: "Subscription & Add-ons", href: "/app/dashboard/subscription", icon: Sparkles },
     { label: "Android App Config", href: "/app/dashboard/app-config", icon: Smartphone },
   ];

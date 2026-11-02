@@ -267,7 +267,54 @@ async def test_platform_end_to_end_security_and_isolation():
         del_prod = await client.delete(f"/api/v1/platform/vendor/products/{prod_id}", headers=headers_a)
         assert del_prod.status_code == 200
 
-        print("\nALL 10 MULTI-VENDOR ISOLATION, SECURITY & IMAGE REORDERING TESTS PASSED PERFECTLY!")
+        # ──────────────────────────────────────────────
+        # Test 11: Shipping Settings & Order MOV Calculation
+        # ──────────────────────────────────────────────
+        # Vendor updates shipping settings
+        ship_update_res = await client.put("/api/v1/platform/vendor/store", headers=headers_a, json={
+            "shipping_enabled": True,
+            "shipping_charge": 80.0,
+            "free_shipping_min_order": 1500.0,
+            "cod_charge": 30.0,
+            "estimated_delivery_days": "2-4 Business Days",
+            "allowed_countries": "India, Nepal",
+            "serviceable_pincodes_type": "all",
+        })
+        assert ship_update_res.status_code == 200, f"Shipping update failed: {ship_update_res.text}"
+        store_settings = ship_update_res.json()
+        assert store_settings["shipping_charge"] == 80.0
+        assert store_settings["free_shipping_min_order"] == 1500.0
+        assert store_settings["cod_charge"] == 30.0
+
+        # Verify public store config reflects updated shipping
+        store_config_res = await client.get("/api/store/abc/config")
+        assert store_config_res.status_code == 200
+        store_cfg = store_config_res.json()
+        assert store_cfg["shipping_charge"] == 80.0
+        assert store_cfg["free_shipping_min_order"] == 1500.0
+        assert store_cfg["cod_charge"] == 30.0
+        assert store_cfg["estimated_delivery_days"] == "2-4 Business Days"
+
+        # Place order below free shipping threshold (MOV < 1500) with COD
+        # Get a product from ABC store
+        abc_prods_res = await client.get("/api/store/abc/products")
+        abc_prod = abc_prods_res.json()[0]
+        p_price = abc_prod["effective_price"]
+        p_id = abc_prod["id"]
+
+        order_res_below_mov = await client.post("/api/store/abc/orders", json={
+            "customer_name": "Test Shipping Buyer",
+            "customer_phone": "9998887776",
+            "shipping_address": "Flat 101, Test Lane, Mumbai 400001",
+            "payment_method": "COD",
+            "items": [{"product_id": p_id, "quantity": 1}],
+        })
+        assert order_res_below_mov.status_code == 201, f"Order failed: {order_res_below_mov.text}"
+        order_data = order_res_below_mov.json()
+        expected_total = round(p_price + 80.0 + 30.0, 2)
+        assert order_data["total_amount"] == expected_total, f"Expected {expected_total}, got {order_data['total_amount']}"
+
+        print("\nALL 11 MULTI-VENDOR ISOLATION, SECURITY, SHIPPING & MOV TESTS PASSED PERFECTLY!")
 
 
 if __name__ == "__main__":

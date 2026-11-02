@@ -16,6 +16,7 @@ import {
   Clock,
   ArrowRight,
   AlertCircle,
+  Truck,
 } from "lucide-react";
 
 export default function StorePreviewClient() {
@@ -121,14 +122,6 @@ export default function StorePreviewClient() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
-      {/* Top Banner Notice */}
-      <div className="bg-slate-900 text-white text-xs py-2 px-4 text-center flex items-center justify-center gap-2">
-        <Smartphone className="w-3.5 h-3.5 text-blue-400" />
-        <span>
-          Store Subdomain: <strong className="font-mono text-blue-300">{config.subdomain}</strong> • Connected dynamically to Android Mobile App v{config.app_version}
-        </span>
-      </div>
-
       {/* Store Header */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-20 shadow-xs">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
@@ -149,8 +142,14 @@ export default function StorePreviewClient() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+          <div className="flex items-center gap-2">
+            {config.free_shipping_min_order && config.free_shipping_min_order > 0 ? (
+              <span className="hidden md:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                <Truck className="w-3.5 h-3.5" />
+                Free Delivery above ₹{config.free_shipping_min_order}
+              </span>
+            ) : null}
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
               <CheckCircle2 className="w-3.5 h-3.5" />
               COD Available
             </span>

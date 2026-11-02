@@ -77,6 +77,14 @@ async def get_store_config(slug: str, db: AsyncSession = Depends(get_db)):
         razorpay_enabled=store.razorpay_enabled,
         razorpay_key_id=store.razorpay_key_id if store.razorpay_enabled else None,
         app_version=app_cfg.app_version if app_cfg else "1.0.0",
+        shipping_enabled=getattr(store, "shipping_enabled", True),
+        shipping_charge=getattr(store, "shipping_charge", 0.0),
+        free_shipping_min_order=getattr(store, "free_shipping_min_order", 999.0),
+        cod_charge=getattr(store, "cod_charge", 0.0),
+        estimated_delivery_days=getattr(store, "estimated_delivery_days", "3-5 Business Days"),
+        allowed_countries=getattr(store, "allowed_countries", "India"),
+        serviceable_pincodes_type=getattr(store, "serviceable_pincodes_type", "all"),
+        serviceable_pincodes=getattr(store, "serviceable_pincodes", None),
     )
 
 

@@ -21,6 +21,18 @@ class StoreUpdateRequest(BaseModel):
     cod_enabled: Optional[bool] = None
     razorpay_enabled: Optional[bool] = None
     razorpay_key_id: Optional[str] = None
+    shipping_enabled: Optional[bool] = None
+    shipping_charge: Optional[float] = None
+    free_shipping_min_order: Optional[float] = None
+    cod_charge: Optional[float] = None
+    estimated_delivery_days: Optional[str] = None
+    allowed_countries: Optional[str] = None
+    serviceable_pincodes_type: Optional[str] = None
+    serviceable_pincodes: Optional[str] = None
+    shiprocket_enabled: Optional[bool] = None
+    shiprocket_email: Optional[str] = None
+    shiprocket_password: Optional[str] = None
+    shiprocket_auto_fulfill: Optional[bool] = None
 
 
 class VendorProfileUpdateRequest(BaseModel):

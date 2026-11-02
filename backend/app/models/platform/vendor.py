@@ -80,6 +80,20 @@ class PlatformStore(BaseModel):
     razorpay_key_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     razorpay_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
+    # Shipping & Logistics Settings
+    shipping_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    shipping_charge: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    free_shipping_min_order: Mapped[Optional[float]] = mapped_column(Float, nullable=True, default=999.0)
+    cod_charge: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    estimated_delivery_days: Mapped[str] = mapped_column(String(100), nullable=False, default="3-5 Business Days")
+    allowed_countries: Mapped[str] = mapped_column(String(500), nullable=False, default="India")
+    serviceable_pincodes_type: Mapped[str] = mapped_column(String(50), nullable=False, default="all")
+    serviceable_pincodes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    shiprocket_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    shiprocket_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    shiprocket_password: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    shiprocket_auto_fulfill: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
     vendor: Mapped["PlatformVendor"] = relationship("PlatformVendor", back_populates="store")
 
 

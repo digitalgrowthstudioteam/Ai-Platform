@@ -158,6 +158,18 @@ export interface StoreSettings {
   cod_enabled: boolean;
   razorpay_enabled: boolean;
   razorpay_key_id?: string;
+  shipping_enabled?: boolean;
+  shipping_charge?: number;
+  free_shipping_min_order?: number;
+  cod_charge?: number;
+  estimated_delivery_days?: string;
+  allowed_countries?: string;
+  serviceable_pincodes_type?: string;
+  serviceable_pincodes?: string;
+  shiprocket_enabled?: boolean;
+  shiprocket_email?: string;
+  shiprocket_password?: string;
+  shiprocket_auto_fulfill?: boolean;
 }
 
 export interface AppConfig {

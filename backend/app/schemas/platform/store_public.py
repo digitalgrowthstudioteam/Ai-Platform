@@ -23,6 +23,14 @@ class PublicStoreConfigResponse(BaseModel):
     razorpay_enabled: bool
     razorpay_key_id: Optional[str] = None
     app_version: Optional[str] = "1.0.0"
+    shipping_enabled: bool = True
+    shipping_charge: float = 0.0
+    free_shipping_min_order: Optional[float] = 999.0
+    cod_charge: float = 0.0
+    estimated_delivery_days: str = "3-5 Business Days"
+    allowed_countries: str = "India"
+    serviceable_pincodes_type: str = "all"
+    serviceable_pincodes: Optional[str] = None
 
 
 class PublicProductImage(BaseModel):
