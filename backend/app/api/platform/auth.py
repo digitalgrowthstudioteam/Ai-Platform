@@ -3,6 +3,7 @@ Digital Growth Studio — Platform Authentication Endpoints
 """
 import re
 import uuid
+import secrets
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, func
@@ -10,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
+from app.core.firebase import verify_firebase_token
 from app.core.platform_auth import (
     hash_password,
     verify_password,
@@ -28,6 +30,7 @@ from app.models.platform.subscription import PlatformPlan, PlatformSubscription
 from app.schemas.platform.auth import (
     PlatformRegisterRequest,
     PlatformLoginRequest,
+    PlatformGoogleLoginRequest,
     PlatformTokenResponse,
     PlatformUserMeResponse,
 )
@@ -222,6 +225,221 @@ async def login_platform(payload: PlatformLoginRequest, db: AsyncSession = Depen
         vendor_id=vendor_id,
         vendor_code=vendor_code,
         store_slug=store_slug,
+    )
+
+
+@router.post("/google-login", response_model=PlatformTokenResponse)
+async def google_login_platform(
+    payload: PlatformGoogleLoginRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Authenticate via Firebase Google Auth ID Token.
+    Security policy:
+    - Only vikramrwadkar@gmail.com is granted SUPER_ADMIN access.
+    - Other Google accounts are authenticated as VENDOR_ADMIN (or auto-provisioned if new).
+    """
+    claims = await verify_firebase_token(payload.id_token)
+    if not claims or not claims.get("email"):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired Google authentication credentials.",
+        )
+
+    email = claims["email"].lower().strip()
+    name = claims.get("name") or email.split("@")[0]
+
+    # Specific rule: ONLY vikramrwadkar@gmail.com gets SUPER_ADMIN
+    is_super_admin_email = (email == "vikramrwadkar@gmail.com")
+
+    stmt = (
+        select(PlatformUser)
+        .where(PlatformUser.email == email)
+        .options(
+            selectinload(PlatformUser.vendors).selectinload(PlatformVendor.store),
+        )
+    )
+    result = await db.execute(stmt)
+    user = result.scalar_one_or_none()
+
+    if is_super_admin_email:
+        if not user:
+            user = PlatformUser(
+                email=email,
+                name=name or "Vikram Wadkar",
+                hashed_password=hash_password(secrets.token_urlsafe(32)),
+                role="SUPER_ADMIN",
+                status="active",
+            )
+            db.add(user)
+            await db.commit()
+            await db.refresh(user)
+        else:
+            if user.role != "SUPER_ADMIN" or user.status != "active":
+                user.role = "SUPER_ADMIN"
+                user.status = "active"
+                await db.commit()
+                await db.refresh(user)
+
+        token = create_platform_access_token({
+            "sub": str(user.id),
+            "email": user.email,
+            "role": "SUPER_ADMIN",
+        })
+        return PlatformTokenResponse(
+            access_token=token,
+            token_type="bearer",
+            user_id=user.id,
+            email=user.email,
+            name=user.name,
+            role="SUPER_ADMIN",
+            vendor_id=None,
+            vendor_code=None,
+            store_slug=None,
+        )
+
+    # For any other Google user
+    if user:
+        if user.status != "active":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Account is inactive or suspended",
+            )
+        # Deny SUPER_ADMIN to any other Google account
+        if user.role == "SUPER_ADMIN" and not is_super_admin_email:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Unauthorized: Super Admin access is restricted to vikramrwadkar@gmail.com.",
+            )
+
+        vendor_id = None
+        vendor_code = None
+        store_slug = None
+        if user.vendors:
+            primary_vendor = user.vendors[0]
+            vendor_id = primary_vendor.id
+            vendor_code = primary_vendor.vendor_code
+            if primary_vendor.store:
+                store_slug = primary_vendor.store.store_slug
+
+        token = create_platform_access_token({
+            "sub": str(user.id),
+            "email": user.email,
+            "role": user.role,
+            "vendor_id": str(vendor_id) if vendor_id else None,
+            "vendor_code": vendor_code,
+        })
+        return PlatformTokenResponse(
+            access_token=token,
+            token_type="bearer",
+            user_id=user.id,
+            email=user.email,
+            name=user.name,
+            role=user.role,
+            vendor_id=vendor_id,
+            vendor_code=vendor_code,
+            store_slug=store_slug,
+        )
+
+    # New user signing in with Google: Auto-provision as new Vendor Admin
+    user = PlatformUser(
+        email=email,
+        name=name,
+        hashed_password=hash_password(secrets.token_urlsafe(32)),
+        role="VENDOR_ADMIN",
+        status="active",
+    )
+    db.add(user)
+    await db.flush()
+
+    count_stmt = select(func.count(PlatformVendor.id))
+    current_count = (await db.execute(count_stmt)).scalar() or 0
+    vendor_code = f"VND{current_count + 1:04d}"
+
+    vendor = PlatformVendor(
+        vendor_code=vendor_code,
+        user_id=user.id,
+        status="active",
+    )
+    db.add(vendor)
+    await db.flush()
+
+    business_name = f"{name}'s Store"
+    profile = PlatformVendorProfile(
+        vendor_id=vendor.id,
+        business_name=business_name,
+        owner_name=name,
+        email=email,
+        phone="",
+        category="General",
+        address="",
+        description="Welcome to my online store powered by Digital Growth Studio.",
+    )
+    db.add(profile)
+
+    base_slug = slugify(name) or "store"
+    desired_slug = f"{base_slug}-{vendor_code.lower()}"
+    store = PlatformStore(
+        vendor_id=vendor.id,
+        store_name=business_name,
+        store_slug=desired_slug,
+        subdomain=f"{desired_slug}.digitalgrowthstudio.in",
+        status="active",
+        contact_email=email,
+    )
+    db.add(store)
+
+    app_config = PlatformVendorAppConfig(
+        vendor_id=vendor.id,
+        app_name=business_name,
+        package_id=f"in.digitalgrowthstudio.{desired_slug.replace('-', '_')}",
+        app_build_status="NOT_REQUESTED",
+    )
+    db.add(app_config)
+
+    storage_usage = PlatformStorageUsage(
+        vendor_id=vendor.id,
+        total_bytes_used=0,
+        image_bytes_used=0,
+        product_count=0,
+        limit_bytes=1073741824,
+    )
+    db.add(storage_usage)
+
+    plan_stmt = select(PlatformPlan).where(PlatformPlan.slug == "starter-store")
+    plan = (await db.execute(plan_stmt)).scalar_one_or_none()
+    now = datetime.now(timezone.utc)
+    if plan:
+        sub = PlatformSubscription(
+            vendor_id=vendor.id,
+            plan_id=plan.id,
+            status="trial",
+            starts_at=now,
+            expires_at=now + timedelta(days=14),
+            next_renewal_date=now + timedelta(days=14),
+        )
+        db.add(sub)
+
+    await db.commit()
+
+    token = create_platform_access_token({
+        "sub": str(user.id),
+        "email": user.email,
+        "role": user.role,
+        "vendor_id": str(vendor.id),
+        "vendor_code": vendor.vendor_code,
+    })
+
+    return PlatformTokenResponse(
+        access_token=token,
+        token_type="bearer",
+        user_id=user.id,
+        email=user.email,
+        name=user.name,
+        role=user.role,
+        vendor_id=vendor.id,
+        vendor_code=vendor.vendor_code,
+        store_slug=desired_slug,
     )
 
 

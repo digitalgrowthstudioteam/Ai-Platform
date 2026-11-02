@@ -2,6 +2,8 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import { signInWithPopup, GoogleAuthProvider } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 import { PlatformUser } from "./types";
 import { platformApi } from "./api";
 
@@ -9,6 +11,7 @@ interface PlatformAuthContextType {
   user: PlatformUser | null;
   loading: boolean;
   login: (email: string, pass: string) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
   register: (payload: any) => Promise<void>;
   logout: () => void;
   refreshUser: () => Promise<void>;
@@ -56,6 +59,26 @@ export function AppPlatformAuthProvider({ children }: { children: React.ReactNod
     }
   };
 
+  const loginWithGoogle = async () => {
+    setLoading(true);
+    try {
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: "select_account" });
+      const credential = await signInWithPopup(auth, provider);
+      const idToken = await credential.user.getIdToken();
+      await platformApi.googleLogin(idToken);
+      const profile = await platformApi.getMe();
+      setUser(profile);
+      if (profile.role === "SUPER_ADMIN") {
+        router.push("/app/admin");
+      } else {
+        router.push("/app/dashboard");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const register = async (payload: any) => {
     await platformApi.register(payload);
     const profile = await platformApi.getMe();
@@ -70,7 +93,7 @@ export function AppPlatformAuthProvider({ children }: { children: React.ReactNod
   };
 
   return (
-    <PlatformAuthContext.Provider value={{ user, loading, login, register, logout, refreshUser }}>
+    <PlatformAuthContext.Provider value={{ user, loading, login, loginWithGoogle, register, logout, refreshUser }}>
       {children}
     </PlatformAuthContext.Provider>
   );

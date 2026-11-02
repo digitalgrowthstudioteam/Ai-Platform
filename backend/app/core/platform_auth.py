@@ -5,6 +5,7 @@ Provides JWT token creation/verification, password hashing, and role dependencie
 import hashlib
 import os
 import secrets
+import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 from fastapi import Depends, HTTPException, status
@@ -78,7 +79,12 @@ async def get_current_platform_user(
     if not user_id_str:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token claims")
 
-    stmt = select(PlatformUser).where(PlatformUser.id == user_id_str)
+    try:
+        user_uuid = uuid.UUID(str(user_id_str))
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid user ID format")
+
+    stmt = select(PlatformUser).where(PlatformUser.id == user_uuid)
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
 

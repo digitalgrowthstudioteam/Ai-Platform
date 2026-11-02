@@ -6,7 +6,7 @@ import { usePlatformAuth } from "@/lib/app-platform/auth";
 import { Lock, Mail, Store, User, Phone, Tag, ArrowRight, AlertCircle, CheckCircle2 } from "lucide-react";
 
 export default function PlatformRegisterPage() {
-  const { register } = usePlatformAuth();
+  const { register, loginWithGoogle } = usePlatformAuth();
   const [formData, setFormData] = useState({
     business_name: "",
     owner_name: "",
@@ -17,7 +17,20 @@ export default function PlatformRegisterPage() {
     store_slug: "",
   });
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const handleGoogleSignUp = async () => {
+    setError(null);
+    setGoogleLoading(true);
+    try {
+      await loginWithGoogle();
+    } catch (err: any) {
+      setError(err.message || "Google Sign-in failed. Please try again.");
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -63,6 +76,35 @@ export default function PlatformRegisterPage() {
               <span>{error}</span>
             </div>
           )}
+
+          {/* Google 1-Click Registration */}
+          <button
+            type="button"
+            onClick={handleGoogleSignUp}
+            disabled={loading || googleLoading}
+            className="w-full mb-6 flex items-center justify-center gap-3 py-2.5 px-4 rounded-xl text-sm font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 shadow-xs transition-all disabled:opacity-50 hover:border-slate-400 cursor-pointer"
+          >
+            {googleLoading ? (
+              <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+                <path d="M17.64 9.205c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#4285F4" />
+                <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.938 5.481 18 9 18z" fill="#34A853" />
+                <path d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.59.102-1.17.282-1.71V4.958H.957A8.995 8.995 0 0 0 0 9c0 1.451.348 2.822.957 4.042l3.007-2.332z" fill="#FBBC05" />
+                <path d="M9 3.58c1.32 0 2.508.454 3.44 1.345l2.582-2.58C13.463.89 11.426 0 9 0 5.481 0 2.438 2.062.957 5.958L3.964 8.29C4.672 6.163 6.656 4.58 9 3.58z" fill="#EA4335" />
+              </svg>
+            )}
+            <span>{googleLoading ? "Connecting with Google..." : "Sign up with Google"}</span>
+          </button>
+
+          <div className="relative mb-6 flex items-center justify-center">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-slate-200" />
+            </div>
+            <div className="relative bg-white px-3 text-xs uppercase tracking-wider text-slate-400 font-medium">
+              or register with email
+            </div>
+          </div>
 
           {/* Membership Tier Banner */}
           <div className="mb-6 p-4 rounded-xl bg-blue-50/80 border border-blue-200">

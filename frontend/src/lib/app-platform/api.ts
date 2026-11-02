@@ -18,7 +18,15 @@ import {
   Addon,
 } from './types';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://digital-growth-studio-api.onrender.com';
+const getPlatformBaseUrl = (): string => {
+  if (typeof window !== 'undefined') {
+    if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      return 'https://digital-growth-studio-api.onrender.com';
+    }
+  }
+  const envUrl = process.env.NEXT_PUBLIC_API_URL || 'https://digital-growth-studio-api.onrender.com';
+  return envUrl.replace(/\/api\/v1\/?$/, '');
+};
 
 class PlatformApiClient {
   private getAuthHeader(): Record<string, string> {
@@ -28,7 +36,8 @@ class PlatformApiClient {
   }
 
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    const url = endpoint.startsWith('http') ? endpoint : `${API_BASE}${endpoint}`;
+    const baseUrl = getPlatformBaseUrl();
+    const url = endpoint.startsWith('http') ? endpoint : `${baseUrl}${endpoint}`;
     const headers = {
       'Content-Type': 'application/json',
       ...this.getAuthHeader(),
@@ -56,6 +65,17 @@ class PlatformApiClient {
     const res = await this.request<PlatformTokenResponse>('/api/v1/platform/auth/login', {
       method: 'POST',
       body: JSON.stringify(payload),
+    });
+    if (typeof window !== 'undefined' && res.access_token) {
+      localStorage.setItem('dgs_platform_token', res.access_token);
+    }
+    return res;
+  }
+
+  async googleLogin(idToken: string): Promise<PlatformTokenResponse> {
+    const res = await this.request<PlatformTokenResponse>('/api/v1/platform/auth/google-login', {
+      method: 'POST',
+      body: JSON.stringify({ id_token: idToken }),
     });
     if (typeof window !== 'undefined' && res.access_token) {
       localStorage.setItem('dgs_platform_token', res.access_token);
@@ -228,7 +248,8 @@ class PlatformApiClient {
       if (token) headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const res = await fetch(`${API_BASE}/api/v1/platform/vendor/upload`, {
+    const baseUrl = getPlatformBaseUrl();
+    const res = await fetch(`${baseUrl}/api/v1/platform/vendor/upload`, {
       method: 'POST',
       headers,
       body: formData,

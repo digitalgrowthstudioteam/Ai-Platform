@@ -21,6 +21,10 @@ class PlatformLoginRequest(BaseModel):
     password: str
 
 
+class PlatformGoogleLoginRequest(BaseModel):
+    id_token: str
+
+
 class PlatformTokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"

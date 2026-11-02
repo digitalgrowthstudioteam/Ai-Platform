@@ -24,6 +24,11 @@ from app.main import app
 
 @pytest.mark.asyncio
 async def test_platform_end_to_end_security_and_isolation():
+    from app.services.platform_seeder import seed_platform_database
+    from tests.conftest import test_sessionmaker
+    async with test_sessionmaker() as db_session:
+        await seed_platform_database(db_session)
+
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         # ──────────────────────────────────────────────
