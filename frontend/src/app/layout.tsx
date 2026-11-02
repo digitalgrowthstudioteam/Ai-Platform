@@ -29,6 +29,30 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={cn(inter.variable, "font-sans", geist.variable)}>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  var host = window.location.hostname;
+                  var parts = host.split('.');
+                  if (parts.length >= 3) {
+                    var sub = parts[0].toLowerCase();
+                    if (sub !== 'www' && sub !== 'app' && sub !== 'api' && sub !== 'admin' && sub !== 'platform' && sub !== 'localhost' && sub !== '127') {
+                      var path = window.location.pathname;
+                      if (!path.startsWith('/app/store/')) {
+                        var target = '/app/store/' + encodeURIComponent(sub) + (path === '/' ? '' : path) + window.location.search;
+                        window.location.replace(target);
+                      }
+                    }
+                  }
+                } catch(e) {}
+              })();
+            `,
+          }}
+        />
+      </head>
       <body>
         <GoogleAnalytics />
         <MetaPixel />

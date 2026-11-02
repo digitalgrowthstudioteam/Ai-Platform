@@ -29,6 +29,16 @@ export function getStoreRouteParams(params?: {
       if (pSlug && pSlug !== "placeholder") {
         slug = pSlug;
       }
+    } else {
+      // Look for subdomain e.g. dgs.digitalgrowthstudio.in
+      const hostname = window.location.hostname;
+      const hostParts = hostname.split(".");
+      if (hostParts.length >= 3) {
+        const sub = hostParts[0].toLowerCase();
+        if (!["www", "app", "api", "admin", "platform", "localhost", "127"].includes(sub)) {
+          slug = sub;
+        }
+      }
     }
 
     // Look for /products/{productId}
