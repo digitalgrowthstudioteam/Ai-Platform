@@ -30,6 +30,38 @@
         "destination": "/settings/admin/quotations/placeholder.html"
       },
       {
+        "source": "/app/store/*/products/**",
+        "destination": "/app/store/placeholder/products/sample.html"
+      },
+      {
+        "source": "/app/store/*/order/**",
+        "destination": "/app/store/placeholder/order/sample.html"
+      },
+      {
+        "source": "/app/store/*/cart/**",
+        "destination": "/app/store/placeholder/cart.html"
+      },
+      {
+        "source": "/app/store/*/cart",
+        "destination": "/app/store/placeholder/cart.html"
+      },
+      {
+        "source": "/app/store/*/checkout/**",
+        "destination": "/app/store/placeholder/checkout.html"
+      },
+      {
+        "source": "/app/store/*/checkout",
+        "destination": "/app/store/placeholder/checkout.html"
+      },
+      {
+        "source": "/app/store/*/account/**",
+        "destination": "/app/store/placeholder/account.html"
+      },
+      {
+        "source": "/app/store/*/account",
+        "destination": "/app/store/placeholder/account.html"
+      },
+      {
         "source": "/app/store/**",
         "destination": "/app/store/placeholder.html"
       }

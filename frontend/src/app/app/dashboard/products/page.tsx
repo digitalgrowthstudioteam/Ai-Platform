@@ -21,6 +21,8 @@ import {
   Upload,
   GripVertical,
   Loader2,
+  Eye,
+  ExternalLink,
 } from "lucide-react";
 
 interface ManagedImage {
@@ -45,6 +47,7 @@ export default function VendorProductsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [selectedCat, setSelectedCat] = useState<string>("");
+  const [storeSlug, setStoreSlug] = useState<string>("abc");
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -79,12 +82,16 @@ export default function VendorProductsPage() {
 
   const loadData = async () => {
     try {
-      const [prods, cats] = await Promise.all([
+      const [prods, cats, me] = await Promise.all([
         platformApi.getProducts({ category_id: selectedCat || undefined }),
         platformApi.getCategories(),
+        platformApi.getMe().catch(() => null),
       ]);
       setProducts(prods);
       setCategories(cats);
+      if (me?.store_slug) {
+        setStoreSlug(me.store_slug);
+      }
     } catch (e: any) {
       console.error(e);
     } finally {
@@ -503,7 +510,13 @@ export default function VendorProductsPage() {
                             )}
                           </div>
                           <div>
-                            <p className="font-semibold text-slate-900 flex items-center gap-1.5 flex-wrap">
+                            <a
+                              href={`/app/store/${storeSlug}/products/${p.id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="font-semibold text-slate-900 hover:text-blue-600 transition-colors flex items-center gap-1.5 flex-wrap"
+                              title="Open Live Product Page"
+                            >
                               {p.name}
                               {p.is_featured && <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />}
                               {p.has_variants && p.variants && p.variants.length > 0 && (
@@ -511,7 +524,8 @@ export default function VendorProductsPage() {
                                   {p.variants.length} Variants
                                 </span>
                               )}
-                            </p>
+                              <ExternalLink className="w-3 h-3 text-slate-400 opacity-60 hover:opacity-100" />
+                            </a>
                             <p className="text-[11px] text-slate-400 truncate max-w-xs">{p.description}</p>
                           </div>
                         </div>
@@ -540,15 +554,26 @@ export default function VendorProductsPage() {
                       </td>
                       <td className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end gap-1">
+                          <a
+                            href={`/app/store/${storeSlug}/products/${p.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                            title="View Live Product Page"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </a>
                           <button
                             onClick={() => openEditModal(p)}
-                            className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
+                            className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg cursor-pointer"
+                            title="Edit Product"
                           >
                             <Edit2 className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => handleDelete(p.id)}
-                            className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg"
+                            className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer"
+                            title="Delete Product"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>

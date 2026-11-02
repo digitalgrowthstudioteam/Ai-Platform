@@ -7,6 +7,7 @@ import { platformApi } from "@/lib/app-platform/api";
 import { useVendorCart } from "@/lib/app-platform/cart-store";
 import StoreHeader from "@/components/app-platform/store/StoreHeader";
 import StoreFooter from "@/components/app-platform/store/StoreFooter";
+import { getStoreRouteParams } from "@/lib/app-platform/store-route-helper";
 import {
   CreditCard,
   Banknote,
@@ -22,7 +23,7 @@ import {
 export default function CheckoutClient() {
   const params = useParams();
   const router = useRouter();
-  const slug = (params?.slug as string) || "abc";
+  const [slug, setSlug] = useState<string>(() => getStoreRouteParams(params as any).slug);
 
   const [config, setConfig] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -43,9 +44,12 @@ export default function CheckoutClient() {
   const [orderNotes, setOrderNotes] = useState("");
 
   useEffect(() => {
+    const resolvedSlug = getStoreRouteParams(params as any).slug;
+    setSlug(resolvedSlug);
+
     async function loadConfig() {
       try {
-        const cfg = await platformApi.getPublicStoreConfig(slug);
+        const cfg = await platformApi.getPublicStoreConfig(resolvedSlug);
         setConfig(cfg);
         if (cfg.cod_enabled === false && cfg.razorpay_enabled) {
           setPaymentMethod("ONLINE");
@@ -57,7 +61,7 @@ export default function CheckoutClient() {
       }
     }
 
-    if (slug) {
+    if (resolvedSlug) {
       loadConfig();
     }
 

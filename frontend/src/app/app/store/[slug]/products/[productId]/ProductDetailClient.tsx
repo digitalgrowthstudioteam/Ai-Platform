@@ -7,6 +7,7 @@ import { platformApi } from "@/lib/app-platform/api";
 import { useVendorCart } from "@/lib/app-platform/cart-store";
 import StoreHeader from "@/components/app-platform/store/StoreHeader";
 import StoreFooter from "@/components/app-platform/store/StoreFooter";
+import { getStoreRouteParams } from "@/lib/app-platform/store-route-helper";
 import {
   ShoppingCart,
   Zap,
@@ -23,8 +24,9 @@ import {
 export default function ProductDetailClient() {
   const params = useParams();
   const router = useRouter();
-  const slug = (params?.slug as string) || "abc";
-  const productId = (params?.productId as string) || "";
+
+  const [activeSlug, setActiveSlug] = useState<string>(() => getStoreRouteParams(params as any).slug);
+  const [activeProductId, setActiveProductId] = useState<string>(() => getStoreRouteParams(params as any).productId);
 
   const [product, setProduct] = useState<any>(null);
   const [config, setConfig] = useState<any>(null);
@@ -34,14 +36,24 @@ export default function ProductDetailClient() {
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
 
-  const { addItem } = useVendorCart(slug);
+  const { addItem } = useVendorCart(activeSlug);
 
   useEffect(() => {
     async function loadData() {
+      const { slug: s, productId: pId } = getStoreRouteParams(params as any);
+      setActiveSlug(s);
+      setActiveProductId(pId);
+
+      if (!s || !pId || pId === "sample") {
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
       try {
         const [prod, cfg] = await Promise.all([
-          platformApi.getPublicStoreProduct(slug, productId),
-          platformApi.getPublicStoreConfig(slug),
+          platformApi.getPublicStoreProduct(s, pId),
+          platformApi.getPublicStoreConfig(s),
         ]);
         setProduct(prod);
         setConfig(cfg);
@@ -68,10 +80,11 @@ export default function ProductDetailClient() {
         setLoading(false);
       }
     }
-    if (slug && productId) {
-      loadData();
-    }
-  }, [slug, productId]);
+    loadData();
+  }, [params]);
+
+  const slug = activeSlug;
+  const productId = activeProductId;
 
   if (loading) {
     return (

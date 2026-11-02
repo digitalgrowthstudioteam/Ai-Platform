@@ -240,10 +240,10 @@ async def get_store_products(
 @router.get("/{slug}/products/{product_id}", response_model=PublicProductItem)
 async def get_store_product_detail(
     slug: str,
-    product_id: uuid.UUID,
+    product_id: str,
     db: AsyncSession = Depends(get_db),
 ):
-    """Fetch details of a single product."""
+    """Fetch details of a single product by UUID or slug."""
     store = await resolve_active_store(slug, db)
 
     from app.models.platform.subscription import PlatformSubscription
@@ -256,10 +256,21 @@ async def get_store_product_detail(
     if sub and sub.status.upper() in ["EXPIRED", "PAST_DUE", "CANCELLED", "SUSPENDED", "UNPAID"]:
         raise HTTPException(status_code=403, detail="Store catalog is paused due to inactive subscription.")
 
+    prod_uuid = None
+    try:
+        prod_uuid = uuid.UUID(product_id)
+    except Exception:
+        pass
+
+    if prod_uuid:
+        condition = (PlatformProduct.id == prod_uuid)
+    else:
+        condition = (PlatformProduct.slug == product_id)
+
     stmt = (
         select(PlatformProduct)
         .where(
-            PlatformProduct.id == product_id,
+            condition,
             PlatformProduct.vendor_id == store.vendor_id,
         )
         .options(

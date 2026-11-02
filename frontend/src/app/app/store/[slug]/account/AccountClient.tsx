@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { platformApi } from "@/lib/app-platform/api";
 import StoreHeader from "@/components/app-platform/store/StoreHeader";
 import StoreFooter from "@/components/app-platform/store/StoreFooter";
+import { getStoreRouteParams } from "@/lib/app-platform/store-route-helper";
 import {
   User,
   Package,
@@ -20,7 +21,7 @@ import {
 
 export default function AccountClient() {
   const params = useParams();
-  const slug = (params?.slug as string) || "abc";
+  const [slug, setSlug] = useState<string>(() => getStoreRouteParams(params as any).slug);
 
   const [config, setConfig] = useState<any>(null);
   const [loadingConfig, setLoadingConfig] = useState(true);
@@ -30,9 +31,12 @@ export default function AccountClient() {
   const [hasSearched, setHasSearched] = useState(false);
 
   useEffect(() => {
+    const resolvedSlug = getStoreRouteParams(params as any).slug;
+    setSlug(resolvedSlug);
+
     async function loadConfig() {
       try {
-        const cfg = await platformApi.getPublicStoreConfig(slug);
+        const cfg = await platformApi.getPublicStoreConfig(resolvedSlug);
         setConfig(cfg);
       } catch (e) {
         console.error("Failed to load store config:", e);
@@ -40,7 +44,7 @@ export default function AccountClient() {
         setLoadingConfig(false);
       }
     }
-    if (slug) {
+    if (resolvedSlug) {
       loadConfig();
     }
 

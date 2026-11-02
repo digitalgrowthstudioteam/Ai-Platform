@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { platformApi } from "@/lib/app-platform/api";
 import StoreHeader from "@/components/app-platform/store/StoreHeader";
 import StoreFooter from "@/components/app-platform/store/StoreFooter";
+import { getStoreRouteParams } from "@/lib/app-platform/store-route-helper";
 import {
   CheckCircle2,
   Package,
@@ -23,8 +24,8 @@ import {
 
 export default function OrderDetailClient() {
   const params = useParams();
-  const slug = (params?.slug as string) || "abc";
-  const orderId = (params?.orderId as string) || "";
+  const [slug, setSlug] = useState<string>(() => getStoreRouteParams(params as any).slug);
+  const [orderId, setOrderId] = useState<string>(() => getStoreRouteParams(params as any).orderId);
 
   const [order, setOrder] = useState<any>(null);
   const [config, setConfig] = useState<any>(null);
@@ -32,11 +33,19 @@ export default function OrderDetailClient() {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
+    const { slug: s, orderId: oId } = getStoreRouteParams(params as any);
+    setSlug(s);
+    setOrderId(oId);
+
     async function loadData() {
+      if (!s || !oId || oId === "sample") {
+        setLoading(false);
+        return;
+      }
       try {
         const [ord, cfg] = await Promise.all([
-          platformApi.getPublicStoreOrder(slug, orderId),
-          platformApi.getPublicStoreConfig(slug),
+          platformApi.getPublicStoreOrder(s, oId),
+          platformApi.getPublicStoreConfig(s),
         ]);
         setOrder(ord);
         setConfig(cfg);
@@ -46,10 +55,8 @@ export default function OrderDetailClient() {
         setLoading(false);
       }
     }
-    if (slug && orderId) {
-      loadData();
-    }
-  }, [slug, orderId]);
+    loadData();
+  }, [params]);
 
   const handleCopy = () => {
     if (order?.order_number) {

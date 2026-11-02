@@ -7,6 +7,7 @@ import { platformApi } from "@/lib/app-platform/api";
 import { useVendorCart } from "@/lib/app-platform/cart-store";
 import StoreHeader from "@/components/app-platform/store/StoreHeader";
 import StoreFooter from "@/components/app-platform/store/StoreFooter";
+import { getStoreRouteParams } from "@/lib/app-platform/store-route-helper";
 import {
   Store,
   ShoppingCart,
@@ -20,7 +21,7 @@ import {
 export default function StorePreviewClient() {
   const params = useParams();
   const router = useRouter();
-  const slug = (params?.slug as string) || "abc";
+  const [slug, setSlug] = useState<string>(() => getStoreRouteParams(params as any).slug);
 
   const [config, setConfig] = useState<any>(null);
   const [banners, setBanners] = useState<any[]>([]);
@@ -36,15 +37,18 @@ export default function StorePreviewClient() {
   const { addItem } = useVendorCart(slug);
 
   useEffect(() => {
+    const resolvedSlug = getStoreRouteParams(params as any).slug;
+    setSlug(resolvedSlug);
+
     async function loadStore() {
       setLoading(true);
       setError(null);
       try {
         const [cfg, bans, cats, prods] = await Promise.all([
-          platformApi.getPublicStoreConfig(slug),
-          platformApi.getPublicStoreBanners(slug),
-          platformApi.getPublicStoreCategories(slug),
-          platformApi.getPublicStoreProducts(slug),
+          platformApi.getPublicStoreConfig(resolvedSlug),
+          platformApi.getPublicStoreBanners(resolvedSlug),
+          platformApi.getPublicStoreCategories(resolvedSlug),
+          platformApi.getPublicStoreProducts(resolvedSlug),
         ]);
         setConfig(cfg);
         setBanners(bans);
@@ -56,10 +60,10 @@ export default function StorePreviewClient() {
         setLoading(false);
       }
     }
-    if (slug) {
+    if (resolvedSlug) {
       loadStore();
     }
-  }, [slug]);
+  }, [params]);
 
   const handleAddToCart = (e: React.MouseEvent, p: any) => {
     e.preventDefault();
@@ -205,7 +209,8 @@ export default function StorePreviewClient() {
               return (
                 <div
                   key={p.id}
-                  className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs hover:border-slate-300 transition-all flex flex-col justify-between group"
+                  onClick={() => router.push(`/app/store/${slug}/products/${p.id}`)}
+                  className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs hover:border-blue-400 hover:shadow-md transition-all flex flex-col justify-between group cursor-pointer"
                 >
                   <Link href={`/app/store/${slug}/products/${p.id}`} className="block">
                     <div className="relative aspect-square w-full bg-slate-100 overflow-hidden">

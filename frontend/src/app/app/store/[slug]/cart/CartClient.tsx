@@ -7,6 +7,7 @@ import { platformApi } from "@/lib/app-platform/api";
 import { useVendorCart } from "@/lib/app-platform/cart-store";
 import StoreHeader from "@/components/app-platform/store/StoreHeader";
 import StoreFooter from "@/components/app-platform/store/StoreFooter";
+import { getStoreRouteParams } from "@/lib/app-platform/store-route-helper";
 import {
   ShoppingCart,
   Trash2,
@@ -22,7 +23,7 @@ import {
 export default function CartClient() {
   const params = useParams();
   const router = useRouter();
-  const slug = (params?.slug as string) || "abc";
+  const [slug, setSlug] = useState<string>(() => getStoreRouteParams(params as any).slug);
 
   const [config, setConfig] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -30,9 +31,12 @@ export default function CartClient() {
     useVendorCart(slug);
 
   useEffect(() => {
+    const resolvedSlug = getStoreRouteParams(params as any).slug;
+    setSlug(resolvedSlug);
+
     async function loadConfig() {
       try {
-        const cfg = await platformApi.getPublicStoreConfig(slug);
+        const cfg = await platformApi.getPublicStoreConfig(resolvedSlug);
         setConfig(cfg);
       } catch (e) {
         console.error("Failed to load store config:", e);
@@ -40,10 +44,10 @@ export default function CartClient() {
         setLoading(false);
       }
     }
-    if (slug) {
+    if (resolvedSlug) {
       loadConfig();
     }
-  }, [slug]);
+  }, [params]);
 
   if (loading || !isLoaded) {
     return (
