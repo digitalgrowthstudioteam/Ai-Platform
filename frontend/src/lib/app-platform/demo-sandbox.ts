@@ -14,6 +14,7 @@ import {
   OrderItem,
   Customer,
   StoreSettings,
+  VendorProfile,
   AppConfig,
 } from './types';
 
@@ -398,6 +399,31 @@ class DemoSandboxStore {
   updateStore(payload: Partial<StoreSettings>): StoreSettings {
     this.storeSettings = { ...this.storeSettings, ...payload };
     return { ...this.storeSettings };
+  }
+
+  // Profile
+  getProfile(): VendorProfile {
+    return {
+      business_name: this.storeSettings.store_name,
+      owner_name: "Demo Store Owner",
+      email: "demo@digitalgrowthstudio.in",
+      phone: "+91 9876543210",
+      category: "Dresses & Apparel",
+      brand_name: "Glow & Style",
+      brand_name_locked: true,
+      whatsapp_number: "+91 9876543210",
+      whatsapp_business_name: "Glow & Style Official",
+      business_phone: "+91 9876543210",
+      has_payment_gateway: "Yes",
+      needs_delivery_help: "No",
+      address: "123 Fashion Blvd, Suite 400, Mumbai, Maharashtra 400001",
+      description: this.storeSettings.description,
+      logo_url: this.storeSettings.logo_url,
+    };
+  }
+
+  updateProfile(payload: Partial<VendorProfile>): VendorProfile {
+    return { ...this.getProfile(), ...payload };
   }
 
   // App Config

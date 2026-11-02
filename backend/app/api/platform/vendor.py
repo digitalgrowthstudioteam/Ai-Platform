@@ -194,7 +194,14 @@ async def update_vendor_profile(
     if not profile:
         raise HTTPException(status_code=404, detail="Profile record not found")
 
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    dump = payload.model_dump(exclude_unset=True)
+    if profile.brand_name and "brand_name" in dump and dump["brand_name"] != profile.brand_name:
+        raise HTTPException(
+            status_code=400,
+            detail="Brand Name is permanent and cannot be changed once selected."
+        )
+
+    for field, value in dump.items():
         setattr(profile, field, value)
 
     await db.commit()

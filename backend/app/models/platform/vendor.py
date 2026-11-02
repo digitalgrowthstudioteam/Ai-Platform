@@ -53,6 +53,13 @@ class PlatformVendorProfile(BaseModel):
     gst_number: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     logo_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     website: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    brand_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    brand_name_locked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    whatsapp_number: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    whatsapp_business_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    business_phone: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    has_payment_gateway: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, default="No")
+    needs_delivery_help: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, default="No")
 
     vendor: Mapped["PlatformVendor"] = relationship("PlatformVendor", back_populates="profile")
 

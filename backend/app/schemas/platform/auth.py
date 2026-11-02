@@ -7,12 +7,24 @@ from pydantic import BaseModel, EmailStr, Field
 
 
 class PlatformRegisterRequest(BaseModel):
+    # Slide 1: Owner Details
+    owner_name: str
     email: EmailStr
     password: str = Field(min_length=6)
-    owner_name: str
+    whatsapp_number: Optional[str] = None
+    phone: Optional[str] = None
+
+    # Slide 2: Business Details
     business_name: str
-    phone: str
+    business_phone: Optional[str] = None
     category: str = "General"
+    whatsapp_business_name: Optional[str] = None
+    brand_name: Optional[str] = None
+    description: Optional[str] = None
+    logo_url: Optional[str] = None
+    address: Optional[str] = None
+    has_payment_gateway: Optional[str] = "No"
+    needs_delivery_help: Optional[str] = "No"
     store_slug: Optional[str] = None
 
 

@@ -152,6 +152,28 @@ export interface Customer {
   created_at: string;
 }
 
+export interface VendorProfile {
+  id?: string;
+  vendor_id?: string;
+  business_name: string;
+  owner_name: string;
+  email: string;
+  phone: string;
+  category: string;
+  address?: string;
+  description?: string;
+  gst_number?: string;
+  logo_url?: string;
+  website?: string;
+  brand_name?: string;
+  brand_name_locked?: boolean;
+  whatsapp_number?: string;
+  whatsapp_business_name?: string;
+  business_phone?: string;
+  has_payment_gateway?: string;
+  needs_delivery_help?: string;
+}
+
 export interface StoreSettings {
   id: string;
   vendor_id: string;

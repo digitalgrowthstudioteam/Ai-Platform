@@ -45,6 +45,12 @@ class VendorProfileUpdateRequest(BaseModel):
     gst_number: Optional[str] = None
     logo_url: Optional[str] = None
     website: Optional[str] = None
+    brand_name: Optional[str] = None
+    whatsapp_number: Optional[str] = None
+    whatsapp_business_name: Optional[str] = None
+    business_phone: Optional[str] = None
+    has_payment_gateway: Optional[str] = None
+    needs_delivery_help: Optional[str] = None
 
 
 class VendorAppConfigUpdateRequest(BaseModel):

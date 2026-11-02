@@ -3,19 +3,68 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { usePlatformAuth } from "@/lib/app-platform/auth";
-import { Lock, Mail, Store, User, Phone, Tag, ArrowRight, AlertCircle, CheckCircle2 } from "lucide-react";
+import {
+  Lock,
+  Mail,
+  Store,
+  User,
+  Phone,
+  Tag,
+  ArrowRight,
+  ArrowLeft,
+  AlertCircle,
+  CheckCircle2,
+  Sparkles,
+  Smartphone,
+  ShieldCheck,
+  Building2,
+  MapPin,
+  FileText,
+  CreditCard,
+  Truck,
+  Image as ImageIcon,
+} from "lucide-react";
+
+const COUNTRY_CODES = [
+  { code: "+91", country: "India", flag: "🇮🇳" },
+  { code: "+1", country: "USA / Canada", flag: "🇺🇸" },
+  { code: "+44", country: "United Kingdom", flag: "🇬🇧" },
+  { code: "+971", country: "UAE", flag: "🇦🇪" },
+  { code: "+65", country: "Singapore", flag: "🇸🇬" },
+  { code: "+61", country: "Australia", flag: "🇦🇺" },
+  { code: "+966", country: "Saudi Arabia", flag: "🇸🇦" },
+  { code: "+49", country: "Germany", flag: "🇩🇪" },
+  { code: "+33", country: "France", flag: "🇫🇷" },
+];
 
 export default function PlatformRegisterPage() {
   const { register, loginWithGoogle } = usePlatformAuth();
+
+  // Slide state: 1 for Owner/Credentials, 2 for Business Details
+  const [slide, setSlide] = useState<1 | 2>(1);
+
   const [formData, setFormData] = useState({
-    business_name: "",
+    // Slide 1: Owner Details
     owner_name: "",
     email: "",
-    phone: "",
     password: "",
-    category: "General Retail",
+    country_code: "+91",
+    whatsapp_number: "",
+
+    // Slide 2: Business Details
+    business_name: "",
+    business_phone: "",
+    category: "Clothing & Apparel",
+    whatsapp_business_name: "",
+    brand_name: "",
+    description: "",
+    logo_url: "",
+    address: "",
+    has_payment_gateway: "No" as "Yes" | "No",
+    needs_delivery_help: "No" as "Yes" | "No",
     store_slug: "",
   });
+
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,26 +81,119 @@ export default function PlatformRegisterPage() {
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+  ) => {
     const { name, value } = e.target;
     setFormData((prev) => {
       const updated = { ...prev, [name]: value };
-      if (name === "business_name" && !prev.store_slug) {
-        updated.store_slug = value.toLowerCase().replace(/[^a-z0-9]/g, "-").replace(/-+/g, "-");
+      // Auto-suggest Brand Name & Subdomain if Business Name is typed
+      if (name === "business_name") {
+        if (!prev.brand_name) {
+          updated.brand_name = value;
+        }
+        if (!prev.whatsapp_business_name) {
+          updated.whatsapp_business_name = value ? `${value} Official` : "";
+        }
+        if (!prev.store_slug) {
+          updated.store_slug = value
+            .toLowerCase()
+            .replace(/[^a-z0-9]/g, "-")
+            .replace(/-+/g, "-")
+            .replace(/^-|-$/g, "");
+        }
+      }
+      if (name === "brand_name" && !prev.store_slug) {
+        updated.store_slug = value
+          .toLowerCase()
+          .replace(/[^a-z0-9]/g, "-")
+          .replace(/-+/g, "-")
+          .replace(/^-|-$/g, "");
       }
       return updated;
     });
   };
 
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        setFormData((prev) => ({ ...prev, logo_url: event.target?.result as string }));
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleNextToSlide2 = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    if (!formData.owner_name.trim()) {
+      setError("Please provide the Owner's Full Name.");
+      return;
+    }
+    if (!formData.email.trim()) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+    if (!formData.password || formData.password.length < 6) {
+      setError("Password must be at least 6 characters.");
+      return;
+    }
+    if (!formData.whatsapp_number.trim()) {
+      setError("Please enter your WhatsApp Number for order updates.");
+      return;
+    }
+
+    setSlide(2);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    if (!formData.business_name.trim()) {
+      setError("Please enter your Business / Store Name.");
+      return;
+    }
+    if (!formData.brand_name.trim()) {
+      setError("Please enter your Brand Name (will be locked once selected).");
+      return;
+    }
+    if (!formData.store_slug.trim()) {
+      setError("Please enter your Desired Store Subdomain.");
+      return;
+    }
+
     setLoading(true);
+
+    const fullWhatsappNumber = `${formData.country_code} ${formData.whatsapp_number.trim()}`;
+    const payload = {
+      owner_name: formData.owner_name.trim(),
+      email: formData.email.toLowerCase().trim(),
+      password: formData.password,
+      whatsapp_number: fullWhatsappNumber,
+      phone: fullWhatsappNumber,
+      business_name: formData.business_name.trim(),
+      business_phone: formData.business_phone.trim() || fullWhatsappNumber,
+      category: formData.category,
+      whatsapp_business_name: formData.whatsapp_business_name.trim() || formData.brand_name.trim(),
+      brand_name: formData.brand_name.trim(),
+      description: formData.description.trim() || undefined,
+      logo_url: formData.logo_url.trim() || undefined,
+      address: formData.address.trim() || undefined,
+      has_payment_gateway: formData.has_payment_gateway,
+      needs_delivery_help: formData.needs_delivery_help,
+      store_slug: formData.store_slug.trim(),
+    };
+
     try {
-      await register(formData);
+      await register(payload);
     } catch (err: any) {
       setError(err.message || "Registration failed. Please check your details.");
-    } finally {
       setLoading(false);
     }
   };
@@ -59,96 +201,95 @@ export default function PlatformRegisterPage() {
   return (
     <div className="flex-1 flex flex-col justify-center items-center py-12 px-4 sm:px-6 lg:px-8 bg-slate-50">
       <div className="sm:mx-auto sm:w-full sm:max-w-xl text-center">
-        <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-blue-600 text-white font-bold text-2xl shadow-sm mb-4">
+        <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-blue-600 text-white font-bold text-2xl shadow-sm mb-4">
           D
         </div>
-        <h2 className="text-2xl font-bold tracking-tight text-slate-900">Launch Your Online Store & Branded Android App</h2>
-        <p className="mt-2 text-sm text-slate-600">
-          Join Digital Growth Studio’s multi-vendor platform. Create your store in 60 seconds.
+        <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
+          Launch Your Branded Android App
+        </h2>
+        <p className="mt-2 text-xs sm:text-sm text-slate-600 max-w-md mx-auto leading-relaxed">
+          Get your customized mobile shopping app and online storefront in 2 simple steps.
+        </p>
+
+        {/* Multi-Step Indicator Bar */}
+        <div className="mt-6 flex items-center justify-center gap-2 max-w-xs mx-auto">
+          <div
+            className={`flex-1 h-1.5 rounded-full transition-all ${
+              slide === 1 ? "bg-blue-600" : "bg-emerald-500"
+            }`}
+          />
+          <div
+            className={`flex-1 h-1.5 rounded-full transition-all ${
+              slide === 2 ? "bg-blue-600" : "bg-slate-200"
+            }`}
+          />
+        </div>
+        <p className="mt-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+          {slide === 1 ? "Step 1 of 2: Owner & Account Setup" : "Step 2 of 2: Business & App Details"}
         </p>
       </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-xl">
-        <div className="bg-white py-8 px-6 shadow-sm border border-slate-200 rounded-2xl sm:px-10">
+      <div className="mt-6 sm:mx-auto sm:w-full sm:max-w-xl">
+        <div className="bg-white py-8 px-6 shadow-sm border border-slate-200 rounded-3xl sm:px-10">
           {error && (
-            <div className="mb-6 p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-sm flex items-start gap-2.5">
+            <div className="mb-6 p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs sm:text-sm flex items-start gap-2.5">
               <AlertCircle className="w-5 h-5 shrink-0 mt-0.5 text-rose-600" />
               <span>{error}</span>
             </div>
           )}
 
-          {/* Google 1-Click Registration */}
-          <button
-            type="button"
-            onClick={handleGoogleSignUp}
-            disabled={loading || googleLoading}
-            className="w-full mb-6 flex items-center justify-center gap-3 py-2.5 px-4 rounded-xl text-sm font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 shadow-xs transition-all disabled:opacity-50 hover:border-slate-400 cursor-pointer"
-          >
-            {googleLoading ? (
-              <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
-                <path d="M17.64 9.205c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#4285F4" />
-                <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.938 5.481 18 9 18z" fill="#34A853" />
-                <path d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.59.102-1.17.282-1.71V4.958H.957A8.995 8.995 0 0 0 0 9c0 1.451.348 2.822.957 4.042l3.007-2.332z" fill="#FBBC05" />
-                <path d="M9 3.58c1.32 0 2.508.454 3.44 1.345l2.582-2.58C13.463.89 11.426 0 9 0 5.481 0 2.438 2.062.957 5.958L3.964 8.29C4.672 6.163 6.656 4.58 9 3.58z" fill="#EA4335" />
-              </svg>
-            )}
-            <span>{googleLoading ? "Connecting with Google..." : "Sign up with Google"}</span>
-          </button>
-
-          <div className="relative mb-6 flex items-center justify-center">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-slate-200" />
-            </div>
-            <div className="relative bg-white px-3 text-xs uppercase tracking-wider text-slate-400 font-medium">
-              or register with email
-            </div>
-          </div>
-
-          {/* Membership Tier Banner */}
-          <div className="mb-6 p-4 rounded-xl bg-blue-50/80 border border-blue-200">
-            <div className="flex items-center justify-between">
+          {/* ======================================================== */}
+          {/* SLIDE 1: OWNER FULL NAME, EMAIL, PASSWORD, WHATSAPP */}
+          {/* ======================================================== */}
+          {slide === 1 && (
+            <form onSubmit={handleNextToSlide2} className="space-y-5">
+              {/* Optional 1-Click Google Sign Up */}
               <div>
-                <span className="text-xs font-bold uppercase tracking-wider text-blue-700">Initial Membership</span>
-                <h4 className="text-base font-bold text-slate-900 mt-0.5">Starter Store Plan</h4>
-              </div>
-              <div className="text-right">
-                <p className="text-lg font-bold text-blue-700">₹499<span className="text-xs font-normal text-slate-500">/mo</span></p>
-                <p className="text-[11px] text-slate-500">+ ₹2,000 one-time setup</p>
-              </div>
-            </div>
-            <ul className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-600">
-              <li className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Branded Online Storefront</li>
-              <li className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Dedicated Store Subdomain</li>
-              <li className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Android Shopping App Config</li>
-              <li className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> 1GB High-Speed Cloud Storage CDN</li>
-            </ul>
-          </div>
+                <button
+                  type="button"
+                  onClick={handleGoogleSignUp}
+                  disabled={loading || googleLoading}
+                  className="w-full flex items-center justify-center gap-3 py-2.5 px-4 rounded-xl text-sm font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 shadow-xs transition-all disabled:opacity-50 hover:border-slate-400 cursor-pointer"
+                >
+                  {googleLoading ? (
+                    <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+                      <path
+                        d="M17.64 9.205c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"
+                        fill="#4285F4"
+                      />
+                      <path
+                        d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.938 5.481 18 9 18z"
+                        fill="#34A853"
+                      />
+                      <path
+                        d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.59.102-1.17.282-1.71V4.958H.957A8.995 8.995 0 0 0 0 9c0 1.451.348 2.822.957 4.042l3.007-2.332z"
+                        fill="#FBBC05"
+                      />
+                      <path
+                        d="M9 3.58c1.32 0 2.508.454 3.44 1.345l2.582-2.58C13.463.89 11.426 0 9 0 5.481 0 2.438 2.062.957 5.958L3.964 8.29C4.672 6.163 6.656 4.58 9 3.58z"
+                        fill="#EA4335"
+                      />
+                    </svg>
+                  )}
+                  <span>{googleLoading ? "Connecting with Google..." : "Fast sign-up with Google"}</span>
+                </button>
 
-          <form className="space-y-4" onSubmit={handleSubmit}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Business / Store Name
-                </label>
-                <div className="relative">
-                  <Store className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
-                  <input
-                    type="text"
-                    required
-                    name="business_name"
-                    value={formData.business_name}
-                    onChange={handleChange}
-                    placeholder="ABC Fashion"
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                <div className="relative my-5 flex items-center justify-center">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-slate-200" />
+                  </div>
+                  <div className="relative bg-white px-3 text-[11px] uppercase tracking-wider text-slate-400 font-bold">
+                    or fill owner credentials
+                  </div>
                 </div>
               </div>
 
+              {/* Owner Full Name */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Owner Full Name
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Owner Full Name <span className="text-rose-500">*</span>
                 </label>
                 <div className="relative">
                   <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
@@ -158,17 +299,16 @@ export default function PlatformRegisterPage() {
                     name="owner_name"
                     value={formData.owner_name}
                     onChange={handleChange}
-                    placeholder="Ananya Sharma"
+                    placeholder="e.g. Ananya Sharma"
                     className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
               </div>
-            </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Email Address */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Email Address
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Email Address <span className="text-rose-500">*</span>
                 </label>
                 <div className="relative">
                   <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
@@ -178,35 +318,19 @@ export default function PlatformRegisterPage() {
                     name="email"
                     value={formData.email}
                     onChange={handleChange}
-                    placeholder="vendor@example.com"
+                    placeholder="e.g. ananya@mybrand.com"
                     className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Used to log in to your store portal and receive order confirmations.
+                </p>
               </div>
 
+              {/* Password */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Phone Number
-                </label>
-                <div className="relative">
-                  <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
-                  <input
-                    type="tel"
-                    required
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleChange}
-                    placeholder="+91 9876543210"
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Password
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Create Portal Password <span className="text-rose-500">*</span>
                 </label>
                 <div className="relative">
                   <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
@@ -217,73 +341,365 @@ export default function PlatformRegisterPage() {
                     name="password"
                     value={formData.password}
                     onChange={handleChange}
-                    placeholder="••••••••"
+                    placeholder="•••••••• (Min 6 characters)"
                     className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
               </div>
 
+              {/* WhatsApp Number with Country Code */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Business Category
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  WhatsApp Number (with Country Code) <span className="text-rose-500">*</span>
                 </label>
-                <div className="relative">
-                  <Tag className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
+                <div className="flex gap-2">
+                  <select
+                    name="country_code"
+                    value={formData.country_code}
+                    onChange={handleChange}
+                    className="w-36 px-2.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    {COUNTRY_CODES.map((c) => (
+                      <option key={`${c.code}-${c.country}`} value={c.code}>
+                        {c.flag} {c.code} ({c.country})
+                      </option>
+                    ))}
+                  </select>
+                  <div className="relative flex-1">
+                    <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
+                    <input
+                      type="tel"
+                      required
+                      name="whatsapp_number"
+                      value={formData.whatsapp_number}
+                      onChange={handleChange}
+                      placeholder="9876543210"
+                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Default: India (+91). For real-time WhatsApp order alerts & customer chat.
+                </p>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full mt-6 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-xs transition-colors cursor-pointer"
+              >
+                Continue to Business Details
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </form>
+          )}
+
+          {/* ======================================================== */}
+          {/* SLIDE 2: BUSINESS & STORE DETAILS */}
+          {/* ======================================================== */}
+          {slide === 2 && (
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Business/Store Name */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Business / Store Name <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <Store className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
+                    <input
+                      type="text"
+                      required
+                      name="business_name"
+                      value={formData.business_name}
+                      onChange={handleChange}
+                      placeholder="e.g. ABC Fashion"
+                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Brand Name (Permanent Lock) */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      Brand Name <span className="text-rose-500">*</span>
+                    </label>
+                    <span className="text-[10px] bg-amber-50 text-amber-800 border border-amber-200 px-1.5 py-0.5 rounded font-bold flex items-center gap-1">
+                      <Lock className="w-2.5 h-2.5" /> Permanent
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <Tag className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
+                    <input
+                      type="text"
+                      required
+                      name="brand_name"
+                      value={formData.brand_name}
+                      onChange={handleChange}
+                      placeholder="e.g. ABC Luxe"
+                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-amber-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <p className="text-[10px] text-amber-700 mt-1">
+                    Cannot be changed once selected. Appears on your Android app build.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Business Number (Website support) */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Business Number <span className="text-[11px] text-slate-400 font-normal">(shown on website)</span>
+                  </label>
+                  <div className="relative">
+                    <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
+                    <input
+                      type="text"
+                      name="business_phone"
+                      value={formData.business_phone}
+                      onChange={handleChange}
+                      placeholder="e.g. +91 98765 43210"
+                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Business Category */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Business Category <span className="text-rose-500">*</span>
+                  </label>
                   <select
                     name="category"
                     value={formData.category}
                     onChange={handleChange}
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="Clothing & Apparel">Clothing & Apparel</option>
-                    <option value="Health & Beauty">Health & Beauty</option>
-                    <option value="Electronics & Gadgets">Electronics & Gadgets</option>
-                    <option value="Home & Kitchen">Home & Kitchen</option>
-                    <option value="Grocery & Gourmet">Grocery & Gourmet</option>
-                    <option value="Jewelry & Accessories">Jewelry & Accessories</option>
+                    <option value="Footwear & Shoes">Footwear & Shoes</option>
+                    <option value="Health, Beauty & Cosmetics">Health, Beauty & Cosmetics</option>
+                    <option value="Electronics & Mobile Accessories">Electronics & Mobile Accessories</option>
+                    <option value="Grocery, Gourmet & Food">Grocery, Gourmet & Food</option>
+                    <option value="Home, Living & Kitchen">Home, Living & Kitchen</option>
+                    <option value="Jewelry & Watches">Jewelry & Watches</option>
                     <option value="General Retail">General Retail</option>
                   </select>
                 </div>
               </div>
-            </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                Desired Store Subdomain
-              </label>
-              <div className="flex rounded-xl shadow-xs">
+              {/* Business WhatsApp Name */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Business WhatsApp Name <span className="text-[11px] text-slate-400 font-normal">(shown on WhatsApp profile)</span>
+                </label>
                 <input
                   type="text"
-                  required
-                  name="store_slug"
-                  value={formData.store_slug}
+                  name="whatsapp_business_name"
+                  value={formData.whatsapp_business_name}
                   onChange={handleChange}
-                  placeholder="abc"
-                  className="w-full min-w-0 flex-1 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-l-xl text-sm font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g. ABC Fashion Support"
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
-                <span className="inline-flex items-center px-3.5 rounded-r-xl border border-l-0 border-slate-200 bg-slate-100 text-slate-600 text-xs font-mono">
-                  .digitalgrowthstudio.in
-                </span>
               </div>
-            </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full mt-4 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 shadow-sm transition-colors disabled:opacity-50"
-            >
-              {loading ? (
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <>
-                  Register & Create Store
-                  <ArrowRight className="w-4 h-4" />
-                </>
-              )}
-            </button>
-          </form>
+              {/* Business Description */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Business Description
+                </label>
+                <textarea
+                  rows={2}
+                  name="description"
+                  value={formData.description}
+                  onChange={handleChange}
+                  placeholder="Briefly describe what your brand specializes in..."
+                  className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
 
-          <div className="mt-6 text-center">
+              {/* Brand Logo Upload / URL */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Brand Logo
+                </label>
+                <div className="flex items-center gap-3">
+                  {formData.logo_url ? (
+                    <div className="w-12 h-12 rounded-xl border border-slate-200 overflow-hidden bg-slate-100 shrink-0">
+                      <img
+                        src={formData.logo_url}
+                        alt="Logo Preview"
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src =
+                            "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=100&q=80";
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-12 h-12 rounded-xl border border-dashed border-slate-300 flex items-center justify-center text-slate-400 bg-slate-50 shrink-0">
+                      <ImageIcon className="w-5 h-5" />
+                    </div>
+                  )}
+
+                  <div className="flex-1 space-y-1.5">
+                    <input
+                      type="url"
+                      name="logo_url"
+                      value={formData.logo_url}
+                      onChange={handleChange}
+                      placeholder="Paste logo image URL (https://...)"
+                      className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <div className="flex items-center gap-2">
+                      <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold transition-colors">
+                        <span>Upload Logo File</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleLogoUpload}
+                          className="hidden"
+                        />
+                      </label>
+                      <span className="text-[10px] text-slate-400">PNG, JPG, SVG square recommended</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Address Full */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Full Business Address
+                </label>
+                <textarea
+                  rows={2}
+                  name="address"
+                  value={formData.address}
+                  onChange={handleChange}
+                  placeholder="e.g. Shop 12, Phoenix Marketcity, Kurla West, Mumbai, Maharashtra - 400070"
+                  className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              {/* Two Questions: Payment Gateway & Delivery Partner Help */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
+                {/* Do You have any Payment Gateway? */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 mb-1.5 flex items-center gap-1.5">
+                    <CreditCard className="w-3.5 h-3.5 text-blue-600" />
+                    Do You have a Payment Gateway?
+                  </label>
+                  <div className="flex items-center gap-4 text-xs font-semibold">
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="has_payment_gateway"
+                        value="Yes"
+                        checked={formData.has_payment_gateway === "Yes"}
+                        onChange={() => setFormData((prev) => ({ ...prev, has_payment_gateway: "Yes" }))}
+                        className="text-blue-600"
+                      />
+                      <span>Yes (Razorpay/Paytm)</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="has_payment_gateway"
+                        value="No"
+                        checked={formData.has_payment_gateway === "No"}
+                        onChange={() => setFormData((prev) => ({ ...prev, has_payment_gateway: "No" }))}
+                        className="text-blue-600"
+                      />
+                      <span>No (COD / Assisted)</span>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Will you need help to register with any Delivery Partner? */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 mb-1.5 flex items-center gap-1.5">
+                    <Truck className="w-3.5 h-3.5 text-blue-600" />
+                    Need Delivery Partner Help?
+                  </label>
+                  <div className="flex items-center gap-4 text-xs font-semibold">
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="needs_delivery_help"
+                        value="Yes"
+                        checked={formData.needs_delivery_help === "Yes"}
+                        onChange={() => setFormData((prev) => ({ ...prev, needs_delivery_help: "Yes" }))}
+                        className="text-blue-600"
+                      />
+                      <span>Yes (Shiprocket help)</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="needs_delivery_help"
+                        value="No"
+                        checked={formData.needs_delivery_help === "No"}
+                        onChange={() => setFormData((prev) => ({ ...prev, needs_delivery_help: "No" }))}
+                        className="text-blue-600"
+                      />
+                      <span>No (Self managed)</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Desired Store Subdomain */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Desired Store Subdomain <span className="text-rose-500">*</span>
+                </label>
+                <div className="flex rounded-xl shadow-xs">
+                  <input
+                    type="text"
+                    required
+                    name="store_slug"
+                    value={formData.store_slug}
+                    onChange={handleChange}
+                    placeholder="abc"
+                    className="w-full min-w-0 flex-1 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-l-xl text-sm font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <span className="inline-flex items-center px-3.5 rounded-r-xl border border-l-0 border-slate-200 bg-slate-100 text-slate-600 text-xs font-mono font-medium">
+                    .digitalgrowthstudio.in
+                  </span>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-between gap-3 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setSlide(1)}
+                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors cursor-pointer"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  Back
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex-1 inline-flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-sm transition-colors disabled:opacity-50 cursor-pointer"
+                >
+                  {loading ? (
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      Register & Launch My App 🚀
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          )}
+
+          <div className="mt-6 text-center pt-4 border-t border-slate-100">
             <p className="text-xs text-slate-500">
               Already have an account?{" "}
               <Link href="/app/login" className="font-semibold text-blue-600 hover:text-blue-700">
@@ -296,4 +712,3 @@ export default function PlatformRegisterPage() {
     </div>
   );
 }
-

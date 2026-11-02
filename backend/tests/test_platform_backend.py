@@ -492,7 +492,64 @@ async def test_platform_end_to_end_security_and_isolation():
         updated_var = next(v for v in updated_pub_p["variants"] if v["id"] == chosen_var["id"])
         assert updated_var["stock_quantity"] == 22
 
-        print("\nALL 14 MULTI-VENDOR ISOLATION, SECURITY, SHIPPING, MOV, ORDER TRACKING, ADMIN PLAN/ADDON DELETION & PRODUCT VARIANTS TESTS PASSED PERFECTLY!")
+        # ──────────────────────────────────────────────
+        # Test 15: Multi-Step Registration ("Launch Your Branded Android App"), Profile Persistence & Brand Name Lock
+        # ──────────────────────────────────────────────
+        reg_payload = {
+            "owner_name": "Vikram Test Owner",
+            "email": "vikram.test@example.com",
+            "password": "SecurePassword123!",
+            "whatsapp_number": "+91 9876500000",
+            "business_name": "Apex Trends",
+            "business_phone": "+91 9876500000",
+            "category": "Apparel & Shoes",
+            "whatsapp_business_name": "Apex Trends Official",
+            "brand_name": "Apex Trends Couture",
+            "description": "Premium handcrafted streetwear",
+            "address": "404 Creative Park, Bengaluru 560001",
+            "has_payment_gateway": "Yes",
+            "needs_delivery_help": "No",
+            "store_slug": "apex-trends",
+        }
+        reg_res = await client.post("/api/v1/platform/auth/register", json=reg_payload)
+        assert reg_res.status_code == 201, f"Registration failed: {reg_res.text}"
+        reg_data = reg_res.json()
+        assert "access_token" in reg_data
+        new_vendor_token = reg_data["access_token"]
+        new_vendor_headers = {"Authorization": f"Bearer {new_vendor_token}"}
+
+        # Check vendor profile persistence
+        prof_res = await client.get("/api/v1/platform/vendor/profile", headers=new_vendor_headers)
+        assert prof_res.status_code == 200, f"Profile fetch failed: {prof_res.text}"
+        prof_data = prof_res.json()
+        assert prof_data["brand_name"] == "Apex Trends Couture"
+        assert prof_data["brand_name_locked"] is True
+        assert prof_data["whatsapp_number"] == "+91 9876500000"
+        assert prof_data["whatsapp_business_name"] == "Apex Trends Official"
+        assert prof_data["business_phone"] == "+91 9876500000"
+        assert prof_data["has_payment_gateway"] == "Yes"
+        assert prof_data["needs_delivery_help"] == "No"
+        assert prof_data["address"] == "404 Creative Park, Bengaluru 560001"
+
+        # Verify Brand Name is strictly immutable (HTTP 400)
+        tamper_res = await client.put(
+            "/api/v1/platform/vendor/profile",
+            headers=new_vendor_headers,
+            json={"brand_name": "Tampered Brand Name"},
+        )
+        assert tamper_res.status_code == 400, "Should reject brand_name modification once locked"
+        assert "Brand Name is permanent and cannot be changed" in tamper_res.json()["detail"]
+
+        # Verify updating allowed profile fields succeeds
+        update_res = await client.put(
+            "/api/v1/platform/vendor/profile",
+            headers=new_vendor_headers,
+            json={"address": "Suite 999, Indiranagar, Bengaluru 560038"},
+        )
+        assert update_res.status_code == 200
+        assert update_res.json()["address"] == "Suite 999, Indiranagar, Bengaluru 560038"
+
+        print("\nALL 15 MULTI-VENDOR ISOLATION, SECURITY, SHIPPING, MOV, ORDER TRACKING, ADMIN PLAN/ADDON DELETION, PRODUCT VARIANTS & BRAND NAME LOCK TESTS PASSED PERFECTLY!")
 
 
 if __name__ == "__main__":

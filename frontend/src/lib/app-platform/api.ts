@@ -11,6 +11,7 @@ import {
   Order,
   Customer,
   StoreSettings,
+  VendorProfile,
   AppConfig,
   SuperAdminOverview,
   VendorListItem,
@@ -147,6 +148,19 @@ class PlatformApiClient {
   async getVendorStore(): Promise<StoreSettings> {
     if (this.isDemoMode()) return demoSandbox.getStore();
     return this.request<StoreSettings>('/api/v1/platform/vendor/store');
+  }
+
+  async getVendorProfile(): Promise<VendorProfile> {
+    if (this.isDemoMode()) return demoSandbox.getProfile();
+    return this.request<VendorProfile>('/api/v1/platform/vendor/profile');
+  }
+
+  async updateVendorProfile(payload: Partial<VendorProfile>): Promise<VendorProfile> {
+    if (this.isDemoMode()) return demoSandbox.updateProfile(payload);
+    return this.request<VendorProfile>('/api/v1/platform/vendor/profile', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
   }
 
   async updateVendorStore(payload: Partial<StoreSettings>): Promise<StoreSettings> {

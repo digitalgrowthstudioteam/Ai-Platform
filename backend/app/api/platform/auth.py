@@ -86,14 +86,28 @@ async def register_vendor(payload: PlatformRegisterRequest, db: AsyncSession = D
     db.add(vendor)
     await db.flush()
 
+    phone_to_use = (payload.whatsapp_number or payload.phone or "").strip()
+    biz_phone = (payload.business_phone or phone_to_use).strip()
+    brand_title = (payload.brand_name.strip() if payload.brand_name else payload.business_name.strip())
+
     # 6. Create Profile
     profile = PlatformVendorProfile(
         vendor_id=vendor.id,
         business_name=payload.business_name.strip(),
         owner_name=payload.owner_name.strip(),
         email=payload.email.lower().strip(),
-        phone=payload.phone.strip(),
+        phone=phone_to_use,
         category=payload.category.strip() or "General",
+        address=payload.address.strip() if payload.address else None,
+        description=payload.description.strip() if payload.description else None,
+        logo_url=payload.logo_url.strip() if payload.logo_url else None,
+        brand_name=brand_title,
+        brand_name_locked=True,
+        whatsapp_number=payload.whatsapp_number.strip() if payload.whatsapp_number else phone_to_use,
+        whatsapp_business_name=payload.whatsapp_business_name.strip() if payload.whatsapp_business_name else brand_title,
+        business_phone=biz_phone,
+        has_payment_gateway=payload.has_payment_gateway or "No",
+        needs_delivery_help=payload.needs_delivery_help or "No",
     )
     db.add(profile)
 
@@ -106,14 +120,18 @@ async def register_vendor(payload: PlatformRegisterRequest, db: AsyncSession = D
         subdomain=subdomain,
         status="active",
         contact_email=payload.email.lower().strip(),
-        contact_phone=payload.phone.strip(),
+        contact_phone=biz_phone,
+        business_address=payload.address.strip() if payload.address else None,
+        description=payload.description.strip() if payload.description else None,
+        logo_url=payload.logo_url.strip() if payload.logo_url else None,
     )
     db.add(store)
 
     # 8. Create Android App Config record
     app_config = PlatformVendorAppConfig(
         vendor_id=vendor.id,
-        app_name=payload.business_name.strip(),
+        app_name=brand_title,
+        app_logo_url=payload.logo_url.strip() if payload.logo_url else None,
         package_id=f"in.digitalgrowthstudio.{desired_slug.replace('-', '_')}",
         app_build_status="NOT_REQUESTED",
     )

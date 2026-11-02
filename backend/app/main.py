@@ -63,6 +63,13 @@ async def lifespan(app: FastAPI):
                 "ALTER TABLE platform_vendors ADD COLUMN IF NOT EXISTS allowed_countries TEXT NOT NULL DEFAULT 'India';",
                 "ALTER TABLE platform_vendors ADD COLUMN IF NOT EXISTS estimated_delivery_days VARCHAR(100) NOT NULL DEFAULT '3-5 Business Days';",
                 "ALTER TABLE platform_vendors ADD COLUMN IF NOT EXISTS serviceable_pincodes TEXT;",
+                "ALTER TABLE platform_vendor_profiles ADD COLUMN IF NOT EXISTS brand_name VARCHAR(255);",
+                "ALTER TABLE platform_vendor_profiles ADD COLUMN IF NOT EXISTS brand_name_locked BOOLEAN NOT NULL DEFAULT TRUE;",
+                "ALTER TABLE platform_vendor_profiles ADD COLUMN IF NOT EXISTS whatsapp_number VARCHAR(50);",
+                "ALTER TABLE platform_vendor_profiles ADD COLUMN IF NOT EXISTS whatsapp_business_name VARCHAR(255);",
+                "ALTER TABLE platform_vendor_profiles ADD COLUMN IF NOT EXISTS business_phone VARCHAR(50);",
+                "ALTER TABLE platform_vendor_profiles ADD COLUMN IF NOT EXISTS has_payment_gateway VARCHAR(50) DEFAULT 'No';",
+                "ALTER TABLE platform_vendor_profiles ADD COLUMN IF NOT EXISTS needs_delivery_help VARCHAR(50) DEFAULT 'No';",
             ]
             for stmt in migration_statements:
                 try:
