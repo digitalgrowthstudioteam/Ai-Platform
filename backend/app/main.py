@@ -83,6 +83,11 @@ async def lifespan(app: FastAPI):
                 "ALTER TABLE platform_vendor_app_configs ADD COLUMN IF NOT EXISTS apk_user_approved BOOLEAN NOT NULL DEFAULT FALSE;",
                 "ALTER TABLE platform_vendor_app_configs ADD COLUMN IF NOT EXISTS apk_user_approved_at TIMESTAMP WITH TIME ZONE;",
                 "ALTER TABLE platform_vendor_app_configs ADD COLUMN IF NOT EXISTS subscription_auto_debit_active BOOLEAN NOT NULL DEFAULT FALSE;",
+                "ALTER TABLE platform_orders ADD COLUMN IF NOT EXISTS courier_name VARCHAR(100);",
+                "ALTER TABLE platform_orders ADD COLUMN IF NOT EXISTS tracking_number VARCHAR(100);",
+                "ALTER TABLE platform_orders ADD COLUMN IF NOT EXISTS tracking_url VARCHAR(500);",
+                "ALTER TABLE platform_orders ADD COLUMN IF NOT EXISTS shipped_at TIMESTAMP WITH TIME ZONE;",
+                "ALTER TABLE platform_orders ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMP WITH TIME ZONE;",
             ]
             for stmt in migration_statements:
                 try:

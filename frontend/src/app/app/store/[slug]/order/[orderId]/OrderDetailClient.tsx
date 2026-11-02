@@ -204,6 +204,31 @@ export default function OrderDetailClient() {
               Payment: <strong>{order.payment_method}</strong> ({order.payment_status})
             </span>
           </div>
+
+          {order.tracking_number && (
+            <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800 flex items-center gap-1.5">
+                  <Truck className="w-3.5 h-3.5 text-emerald-600" />
+                  Dispatched via {order.courier_name || "Express Courier"}
+                </span>
+                <p className="text-xs font-mono font-bold text-slate-900 mt-0.5">
+                  AWB / Tracking ID: <span className="text-emerald-700">{order.tracking_number}</span>
+                </p>
+              </div>
+              {order.tracking_url && (
+                <a
+                  href={order.tracking_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-xs transition-colors self-start sm:self-auto"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  Track Live Shipment
+                </a>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Two-Column Details */}

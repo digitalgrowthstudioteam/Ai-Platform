@@ -40,6 +40,11 @@ class PlatformOrder(BaseModel):
     payment_method: Mapped[str] = mapped_column(String(50), nullable=False, default="COD")  # COD, ONLINE
     payment_status: Mapped[str] = mapped_column(String(50), nullable=False, default="PENDING")  # PENDING, PAID, FAILED
     order_status: Mapped[str] = mapped_column(String(50), nullable=False, default="NEW")  # NEW, CONFIRMED, PROCESSING, SHIPPED, DELIVERED, CANCELLED
+    courier_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    tracking_number: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    tracking_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    shipped_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    delivered_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     customer: Mapped[Optional["PlatformCustomer"]] = relationship("PlatformCustomer", back_populates="orders")

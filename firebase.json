@@ -42,6 +42,14 @@
         "destination": "/app/dashboard/products/placeholder.html"
       },
       {
+        "source": "/app/dashboard/orders/*/**",
+        "destination": "/app/dashboard/orders/placeholder.html"
+      },
+      {
+        "source": "/app/dashboard/orders/*",
+        "destination": "/app/dashboard/orders/placeholder.html"
+      },
+      {
         "source": "/app/store/*/products/**",
         "destination": "/app/store/placeholder/products/sample.html"
       },

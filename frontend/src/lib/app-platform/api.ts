@@ -300,7 +300,23 @@ class PlatformApiClient {
     return this.request<Order[]>(`/api/v1/platform/vendor/orders${qs}`);
   }
 
-  async updateOrderStatus(orderId: string, payload: { order_status?: string; payment_status?: string }): Promise<any> {
+  async getOrder(orderId: string): Promise<Order> {
+    if (this.isDemoMode()) {
+      const ord = demoSandbox.getOrder(orderId);
+      if (ord) return ord;
+      return demoSandbox.getOrders()[0];
+    }
+    return this.request<Order>(`/api/v1/platform/vendor/orders/${orderId}`);
+  }
+
+  async updateOrderStatus(orderId: string, payload: {
+    order_status?: string;
+    payment_status?: string;
+    courier_name?: string;
+    tracking_number?: string;
+    tracking_url?: string;
+    notes?: string;
+  }): Promise<any> {
     if (this.isDemoMode()) return demoSandbox.updateOrderStatus(orderId, payload);
     return this.request(`/api/v1/platform/vendor/orders/${orderId}/status`, {
       method: 'PATCH',

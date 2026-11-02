@@ -615,8 +615,13 @@ class DemoSandboxStore {
     }
     return [...this.orders];
   }
+
+  getOrder(orderId: string): Order | undefined {
+    return this.orders.find((o) => o.id === orderId || o.order_number === orderId);
+  }
+
   updateOrderStatus(orderId: string, payload: any): Order {
-    const idx = this.orders.findIndex((o) => o.id === orderId);
+    const idx = this.orders.findIndex((o) => o.id === orderId || o.order_number === orderId);
     if (idx !== -1) {
       this.orders[idx] = { ...this.orders[idx], ...payload };
       return this.orders[idx];
@@ -676,10 +681,6 @@ class DemoSandboxStore {
 
     this.orders.unshift(newOrder);
     return newOrder;
-  }
-
-  getOrder(orderId: string): Order | undefined {
-    return this.orders.find((o) => o.id === orderId || o.order_number === orderId);
   }
 
   getCustomerOrders(phone: string): Order[] {

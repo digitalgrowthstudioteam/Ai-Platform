@@ -38,3 +38,4 @@ export default function EditProductClient() {
 
   return <ProductForm productId={productId} />;
 }
+

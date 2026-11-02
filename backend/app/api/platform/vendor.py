@@ -882,6 +882,11 @@ async def list_vendor_orders(
             payment_method=o.payment_method,
             payment_status=o.payment_status,
             order_status=o.order_status,
+            courier_name=o.courier_name,
+            tracking_number=o.tracking_number,
+            tracking_url=o.tracking_url,
+            shipped_at=o.shipped_at,
+            delivered_at=o.delivered_at,
             notes=o.notes,
             created_at=o.created_at,
             items=[
@@ -901,14 +906,26 @@ async def list_vendor_orders(
 
 @router.get("/orders/{order_id}", response_model=OrderResponse)
 async def get_vendor_order_detail(
-    order_id: uuid.UUID,
+    order_id: str,
     current: CurrentVendor = Depends(require_vendor_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """View details of a specific order belonging to this vendor."""
+    """View details of a specific order belonging to this vendor (by UUID or order_number)."""
+    vid = current.vendor.id
+    target_uuid = None
+    try:
+        target_uuid = uuid.UUID(order_id)
+    except (ValueError, AttributeError):
+        pass
+
     stmt = (
         select(PlatformOrder)
-        .where(PlatformOrder.id == order_id, PlatformOrder.vendor_id == current.vendor.id)
+        .where(
+            PlatformOrder.vendor_id == vid,
+            or_(PlatformOrder.id == target_uuid, PlatformOrder.order_number == order_id)
+            if target_uuid
+            else PlatformOrder.order_number == order_id,
+        )
         .options(selectinload(PlatformOrder.items))
     )
     order = (await db.execute(stmt)).scalar_one_or_none()
@@ -927,6 +944,11 @@ async def get_vendor_order_detail(
         payment_method=order.payment_method,
         payment_status=order.payment_status,
         order_status=order.order_status,
+        courier_name=order.courier_name,
+        tracking_number=order.tracking_number,
+        tracking_url=order.tracking_url,
+        shipped_at=order.shipped_at,
+        delivered_at=order.delivered_at,
         notes=order.notes,
         created_at=order.created_at,
         items=[
@@ -945,24 +967,56 @@ async def get_vendor_order_detail(
 
 @router.patch("/orders/{order_id}/status")
 async def update_vendor_order_status(
-    order_id: uuid.UUID,
+    order_id: str,
     payload: OrderStatusUpdateRequest,
     current: CurrentVendor = Depends(require_vendor_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """Update fulfillment or payment status of vendor's order."""
-    stmt = select(PlatformOrder).where(PlatformOrder.id == order_id, PlatformOrder.vendor_id == current.vendor.id)
+    """Update fulfillment or payment status and tracking details of vendor's order."""
+    vid = current.vendor.id
+    target_uuid = None
+    try:
+        target_uuid = uuid.UUID(order_id)
+    except (ValueError, AttributeError):
+        pass
+
+    stmt = select(PlatformOrder).where(
+        PlatformOrder.vendor_id == vid,
+        or_(PlatformOrder.id == target_uuid, PlatformOrder.order_number == order_id)
+        if target_uuid
+        else PlatformOrder.order_number == order_id,
+    )
     order = (await db.execute(stmt)).scalar_one_or_none()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found or access denied")
 
     if payload.order_status:
         order.order_status = payload.order_status
+        if payload.order_status == "SHIPPED" and not order.shipped_at:
+            order.shipped_at = datetime.now(timezone.utc)
+        elif payload.order_status == "DELIVERED" and not order.delivered_at:
+            order.delivered_at = datetime.now(timezone.utc)
     if payload.payment_status:
         order.payment_status = payload.payment_status
+    if payload.courier_name is not None:
+        order.courier_name = payload.courier_name
+    if payload.tracking_number is not None:
+        order.tracking_number = payload.tracking_number
+    if payload.tracking_url is not None:
+        order.tracking_url = payload.tracking_url
+    if payload.notes is not None:
+        order.notes = payload.notes
 
     await db.commit()
-    return {"message": "Order status updated", "order_status": order.order_status, "payment_status": order.payment_status}
+    await db.refresh(order)
+    return {
+        "message": "Order status and tracking updated",
+        "order_status": order.order_status,
+        "payment_status": order.payment_status,
+        "courier_name": order.courier_name,
+        "tracking_number": order.tracking_number,
+        "tracking_url": order.tracking_url,
+    }
 
 
 # ──────────────────────────────────────────────

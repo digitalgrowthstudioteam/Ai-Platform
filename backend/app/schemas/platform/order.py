@@ -48,6 +48,11 @@ class OrderResponse(BaseModel):
     payment_method: str
     payment_status: str
     order_status: str
+    courier_name: Optional[str] = None
+    tracking_number: Optional[str] = None
+    tracking_url: Optional[str] = None
+    shipped_at: Optional[datetime] = None
+    delivered_at: Optional[datetime] = None
     notes: Optional[str] = None
     created_at: datetime
     items: List[OrderItemResponse] = []
@@ -56,6 +61,10 @@ class OrderResponse(BaseModel):
 class OrderStatusUpdateRequest(BaseModel):
     order_status: Optional[str] = None  # NEW, CONFIRMED, PROCESSING, SHIPPED, DELIVERED, CANCELLED
     payment_status: Optional[str] = None  # PENDING, PAID, FAILED
+    courier_name: Optional[str] = None
+    tracking_number: Optional[str] = None
+    tracking_url: Optional[str] = None
+    notes: Optional[str] = None
 
 
 class CustomerResponse(BaseModel):

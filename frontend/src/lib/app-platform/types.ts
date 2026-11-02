@@ -140,6 +140,11 @@ export interface Order {
   payment_method: string;
   payment_status: string;
   order_status: 'NEW' | 'CONFIRMED' | 'PROCESSING' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
+  courier_name?: string;
+  tracking_number?: string;
+  tracking_url?: string;
+  shipped_at?: string;
+  delivered_at?: string;
   notes?: string;
   created_at: string;
   items: OrderItem[];
