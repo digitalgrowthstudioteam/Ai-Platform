@@ -4,11 +4,13 @@ import React, { useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { usePlatformAuth } from "@/lib/app-platform/auth";
+import { useMobileNav } from "@/lib/app-platform/mobile-nav";
 import VendorSidebar from "@/components/app-platform/layout/VendorSidebar";
-import { Sparkles, RefreshCw, ArrowRight } from "lucide-react";
+import { Sparkles, RefreshCw, ArrowRight, Menu } from "lucide-react";
 
 export default function VendorDashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, loading, isDemo, resetDemoSandbox } = usePlatformAuth();
+  const { open: openMobileNav } = useMobileNav();
   const router = useRouter();
 
   useEffect(() => {
@@ -28,7 +30,25 @@ export default function VendorDashboardLayout({ children }: { children: React.Re
   return (
     <div className="flex-1 flex flex-col md:flex-row">
       <VendorSidebar />
-      <div className="flex-1 p-6 md:p-8 max-w-7xl mx-auto w-full overflow-y-auto">
+      <div className="flex-1 p-4 sm:p-6 md:p-8 max-w-7xl mx-auto w-full overflow-y-auto">
+        {/* Mobile Navigation Quick Bar */}
+        <div className="md:hidden mb-4 flex items-center justify-between p-3 rounded-2xl bg-white border border-slate-200 shadow-2xs">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
+            <span className="text-xs font-bold text-slate-800 truncate">
+              {user?.store_name || "Store Dashboard"}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={openMobileNav}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold hover:bg-blue-100 transition-colors cursor-pointer shrink-0"
+          >
+            <Menu className="w-3.5 h-3.5" />
+            <span>Dashboard Menu</span>
+          </button>
+        </div>
+
         {isDemo && (
           <div className="mb-6 p-3.5 sm:p-4 rounded-2xl bg-amber-50/80 border border-amber-200 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
             <div className="flex items-start gap-2.5">

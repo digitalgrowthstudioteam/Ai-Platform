@@ -3,29 +3,41 @@
 import React from "react";
 import Link from "next/link";
 import { usePlatformAuth } from "@/lib/app-platform/auth";
+import { useMobileNav } from "@/lib/app-platform/mobile-nav";
 import {
   Store,
   ExternalLink,
   Shield,
   LogOut,
-  Bell,
-  Smartphone,
-  ChevronDown,
+  Menu,
+  X,
 } from "lucide-react";
 
 export default function AppHeader() {
   const { user, logout } = usePlatformAuth();
+  const { isOpen, toggle } = useMobileNav();
 
   return (
-    <header className="h-16 border-b border-slate-200 bg-white sticky top-0 z-30 px-6 flex items-center justify-between">
-      <div className="flex items-center gap-4">
+    <header className="h-16 border-b border-slate-200 bg-white sticky top-0 z-30 px-4 sm:px-6 flex items-center justify-between">
+      <div className="flex items-center gap-2 sm:gap-4">
+        {user && (
+          <button
+            type="button"
+            onClick={toggle}
+            className="md:hidden p-2 -ml-1 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
+            aria-label={isOpen ? "Close navigation menu" : "Open navigation menu"}
+          >
+            {isOpen ? <X className="w-5 h-5 text-slate-800" /> : <Menu className="w-5 h-5 text-slate-800" />}
+          </button>
+        )}
+
         <Link href="/app" className="flex items-center gap-2">
-          <div className="w-9 h-9 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-lg shadow-sm">
+          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-base sm:text-lg shadow-sm shrink-0">
             D
           </div>
           <div>
-            <span className="font-bold text-slate-900 tracking-tight text-base">Digital Growth Studio</span>
-            <span className="ml-2 text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+            <span className="font-bold text-slate-900 tracking-tight text-sm sm:text-base">Digital Growth Studio</span>
+            <span className="hidden sm:inline-block ml-2 text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
               SaaS App Platform
             </span>
           </div>
