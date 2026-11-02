@@ -46,6 +46,32 @@ async def lifespan(app: FastAPI):
     from app.core.firebase import initialize_firebase
     initialize_firebase(settings.FIREBASE_PRIVATE_KEY_PATH)
 
+    # Ensure platform tables and newly added schema fields exist in production database
+    from app.database import engine, Base
+    import sqlalchemy as sa
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+            migration_statements = [
+                "ALTER TABLE platform_products ADD COLUMN IF NOT EXISTS has_variants BOOLEAN NOT NULL DEFAULT FALSE;",
+                "ALTER TABLE platform_order_items ADD COLUMN IF NOT EXISTS variant_id UUID REFERENCES platform_product_variants(id) ON DELETE SET NULL;",
+                "ALTER TABLE platform_order_items ADD COLUMN IF NOT EXISTS variant_name VARCHAR(255);",
+                "ALTER TABLE platform_vendors ADD COLUMN IF NOT EXISTS free_shipping_threshold DOUBLE PRECISION;",
+                "ALTER TABLE platform_vendors ADD COLUMN IF NOT EXISTS standard_shipping_fee DOUBLE PRECISION NOT NULL DEFAULT 0.0;",
+                "ALTER TABLE platform_vendors ADD COLUMN IF NOT EXISTS cod_handling_fee DOUBLE PRECISION NOT NULL DEFAULT 0.0;",
+                "ALTER TABLE platform_vendors ADD COLUMN IF NOT EXISTS min_order_value DOUBLE PRECISION NOT NULL DEFAULT 0.0;",
+                "ALTER TABLE platform_vendors ADD COLUMN IF NOT EXISTS allowed_countries TEXT NOT NULL DEFAULT 'India';",
+                "ALTER TABLE platform_vendors ADD COLUMN IF NOT EXISTS estimated_delivery_days VARCHAR(100) NOT NULL DEFAULT '3-5 Business Days';",
+                "ALTER TABLE platform_vendors ADD COLUMN IF NOT EXISTS serviceable_pincodes TEXT;",
+            ]
+            for stmt in migration_statements:
+                try:
+                    await conn.execute(sa.text(stmt))
+                except Exception as stmt_err:
+                    logger.warning("column_migration_notice", statement=stmt, error=str(stmt_err))
+    except Exception as db_sync_err:
+        logger.error("database_table_sync_failed", error=str(db_sync_err))
+
     # Seed admin pricing configurations dynamically
     from app.database import async_session_factory
     from app.services.config_seeder import seed_admin_configs
