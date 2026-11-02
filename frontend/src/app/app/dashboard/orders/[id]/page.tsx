@@ -9,3 +9,4 @@ export function generateStaticParams() {
 export default function VendorOrderDetailPage() {
   return <OrderDetailClient />;
 }
+

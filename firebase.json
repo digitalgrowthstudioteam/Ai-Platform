@@ -50,6 +50,14 @@
         "destination": "/app/dashboard/orders/placeholder.html"
       },
       {
+        "source": "/app/admin/vendors/*/**",
+        "destination": "/app/admin/vendors/placeholder.html"
+      },
+      {
+        "source": "/app/admin/vendors/*",
+        "destination": "/app/admin/vendors/placeholder.html"
+      },
+      {
         "source": "/app/store/*/products/**",
         "destination": "/app/store/placeholder/products/sample.html"
       },

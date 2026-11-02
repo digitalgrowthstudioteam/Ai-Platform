@@ -6,7 +6,7 @@ import uuid
 from typing import List, Optional
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select, func, desc, update, delete
+from sqlalchemy import select, func, desc, update, delete, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -272,14 +272,24 @@ async def create_vendor_manually(
 
 @router.get("/vendors/{vendor_id}", response_model=VendorDetailFullResponse)
 async def get_vendor_full_detail(
-    vendor_id: uuid.UUID,
+    vendor_id: str,
     admin: PlatformUser = Depends(require_super_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """Retrieve comprehensive details of a single vendor for Super Admin inspection."""
+    """Retrieve comprehensive details of a single vendor for Super Admin inspection (by UUID or vendor_code)."""
+    target_uuid = None
+    try:
+        target_uuid = uuid.UUID(vendor_id)
+    except (ValueError, AttributeError):
+        pass
+
     stmt = (
         select(PlatformVendor)
-        .where(PlatformVendor.id == vendor_id)
+        .where(
+            or_(PlatformVendor.id == target_uuid, PlatformVendor.vendor_code == vendor_id)
+            if target_uuid
+            else PlatformVendor.vendor_code == vendor_id
+        )
         .options(
             selectinload(PlatformVendor.profile),
             selectinload(PlatformVendor.store),
@@ -358,13 +368,24 @@ async def get_vendor_full_detail(
 
 @router.patch("/vendors/{vendor_id}/status")
 async def update_vendor_status(
-    vendor_id: uuid.UUID,
+    vendor_id: str,
     payload: VendorStatusUpdateRequest,
     admin: PlatformUser = Depends(require_super_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """Activate, deactivate, or suspend a vendor."""
-    v = (await db.execute(select(PlatformVendor).where(PlatformVendor.id == vendor_id))).scalar_one_or_none()
+    target_uuid = None
+    try:
+        target_uuid = uuid.UUID(vendor_id)
+    except (ValueError, AttributeError):
+        pass
+
+    stmt = select(PlatformVendor).where(
+        or_(PlatformVendor.id == target_uuid, PlatformVendor.vendor_code == vendor_id)
+        if target_uuid
+        else PlatformVendor.vendor_code == vendor_id
+    )
+    v = (await db.execute(stmt)).scalar_one_or_none()
     if not v:
         raise HTTPException(status_code=404, detail="Vendor not found")
 
@@ -384,13 +405,28 @@ async def update_vendor_status(
 
 @router.patch("/vendors/{vendor_id}/app-config")
 async def update_vendor_app_build_status(
-    vendor_id: uuid.UUID,
+    vendor_id: str,
     payload: VendorAppStatusUpdateRequest,
     admin: PlatformUser = Depends(require_super_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """Update Android application build and publication status for developers."""
-    app_cfg = (await db.execute(select(PlatformVendorAppConfig).where(PlatformVendorAppConfig.vendor_id == vendor_id))).scalar_one_or_none()
+    """Update Android application build and publication status for developers (by UUID or vendor_code)."""
+    target_uuid = None
+    try:
+        target_uuid = uuid.UUID(vendor_id)
+    except (ValueError, AttributeError):
+        pass
+
+    v_stmt = select(PlatformVendor).where(
+        or_(PlatformVendor.id == target_uuid, PlatformVendor.vendor_code == vendor_id)
+        if target_uuid
+        else PlatformVendor.vendor_code == vendor_id
+    )
+    v = (await db.execute(v_stmt)).scalar_one_or_none()
+    if not v:
+        raise HTTPException(status_code=404, detail="Vendor not found")
+
+    app_cfg = (await db.execute(select(PlatformVendorAppConfig).where(PlatformVendorAppConfig.vendor_id == v.id))).scalar_one_or_none()
     if not app_cfg:
         raise HTTPException(status_code=404, detail="Vendor app config not found")
 
@@ -412,17 +448,32 @@ async def update_vendor_app_build_status(
 
 @router.patch("/vendors/{vendor_id}/setup-fee")
 async def update_vendor_setup_fee(
-    vendor_id: uuid.UUID,
+    vendor_id: str,
     payload: AdminVendorSetupFeeUpdateRequest,
     admin: PlatformUser = Depends(require_super_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Super Admin setup fee control:
+    Super Admin setup fee control (by UUID or vendor_code):
     - Waive setup fee for specific vendor (without public mention)
     - Set custom discounted price for specific vendor
     """
-    sub_stmt = select(PlatformSubscription).where(PlatformSubscription.vendor_id == vendor_id).order_by(desc(PlatformSubscription.created_at))
+    target_uuid = None
+    try:
+        target_uuid = uuid.UUID(vendor_id)
+    except (ValueError, AttributeError):
+        pass
+
+    v_stmt = select(PlatformVendor).where(
+        or_(PlatformVendor.id == target_uuid, PlatformVendor.vendor_code == vendor_id)
+        if target_uuid
+        else PlatformVendor.vendor_code == vendor_id
+    )
+    v = (await db.execute(v_stmt)).scalar_one_or_none()
+    if not v:
+        raise HTTPException(status_code=404, detail="Vendor not found")
+
+    sub_stmt = select(PlatformSubscription).where(PlatformSubscription.vendor_id == v.id).order_by(desc(PlatformSubscription.created_at))
     sub = (await db.execute(sub_stmt)).scalars().first()
     if not sub:
         raise HTTPException(status_code=404, detail="Subscription record not found for vendor")
