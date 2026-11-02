@@ -30,7 +30,10 @@ pool_kwargs = {
 
 engine = create_async_engine(
     settings.DATABASE_URL,
-    connect_args={"statement_cache_size": 0},
+    connect_args={
+        "statement_cache_size": 0,
+        "prepared_statement_name_func": lambda: "",
+    },
     echo=settings.DEBUG,
     **pool_kwargs
 )

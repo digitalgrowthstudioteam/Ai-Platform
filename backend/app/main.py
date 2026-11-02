@@ -115,6 +115,10 @@ app.add_middleware(CustomCORSMiddleware)
 # Mount API v1 router
 app.include_router(api_v1_router, prefix="/api/v1")
 
+# Direct mount for public store & Android app endpoints (/api/store/{slug}/*)
+from app.api.store.endpoints import router as public_store_router
+app.include_router(public_store_router, prefix="/api")
+
 
 @app.get("/", tags=["Root"])
 async def root():

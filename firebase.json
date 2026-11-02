@@ -28,6 +28,10 @@
       {
         "source": "/settings/admin/quotations/**",
         "destination": "/settings/admin/quotations/placeholder.html"
+      },
+      {
+        "source": "/app/store/**",
+        "destination": "/app/store/placeholder.html"
       }
     ],
     "headers": [

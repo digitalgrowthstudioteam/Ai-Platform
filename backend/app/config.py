@@ -73,6 +73,18 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: Optional[str] = Field(default=None, description="SMTP server password")
     SMTP_FROM: str = Field(default="noreply@digitalgrowthstudio.in", description="SMTP sender address")
 
+    # Multi-Vendor Platform & Bunny.net Storage
+    BUNNY_STORAGE_ZONE: Optional[str] = Field(default=None, description="Bunny.net Storage Zone Name")
+    BUNNY_API_KEY: Optional[str] = Field(default=None, description="Bunny.net Storage Zone Password / API Key")
+    BUNNY_STORAGE_REGION: str = Field(default="de", description="Bunny.net Storage Region (de, ny, sg, etc.)")
+    BUNNY_CDN_HOSTNAME: Optional[str] = Field(default=None, description="Bunny.net Pull Zone CDN Hostname")
+    PLATFORM_JWT_SECRET: str = Field(
+        default="dgs-ecommerce-platform-jwt-secret-key-prod-2026",
+        description="JWT secret for multi-vendor platform sessions"
+    )
+    PLATFORM_JWT_ALGORITHM: str = Field(default="HS256", description="JWT signing algorithm")
+    PLATFORM_JWT_EXPIRE_MINUTES: int = Field(default=10080, description="Token expiry in minutes (7 days)")
+
     @property
     def cors_origins(self) -> list[str]:
         """Parse comma-separated CORS origins into a list."""

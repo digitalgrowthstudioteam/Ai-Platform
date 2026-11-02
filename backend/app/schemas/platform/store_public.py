@@ -1,0 +1,68 @@
+"""
+Digital Growth Studio — Public Store Schemas for Android App & Web Storefront
+"""
+import uuid
+from typing import Optional, List
+from pydantic import BaseModel
+
+
+class PublicStoreConfigResponse(BaseModel):
+    store_name: str
+    store_slug: str
+    subdomain: str
+    description: Optional[str] = None
+    primary_color: str
+    secondary_color: str
+    logo_url: Optional[str] = None
+    banner_url: Optional[str] = None
+    contact_email: Optional[str] = None
+    contact_phone: Optional[str] = None
+    business_address: Optional[str] = None
+    opening_hours: str
+    cod_enabled: bool
+    razorpay_enabled: bool
+    razorpay_key_id: Optional[str] = None
+    app_version: Optional[str] = "1.0.0"
+
+
+class PublicProductImage(BaseModel):
+    image_url: str
+    sort_order: int
+    is_thumbnail: bool
+
+
+class PublicProductItem(BaseModel):
+    id: uuid.UUID
+    name: str
+    slug: str
+    description: Optional[str] = None
+    regular_price: float
+    sale_price: Optional[float] = None
+    effective_price: float
+    sku: str
+    stock_quantity: int
+    in_stock: bool
+    category_id: Optional[uuid.UUID] = None
+    category_name: Optional[str] = None
+    thumbnail_url: Optional[str] = None
+    images: List[PublicProductImage] = []
+    is_featured: bool
+
+
+class PublicCategoryItem(BaseModel):
+    id: uuid.UUID
+    name: str
+    slug: str
+    image_url: Optional[str] = None
+    sort_order: int
+
+
+class PublicBannerItem(BaseModel):
+    id: uuid.UUID
+    title: str
+    description: Optional[str] = None
+    promo_offer: Optional[str] = None
+    image_url: str
+    link_url: Optional[str] = None
+    sort_order: int
+

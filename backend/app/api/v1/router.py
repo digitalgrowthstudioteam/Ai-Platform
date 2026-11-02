@@ -17,6 +17,10 @@ from app.api.v1.notification import router as notification_router
 from app.api.v1.assistant import router as assistant_router
 from app.api.v1.funnel import router as funnel_router
 from app.api.v1.ads_service import router as ads_service_router
+from app.api.platform.auth import router as platform_auth_router
+from app.api.platform.vendor import router as platform_vendor_router
+from app.api.platform.admin import router as platform_admin_router
+from app.api.store.endpoints import router as store_router
 
 api_v1_router = APIRouter()
 api_v1_router.include_router(auth_router)
@@ -33,6 +37,12 @@ api_v1_router.include_router(notification_router, tags=["Notifications"])
 api_v1_router.include_router(assistant_router, tags=["AI Assistant"])
 api_v1_router.include_router(funnel_router, tags=["Lead Acquisition Funnel"])
 api_v1_router.include_router(ads_service_router, tags=["Meta Ads Management Service"])
+
+# Multi-Vendor Platform Routers
+api_v1_router.include_router(platform_auth_router)
+api_v1_router.include_router(platform_vendor_router)
+api_v1_router.include_router(platform_admin_router)
+api_v1_router.include_router(store_router)
 
 
 # ──────────────────────────────────────────────

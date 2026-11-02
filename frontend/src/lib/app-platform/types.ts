@@ -1,0 +1,232 @@
+/**
+ * Digital Growth Studio — Multi-Vendor E-Commerce Platform Types
+ */
+
+export interface PlatformUser {
+  user_id: string;
+  email: string;
+  name: string;
+  role: 'SUPER_ADMIN' | 'VENDOR_ADMIN';
+  vendor_id?: string;
+  vendor_code?: string;
+  store_slug?: string;
+  store_name?: string;
+  status: string;
+}
+
+export interface PlatformTokenResponse {
+  access_token: string;
+  token_type: string;
+  user_id: string;
+  email: string;
+  name: string;
+  role: 'SUPER_ADMIN' | 'VENDOR_ADMIN';
+  vendor_id?: string;
+  vendor_code?: string;
+  store_slug?: string;
+}
+
+export interface VendorOverview {
+  vendor_code: string;
+  store_name: string;
+  store_slug: string;
+  subdomain: string;
+  status: string;
+  total_products: number;
+  active_products: number;
+  out_of_stock_products: number;
+  total_orders: number;
+  pending_orders: number;
+  processing_orders: number;
+  completed_orders: number;
+  cancelled_orders: number;
+  total_sales_inr: number;
+  total_customers: number;
+  storage_used_bytes: number;
+  storage_limit_bytes: number;
+  storage_percentage: number;
+  subscription_plan: string;
+  subscription_status: string;
+  subscription_renewal_date?: string;
+}
+
+export interface ProductImage {
+  id: string;
+  image_url: string;
+  sort_order: number;
+  is_thumbnail: boolean;
+}
+
+export interface Product {
+  id: string;
+  vendor_id: string;
+  category_id?: string;
+  category_name?: string;
+  name: string;
+  slug: string;
+  description?: string;
+  regular_price: number;
+  sale_price?: number;
+  sku: string;
+  stock_quantity: number;
+  status: 'active' | 'inactive' | 'out_of_stock';
+  is_featured: boolean;
+  thumbnail_url?: string;
+  images: ProductImage[];
+  created_at: string;
+}
+
+export interface Category {
+  id: string;
+  vendor_id: string;
+  name: string;
+  slug: string;
+  image_url?: string;
+  sort_order: number;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface Banner {
+  id: string;
+  vendor_id: string;
+  title: string;
+  description?: string;
+  promo_offer?: string;
+  image_url: string;
+  link_url?: string;
+  sort_order: number;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface OrderItem {
+  id: string;
+  product_id?: string;
+  product_name: string;
+  product_sku?: string;
+  price: number;
+  quantity: number;
+  total: number;
+}
+
+export interface Order {
+  id: string;
+  vendor_id: string;
+  order_number: string;
+  customer_name: string;
+  customer_phone: string;
+  customer_email?: string;
+  shipping_address: string;
+  total_amount: number;
+  payment_method: string;
+  payment_status: string;
+  order_status: 'NEW' | 'CONFIRMED' | 'PROCESSING' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
+  notes?: string;
+  created_at: string;
+  items: OrderItem[];
+}
+
+export interface Customer {
+  id: string;
+  vendor_id: string;
+  name: string;
+  phone: string;
+  email?: string;
+  total_orders: number;
+  total_spent: number;
+  last_order_at?: string;
+  created_at: string;
+}
+
+export interface StoreSettings {
+  id: string;
+  vendor_id: string;
+  store_name: string;
+  store_slug: string;
+  subdomain: string;
+  status: string;
+  primary_color: string;
+  secondary_color: string;
+  description?: string;
+  logo_url?: string;
+  banner_url?: string;
+  contact_email?: string;
+  contact_phone?: string;
+  business_address?: string;
+  opening_hours: string;
+  cod_enabled: boolean;
+  razorpay_enabled: boolean;
+  razorpay_key_id?: string;
+}
+
+export interface AppConfig {
+  id: string;
+  vendor_id: string;
+  app_name: string;
+  app_logo_url?: string;
+  splash_screen_url?: string;
+  primary_color: string;
+  secondary_color: string;
+  package_id: string;
+  app_build_status: 'NOT_REQUESTED' | 'QUEUED' | 'IN_DEVELOPMENT' | 'BUILT' | 'FAILED';
+  app_version: string;
+  playstore_url?: string;
+  publication_status: 'UNPUBLISHED' | 'PENDING_REVIEW' | 'PUBLISHED';
+}
+
+export interface SuperAdminOverview {
+  total_vendors: number;
+  active_vendors: number;
+  inactive_vendors: number;
+  trial_vendors: number;
+  expired_subscriptions: number;
+  total_mrr_inr: number;
+  total_orders_all_vendors: number;
+  total_products_all_vendors: number;
+  new_registrations_this_month: number;
+  total_storage_used_mb: number;
+}
+
+export interface VendorListItem {
+  id: string;
+  vendor_code: string;
+  business_name: string;
+  owner_name: string;
+  email: string;
+  phone: string;
+  store_slug: string;
+  subdomain: string;
+  status: string;
+  plan_name: string;
+  subscription_status: string;
+  total_products: number;
+  total_orders: number;
+  app_build_status: string;
+  created_at: string;
+}
+
+export interface Plan {
+  id: string;
+  name: string;
+  slug: string;
+  monthly_price_inr: number;
+  setup_fee_inr: number;
+  storage_limit_mb: number;
+  max_products: number;
+  is_active: boolean;
+  features_json: string;
+  created_at: string;
+}
+
+export interface Addon {
+  id: string;
+  name: string;
+  code: string;
+  description?: string;
+  price_inr: number;
+  billing_type: 'ONE_TIME' | 'MONTHLY';
+  is_active: boolean;
+  created_at: string;
+}
+

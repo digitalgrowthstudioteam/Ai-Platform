@@ -15,6 +15,12 @@ interface AppWrapperProps {
 export default function AppWrapper({ children }: AppWrapperProps) {
   const pathname = usePathname();
   const cleanPath = pathname === "/" ? "/" : pathname.replace(/\/$/, "");
+
+  // Multi-vendor e-commerce app platform (/app/*) is completely isolated
+  if (cleanPath === "/app" || cleanPath.startsWith("/app/")) {
+    return <>{children}</>;
+  }
+
   const isPublicRoute = [
     "/",
     "/privacy",
