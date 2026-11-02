@@ -244,7 +244,12 @@ export default function OrderDetailClient() {
                 <div key={it.id} className="pt-2 first:pt-0 flex items-center justify-between text-xs">
                   <div>
                     <p className="font-semibold text-slate-900">{it.product_name}</p>
-                    <p className="text-[11px] text-slate-400 font-mono">
+                    {it.variant_name && (
+                      <span className="text-[10px] text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded font-medium border border-purple-200 inline-block mt-0.5">
+                        Variant: {it.variant_name}
+                      </span>
+                    )}
+                    <p className="text-[11px] text-slate-400 font-mono mt-0.5">
                       Qty: {it.quantity} × ₹{it.price}
                     </p>
                   </div>

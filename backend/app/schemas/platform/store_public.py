@@ -33,6 +33,9 @@ class PublicStoreConfigResponse(BaseModel):
     serviceable_pincodes: Optional[str] = None
 
 
+from app.schemas.platform.catalog import ProductVariantResponse
+
+
 class PublicProductImage(BaseModel):
     image_url: str
     sort_order: int
@@ -54,6 +57,8 @@ class PublicProductItem(BaseModel):
     category_name: Optional[str] = None
     thumbnail_url: Optional[str] = None
     images: List[PublicProductImage] = []
+    has_variants: bool = False
+    variants: List[ProductVariantResponse] = []
     is_featured: bool
 
 

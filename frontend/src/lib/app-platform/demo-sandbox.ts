@@ -73,6 +73,7 @@ const INITIAL_PRODUCTS: Product[] = [
     stock_quantity: 45,
     status: "active",
     is_featured: true,
+    has_variants: true,
     thumbnail_url: "https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?w=500&q=80",
     images: [
       {
@@ -92,6 +93,45 @@ const INITIAL_PRODUCTS: Product[] = [
         image_url: "https://images.unsplash.com/photo-1496747611176-843222e1e57c?w=500&q=80",
         sort_order: 2,
         is_thumbnail: false,
+      },
+    ],
+    variants: [
+      {
+        id: "var-1",
+        name: "Small / Rose Pink",
+        sku: "DEMO-DRS-001-SM",
+        price: 1499.0,
+        stock_quantity: 15,
+        images: [
+          "https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?w=500&q=80",
+          "https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=500&q=80",
+        ],
+        sort_order: 0,
+        is_active: true,
+      },
+      {
+        id: "var-2",
+        name: "Medium / Emerald Flora",
+        sku: "DEMO-DRS-001-MD",
+        price: 1499.0,
+        stock_quantity: 20,
+        images: [
+          "https://images.unsplash.com/photo-1496747611176-843222e1e57c?w=500&q=80",
+        ],
+        sort_order: 1,
+        is_active: true,
+      },
+      {
+        id: "var-3",
+        name: "Large / Ocean Navy",
+        sku: "DEMO-DRS-001-LG",
+        price: 1699.0,
+        stock_quantity: 10,
+        images: [
+          "https://images.unsplash.com/photo-1539109136881-3be0616acf4b?w=500&q=80",
+        ],
+        sort_order: 2,
+        is_active: true,
       },
     ],
     created_at: new Date().toISOString(),
@@ -388,6 +428,19 @@ class DemoSandboxStore {
       sort_order: idx,
       is_thumbnail: idx === 0,
     }));
+    const variants = (payload.variants || []).map((v: any, idx: number) => ({
+      id: v.id || `var-${Date.now()}-${idx}`,
+      name: v.name,
+      sku: v.sku || `${payload.sku || "SKU"}-${idx + 1}`,
+      price: v.price ? Number(v.price) : undefined,
+      stock_quantity: Number(v.stock_quantity) || 0,
+      images: v.images || [],
+      sort_order: v.sort_order ?? idx,
+      is_active: v.is_active !== false,
+    }));
+    const hasVariants = variants.length > 0;
+    const stockQty = hasVariants ? variants.reduce((acc: number, cur: any) => acc + cur.stock_quantity, 0) : Number(payload.stock_quantity) || 0;
+
     const newProd: Product = {
       id: `demo-prod-${Date.now()}`,
       vendor_id: "demo-vendor-sandbox",
@@ -399,11 +452,13 @@ class DemoSandboxStore {
       regular_price: Number(payload.regular_price) || 0,
       sale_price: payload.sale_price ? Number(payload.sale_price) : undefined,
       sku: payload.sku || `SKU-${Date.now().toString().slice(-4)}`,
-      stock_quantity: Number(payload.stock_quantity) || 0,
+      stock_quantity: stockQty,
       status: payload.status || "active",
       is_featured: Boolean(payload.is_featured),
+      has_variants: hasVariants,
       thumbnail_url: images.length > 0 ? images[0].image_url : undefined,
       images,
+      variants,
       created_at: new Date().toISOString(),
     };
     this.products.unshift(newProd);
@@ -422,9 +477,31 @@ class DemoSandboxStore {
           is_thumbnail: i === 0,
         }));
       }
+      let variants = existing.variants || [];
+      let hasVariants = existing.has_variants;
+      let stockQty = payload.stock_quantity !== undefined ? Number(payload.stock_quantity) : existing.stock_quantity;
+      if (payload.variants !== undefined) {
+        variants = (payload.variants || []).map((v: any, i: number) => ({
+          id: v.id || `var-${Date.now()}-${i}`,
+          name: v.name,
+          sku: v.sku || `${existing.sku}-${i + 1}`,
+          price: v.price ? Number(v.price) : undefined,
+          stock_quantity: Number(v.stock_quantity) || 0,
+          images: v.images || [],
+          sort_order: v.sort_order ?? i,
+          is_active: v.is_active !== false,
+        }));
+        hasVariants = variants.length > 0;
+        if (hasVariants) {
+          stockQty = variants.reduce((acc: number, cur: any) => acc + cur.stock_quantity, 0);
+        }
+      }
       this.products[idx] = {
         ...existing,
         ...payload,
+        stock_quantity: stockQty,
+        has_variants: hasVariants,
+        variants,
         images: updatedImages,
         thumbnail_url: updatedImages.length > 0 ? updatedImages[0].image_url : existing.thumbnail_url,
       };

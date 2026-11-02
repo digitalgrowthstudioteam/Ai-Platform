@@ -13,6 +13,7 @@ from app.models.platform.catalog import (
     PlatformCategory,
     PlatformProduct,
     PlatformProductImage,
+    PlatformProductVariant,
     PlatformBanner,
 )
 from app.models.platform.order import (
@@ -43,6 +44,7 @@ __all__ = [
     "PlatformCategory",
     "PlatformProduct",
     "PlatformProductImage",
+    "PlatformProductVariant",
     "PlatformBanner",
     "PlatformCustomer",
     "PlatformOrder",

@@ -137,6 +137,8 @@ export default function CheckoutClient() {
         payment_method: paymentMethod,
         items: items.map((i) => ({
           product_id: i.product_id,
+          variant_id: i.variant_id || undefined,
+          variant_name: i.variant_name || undefined,
           quantity: i.quantity,
         })),
         notes: orderNotes.trim() || `Order placed via Web Storefront (Est: ${config?.estimated_delivery_days || "3-5 Days"})`,
@@ -455,7 +457,7 @@ export default function CheckoutClient() {
               {/* Items List Preview */}
               <div className="space-y-3 max-h-60 overflow-y-auto pr-1 divide-y divide-slate-100">
                 {items.map((it) => (
-                  <div key={it.product_id} className="pt-2 first:pt-0 flex items-center justify-between gap-3 text-xs">
+                  <div key={it.id || it.product_id} className="pt-2 first:pt-0 flex items-center justify-between gap-3 text-xs">
                     <div className="flex items-center gap-2.5 min-w-0">
                       {it.thumbnail_url ? (
                         <img src={it.thumbnail_url} alt={it.name} className="w-10 h-10 rounded-lg object-cover border border-slate-200 shrink-0" />
@@ -466,6 +468,11 @@ export default function CheckoutClient() {
                       )}
                       <div className="min-w-0">
                         <p className="font-semibold text-slate-900 line-clamp-1">{it.name}</p>
+                        {it.variant_name && (
+                          <span className="text-[10px] text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded font-medium border border-purple-200 inline-block mt-0.5">
+                            {it.variant_name}
+                          </span>
+                        )}
                         <p className="text-[11px] text-slate-500 font-mono">Qty: {it.quantity} × ₹{it.effective_price}</p>
                       </div>
                     </div>

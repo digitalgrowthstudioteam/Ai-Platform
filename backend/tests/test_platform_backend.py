@@ -402,7 +402,97 @@ async def test_platform_end_to_end_security_and_isolation():
         )
         assert del_addon_res.status_code == 200, f"Delete addon failed: {del_addon_res.text}"
 
-        print("\nALL 13 MULTI-VENDOR ISOLATION, SECURITY, SHIPPING, MOV, ORDER TRACKING & ADMIN PLAN/ADDON DELETION TESTS PASSED PERFECTLY!")
+        # ──────────────────────────────────────────────
+        # Test 14: Product Multi-Variant Creation & Order Stock Deduction
+        # ──────────────────────────────────────────────
+        variant_prod_res = await client.post(
+            "/api/v1/platform/vendor/products",
+            headers=headers_a,
+            json={
+                "name": "Luxury Silk Robe with Variants",
+                "description": "Premium silk robe with size and color options",
+                "regular_price": 2499.0,
+                "sale_price": 1999.0,
+                "sku": "ROBE-VAR-TEST",
+                "stock_quantity": 0,
+                "status": "active",
+                "is_featured": True,
+                "has_variants": True,
+                "variants": [
+                    {
+                        "name": "Small / Crimson Red",
+                        "sku": "ROBE-S-RED",
+                        "price": 1999.0,
+                        "stock_quantity": 15,
+                        "images": [
+                            "https://images.unsplash.com/photo-1523275335684-37898b6baf30",
+                            "https://images.unsplash.com/photo-1505740420928-5e560c06d30e",
+                        ],
+                        "sort_order": 0,
+                        "is_active": True,
+                    },
+                    {
+                        "name": "Large / Midnight Navy",
+                        "sku": "ROBE-L-NAVY",
+                        "price": 2199.0,
+                        "stock_quantity": 25,
+                        "images": [
+                            "https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f"
+                        ],
+                        "sort_order": 1,
+                        "is_active": True,
+                    },
+                ],
+            },
+        )
+        assert variant_prod_res.status_code == 201, f"Create variant product failed: {variant_prod_res.text}"
+        var_prod = variant_prod_res.json()
+        assert var_prod["has_variants"] is True
+        assert len(var_prod["variants"]) == 2
+        assert var_prod["stock_quantity"] == 40  # 15 + 25 auto-summed
+        assert len(var_prod["variants"][0]["images"]) == 2
+
+        # Public Storefront API loads variants
+        public_prod_res = await client.get(f"/api/store/abc/products/{var_prod['id']}")
+        assert public_prod_res.status_code == 200
+        pub_p = public_prod_res.json()
+        assert pub_p["has_variants"] is True
+        assert len(pub_p["variants"]) == 2
+
+        # Customer buys Large Midnight Navy variant
+        chosen_var = pub_p["variants"][1]
+        order_var_res = await client.post(
+            "/api/store/abc/orders",
+            json={
+                "customer_name": "Test Customer",
+                "customer_phone": "+91 9988776655",
+                "customer_email": "customer@test.com",
+                "shipping_address": "Flat 101, Test Road, Mumbai 400001",
+                "payment_method": "COD",
+                "items": [
+                    {
+                        "product_id": var_prod["id"],
+                        "variant_id": chosen_var["id"],
+                        "variant_name": chosen_var["name"],
+                        "quantity": 3,
+                    }
+                ],
+            },
+        )
+        assert order_var_res.status_code == 201, f"Variant order placement failed: {order_var_res.text}"
+        order_data = order_var_res.json()
+        assert len(order_data["items"]) == 1
+        assert order_data["items"][0]["variant_id"] == chosen_var["id"]
+        assert order_data["items"][0]["price"] == 2199.0
+
+        # Verify stock deduction: 25 - 3 = 22 for variant; 40 - 3 = 37 for product
+        verify_prod_res = await client.get(f"/api/store/abc/products/{var_prod['id']}")
+        updated_pub_p = verify_prod_res.json()
+        assert updated_pub_p["stock_quantity"] == 37
+        updated_var = next(v for v in updated_pub_p["variants"] if v["id"] == chosen_var["id"])
+        assert updated_var["stock_quantity"] == 22
+
+        print("\nALL 14 MULTI-VENDOR ISOLATION, SECURITY, SHIPPING, MOV, ORDER TRACKING, ADMIN PLAN/ADDON DELETION & PRODUCT VARIANTS TESTS PASSED PERFECTLY!")
 
 
 if __name__ == "__main__":

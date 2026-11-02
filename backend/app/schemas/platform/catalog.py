@@ -41,6 +41,28 @@ class ProductImageItem(BaseModel):
     is_thumbnail: bool
 
 
+class ProductVariantPayload(BaseModel):
+    id: Optional[uuid.UUID] = None
+    name: str = Field(min_length=1)
+    sku: Optional[str] = ""
+    price: Optional[float] = None
+    stock_quantity: int = Field(default=0, ge=0)
+    images: List[str] = []
+    sort_order: int = 0
+    is_active: bool = True
+
+
+class ProductVariantResponse(BaseModel):
+    id: uuid.UUID
+    name: str
+    sku: str
+    price: Optional[float] = None
+    stock_quantity: int
+    images: List[str] = []
+    sort_order: int
+    is_active: bool
+
+
 class ProductCreatePayload(BaseModel):
     name: str = Field(min_length=1)
     description: Optional[str] = None
@@ -51,8 +73,10 @@ class ProductCreatePayload(BaseModel):
     category_id: Optional[uuid.UUID] = None
     status: str = "active"  # active, inactive, out_of_stock
     is_featured: bool = False
+    has_variants: bool = False
     thumbnail_url: Optional[str] = None
     image_urls: Optional[List[str]] = []
+    variants: Optional[List[ProductVariantPayload]] = []
 
 
 class ProductUpdatePayload(BaseModel):
@@ -65,8 +89,10 @@ class ProductUpdatePayload(BaseModel):
     category_id: Optional[uuid.UUID] = None
     status: Optional[str] = None
     is_featured: Optional[bool] = None
+    has_variants: Optional[bool] = None
     thumbnail_url: Optional[str] = None
     image_urls: Optional[List[str]] = None
+    variants: Optional[List[ProductVariantPayload]] = None
 
 
 class ProductResponse(BaseModel):
@@ -83,8 +109,10 @@ class ProductResponse(BaseModel):
     stock_quantity: int
     status: str
     is_featured: bool
+    has_variants: bool = False
     thumbnail_url: Optional[str] = None
     images: List[ProductImageItem] = []
+    variants: List[ProductVariantResponse] = []
     created_at: datetime
 
 

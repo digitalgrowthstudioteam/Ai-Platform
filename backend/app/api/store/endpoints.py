@@ -3,6 +3,7 @@ Digital Growth Studio — Public Storefront & Android App API Endpoints
 All routes dynamically resolve by store slug and expose only sanitized customer-facing data.
 """
 import uuid
+import json
 from typing import List, Optional
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -12,8 +13,9 @@ from sqlalchemy.orm import selectinload
 
 from app.database import get_db
 from app.models.platform.vendor import PlatformStore, PlatformVendor, PlatformVendorAppConfig
-from app.models.platform.catalog import PlatformCategory, PlatformProduct, PlatformBanner
+from app.models.platform.catalog import PlatformCategory, PlatformProduct, PlatformProductVariant, PlatformBanner
 from app.models.platform.order import PlatformCustomer, PlatformOrder, PlatformOrderItem
+from app.schemas.platform.catalog import ProductVariantResponse
 from app.schemas.platform.store_public import (
     PublicStoreConfigResponse,
     PublicProductItem,
@@ -138,6 +140,30 @@ async def get_store_banners(slug: str, db: AsyncSession = Depends(get_db)):
     ]
 
 
+def serialize_public_variants(variants: List[PlatformProductVariant]) -> List[ProductVariantResponse]:
+    out = []
+    for v in sorted(variants, key=lambda x: x.sort_order):
+        if not v.is_active:
+            continue
+        imgs = []
+        if v.images_json:
+            try:
+                imgs = json.loads(v.images_json)
+            except Exception:
+                imgs = []
+        out.append(ProductVariantResponse(
+            id=v.id,
+            name=v.name,
+            sku=v.sku,
+            price=v.price,
+            stock_quantity=v.stock_quantity,
+            images=imgs,
+            sort_order=v.sort_order,
+            is_active=v.is_active,
+        ))
+    return out
+
+
 @router.get("/{slug}/products", response_model=List[PublicProductItem])
 async def get_store_products(
     slug: str,
@@ -156,6 +182,7 @@ async def get_store_products(
         .options(
             selectinload(PlatformProduct.category),
             selectinload(PlatformProduct.images),
+            selectinload(PlatformProduct.variants),
         )
         .order_by(desc(PlatformProduct.is_featured), desc(PlatformProduct.created_at))
     )
@@ -189,6 +216,8 @@ async def get_store_products(
                     is_thumbnail=img.is_thumbnail,
                 ) for img in sorted(p.images, key=lambda x: x.sort_order)
             ],
+            has_variants=p.has_variants,
+            variants=serialize_public_variants(p.variants or []),
             is_featured=p.is_featured,
         ))
     return output
@@ -211,6 +240,7 @@ async def get_store_product_detail(
         .options(
             selectinload(PlatformProduct.category),
             selectinload(PlatformProduct.images),
+            selectinload(PlatformProduct.variants),
         )
     )
     p = (await db.execute(stmt)).scalar_one_or_none()
@@ -239,6 +269,8 @@ async def get_store_product_detail(
                 is_thumbnail=img.is_thumbnail,
             ) for img in sorted(p.images, key=lambda x: x.sort_order)
         ],
+        has_variants=p.has_variants,
+        variants=serialize_public_variants(p.variants or []),
         is_featured=p.is_featured,
     )
 
@@ -280,9 +312,13 @@ async def create_store_order(
     order_items_to_create = []
 
     for item in payload.items:
-        p_stmt = select(PlatformProduct).where(
-            PlatformProduct.id == item.product_id,
-            PlatformProduct.vendor_id == vid,
+        p_stmt = (
+            select(PlatformProduct)
+            .where(
+                PlatformProduct.id == item.product_id,
+                PlatformProduct.vendor_id == vid,
+            )
+            .options(selectinload(PlatformProduct.variants))
         )
         product = (await db.execute(p_stmt)).scalar_one_or_none()
         if not product:
@@ -290,25 +326,55 @@ async def create_store_order(
                 status_code=400,
                 detail=f"Product '{item.product_id}' is not available in this store"
             )
-        if product.status != "active" or product.stock_quantity < item.quantity:
+        if product.status != "active":
             raise HTTPException(
                 status_code=400,
-                detail=f"Product '{product.name}' is out of stock or insufficient quantity"
+                detail=f"Product '{product.name}' is inactive or unavailable"
             )
 
         unit_price = product.sale_price if (product.sale_price and product.sale_price > 0) else product.regular_price
-        line_total = unit_price * item.quantity
-        calculated_total += line_total
+        item_variant_name = item.variant_name
+        item_sku = product.sku
 
-        # Deduct stock
-        product.stock_quantity -= item.quantity
+        # If a specific variant was ordered, validate and deduct variant stock
+        if item.variant_id:
+            v_stmt = select(PlatformProductVariant).where(
+                PlatformProductVariant.id == item.variant_id,
+                PlatformProductVariant.product_id == product.id,
+            )
+            variant = (await db.execute(v_stmt)).scalar_one_or_none()
+            if not variant:
+                raise HTTPException(status_code=400, detail=f"Variant not found for product '{product.name}'")
+            if variant.stock_quantity < item.quantity:
+                raise HTTPException(status_code=400, detail=f"Variant '{variant.name}' of '{product.name}' has insufficient stock ({variant.stock_quantity} remaining)")
+            
+            variant.stock_quantity -= item.quantity
+            item_variant_name = variant.name
+            if variant.sku:
+                item_sku = variant.sku
+            if variant.price and variant.price > 0:
+                unit_price = variant.price
+        else:
+            if product.stock_quantity < item.quantity:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Product '{product.name}' is out of stock or insufficient quantity"
+                )
+
+        # Deduct total product stock
+        product.stock_quantity = max(0, product.stock_quantity - item.quantity)
         if product.stock_quantity <= 0:
             product.status = "out_of_stock"
 
+        line_total = unit_price * item.quantity
+        calculated_total += line_total
+
         order_items_to_create.append({
             "product_id": product.id,
-            "product_name": product.name,
-            "product_sku": product.sku,
+            "variant_id": item.variant_id,
+            "variant_name": item_variant_name,
+            "product_name": f"{product.name} ({item_variant_name})" if item_variant_name else product.name,
+            "product_sku": item_sku,
             "price": unit_price,
             "quantity": item.quantity,
             "total": line_total,
@@ -355,6 +421,8 @@ async def create_store_order(
             order_id=order.id,
             vendor_id=vid,
             product_id=it_data["product_id"],
+            variant_id=it_data.get("variant_id"),
+            variant_name=it_data.get("variant_name"),
             product_name=it_data["product_name"],
             product_sku=it_data["product_sku"],
             price=it_data["price"],
@@ -389,6 +457,8 @@ async def create_store_order(
             OrderItemResponse(
                 id=it.id,
                 product_id=it.product_id,
+                variant_id=it.variant_id,
+                variant_name=it.variant_name,
                 product_name=it.product_name,
                 product_sku=it.product_sku,
                 price=it.price,

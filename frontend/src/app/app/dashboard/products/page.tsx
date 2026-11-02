@@ -30,6 +30,15 @@ interface ManagedImage {
   is_thumbnail: boolean;
 }
 
+interface ManagedVariant {
+  id: string;
+  name: string;
+  sku: string;
+  price: string;
+  stock_quantity: string;
+  images: string[];
+}
+
 export default function VendorProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -59,6 +68,12 @@ export default function VendorProductsPage() {
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  // Multiple Product Variants State
+  const [hasVariants, setHasVariants] = useState(false);
+  const [variants, setVariants] = useState<ManagedVariant[]>([]);
+  const [uploadingVariantIdx, setUploadingVariantIdx] = useState<number | null>(null);
+  const [variantUrlInputs, setVariantUrlInputs] = useState<{ [key: number]: string }>({});
+
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
@@ -80,6 +95,72 @@ export default function VendorProductsPage() {
   useEffect(() => {
     loadData();
   }, [selectedCat]);
+
+  const addVariantRow = () => {
+    const num = variants.length + 1;
+    const baseSku = formData.sku || "SKU";
+    setVariants((prev) => [
+      ...prev,
+      {
+        id: `var-${Date.now()}-${num}`,
+        name: "",
+        sku: `${baseSku}-V${num}`,
+        price: "",
+        stock_quantity: "10",
+        images: [],
+      },
+    ]);
+  };
+
+  const removeVariantRow = (index: number) => {
+    setVariants((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const updateVariantField = (index: number, field: keyof ManagedVariant, value: any) => {
+    setVariants((prev) =>
+      prev.map((v, i) => (i === index ? { ...v, [field]: value } : v))
+    );
+  };
+
+  const addVariantPhotoUrl = (index: number) => {
+    const url = (variantUrlInputs[index] || "").trim();
+    if (!url) return;
+    setVariants((prev) =>
+      prev.map((v, i) =>
+        i === index ? { ...v, images: [...v.images, url] } : v
+      )
+    );
+    setVariantUrlInputs((prev) => ({ ...prev, [index]: "" }));
+  };
+
+  const handleVariantFileUpload = async (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingVariantIdx(index);
+    try {
+      const res = await platformApi.uploadFile(file, "products");
+      setVariants((prev) =>
+        prev.map((v, i) =>
+          i === index ? { ...v, images: [...v.images, res.url] } : v
+        )
+      );
+    } catch (err: any) {
+      alert(err.message || "Variant photo upload failed");
+    } finally {
+      setUploadingVariantIdx(null);
+      e.target.value = "";
+    }
+  };
+
+  const removeVariantPhoto = (variantIndex: number, photoIndex: number) => {
+    setVariants((prev) =>
+      prev.map((v, i) =>
+        i === variantIndex
+          ? { ...v, images: v.images.filter((_, pIdx) => pIdx !== photoIndex) }
+          : v
+      )
+    );
+  };
 
   const openAddModal = () => {
     setEditingProduct(null);
@@ -103,6 +184,9 @@ export default function VendorProductsPage() {
       },
     ]);
     setNewImageUrl("");
+    setHasVariants(false);
+    setVariants([]);
+    setVariantUrlInputs({});
     setIsModalOpen(true);
   };
 
@@ -142,6 +226,24 @@ export default function VendorProductsPage() {
     }
     setProductImages(initialImages);
     setNewImageUrl("");
+
+    if (p.has_variants && p.variants && p.variants.length > 0) {
+      setHasVariants(true);
+      setVariants(
+        p.variants.map((v) => ({
+          id: v.id,
+          name: v.name,
+          sku: v.sku,
+          price: v.price !== undefined && v.price !== null ? String(v.price) : "",
+          stock_quantity: String(v.stock_quantity),
+          images: v.images || [],
+        }))
+      );
+    } else {
+      setHasVariants(false);
+      setVariants([]);
+    }
+    setVariantUrlInputs({});
     setIsModalOpen(true);
   };
 
@@ -240,6 +342,25 @@ export default function VendorProductsPage() {
         thumbnail_url: productImages.length > 0 ? productImages[0].image_url : null,
         image_urls: productImages.map((img) => img.image_url),
       };
+
+      if (hasVariants && variants.length > 0) {
+        const formattedVariants = variants.map((v, i) => ({
+          id: v.id.startsWith("var-") ? undefined : v.id,
+          name: v.name.trim() || `Variant ${i + 1}`,
+          sku: v.sku.trim() || `${formData.sku}-V${i + 1}`,
+          price: v.price ? parseFloat(v.price) : null,
+          stock_quantity: parseInt(v.stock_quantity, 10) || 0,
+          images: v.images,
+          sort_order: i,
+          is_active: true,
+        }));
+        payload.has_variants = true;
+        payload.variants = formattedVariants;
+        payload.stock_quantity = formattedVariants.reduce((sum, v) => sum + v.stock_quantity, 0);
+      } else {
+        payload.has_variants = false;
+        payload.variants = [];
+      }
 
       if (editingProduct) {
         await platformApi.updateProduct(editingProduct.id, payload);
@@ -382,9 +503,14 @@ export default function VendorProductsPage() {
                             )}
                           </div>
                           <div>
-                            <p className="font-semibold text-slate-900 flex items-center gap-1.5">
+                            <p className="font-semibold text-slate-900 flex items-center gap-1.5 flex-wrap">
                               {p.name}
                               {p.is_featured && <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />}
+                              {p.has_variants && p.variants && p.variants.length > 0 && (
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                                  {p.variants.length} Variants
+                                </span>
+                              )}
                             </p>
                             <p className="text-[11px] text-slate-400 truncate max-w-xs">{p.description}</p>
                           </div>
@@ -440,7 +566,7 @@ export default function VendorProductsPage() {
       {/* Product Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-xl border border-slate-200 max-h-[92vh] overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-3xl w-full p-6 shadow-xl border border-slate-200 max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <div>
                 <h3 className="text-lg font-bold text-slate-900">
@@ -527,14 +653,19 @@ export default function VendorProductsPage() {
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                    Stock Quantity
+                    Stock Quantity {hasVariants && "(Auto-summed)"}
                   </label>
                   <input
                     type="number"
-                    required
-                    value={formData.stock_quantity}
+                    required={!hasVariants}
+                    disabled={hasVariants}
+                    value={
+                      hasVariants
+                        ? variants.reduce((sum, v) => sum + (parseInt(v.stock_quantity, 10) || 0), 0)
+                        : formData.stock_quantity
+                    }
                     onChange={(e) => setFormData({ ...formData, stock_quantity: e.target.value })}
-                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-75 disabled:bg-slate-100"
                   />
                 </div>
               </div>
@@ -572,6 +703,220 @@ export default function VendorProductsPage() {
                     <option value="out_of_stock">Out of Stock</option>
                   </select>
                 </div>
+              </div>
+
+              {/* Product Variants & Options Section */}
+              <div className="pt-3 border-t border-slate-200">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3.5 rounded-xl bg-purple-50/70 border border-purple-200/80">
+                  <div className="flex items-center gap-2.5">
+                    <input
+                      type="checkbox"
+                      id="has_variants"
+                      checked={hasVariants}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setHasVariants(checked);
+                        if (checked && variants.length === 0) {
+                          addVariantRow();
+                        }
+                      }}
+                      className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500 cursor-pointer"
+                    />
+                    <div>
+                      <label htmlFor="has_variants" className="text-xs font-bold text-purple-950 cursor-pointer block">
+                        Multiple Variants (e.g. Sizes, Colors, Volumes, Models)
+                      </label>
+                      <p className="text-[11px] text-purple-700/80">
+                        Enable if this product has options with distinct photos and individual stock counts.
+                      </p>
+                    </div>
+                  </div>
+                  {hasVariants && (
+                    <button
+                      type="button"
+                      onClick={addVariantRow}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold shadow-2xs transition-colors shrink-0 cursor-pointer self-start sm:self-auto"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      Add Variant
+                    </button>
+                  )}
+                </div>
+
+                {hasVariants && (
+                  <div className="mt-3 space-y-3">
+                    {variants.map((v, vIdx) => (
+                      <div
+                        key={v.id || vIdx}
+                        className="p-3.5 rounded-xl border border-purple-200 bg-white shadow-2xs space-y-3"
+                      >
+                        <div className="flex items-center justify-between pb-2 border-b border-purple-100">
+                          <span className="inline-flex items-center gap-2 text-xs font-bold text-purple-900">
+                            <span className="w-5 h-5 rounded-full bg-purple-100 text-purple-700 text-[10px] flex items-center justify-center font-bold">
+                              {vIdx + 1}
+                            </span>
+                            Variant #{vIdx + 1}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => removeVariantRow(vIdx)}
+                            className="text-slate-400 hover:text-rose-600 p-1 rounded-md transition-colors cursor-pointer"
+                            title="Remove variant"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
+                          <div className="sm:col-span-1">
+                            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-0.5">
+                              Variant Name *
+                            </label>
+                            <input
+                              type="text"
+                              required={hasVariants}
+                              value={v.name}
+                              onChange={(e) => updateVariantField(vIdx, "name", e.target.value)}
+                              placeholder="e.g. Small / Red"
+                              className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:bg-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-0.5">
+                              SKU
+                            </label>
+                            <input
+                              type="text"
+                              value={v.sku}
+                              onChange={(e) => updateVariantField(vIdx, "sku", e.target.value)}
+                              placeholder="SKU-VAR-1"
+                              className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono focus:bg-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-0.5">
+                              Stock Qty *
+                            </label>
+                            <input
+                              type="number"
+                              required={hasVariants}
+                              min="0"
+                              value={v.stock_quantity}
+                              onChange={(e) => updateVariantField(vIdx, "stock_quantity", e.target.value)}
+                              placeholder="10"
+                              className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:bg-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-0.5">
+                              Price (₹ optional)
+                            </label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={v.price}
+                              onChange={(e) => updateVariantField(vIdx, "price", e.target.value)}
+                              placeholder="Default price"
+                              className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:bg-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Variant Photos Sub-Gallery */}
+                        <div className="pt-2 border-t border-slate-100">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-[11px] font-semibold text-slate-700">
+                              Variant Photos ({v.images.length})
+                            </span>
+                            <span className="text-[10px] text-slate-400">
+                              Dedicated photos shown when customer selects this variant
+                            </span>
+                          </div>
+
+                          {/* Thumbnail strip */}
+                          {v.images.length > 0 && (
+                            <div className="flex flex-wrap gap-2 mb-2">
+                              {v.images.map((imgUrl, imgIdx) => (
+                                <div key={imgIdx} className="relative group w-12 h-12 rounded-lg border border-slate-200 overflow-hidden bg-slate-100">
+                                  <img
+                                    src={imgUrl}
+                                    alt={`Variant photo ${imgIdx + 1}`}
+                                    className="w-full h-full object-cover"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => removeVariantPhoto(vIdx, imgIdx)}
+                                    className="absolute top-0.5 right-0.5 p-0.5 rounded-full bg-slate-900/80 text-white hover:bg-rose-600 transition-colors cursor-pointer"
+                                    title="Remove photo"
+                                  >
+                                    <X className="w-2.5 h-2.5" />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Upload / URL Input Row */}
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              type="url"
+                              value={variantUrlInputs[vIdx] || ""}
+                              onChange={(e) =>
+                                setVariantUrlInputs((prev) => ({ ...prev, [vIdx]: e.target.value }))
+                              }
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  addVariantPhotoUrl(vIdx);
+                                }
+                              }}
+                              placeholder="Paste variant image URL..."
+                              className="flex-1 px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:bg-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => addVariantPhotoUrl(vIdx)}
+                              className="px-2.5 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-800 text-white text-xs font-semibold transition-colors shrink-0 cursor-pointer"
+                            >
+                              Add URL
+                            </button>
+                            <label className="cursor-pointer inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 text-xs font-semibold transition-colors shrink-0">
+                              {uploadingVariantIdx === vIdx ? (
+                                <>
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  <span>...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Upload className="w-3.5 h-3.5" />
+                                  <span>Upload</span>
+                                </>
+                              )}
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={(e) => handleVariantFileUpload(vIdx, e)}
+                                className="hidden"
+                              />
+                            </label>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+
+                    <button
+                      type="button"
+                      onClick={addVariantRow}
+                      className="w-full py-2 border border-dashed border-purple-300 hover:border-purple-500 hover:bg-purple-50/50 rounded-xl text-purple-700 font-semibold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      Add Another Variant
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Multiple Images Gallery Manager */}

@@ -9,6 +9,8 @@ from pydantic import BaseModel, Field
 
 class OrderItemCreate(BaseModel):
     product_id: uuid.UUID
+    variant_id: Optional[uuid.UUID] = None
+    variant_name: Optional[str] = None
     quantity: int = Field(gt=0)
 
 
@@ -25,6 +27,8 @@ class PublicOrderCreateRequest(BaseModel):
 class OrderItemResponse(BaseModel):
     id: uuid.UUID
     product_id: Optional[uuid.UUID] = None
+    variant_id: Optional[uuid.UUID] = None
+    variant_name: Optional[str] = None
     product_name: str
     product_sku: Optional[str] = None
     price: float

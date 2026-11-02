@@ -29,6 +29,7 @@ export default function ProductDetailClient() {
   const [product, setProduct] = useState<any>(null);
   const [config, setConfig] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [selectedVariantId, setSelectedVariantId] = useState<string>("");
   const [activeImage, setActiveImage] = useState<string>("");
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
@@ -44,10 +45,22 @@ export default function ProductDetailClient() {
         ]);
         setProduct(prod);
         setConfig(cfg);
-        if (prod?.images && prod.images.length > 0) {
-          setActiveImage(prod.images[0].image_url);
-        } else if (prod?.thumbnail_url) {
-          setActiveImage(prod.thumbnail_url);
+        if (prod?.has_variants && prod.variants && prod.variants.length > 0) {
+          const firstVar = prod.variants[0];
+          setSelectedVariantId(firstVar.id);
+          if (firstVar.images && firstVar.images.length > 0) {
+            setActiveImage(firstVar.images[0]);
+          } else if (prod?.images && prod.images.length > 0) {
+            setActiveImage(prod.images[0].image_url);
+          } else if (prod?.thumbnail_url) {
+            setActiveImage(prod.thumbnail_url);
+          }
+        } else {
+          if (prod?.images && prod.images.length > 0) {
+            setActiveImage(prod.images[0].image_url);
+          } else if (prod?.thumbnail_url) {
+            setActiveImage(prod.thumbnail_url);
+          }
         }
       } catch (e) {
         console.error("Failed to load product detail:", e);
@@ -98,24 +111,39 @@ export default function ProductDetailClient() {
     );
   }
 
-  const imagesList = product.images && product.images.length > 0
-    ? product.images.map((img: any) => img.image_url)
-    : product.thumbnail_url
-    ? [product.thumbnail_url]
-    : [];
+  const selectedVariant =
+    product?.has_variants && product.variants && product.variants.length > 0
+      ? product.variants.find((v: any) => v.id === selectedVariantId) || product.variants[0]
+      : null;
+
+  const imagesList =
+    selectedVariant?.images && selectedVariant.images.length > 0
+      ? selectedVariant.images
+      : product.images && product.images.length > 0
+      ? product.images.map((img: any) => img.image_url)
+      : product.thumbnail_url
+      ? [product.thumbnail_url]
+      : [];
+
+  const currentPrice = selectedVariant?.price && selectedVariant.price > 0 ? selectedVariant.price : product.effective_price;
+  const currentRegularPrice = selectedVariant?.price && selectedVariant.price > 0 ? selectedVariant.price : product.regular_price;
+  const currentStock = selectedVariant ? selectedVariant.stock_quantity : (product.stock_quantity || 0);
+  const isInStock = currentStock > 0 && product.status === "active";
 
   const handleAddToCart = () => {
     addItem({
-      id: product.id,
+      id: selectedVariant ? `${product.id}-${selectedVariant.id}` : product.id,
       product_id: product.id,
-      name: product.name,
+      variant_id: selectedVariant ? selectedVariant.id : undefined,
+      variant_name: selectedVariant ? selectedVariant.name : undefined,
+      name: selectedVariant ? `${product.name} (${selectedVariant.name})` : product.name,
       slug: product.slug,
-      sku: product.sku,
-      price: product.regular_price,
-      effective_price: product.effective_price,
-      thumbnail_url: product.thumbnail_url || (imagesList.length > 0 ? imagesList[0] : undefined),
+      sku: selectedVariant?.sku || product.sku,
+      price: currentRegularPrice,
+      effective_price: currentPrice,
+      thumbnail_url: (selectedVariant?.images && selectedVariant.images.length > 0) ? selectedVariant.images[0] : (product.thumbnail_url || (imagesList.length > 0 ? imagesList[0] : undefined)),
       quantity: qty,
-      stock_quantity: product.stock_quantity,
+      stock_quantity: currentStock,
     });
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
@@ -123,16 +151,18 @@ export default function ProductDetailClient() {
 
   const handleBuyNow = () => {
     addItem({
-      id: product.id,
+      id: selectedVariant ? `${product.id}-${selectedVariant.id}` : product.id,
       product_id: product.id,
-      name: product.name,
+      variant_id: selectedVariant ? selectedVariant.id : undefined,
+      variant_name: selectedVariant ? selectedVariant.name : undefined,
+      name: selectedVariant ? `${product.name} (${selectedVariant.name})` : product.name,
       slug: product.slug,
-      sku: product.sku,
-      price: product.regular_price,
-      effective_price: product.effective_price,
-      thumbnail_url: product.thumbnail_url || (imagesList.length > 0 ? imagesList[0] : undefined),
+      sku: selectedVariant?.sku || product.sku,
+      price: currentRegularPrice,
+      effective_price: currentPrice,
+      thumbnail_url: (selectedVariant?.images && selectedVariant.images.length > 0) ? selectedVariant.images[0] : (product.thumbnail_url || (imagesList.length > 0 ? imagesList[0] : undefined)),
       quantity: qty,
-      stock_quantity: product.stock_quantity,
+      stock_quantity: currentStock,
     });
     router.push(`/app/store/${slug}/checkout`);
   };
@@ -226,11 +256,11 @@ export default function ProductDetailClient() {
               <div>
                 <div className="flex items-baseline gap-2">
                   <span className="text-2xl font-black text-slate-900 font-mono">
-                    ₹{product.effective_price.toLocaleString("en-IN")}
+                    ₹{currentPrice.toLocaleString("en-IN")}
                   </span>
-                  {product.sale_price && product.sale_price < product.regular_price && (
+                  {currentRegularPrice > currentPrice && (
                     <span className="text-sm text-slate-400 line-through font-mono">
-                      ₹{product.regular_price.toLocaleString("en-IN")}
+                      ₹{currentRegularPrice.toLocaleString("en-IN")}
                     </span>
                   )}
                 </div>
@@ -239,14 +269,70 @@ export default function ProductDetailClient() {
 
               <span
                 className={`px-3 py-1 rounded-full text-xs font-bold ${
-                  product.in_stock
+                  isInStock
                     ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                     : "bg-rose-50 text-rose-700 border border-rose-200"
                 }`}
               >
-                {product.in_stock ? `In Stock (${product.stock_quantity})` : "Out of Stock"}
+                {isInStock ? `In Stock (${currentStock})` : "Out of Stock"}
               </span>
             </div>
+
+            {/* Product Variants Selector */}
+            {product.has_variants && product.variants && product.variants.length > 0 && (
+              <div className="space-y-2.5 pt-1">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                    Select Option / Variant:
+                  </label>
+                  {selectedVariant && (
+                    <span className="text-xs font-semibold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200">
+                      {selectedVariant.name}
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {product.variants.map((v: any) => {
+                    const isSelected = v.id === (selectedVariant?.id || "");
+                    const hasStock = v.stock_quantity > 0;
+                    return (
+                      <button
+                        key={v.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedVariantId(v.id);
+                          if (v.images && v.images.length > 0) {
+                            setActiveImage(v.images[0]);
+                          }
+                        }}
+                        className={`px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer flex items-center gap-2 ${
+                          isSelected
+                            ? "bg-blue-600 text-white border-blue-600 shadow-xs ring-2 ring-blue-100"
+                            : hasStock
+                            ? "bg-white border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+                            : "bg-slate-50 border-slate-200 text-slate-400 opacity-60 line-through"
+                        }`}
+                      >
+                        <span>{v.name}</span>
+                        {v.price && v.price !== product.regular_price && (
+                          <span className={`text-[11px] font-mono ${isSelected ? "text-blue-100" : "text-slate-500"}`}>
+                            ₹{v.price}
+                          </span>
+                        )}
+                        {hasStock ? (
+                          <span className={`text-[10px] font-normal ${isSelected ? "text-blue-100" : "text-emerald-600"}`}>
+                            ({v.stock_quantity})
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-rose-500 font-normal">Sold Out</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Quantity Selector */}
             <div className="flex items-center gap-4 text-xs font-semibold text-slate-700">
@@ -261,8 +347,8 @@ export default function ProductDetailClient() {
                 </button>
                 <span className="w-12 text-center font-bold font-mono text-sm">{qty}</span>
                 <button
-                  onClick={() => setQty(Math.min(product.stock_quantity || 10, qty + 1))}
-                  disabled={qty >= (product.stock_quantity || 10)}
+                  onClick={() => setQty(Math.min(currentStock || 10, qty + 1))}
+                  disabled={qty >= (currentStock || 10)}
                   className="p-2 hover:bg-slate-100 disabled:opacity-40 transition-colors"
                 >
                   <Plus className="w-3.5 h-3.5" />
@@ -274,8 +360,8 @@ export default function ProductDetailClient() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
               <button
                 onClick={handleAddToCart}
-                disabled={!product.in_stock}
-                className="py-3 px-5 rounded-xl text-xs font-bold border-2 transition-all flex items-center justify-center gap-2 hover:bg-slate-50 disabled:opacity-50"
+                disabled={!isInStock}
+                className="py-3 px-5 rounded-xl text-xs font-bold border-2 transition-all flex items-center justify-center gap-2 hover:bg-slate-50 disabled:opacity-50 cursor-pointer"
                 style={{ borderColor: primaryColor, color: primaryColor }}
               >
                 {added ? (
@@ -293,8 +379,8 @@ export default function ProductDetailClient() {
 
               <button
                 onClick={handleBuyNow}
-                disabled={!product.in_stock}
-                className="py-3 px-5 rounded-xl text-xs font-bold text-white shadow-xs hover:opacity-95 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
+                disabled={!isInStock}
+                className="py-3 px-5 rounded-xl text-xs font-bold text-white shadow-xs hover:opacity-95 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
                 style={{ backgroundColor: primaryColor }}
               >
                 <Zap className="w-4 h-4" />
@@ -342,12 +428,14 @@ export default function ProductDetailClient() {
       {/* Mobile Sticky Bottom Action Bar */}
       <div className="sm:hidden fixed bottom-0 left-0 right-0 p-3 bg-white/95 backdrop-blur-md border-t border-slate-200 z-40 flex items-center gap-2 shadow-lg">
         <div className="flex-1 min-w-0 pr-2">
-          <p className="text-[10px] text-slate-500 font-medium truncate">{product.name}</p>
-          <p className="text-sm font-black text-slate-900 font-mono">₹{product.effective_price.toLocaleString("en-IN")}</p>
+          <p className="text-[10px] text-slate-500 font-medium truncate">
+            {selectedVariant ? `${product.name} (${selectedVariant.name})` : product.name}
+          </p>
+          <p className="text-sm font-black text-slate-900 font-mono">₹{currentPrice.toLocaleString("en-IN")}</p>
         </div>
         <button
           onClick={handleAddToCart}
-          disabled={!product.in_stock}
+          disabled={!isInStock}
           className="py-2.5 px-3 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-1.5 hover:bg-slate-50 disabled:opacity-50 cursor-pointer"
           style={{ borderColor: primaryColor, color: primaryColor }}
         >
@@ -356,7 +444,7 @@ export default function ProductDetailClient() {
         </button>
         <button
           onClick={handleBuyNow}
-          disabled={!product.in_stock}
+          disabled={!isInStock}
           className="py-2.5 px-4 rounded-xl text-xs font-bold text-white shadow-xs hover:opacity-95 transition-opacity disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer"
           style={{ backgroundColor: primaryColor }}
         >

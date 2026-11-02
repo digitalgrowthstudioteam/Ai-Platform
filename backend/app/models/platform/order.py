@@ -53,6 +53,8 @@ class PlatformOrderItem(BaseModel):
     order_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("platform_orders.id", ondelete="CASCADE"), nullable=False, index=True)
     vendor_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("platform_vendors.id", ondelete="CASCADE"), nullable=False, index=True)
     product_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("platform_products.id", ondelete="SET NULL"), nullable=True)
+    variant_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("platform_product_variants.id", ondelete="SET NULL"), nullable=True)
+    variant_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     product_name: Mapped[str] = mapped_column(String(255), nullable=False)
     product_sku: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     price: Mapped[float] = mapped_column(Float, nullable=False)

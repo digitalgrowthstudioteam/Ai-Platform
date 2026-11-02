@@ -4,6 +4,7 @@ All operations strictly enforce vendor isolation.
 """
 import uuid
 import re
+import json
 from typing import List, Optional
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
@@ -25,6 +26,7 @@ from app.models.platform.catalog import (
     PlatformCategory,
     PlatformProduct,
     PlatformProductImage,
+    PlatformProductVariant,
     PlatformBanner,
 )
 from app.models.platform.order import (
@@ -49,6 +51,8 @@ from app.schemas.platform.catalog import (
     BannerUpdatePayload,
     BannerResponse,
     ProductImageItem,
+    ProductVariantPayload,
+    ProductVariantResponse,
 )
 from app.schemas.platform.order import (
     OrderResponse,
@@ -306,6 +310,28 @@ async def delete_vendor_category(
 # ──────────────────────────────────────────────
 # 4. Product Management
 # ──────────────────────────────────────────────
+def serialize_variants(variants: List[PlatformProductVariant]) -> List[ProductVariantResponse]:
+    out = []
+    for v in sorted(variants, key=lambda x: x.sort_order):
+        imgs = []
+        if v.images_json:
+            try:
+                imgs = json.loads(v.images_json)
+            except Exception:
+                imgs = []
+        out.append(ProductVariantResponse(
+            id=v.id,
+            name=v.name,
+            sku=v.sku,
+            price=v.price,
+            stock_quantity=v.stock_quantity,
+            images=imgs,
+            sort_order=v.sort_order,
+            is_active=v.is_active,
+        ))
+    return out
+
+
 @router.get("/products", response_model=List[ProductResponse])
 async def list_vendor_products(
     category_id: Optional[uuid.UUID] = None,
@@ -320,6 +346,7 @@ async def list_vendor_products(
         .options(
             selectinload(PlatformProduct.category),
             selectinload(PlatformProduct.images),
+            selectinload(PlatformProduct.variants),
         )
         .order_by(desc(PlatformProduct.created_at))
     )
@@ -346,6 +373,7 @@ async def list_vendor_products(
             stock_quantity=p.stock_quantity,
             status=p.status,
             is_featured=p.is_featured,
+            has_variants=p.has_variants,
             thumbnail_url=p.thumbnail_url,
             images=[
                 ProductImageItem(
@@ -355,6 +383,7 @@ async def list_vendor_products(
                     is_thumbnail=img.is_thumbnail,
                 ) for img in sorted(p.images, key=lambda x: x.sort_order)
             ],
+            variants=serialize_variants(p.variants or []),
             created_at=p.created_at,
         ))
     return output
@@ -376,6 +405,9 @@ async def create_vendor_product(
         if not (await db.execute(c_stmt)).scalar_one_or_none():
             raise HTTPException(status_code=400, detail="Invalid category ID")
 
+    has_variants = bool(payload.variants and len(payload.variants) > 0)
+    stock_qty = sum(v.stock_quantity for v in payload.variants) if has_variants else payload.stock_quantity
+
     product = PlatformProduct(
         vendor_id=vid,
         category_id=payload.category_id,
@@ -385,9 +417,10 @@ async def create_vendor_product(
         regular_price=payload.regular_price,
         sale_price=payload.sale_price,
         sku=payload.sku or f"SKU-{uuid.uuid4().hex[:6].upper()}",
-        stock_quantity=payload.stock_quantity,
+        stock_quantity=stock_qty,
         status=payload.status,
         is_featured=payload.is_featured,
+        has_variants=has_variants,
         thumbnail_url=payload.thumbnail_url or (payload.image_urls[0] if payload.image_urls else None),
     )
     db.add(product)
@@ -405,6 +438,23 @@ async def create_vendor_product(
             )
             db.add(img)
 
+    # Add variants
+    if payload.variants:
+        for idx, v in enumerate(payload.variants):
+            var_sku = v.sku.strip() if (v.sku and v.sku.strip()) else f"{product.sku}-{idx+1}"
+            var_record = PlatformProductVariant(
+                product_id=product.id,
+                vendor_id=vid,
+                name=v.name.strip(),
+                sku=var_sku,
+                price=v.price,
+                stock_quantity=v.stock_quantity,
+                images_json=json.dumps(v.images or []),
+                sort_order=v.sort_order if v.sort_order else idx,
+                is_active=v.is_active,
+            )
+            db.add(var_record)
+
     # Update vendor product count in storage record
     await db.execute(
         update(PlatformStorageUsage)
@@ -418,7 +468,11 @@ async def create_vendor_product(
     stmt = (
         select(PlatformProduct)
         .where(PlatformProduct.id == product.id)
-        .options(selectinload(PlatformProduct.category), selectinload(PlatformProduct.images))
+        .options(
+            selectinload(PlatformProduct.category),
+            selectinload(PlatformProduct.images),
+            selectinload(PlatformProduct.variants),
+        )
     )
     saved = (await db.execute(stmt)).scalar_one()
 
@@ -436,6 +490,7 @@ async def create_vendor_product(
         stock_quantity=saved.stock_quantity,
         status=saved.status,
         is_featured=saved.is_featured,
+        has_variants=saved.has_variants,
         thumbnail_url=saved.thumbnail_url,
         images=[
             ProductImageItem(
@@ -445,6 +500,7 @@ async def create_vendor_product(
                 is_thumbnail=img.is_thumbnail,
             ) for img in sorted(saved.images, key=lambda x: x.sort_order)
         ],
+        variants=serialize_variants(saved.variants or []),
         created_at=saved.created_at,
     )
 
@@ -461,7 +517,11 @@ async def update_vendor_product(
     stmt = (
         select(PlatformProduct)
         .where(PlatformProduct.id == product_id, PlatformProduct.vendor_id == vid)
-        .options(selectinload(PlatformProduct.category), selectinload(PlatformProduct.images))
+        .options(
+            selectinload(PlatformProduct.category),
+            selectinload(PlatformProduct.images),
+            selectinload(PlatformProduct.variants),
+        )
     )
     product = (await db.execute(stmt)).scalar_one_or_none()
     if not product:
@@ -469,6 +529,8 @@ async def update_vendor_product(
 
     data = payload.model_dump(exclude_unset=True)
     image_urls = data.pop("image_urls", None)
+    variants_payload = data.pop("variants", None)
+    has_variants_payload = data.pop("has_variants", None)
 
     for field, value in data.items():
         if field == "name" and value:
@@ -491,7 +553,43 @@ async def update_vendor_product(
         else:
             product.thumbnail_url = None
 
+    if variants_payload is not None:
+        # Delete existing variants and re-insert
+        await db.execute(delete(PlatformProductVariant).where(PlatformProductVariant.product_id == product.id))
+        has_vars = len(variants_payload) > 0
+        product.has_variants = has_vars
+        if has_vars:
+            product.stock_quantity = sum(v.stock_quantity for v in variants_payload)
+            for idx, v in enumerate(variants_payload):
+                var_sku = v.sku.strip() if (v.sku and v.sku.strip()) else f"{product.sku}-{idx+1}"
+                var_record = PlatformProductVariant(
+                    product_id=product.id,
+                    vendor_id=vid,
+                    name=v.name.strip(),
+                    sku=var_sku,
+                    price=v.price,
+                    stock_quantity=v.stock_quantity,
+                    images_json=json.dumps(v.images or []),
+                    sort_order=v.sort_order if v.sort_order else idx,
+                    is_active=v.is_active,
+                )
+                db.add(var_record)
+    elif has_variants_payload is not None:
+        product.has_variants = has_variants_payload
+
     await db.commit()
+
+    # Reload product with variants
+    stmt = (
+        select(PlatformProduct)
+        .where(PlatformProduct.id == product.id)
+        .options(
+            selectinload(PlatformProduct.category),
+            selectinload(PlatformProduct.images),
+            selectinload(PlatformProduct.variants),
+        )
+    )
+    product = (await db.execute(stmt)).scalar_one()
 
     return ProductResponse(
         id=product.id,
@@ -507,6 +605,7 @@ async def update_vendor_product(
         stock_quantity=product.stock_quantity,
         status=product.status,
         is_featured=product.is_featured,
+        has_variants=product.has_variants,
         thumbnail_url=product.thumbnail_url,
         images=[
             ProductImageItem(
@@ -516,6 +615,7 @@ async def update_vendor_product(
                 is_thumbnail=img.is_thumbnail,
             ) for img in sorted(product.images, key=lambda x: x.sort_order)
         ],
+        variants=serialize_variants(product.variants or []),
         created_at=product.created_at,
     )
 

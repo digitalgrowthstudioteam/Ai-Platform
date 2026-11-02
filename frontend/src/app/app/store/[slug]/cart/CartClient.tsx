@@ -150,7 +150,7 @@ export default function CartClient() {
               {/* Items List */}
               <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs divide-y divide-slate-100">
                 {items.map((item) => (
-                  <div key={item.product_id} className="p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div key={item.id} className="p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <div className="flex items-center gap-3.5 flex-1 min-w-0">
                       {item.thumbnail_url ? (
                         <img
@@ -170,8 +170,13 @@ export default function CartClient() {
                         >
                           {item.name}
                         </Link>
+                        {item.variant_name && (
+                          <span className="inline-block px-2 py-0.5 mt-0.5 rounded-md text-[10px] font-semibold bg-purple-50 text-purple-700 border border-purple-200">
+                            Option: {item.variant_name}
+                          </span>
+                        )}
                         {item.sku && (
-                          <p className="text-[11px] text-slate-400 font-mono">SKU: {item.sku}</p>
+                          <p className="text-[11px] text-slate-400 font-mono mt-0.5">SKU: {item.sku}</p>
                         )}
                         <p className="text-xs font-semibold text-slate-900 mt-1">
                           ₹{item.effective_price.toLocaleString("en-IN")}
@@ -188,7 +193,7 @@ export default function CartClient() {
                     <div className="flex items-center justify-between sm:justify-end gap-6 w-full sm:w-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
                       <div className="flex items-center border border-slate-200 rounded-xl overflow-hidden bg-slate-50">
                         <button
-                          onClick={() => updateQty(item.product_id, item.quantity - 1)}
+                          onClick={() => updateQty(item.id, item.quantity - 1)}
                           className="p-1.5 hover:bg-slate-200 text-slate-600 transition-colors"
                           title="Decrease"
                         >
@@ -196,7 +201,7 @@ export default function CartClient() {
                         </button>
                         <span className="w-10 text-center font-bold text-xs font-mono">{item.quantity}</span>
                         <button
-                          onClick={() => updateQty(item.product_id, item.quantity + 1)}
+                          onClick={() => updateQty(item.id, item.quantity + 1)}
                           className="p-1.5 hover:bg-slate-200 text-slate-600 transition-colors"
                           title="Increase"
                         >
@@ -211,7 +216,7 @@ export default function CartClient() {
                       </div>
 
                       <button
-                        onClick={() => removeItem(item.product_id)}
+                        onClick={() => removeItem(item.id)}
                         className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
                         title="Remove item"
                       >

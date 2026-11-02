@@ -7,8 +7,10 @@
 import { useState, useEffect, useCallback } from "react";
 
 export interface StoreCartItem {
-  id: string; // product id
+  id: string; // unique item id (e.g. prod_id or prod_id:variant_id)
   product_id: string;
+  variant_id?: string;
+  variant_name?: string;
   name: string;
   slug?: string;
   sku?: string;
@@ -49,7 +51,10 @@ export function saveStoreCart(slug: string, items: StoreCartItem[]): void {
 export function addStoreCartItem(slug: string, item: Omit<StoreCartItem, "quantity"> & { quantity?: number }): StoreCartItem[] {
   const current = getStoreCart(slug);
   const qtyToAdd = item.quantity && item.quantity > 0 ? item.quantity : 1;
-  const existingIdx = current.findIndex((i) => i.product_id === item.product_id);
+  const matchKey = (i: StoreCartItem) =>
+    i.product_id === item.product_id && (i.variant_id || "") === (item.variant_id || "");
+
+  const existingIdx = current.findIndex(matchKey);
 
   let updated: StoreCartItem[];
   if (existingIdx !== -1) {
@@ -65,6 +70,7 @@ export function addStoreCartItem(slug: string, item: Omit<StoreCartItem, "quanti
       ...current,
       {
         ...item,
+        id: item.variant_id ? `${item.product_id}-${item.variant_id}` : item.product_id,
         quantity: qtyToAdd,
       },
     ];
@@ -74,13 +80,13 @@ export function addStoreCartItem(slug: string, item: Omit<StoreCartItem, "quanti
   return updated;
 }
 
-export function updateStoreCartItemQty(slug: string, productId: string, quantity: number): StoreCartItem[] {
+export function updateStoreCartItemQty(slug: string, itemIdOrProdId: string, quantity: number): StoreCartItem[] {
   const current = getStoreCart(slug);
   if (quantity <= 0) {
-    return removeStoreCartItem(slug, productId);
+    return removeStoreCartItem(slug, itemIdOrProdId);
   }
   const updated = current.map((item) => {
-    if (item.product_id === productId) {
+    if (item.id === itemIdOrProdId || item.product_id === itemIdOrProdId) {
       const max = item.stock_quantity ?? 99;
       return { ...item, quantity: Math.min(quantity, max) };
     }
@@ -90,9 +96,9 @@ export function updateStoreCartItemQty(slug: string, productId: string, quantity
   return updated;
 }
 
-export function removeStoreCartItem(slug: string, productId: string): StoreCartItem[] {
+export function removeStoreCartItem(slug: string, itemIdOrProdId: string): StoreCartItem[] {
   const current = getStoreCart(slug);
-  const updated = current.filter((item) => item.product_id !== productId);
+  const updated = current.filter((item) => item.id !== itemIdOrProdId && item.product_id !== itemIdOrProdId);
   saveStoreCart(slug, updated);
   return updated;
 }

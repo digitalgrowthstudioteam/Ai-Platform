@@ -38,6 +38,7 @@ class PlatformProduct(BaseModel):
     stock_quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     status: Mapped[str] = mapped_column(String(50), nullable=False, default="active")  # active, inactive, out_of_stock
     is_featured: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    has_variants: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     thumbnail_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
 
     category: Mapped[Optional["PlatformCategory"]] = relationship("PlatformCategory", back_populates="products")
@@ -47,6 +48,29 @@ class PlatformProduct(BaseModel):
         cascade="all, delete-orphan",
         order_by="PlatformProductImage.sort_order",
     )
+    variants: Mapped[List["PlatformProductVariant"]] = relationship(
+        "PlatformProductVariant",
+        back_populates="product",
+        cascade="all, delete-orphan",
+        order_by="PlatformProductVariant.sort_order",
+    )
+
+
+class PlatformProductVariant(BaseModel):
+    """Product variant with independent SKU, quantity, custom pricing, and multiple photos."""
+    __tablename__ = "platform_product_variants"
+
+    product_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("platform_products.id", ondelete="CASCADE"), nullable=False, index=True)
+    vendor_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("platform_vendors.id", ondelete="CASCADE"), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    sku: Mapped[str] = mapped_column(String(100), nullable=False, default="")
+    price: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    stock_quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    images_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")  # JSON list of image URLs
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+    product: Mapped["PlatformProduct"] = relationship("PlatformProduct", back_populates="variants")
 
 
 class PlatformProductImage(BaseModel):

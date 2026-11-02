@@ -57,6 +57,17 @@ export interface ProductImage {
   is_thumbnail: boolean;
 }
 
+export interface ProductVariant {
+  id: string;
+  name: string;
+  sku: string;
+  price?: number;
+  stock_quantity: number;
+  images: string[];
+  sort_order: number;
+  is_active: boolean;
+}
+
 export interface Product {
   id: string;
   vendor_id: string;
@@ -71,8 +82,10 @@ export interface Product {
   stock_quantity: number;
   status: 'active' | 'inactive' | 'out_of_stock';
   is_featured: boolean;
+  has_variants?: boolean;
   thumbnail_url?: string;
   images: ProductImage[];
+  variants?: ProductVariant[];
   created_at: string;
 }
 
