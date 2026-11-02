@@ -23,6 +23,7 @@ pip-delete-this-directory.txt
 .env.production.local
 
 # ── Firebase ─────────────────────────────────
+.firebase/
 firebase-service-account.json
 *-firebase-adminsdk-*.json
 
