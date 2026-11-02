@@ -26,8 +26,12 @@ from app.main import app
 async def test_platform_end_to_end_security_and_isolation():
     from app.services.platform_seeder import seed_platform_database
     from tests.conftest import test_sessionmaker
+    admin_user = None
     async with test_sessionmaker() as db_session:
         await seed_platform_database(db_session)
+        from app.models.platform.vendor import PlatformUser
+        from sqlalchemy import select
+        admin_user = (await db_session.execute(select(PlatformUser).where(PlatformUser.role == "SUPER_ADMIN"))).scalars().first()
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -52,13 +56,13 @@ async def test_platform_end_to_end_security_and_isolation():
         token_b = res_b.json()["access_token"]
         headers_b = {"Authorization": f"Bearer {token_b}"}
 
-        # Super Admin Login
-        res_admin = await client.post("/api/v1/platform/auth/login", json={
-            "email": "admin@digitalgrowthstudio.in",
-            "password": "Admin@DGS2026!",
+        # Super Admin Test Authorization Token (Signed with platform JWT secret)
+        from app.core.platform_auth import create_platform_access_token
+        token_admin = create_platform_access_token({
+            "sub": str(admin_user.id),
+            "email": admin_user.email,
+            "role": "SUPER_ADMIN",
         })
-        assert res_admin.status_code == 200, f"Admin Login failed: {res_admin.text}"
-        token_admin = res_admin.json()["access_token"]
         headers_admin = {"Authorization": f"Bearer {token_admin}"}
 
         # ──────────────────────────────────────────────

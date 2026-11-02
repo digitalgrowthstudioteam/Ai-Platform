@@ -78,9 +78,9 @@ class Settings(BaseSettings):
     BUNNY_API_KEY: Optional[str] = Field(default=None, description="Bunny.net Storage Zone Password / API Key")
     BUNNY_STORAGE_REGION: str = Field(default="de", description="Bunny.net Storage Region (de, ny, sg, etc.)")
     BUNNY_CDN_HOSTNAME: Optional[str] = Field(default=None, description="Bunny.net Pull Zone CDN Hostname")
-    PLATFORM_JWT_SECRET: str = Field(
-        default="dgs-ecommerce-platform-jwt-secret-key-prod-2026",
-        description="JWT secret for multi-vendor platform sessions"
+    PLATFORM_JWT_SECRET: Optional[str] = Field(
+        default=None,
+        description="JWT secret for multi-vendor platform sessions (defaults to SECRET_KEY if unset)"
     )
     PLATFORM_JWT_ALGORITHM: str = Field(default="HS256", description="JWT signing algorithm")
     PLATFORM_JWT_EXPIRE_MINUTES: int = Field(default=10080, description="Token expiry in minutes (7 days)")

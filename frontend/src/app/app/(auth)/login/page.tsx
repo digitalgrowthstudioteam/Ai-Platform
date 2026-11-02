@@ -173,18 +173,6 @@ export default function PlatformLoginPage() {
                 </span>
                 <span className="font-mono text-[10px] text-emerald-500">xyzcosmetics@...</span>
               </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickLogin("admin@digitalgrowthstudio.in", "Admin@DGS2026!")}
-                className="w-full flex items-center justify-between px-3 py-2 text-xs font-medium bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg border border-purple-200 transition-colors"
-              >
-                <span className="flex items-center gap-1.5">
-                  <Shield className="w-3.5 h-3.5 text-purple-600" />
-                  Super Admin
-                </span>
-                <span className="font-mono text-[10px] text-purple-500">admin@...</span>
-              </button>
             </div>
           </div>
 

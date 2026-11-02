@@ -3,6 +3,7 @@ Digital Growth Studio — Platform Database Seeder & Demo Data Generator
 Initializes default plans, Super Admin, and demo vendors (ABC Fashion & XYZ Cosmetics).
 """
 import uuid
+import secrets
 from datetime import datetime, timedelta, timezone
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -74,13 +75,13 @@ async def seed_platform_database(db: AsyncSession):
                 is_active=True,
             ))
 
-    # 3. Seed Super Admin
+    # 3. Seed Super Admin (Authenticates via Google OAuth)
     admin_stmt = select(PlatformUser).where(PlatformUser.email == "admin@digitalgrowthstudio.in")
     super_admin = (await db.execute(admin_stmt)).scalar_one_or_none()
     if not super_admin:
         super_admin = PlatformUser(
             email="admin@digitalgrowthstudio.in",
-            hashed_password=hash_password("Admin@DGS2026!"),
+            hashed_password=hash_password(secrets.token_urlsafe(32)),
             name="Digital Growth Super Admin",
             role="SUPER_ADMIN",
             status="active",

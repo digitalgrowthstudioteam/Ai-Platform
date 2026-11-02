@@ -40,20 +40,28 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         return False
 
 
+def get_platform_jwt_secret() -> str:
+    """Retrieve platform JWT secret or fallback to application ENCRYPTION_KEY."""
+    settings = get_settings()
+    return settings.PLATFORM_JWT_SECRET or settings.ENCRYPTION_KEY or "dgs_platform_session_key_internal"
+
+
 def create_platform_access_token(payload: dict, expires_delta: Optional[timedelta] = None) -> str:
     """Create a signed JWT access token for platform users."""
+    settings = get_settings()
     to_encode = payload.copy()
     expire = datetime.now(timezone.utc) + (
         expires_delta if expires_delta else timedelta(minutes=settings.PLATFORM_JWT_EXPIRE_MINUTES)
     )
     to_encode.update({"exp": expire})
-    return jwt.encode(to_encode, settings.PLATFORM_JWT_SECRET, algorithm=settings.PLATFORM_JWT_ALGORITHM)
+    return jwt.encode(to_encode, get_platform_jwt_secret(), algorithm=settings.PLATFORM_JWT_ALGORITHM)
 
 
 def decode_platform_access_token(token: str) -> dict:
     """Decode and validate a platform JWT access token."""
+    settings = get_settings()
     try:
-        return jwt.decode(token, settings.PLATFORM_JWT_SECRET, algorithms=[settings.PLATFORM_JWT_ALGORITHM])
+        return jwt.decode(token, get_platform_jwt_secret(), algorithms=[settings.PLATFORM_JWT_ALGORITHM])
     except JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

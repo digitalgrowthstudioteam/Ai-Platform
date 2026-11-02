@@ -68,3 +68,4 @@ async def test_google_login_non_vikram_cannot_be_super_admin():
             vendor_headers = {"Authorization": f"Bearer {data['access_token']}"}
             admin_res = await client.get("/api/v1/platform/admin/overview", headers=vendor_headers)
             assert admin_res.status_code == 403, "Vendor unexpectedly accessed super admin endpoint!"
+
