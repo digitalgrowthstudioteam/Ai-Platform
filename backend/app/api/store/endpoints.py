@@ -179,7 +179,7 @@ async def get_store_products(
                     image_url=img.image_url,
                     sort_order=img.sort_order,
                     is_thumbnail=img.is_thumbnail,
-                ) for img in p.images
+                ) for img in sorted(p.images, key=lambda x: x.sort_order)
             ],
             is_featured=p.is_featured,
         ))
@@ -229,7 +229,7 @@ async def get_store_product_detail(
                 image_url=img.image_url,
                 sort_order=img.sort_order,
                 is_thumbnail=img.is_thumbnail,
-            ) for img in p.images
+            ) for img in sorted(p.images, key=lambda x: x.sort_order)
         ],
         is_featured=p.is_featured,
     )

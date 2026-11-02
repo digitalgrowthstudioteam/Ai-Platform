@@ -41,11 +41,16 @@ class PlatformProduct(BaseModel):
     thumbnail_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
 
     category: Mapped[Optional["PlatformCategory"]] = relationship("PlatformCategory", back_populates="products")
-    images: Mapped[List["PlatformProductImage"]] = relationship("PlatformProductImage", back_populates="product", cascade="all, delete-orphan")
+    images: Mapped[List["PlatformProductImage"]] = relationship(
+        "PlatformProductImage",
+        back_populates="product",
+        cascade="all, delete-orphan",
+        order_by="PlatformProductImage.sort_order",
+    )
 
 
 class PlatformProductImage(BaseModel):
-    """Product images stored in Bunny.net."""
+    """Product images stored in Cloud CDN Storage."""
     __tablename__ = "platform_product_images"
 
     product_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("platform_products.id", ondelete="CASCADE"), nullable=False, index=True)

@@ -224,7 +224,7 @@ export default function VendorBannersPage() {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                  Image URL (Bunny.net CDN / Web)
+                  Banner Image URL (CDN / Web)
                 </label>
                 <input
                   type="url"

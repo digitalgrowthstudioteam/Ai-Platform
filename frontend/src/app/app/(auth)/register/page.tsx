@@ -122,7 +122,7 @@ export default function PlatformRegisterPage() {
               <li className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Branded Online Storefront</li>
               <li className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Dedicated Store Subdomain</li>
               <li className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Android Shopping App Config</li>
-              <li className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> 1GB High-Speed Bunny CDN</li>
+              <li className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> 1GB High-Speed Cloud Storage CDN</li>
             </ul>
           </div>
 

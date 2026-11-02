@@ -43,7 +43,7 @@ export default function AdminStoragePage() {
   return (
     <div className="space-y-6 max-w-5xl">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900">Bunny.net Storage Management</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900">Cloud Storage Management</h1>
         <p className="text-sm text-slate-500">Monitor image & asset consumption across all stores, detect over-quota usage, and adjust limits</p>
       </div>
 

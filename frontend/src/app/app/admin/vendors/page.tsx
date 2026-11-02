@@ -323,7 +323,7 @@ export default function AdminVendorsPage() {
                       <p className="font-semibold text-slate-900">{vendorDetail.total_products} products • {vendorDetail.total_orders} orders</p>
                     </div>
                     <div>
-                      <span className="text-slate-400">Bunny Storage Consumption:</span>
+                      <span className="text-slate-400">Cloud Storage Consumption:</span>
                       <p className="font-semibold text-slate-900">{vendorDetail.storage_used_mb} MB used / {vendorDetail.storage_limit_mb} MB limit</p>
                     </div>
                     <div>

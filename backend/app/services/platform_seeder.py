@@ -51,14 +51,14 @@ async def seed_platform_database(db: AsyncSession):
             storage_limit_mb=1024,
             max_products=100,
             is_active=True,
-            features_json='["Online Storefront", "Branded Android App Support", "Unlimited Orders", "1GB Bunny.net Storage", "Cash On Delivery & Razorpay"]',
+            features_json='["Online Storefront", "Branded Android App Support", "Unlimited Orders", "1GB High-Speed Cloud Storage", "Cash On Delivery & Razorpay"]',
         )
         db.add(starter_plan)
         await db.flush()
 
     # 2. Seed Default Add-ons
     default_addons = [
-        {"name": "Additional 5GB Bunny Storage", "code": "storage-5gb", "price": 299.0, "type": "MONTHLY"},
+        {"name": "Additional 5GB Cloud Storage", "code": "storage-5gb", "price": 299.0, "type": "MONTHLY"},
         {"name": "Custom Domain Setup", "code": "custom-domain", "price": 999.0, "type": "ONE_TIME"},
         {"name": "Razorpay Payment Gateway Assistance", "code": "razorpay-setup", "price": 499.0, "type": "ONE_TIME"},
         {"name": "Custom Android App Theme & Splash", "code": "app-customization", "price": 1499.0, "type": "ONE_TIME"},

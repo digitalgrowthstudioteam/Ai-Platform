@@ -73,11 +73,11 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: Optional[str] = Field(default=None, description="SMTP server password")
     SMTP_FROM: str = Field(default="noreply@digitalgrowthstudio.in", description="SMTP sender address")
 
-    # Multi-Vendor Platform & Bunny.net Storage
-    BUNNY_STORAGE_ZONE: Optional[str] = Field(default=None, description="Bunny.net Storage Zone Name")
-    BUNNY_API_KEY: Optional[str] = Field(default=None, description="Bunny.net Storage Zone Password / API Key")
-    BUNNY_STORAGE_REGION: str = Field(default="de", description="Bunny.net Storage Region (de, ny, sg, etc.)")
-    BUNNY_CDN_HOSTNAME: Optional[str] = Field(default=None, description="Bunny.net Pull Zone CDN Hostname")
+    # Multi-Vendor Platform & Cloud Media CDN Storage
+    BUNNY_STORAGE_ZONE: Optional[str] = Field(default=None, description="Cloud Media Storage Zone Name")
+    BUNNY_API_KEY: Optional[str] = Field(default=None, description="Cloud Media Storage Zone Password / API Key")
+    BUNNY_STORAGE_REGION: str = Field(default="de", description="Cloud Media Storage Region (de, ny, sg, etc.)")
+    BUNNY_CDN_HOSTNAME: Optional[str] = Field(default=None, description="Cloud Media Pull Zone CDN Hostname")
     PLATFORM_JWT_SECRET: Optional[str] = Field(
         default=None,
         description="JWT secret for multi-vendor platform sessions (defaults to SECRET_KEY if unset)"

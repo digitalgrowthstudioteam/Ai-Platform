@@ -91,7 +91,7 @@ export default function VendorSubscriptionPage() {
           </div>
 
           <div className="p-4 rounded-xl bg-slate-50 border border-slate-100">
-            <span className="text-xs text-slate-400 block mb-1">Bunny Storage Usage</span>
+            <span className="text-xs text-slate-400 block mb-1">Cloud Storage Usage</span>
             <p className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
               <HardDrive className="w-4 h-4 text-amber-600" />
               {storageUsedMb} MB / {storageLimitMb} MB

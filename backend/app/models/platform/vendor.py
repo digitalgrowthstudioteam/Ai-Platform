@@ -103,7 +103,7 @@ class PlatformVendorAppConfig(BaseModel):
 
 
 class PlatformStorageUsage(BaseModel):
-    """Storage consumption per vendor (for Bunny.net assets and product images)."""
+    """Storage consumption per vendor (for media assets and product images)."""
     __tablename__ = "platform_storage_usage"
 
     vendor_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("platform_vendors.id", ondelete="CASCADE"), unique=True, nullable=False)

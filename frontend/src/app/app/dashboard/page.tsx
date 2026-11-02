@@ -113,7 +113,7 @@ export default function VendorDashboardOverviewPage() {
           accentColor="text-indigo-600 bg-indigo-50"
         />
         <StatCard
-          title="Bunny.net Storage"
+          title="Cloud Storage"
           value={`${storageUsedMb} MB`}
           subtitle={`Limit: ${storageLimitMb} MB (${overview?.storage_percentage || 0}%)`}
           icon={HardDrive}
@@ -208,7 +208,7 @@ export default function VendorDashboardOverviewPage() {
             {/* Storage Progress */}
             <div className="mt-5 space-y-2">
               <div className="flex items-center justify-between text-xs">
-                <span className="font-medium text-slate-700">Bunny Storage Quota</span>
+                <span className="font-medium text-slate-700">Storage Quota</span>
                 <span className="font-bold text-slate-900">{overview?.storage_percentage}%</span>
               </div>
               <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">

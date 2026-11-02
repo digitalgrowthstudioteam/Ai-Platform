@@ -214,7 +214,60 @@ async def test_platform_end_to_end_security_and_isolation():
         public_store_blocked = await client.get("/api/store/suspended-store/config")
         assert public_store_blocked.status_code == 403, "Public storefront for suspended vendor MUST be 403"
 
-        print("\nALL 9 MULTI-VENDOR ISOLATION & SECURITY TESTS PASSED PERFECTLY!")
+        # ──────────────────────────────────────────────
+        # Test 10: Multi-Image Product Gallery & Image Reordering
+        # ──────────────────────────────────────────────
+        initial_images = [
+            "https://images.example.com/item-angle-1.jpg",
+            "https://images.example.com/item-angle-2.jpg",
+            "https://images.example.com/item-angle-3.jpg",
+        ]
+        create_prod_res = await client.post("/api/v1/platform/vendor/products", headers=headers_a, json={
+            "name": "Multi-Image Test Silk Scarf",
+            "description": "Silk scarf with multiple image angles",
+            "regular_price": 799.0,
+            "stock_quantity": 25,
+            "image_urls": initial_images,
+        })
+        assert create_prod_res.status_code == 201, f"Product creation failed: {create_prod_res.text}"
+        prod_data = create_prod_res.json()
+        prod_id = prod_data["id"]
+
+        assert prod_data["thumbnail_url"] == initial_images[0]
+        assert len(prod_data["images"]) == 3
+        assert [img["image_url"] for img in prod_data["images"]] == initial_images
+        assert [img["sort_order"] for img in prod_data["images"]] == [0, 1, 2]
+        assert prod_data["images"][0]["is_thumbnail"] is True
+
+        # Now reorder images: move Angle 3 to first position (Cover), Angle 1 to second, Angle 2 to third
+        reordered_images = [
+            "https://images.example.com/item-angle-3.jpg",
+            "https://images.example.com/item-angle-1.jpg",
+            "https://images.example.com/item-angle-2.jpg",
+        ]
+        update_prod_res = await client.put(f"/api/v1/platform/vendor/products/{prod_id}", headers=headers_a, json={
+            "image_urls": reordered_images,
+        })
+        assert update_prod_res.status_code == 200, f"Product update failed: {update_prod_res.text}"
+        updated_data = update_prod_res.json()
+
+        assert updated_data["thumbnail_url"] == reordered_images[0]
+        assert [img["image_url"] for img in updated_data["images"]] == reordered_images
+        assert [img["sort_order"] for img in updated_data["images"]] == [0, 1, 2]
+        assert updated_data["images"][0]["is_thumbnail"] is True
+
+        # Verify public storefront delivers the exact reordered image array
+        store_prod_res = await client.get(f"/api/store/abc/products/{prod_id}")
+        assert store_prod_res.status_code == 200
+        store_prod = store_prod_res.json()
+        assert store_prod["thumbnail_url"] == reordered_images[0]
+        assert [img["image_url"] for img in store_prod["images"]] == reordered_images
+
+        # Clean up test product
+        del_prod = await client.delete(f"/api/v1/platform/vendor/products/{prod_id}", headers=headers_a)
+        assert del_prod.status_code == 200
+
+        print("\nALL 10 MULTI-VENDOR ISOLATION, SECURITY & IMAGE REORDERING TESTS PASSED PERFECTLY!")
 
 
 if __name__ == "__main__":

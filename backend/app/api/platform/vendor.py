@@ -7,7 +7,7 @@ import re
 from typing import List, Optional
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
-from sqlalchemy import select, func, desc, update
+from sqlalchemy import select, func, desc, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -353,7 +353,7 @@ async def list_vendor_products(
                     image_url=img.image_url,
                     sort_order=img.sort_order,
                     is_thumbnail=img.is_thumbnail,
-                ) for img in p.images
+                ) for img in sorted(p.images, key=lambda x: x.sort_order)
             ],
             created_at=p.created_at,
         ))
@@ -443,7 +443,7 @@ async def create_vendor_product(
                 image_url=img.image_url,
                 sort_order=img.sort_order,
                 is_thumbnail=img.is_thumbnail,
-            ) for img in saved.images
+            ) for img in sorted(saved.images, key=lambda x: x.sort_order)
         ],
         created_at=saved.created_at,
     )
@@ -476,9 +476,7 @@ async def update_vendor_product(
         setattr(product, field, value)
 
     if image_urls is not None:
-        # Replace images
-        for existing_img in list(product.images):
-            await db.delete(existing_img)
+        product.images.clear()
         for idx, url in enumerate(image_urls):
             img = PlatformProductImage(
                 product_id=product.id,
@@ -487,12 +485,13 @@ async def update_vendor_product(
                 sort_order=idx,
                 is_thumbnail=(idx == 0),
             )
-            db.add(img)
+            product.images.append(img)
         if image_urls:
             product.thumbnail_url = image_urls[0]
+        else:
+            product.thumbnail_url = None
 
     await db.commit()
-    await db.refresh(product)
 
     return ProductResponse(
         id=product.id,
@@ -515,7 +514,7 @@ async def update_vendor_product(
                 image_url=img.image_url,
                 sort_order=img.sort_order,
                 is_thumbnail=img.is_thumbnail,
-            ) for img in product.images
+            ) for img in sorted(product.images, key=lambda x: x.sort_order)
         ],
         created_at=product.created_at,
     )
@@ -535,11 +534,10 @@ async def delete_vendor_product(
         raise HTTPException(status_code=404, detail="Product not found or access denied")
 
     await db.delete(product)
-    await db.execute(
-        update(PlatformStorageUsage)
-        .where(PlatformStorageUsage.vendor_id == vid)
-        .values(product_count=func.greatest(0, PlatformStorageUsage.product_count - 1))
-    )
+    storage_stmt = select(PlatformStorageUsage).where(PlatformStorageUsage.vendor_id == vid)
+    storage = (await db.execute(storage_stmt)).scalar_one_or_none()
+    if storage and storage.product_count > 0:
+        storage.product_count -= 1
     await db.commit()
     return {"message": "Product deleted successfully"}
 
@@ -757,7 +755,7 @@ async def list_vendor_customers(
 
 
 # ──────────────────────────────────────────────
-# 8. Bunny.net Image Upload & Quota Tracking
+# 8. Media Upload & Quota Tracking
 # ──────────────────────────────────────────────
 @router.post("/upload")
 async def upload_vendor_asset(
@@ -766,7 +764,7 @@ async def upload_vendor_asset(
     current: CurrentVendor = Depends(require_vendor_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """Upload media file to Bunny.net and track vendor storage usage."""
+    """Upload media file to Cloud CDN storage and track vendor storage usage."""
     vid = current.vendor.id
     contents = await file.read()
     file_size = len(contents)

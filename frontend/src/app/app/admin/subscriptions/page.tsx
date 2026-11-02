@@ -135,7 +135,7 @@ export default function AdminSubscriptionsPage() {
               <div className="mt-4 space-y-2 text-xs text-slate-600">
                 <div className="flex items-center gap-2">
                   <HardDrive className="w-3.5 h-3.5 text-amber-500" />
-                  <span>{p.storage_limit_mb} MB Bunny Storage</span>
+                  <span>{p.storage_limit_mb} MB Cloud Storage</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Package className="w-3.5 h-3.5 text-blue-500" />
