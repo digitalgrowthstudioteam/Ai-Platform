@@ -7,7 +7,7 @@ import { platformApi } from "@/lib/app-platform/api";
 import { useVendorCart } from "@/lib/app-platform/cart-store";
 import StoreHeader from "@/components/app-platform/store/StoreHeader";
 import StoreFooter from "@/components/app-platform/store/StoreFooter";
-import { getStoreRouteParams } from "@/lib/app-platform/store-route-helper";
+import { getStoreRouteParams, getStoreHref } from "@/lib/app-platform/store-route-helper";
 import {
   Store,
   ShoppingCart,
@@ -101,7 +101,7 @@ export default function StorePreviewClient() {
       quantity: 1,
       stock_quantity: p.stock_quantity,
     });
-    router.push(`/app/store/${slug}/checkout`);
+    router.push(getStoreHref(slug, "/checkout"));
   };
 
   if (loading) {
@@ -209,10 +209,10 @@ export default function StorePreviewClient() {
               return (
                 <div
                   key={p.id}
-                  onClick={() => router.push(`/app/store/${slug}/products/${p.id}`)}
+                  onClick={() => router.push(getStoreHref(slug, `/products/${p.id}`))}
                   className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs hover:border-blue-400 hover:shadow-md transition-all flex flex-col justify-between group cursor-pointer"
                 >
-                  <Link href={`/app/store/${slug}/products/${p.id}`} className="block">
+                  <Link href={getStoreHref(slug, `/products/${p.id}`)} className="block">
                     <div className="relative aspect-square w-full bg-slate-100 overflow-hidden">
                       <img
                         src={p.thumbnail_url || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&q=80"}

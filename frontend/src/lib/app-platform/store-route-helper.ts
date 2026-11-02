@@ -5,6 +5,24 @@
  * may have placeholder route params ('placeholder', 'sample') on initial SSR/static bundle.
  * This utility resolves the true slug, productId, and orderId by falling back to window.location.pathname.
  */
+export function isSubdomainAccess(): boolean {
+  if (typeof window === "undefined") return false;
+  const hostParts = window.location.hostname.split(".");
+  if (hostParts.length >= 3) {
+    const sub = hostParts[0].toLowerCase();
+    return !["www", "app", "api", "admin", "platform", "localhost", "127"].includes(sub);
+  }
+  return false;
+}
+
+export function getStoreHref(slug: string, subpath: string = ""): string {
+  const cleanSubpath = subpath ? (subpath.startsWith("/") ? subpath : `/${subpath}`) : "";
+  if (isSubdomainAccess()) {
+    return cleanSubpath || "/";
+  }
+  return `/app/store/${slug}${cleanSubpath}`;
+}
+
 export function getStoreRouteParams(params?: {
   slug?: string;
   productId?: string;

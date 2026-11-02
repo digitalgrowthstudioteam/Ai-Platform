@@ -7,7 +7,7 @@ import { platformApi } from "@/lib/app-platform/api";
 import { useVendorCart } from "@/lib/app-platform/cart-store";
 import StoreHeader from "@/components/app-platform/store/StoreHeader";
 import StoreFooter from "@/components/app-platform/store/StoreFooter";
-import { getStoreRouteParams } from "@/lib/app-platform/store-route-helper";
+import { getStoreRouteParams, getStoreHref } from "@/lib/app-platform/store-route-helper";
 import {
   CreditCard,
   Banknote,
@@ -154,7 +154,7 @@ export default function CheckoutClient() {
       clearCart();
 
       // Navigate directly to the dedicated Order Detail Page
-      router.push(`/app/store/${slug}/order/${order.id || order.order_number}`);
+      router.push(getStoreHref(slug, `/order/${order.id || order.order_number}`));
     } catch (err: any) {
       setError(err.message || "Failed to place order. Please try again.");
       setSubmitting(false);
@@ -163,16 +163,16 @@ export default function CheckoutClient() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
-      <StoreHeader slug={slug} config={config} backHref={`/app/store/${slug}/cart`} backLabel="Back to Cart" />
+      <StoreHeader slug={slug} config={config} backHref={getStoreHref(slug, "/cart")} backLabel="Back to Cart" />
 
       <main className="max-w-6xl mx-auto px-4 py-8 flex-1 w-full">
         {/* Breadcrumb / Step Indicator */}
         <div className="flex items-center gap-2 text-xs text-slate-500 mb-6">
-          <Link href={`/app/store/${slug}`} className="hover:text-blue-600 transition-colors">
+          <Link href={getStoreHref(slug)} className="hover:text-blue-600 transition-colors">
             {config?.store_name || "Store"}
           </Link>
           <span>/</span>
-          <Link href={`/app/store/${slug}/cart`} className="hover:text-blue-600 transition-colors">
+          <Link href={getStoreHref(slug, "/cart")} className="hover:text-blue-600 transition-colors">
             Cart ({items.length})
           </Link>
           <span>/</span>
@@ -190,7 +190,7 @@ export default function CheckoutClient() {
             </p>
             <div className="pt-2">
               <Link
-                href={`/app/store/${slug}`}
+                href={getStoreHref(slug)}
                 className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-semibold text-white shadow-xs"
                 style={{ backgroundColor: primaryColor }}
               >
@@ -453,7 +453,7 @@ export default function CheckoutClient() {
             <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-5 sticky top-24">
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                 <h3 className="text-sm font-bold text-slate-900">Your Order Review</h3>
-                <Link href={`/app/store/${slug}/cart`} className="text-xs text-blue-600 hover:underline font-semibold">
+                <Link href={getStoreHref(slug, "/cart")} className="text-xs text-blue-600 hover:underline font-semibold">
                   Edit Cart
                 </Link>
               </div>

@@ -6,7 +6,7 @@ import { useParams } from "next/navigation";
 import { platformApi } from "@/lib/app-platform/api";
 import StoreHeader from "@/components/app-platform/store/StoreHeader";
 import StoreFooter from "@/components/app-platform/store/StoreFooter";
-import { getStoreRouteParams } from "@/lib/app-platform/store-route-helper";
+import { getStoreRouteParams, getStoreHref } from "@/lib/app-platform/store-route-helper";
 import {
   CheckCircle2,
   Package,
@@ -90,13 +90,13 @@ export default function OrderDetailClient() {
           </p>
           <div className="pt-2 flex justify-center gap-3">
             <Link
-              href={`/app/store/${slug}/account`}
+              href={getStoreHref(slug, "/account")}
               className="px-4 py-2.5 rounded-xl text-xs font-semibold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"
             >
               Check My Account
             </Link>
             <Link
-              href={`/app/store/${slug}`}
+              href={getStoreHref(slug)}
               className="px-4 py-2.5 rounded-xl text-xs font-semibold text-white shadow-xs"
               style={{ backgroundColor: primaryColor }}
             >
@@ -316,14 +316,14 @@ export default function OrderDetailClient() {
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4">
           <Link
-            href={`/app/store/${slug}`}
+            href={getStoreHref(slug)}
             className="w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs font-semibold text-white shadow-xs text-center"
             style={{ backgroundColor: primaryColor }}
           >
             ← Return to Storefront
           </Link>
           <Link
-            href={`/app/store/${slug}/account`}
+            href={getStoreHref(slug, "/account")}
             className="w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 text-center flex items-center justify-center gap-1.5"
           >
             <span>View All My Orders</span>

@@ -6,7 +6,7 @@ import { useParams } from "next/navigation";
 import { platformApi } from "@/lib/app-platform/api";
 import StoreHeader from "@/components/app-platform/store/StoreHeader";
 import StoreFooter from "@/components/app-platform/store/StoreFooter";
-import { getStoreRouteParams } from "@/lib/app-platform/store-route-helper";
+import { getStoreRouteParams, getStoreHref } from "@/lib/app-platform/store-route-helper";
 import {
   User,
   Package,
@@ -102,7 +102,7 @@ export default function AccountClient() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
-      <StoreHeader slug={slug} config={config} backHref={`/app/store/${slug}`} backLabel="Back to Store" />
+      <StoreHeader slug={slug} config={config} backHref={getStoreHref(slug)} backLabel="Back to Store" />
 
       <main className="max-w-4xl mx-auto px-4 py-8 flex-1 w-full space-y-6">
         {/* Account Header */}
@@ -117,7 +117,7 @@ export default function AccountClient() {
             </p>
           </div>
           <Link
-            href={`/app/store/${slug}`}
+            href={getStoreHref(slug)}
             className="text-xs font-semibold text-blue-600 hover:underline flex items-center gap-1"
           >
             ← Browse Catalog
@@ -175,7 +175,7 @@ export default function AccountClient() {
                 </p>
                 <div className="pt-2">
                   <Link
-                    href={`/app/store/${slug}`}
+                    href={getStoreHref(slug)}
                     className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-xs font-semibold text-white shadow-xs"
                     style={{ backgroundColor: primaryColor }}
                   >
@@ -231,7 +231,7 @@ export default function AccountClient() {
                         Shipping to: {ord.customer_name} ({ord.shipping_address?.split("-")[0] || ord.shipping_address})
                       </span>
                       <Link
-                        href={`/app/store/${slug}/order/${ord.id}`}
+                        href={getStoreHref(slug, `/order/${ord.id}`)}
                         className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-700 hover:underline shrink-0"
                       >
                         <span>View Full Receipt & Tracking</span>

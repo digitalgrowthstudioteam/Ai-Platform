@@ -7,7 +7,7 @@ import { platformApi } from "@/lib/app-platform/api";
 import { useVendorCart } from "@/lib/app-platform/cart-store";
 import StoreHeader from "@/components/app-platform/store/StoreHeader";
 import StoreFooter from "@/components/app-platform/store/StoreFooter";
-import { getStoreRouteParams } from "@/lib/app-platform/store-route-helper";
+import { getStoreRouteParams, getStoreHref } from "@/lib/app-platform/store-route-helper";
 import {
   ShoppingCart,
   Trash2,
@@ -72,7 +72,7 @@ export default function CartClient() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
-      <StoreHeader slug={slug} config={config} backHref={`/app/store/${slug}`} backLabel="Back to Products" />
+      <StoreHeader slug={slug} config={config} backHref={getStoreHref(slug)} backLabel="Back to Products" />
 
       <main className="max-w-6xl mx-auto px-4 py-8 pb-24 sm:pb-8 flex-1 w-full">
         {/* Page Title */}
@@ -108,7 +108,7 @@ export default function CartClient() {
             </p>
             <div className="pt-2">
               <Link
-                href={`/app/store/${slug}`}
+                href={getStoreHref(slug)}
                 className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-semibold text-white shadow-xs hover:opacity-95 transition-opacity"
                 style={{ backgroundColor: primaryColor }}
               >
@@ -169,7 +169,7 @@ export default function CartClient() {
                       )}
                       <div className="min-w-0">
                         <Link
-                          href={`/app/store/${slug}/products/${item.product_id}`}
+                          href={getStoreHref(slug, `/products/${item.product_id}`)}
                           className="font-bold text-slate-900 text-sm hover:text-blue-600 transition-colors line-clamp-1"
                         >
                           {item.name}
@@ -233,7 +233,7 @@ export default function CartClient() {
 
               <div className="flex items-center justify-between pt-2">
                 <Link
-                  href={`/app/store/${slug}`}
+                  href={getStoreHref(slug)}
                   className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1"
                 >
                   ← Continue Shopping
@@ -279,7 +279,7 @@ export default function CartClient() {
 
               <div className="pt-2 space-y-2.5">
                 <button
-                  onClick={() => router.push(`/app/store/${slug}/checkout`)}
+                  onClick={() => router.push(getStoreHref(slug, "/checkout"))}
                   className="w-full py-3 px-4 rounded-xl text-xs font-semibold text-white shadow-xs hover:opacity-95 transition-opacity flex items-center justify-center gap-2"
                   style={{ backgroundColor: primaryColor }}
                 >
@@ -308,7 +308,7 @@ export default function CartClient() {
             <p className="text-base font-extrabold text-blue-700 font-mono">₹{finalTotal.toLocaleString("en-IN")}</p>
           </div>
           <button
-            onClick={() => router.push(`/app/store/${slug}/checkout`)}
+            onClick={() => router.push(getStoreHref(slug, "/checkout"))}
             className="py-2.5 px-5 rounded-xl text-xs font-bold text-white shadow-xs hover:opacity-95 transition-opacity flex items-center justify-center gap-1.5 cursor-pointer"
             style={{ backgroundColor: primaryColor }}
           >

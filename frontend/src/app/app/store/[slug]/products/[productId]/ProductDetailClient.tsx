@@ -7,7 +7,7 @@ import { platformApi } from "@/lib/app-platform/api";
 import { useVendorCart } from "@/lib/app-platform/cart-store";
 import StoreHeader from "@/components/app-platform/store/StoreHeader";
 import StoreFooter from "@/components/app-platform/store/StoreFooter";
-import { getStoreRouteParams } from "@/lib/app-platform/store-route-helper";
+import { getStoreRouteParams, getStoreHref } from "@/lib/app-platform/store-route-helper";
 import {
   ShoppingCart,
   Zap,
@@ -110,7 +110,7 @@ export default function ProductDetailClient() {
           </p>
           <div className="pt-2">
             <Link
-              href={`/app/store/${slug}`}
+              href={getStoreHref(slug)}
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-semibold text-white shadow-xs"
               style={{ backgroundColor: primaryColor }}
             >
@@ -177,7 +177,7 @@ export default function ProductDetailClient() {
       quantity: qty,
       stock_quantity: currentStock,
     });
-    router.push(`/app/store/${slug}/checkout`);
+    router.push(getStoreHref(slug, "/checkout"));
   };
 
   const discountPercent =
@@ -187,12 +187,12 @@ export default function ProductDetailClient() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
-      <StoreHeader slug={slug} config={config} backHref={`/app/store/${slug}`} backLabel="Back to Products" />
+      <StoreHeader slug={slug} config={config} backHref={getStoreHref(slug)} backLabel="Back to Products" />
 
       <main className="max-w-6xl mx-auto px-4 py-8 pb-24 sm:pb-8 flex-1 w-full space-y-6">
         {/* Breadcrumb */}
         <div className="flex items-center gap-2 text-xs text-slate-500">
-          <Link href={`/app/store/${slug}`} className="hover:text-blue-600 transition-colors">
+          <Link href={getStoreHref(slug)} className="hover:text-blue-600 transition-colors">
             {config?.store_name}
           </Link>
           <span>/</span>

@@ -3,6 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { useVendorCart } from "@/lib/app-platform/cart-store";
+import { getStoreHref } from "@/lib/app-platform/store-route-helper";
 import {
   ShoppingCart,
   User,
@@ -70,7 +71,7 @@ export default function StoreHeader({
             </Link>
           )}
 
-          <Link href={`/app/store/${slug}`} className="flex items-center gap-3 group">
+          <Link href={getStoreHref(slug)} className="flex items-center gap-3 group">
             {config?.logo_url ? (
               <img
                 src={config.logo_url}
@@ -99,7 +100,7 @@ export default function StoreHeader({
         {/* Action Buttons: Account & Cart */}
         <div className="flex items-center gap-2 sm:gap-3">
           <Link
-            href={`/app/store/${slug}/account`}
+            href={getStoreHref(slug, "/account")}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors border border-slate-200"
           >
             <User className="w-3.5 h-3.5 text-slate-500" />
@@ -107,7 +108,7 @@ export default function StoreHeader({
           </Link>
 
           <Link
-            href={`/app/store/${slug}/cart`}
+            href={getStoreHref(slug, "/cart")}
             className="relative flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold text-white shadow-xs hover:opacity-95 transition-opacity"
             style={{ backgroundColor: primaryColor }}
           >
