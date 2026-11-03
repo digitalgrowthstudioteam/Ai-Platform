@@ -40,7 +40,7 @@ class PlatformApiClient {
     return token ? { Authorization: `Bearer ${token}` } : {};
   }
 
-  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  private async request<T>(endpoint: string, options: RequestInit & { timeout?: number } = {}): Promise<T> {
     const baseUrl = getPlatformBaseUrl();
     const url = endpoint.startsWith('http') ? endpoint : `${baseUrl}${endpoint}`;
     const headers = {
@@ -49,15 +49,33 @@ class PlatformApiClient {
       ...(options.headers || {}),
     };
 
+    const controller = new AbortController();
+    const timeoutMs = options.timeout ?? 8000;
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
     let res: Response;
     try {
-      res = await fetch(url, { ...options, headers });
+      res = await fetch(url, {
+        ...options,
+        headers,
+        signal: options.signal || controller.signal,
+      });
     } catch (netErr: any) {
+      if (netErr?.name === 'AbortError') {
+        const err = new Error('Connection timed out. Retrying in background...');
+        (err as any).status = 408;
+        throw err;
+      }
       if (netErr?.message === 'Failed to fetch' || netErr?.name === 'TypeError') {
-        throw new Error('Unable to connect to platform server. Please check your internet or retry in a few moments.');
+        const err = new Error('Unable to connect to platform server. Please check your internet or retry.');
+        (err as any).status = 503;
+        throw err;
       }
       throw netErr;
+    } finally {
+      clearTimeout(timeoutId);
     }
+
     if (!res.ok) {
       let errorMsg = 'An error occurred';
       try {
@@ -66,7 +84,9 @@ class PlatformApiClient {
       } catch {
         errorMsg = await res.text() || res.statusText;
       }
-      throw new Error(errorMsg);
+      const err = new Error(errorMsg);
+      (err as any).status = res.status;
+      throw err;
     }
     return res.json();
   }
@@ -144,6 +164,7 @@ class PlatformApiClient {
   logout() {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('dgs_platform_token');
+      localStorage.removeItem('dgs_platform_user');
       localStorage.removeItem('dgs_platform_is_demo');
     }
   }

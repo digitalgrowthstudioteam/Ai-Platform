@@ -15,10 +15,17 @@ export default function VendorDashboardLayout({ children }: { children: React.Re
   const router = useRouter();
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      const token = localStorage.getItem("dgs_platform_token");
+      if (!token && !isDemo) {
+        router.replace("/app/login");
+        return;
+      }
+    }
     if (!loading && !user) {
       router.replace("/app/login");
     }
-  }, [user, loading, router]);
+  }, [user, loading, router, isDemo]);
 
   if (loading || !user) {
     return (

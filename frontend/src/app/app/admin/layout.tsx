@@ -13,6 +13,13 @@ export default function AdminDashboardLayout({ children }: { children: React.Rea
   const router = useRouter();
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      const token = localStorage.getItem("dgs_platform_token");
+      if (!token) {
+        router.replace("/app/login");
+        return;
+      }
+    }
     if (!loading) {
       if (!user) {
         router.replace("/app/login");

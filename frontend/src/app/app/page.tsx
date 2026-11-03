@@ -9,16 +9,59 @@ export default function PlatformRootPage() {
   const { user, loading } = usePlatformAuth();
   const router = useRouter();
 
+  // Fast-path immediate redirect without waiting for network revalidation
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    // 1. Subdomain brand storefront fast-path
+    if (isSubdomainAccess()) {
+      const { slug } = getStoreRouteParams();
+      router.replace(`/app/store/${slug}`);
+      return;
+    }
+
+    const token = localStorage.getItem("dgs_platform_token");
+    if (!token) {
+      router.replace("/app/login");
+      return;
+    }
+
+    // 2. Cached user instant redirect (0ms)
+    const cachedUserStr = localStorage.getItem("dgs_platform_user");
+    if (cachedUserStr) {
+      try {
+        const cached = JSON.parse(cachedUserStr);
+        if (cached?.role === "SUPER_ADMIN") {
+          router.replace("/app/admin");
+        } else {
+          router.replace("/app/dashboard");
+        }
+        return;
+      } catch {}
+    }
+
+    // 3. Fallback safeguard: Never leave user stuck on loader
+    const fallbackTimer = setTimeout(() => {
+      const liveToken = localStorage.getItem("dgs_platform_token");
+      if (!liveToken) {
+        window.location.replace("/app/login");
+      } else {
+        window.location.replace("/app/dashboard");
+      }
+    }, 1500);
+
+    return () => clearTimeout(fallbackTimer);
+  }, [router]);
+
+  // Reactive redirect when auth state updates
   useEffect(() => {
     if (!loading) {
-      // 1. If on a brand subdomain, shoppers go straight to their store catalog
       if (typeof window !== "undefined" && isSubdomainAccess()) {
         const { slug } = getStoreRouteParams();
         router.replace(`/app/store/${slug}`);
         return;
       }
 
-      // 2. SaaS platform navigation for vendors & admin
       if (!user) {
         router.replace("/app/login");
       } else if (user.role === "SUPER_ADMIN") {
