@@ -192,7 +192,7 @@ async def get_store_products(
         select(PlatformProduct)
         .where(
             PlatformProduct.vendor_id == store.vendor_id,
-            PlatformProduct.status.in_(["active", "out_of_stock"]),
+            PlatformProduct.status.in_(["active", "published", "out_of_stock"]),
         )
         .options(
             selectinload(PlatformProduct.category),
