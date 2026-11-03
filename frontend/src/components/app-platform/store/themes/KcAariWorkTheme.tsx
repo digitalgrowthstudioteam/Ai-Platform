@@ -45,7 +45,6 @@ export default function KcAariWorkTheme({
 }: KcAariWorkThemeProps) {
   const router = useRouter();
   const [selectedCat, setSelectedCat] = useState<string>("");
-  const [quickViewProduct, setQuickViewProduct] = useState<any | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
   const { addItem, itemCount: cartCount } = useVendorCart(slug);
@@ -368,9 +367,17 @@ export default function KcAariWorkTheme({
               </div>
             </div>
 
-            {/* Right Hero Spotlight Card (Matches Screenshot!) */}
+            {/* Right Hero Spotlight Card (Strictly links to dedicated product page) */}
             <div className="lg:col-span-5 flex justify-center">
-              <div className="relative w-full max-w-sm rounded-3xl p-2 bg-gradient-to-b from-[#D4AF37]/50 via-amber-500/20 to-transparent shadow-2xl border border-[#D4AF37]/40 overflow-hidden group">
+              <div
+                onClick={() => {
+                  const targetProduct = products && products.length > 0 ? products[0] : null;
+                  if (targetProduct) {
+                    router.push(getStoreHref(slug, `/products/${targetProduct.id}`));
+                  }
+                }}
+                className="relative w-full max-w-sm rounded-3xl p-2 bg-gradient-to-b from-[#D4AF37]/50 via-amber-500/20 to-transparent shadow-2xl border border-[#D4AF37]/40 overflow-hidden group cursor-pointer"
+              >
                 <div className="relative aspect-[4/5] rounded-2xl overflow-hidden bg-slate-900">
                   <img
                     src="https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=800&q=85"
@@ -396,18 +403,9 @@ export default function KcAariWorkTheme({
                       <span className="font-mono text-amber-300 font-extrabold text-sm">
                         ₹4,950
                       </span>
-                      <a
-                        href={getWhatsAppOrderUrl({
-                          name: "Royal Peacock Gold Handcrafted Bridal Blouse",
-                          effective_price: 4950,
-                          sku: "KCA-HERO-001",
-                        })}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[11px] font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-1"
-                      >
-                        Order on WhatsApp →
-                      </a>
+                      <span className="text-[11px] font-bold text-amber-300 hover:text-white flex items-center gap-1">
+                        View Product Page →
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -525,21 +523,26 @@ export default function KcAariWorkTheme({
                   ? Math.round(((p.regular_price - p.sale_price) / p.regular_price) * 100)
                   : 0;
 
+              const productDetailHref = getStoreHref(slug, `/products/${p.id}`);
+
               return (
                 <div
                   key={p.id}
-                  className="bg-white rounded-3xl border border-amber-900/10 overflow-hidden shadow-xs hover:shadow-xl hover:border-[#D4AF37]/50 transition-all duration-300 flex flex-col justify-between group"
+                  onClick={() => router.push(productDetailHref)}
+                  className="bg-white rounded-3xl border border-amber-900/10 overflow-hidden shadow-xs hover:shadow-xl hover:border-[#D4AF37]/50 transition-all duration-300 flex flex-col justify-between group cursor-pointer"
                 >
                   {/* Image Container with Badges */}
                   <div className="relative aspect-[4/5] bg-slate-100 overflow-hidden">
-                    <img
-                      src={p.thumbnail_url || "https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=800&q=80"}
-                      alt={p.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    />
+                    <Link href={productDetailHref} className="block w-full h-full">
+                      <img
+                        src={p.thumbnail_url || "https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=800&q=80"}
+                        alt={p.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
+                    </Link>
 
                     {/* Badge top left */}
-                    <div className="absolute top-3 left-3 flex flex-col gap-1.5 z-10">
+                    <div className="absolute top-3 left-3 flex flex-col gap-1.5 z-10 pointer-events-none">
                       <span className="px-2.5 py-0.5 rounded-full bg-[#062817]/90 text-amber-200 text-[10px] font-bold shadow-xs border border-[#D4AF37]/30">
                         {idx === 0
                           ? "✨ Most Loved Bridal"
@@ -567,15 +570,16 @@ export default function KcAariWorkTheme({
                       />
                     </button>
 
-                    {/* Quick View Button Hover */}
-                    <button
-                      type="button"
-                      onClick={() => setQuickViewProduct(p)}
-                      className="absolute bottom-3 left-1/2 -translate-x-1/2 px-4 py-1.5 rounded-full bg-[#062817]/90 text-amber-200 text-xs font-bold opacity-0 group-hover:opacity-100 transition-opacity shadow-md flex items-center gap-1.5 cursor-pointer"
+                    {/* Dedicated Product Page Navigation Button on Hover */}
+                    <Link
+                      href={productDetailHref}
+                      onClick={(e) => e.stopPropagation()}
+                      className="absolute bottom-3 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full bg-[#062817]/95 text-amber-200 text-xs font-bold opacity-0 group-hover:opacity-100 transition-all shadow-md flex items-center gap-1.5 hover:bg-[#083820] hover:scale-105 border border-[#D4AF37]/50 z-10"
                     >
-                      <Eye className="w-3.5 h-3.5" />
-                      Quick View
-                    </button>
+                      <Eye className="w-3.5 h-3.5 text-amber-300" />
+                      <span>View Details</span>
+                      <ArrowRight className="w-3 h-3 text-amber-300" />
+                    </Link>
                   </div>
 
                   {/* Card Details */}
@@ -590,13 +594,15 @@ export default function KcAariWorkTheme({
                         <span className="text-[10px] text-slate-400 font-mono ml-1">+ Custom Colors</span>
                       </div>
 
-                      <h3 className="font-serif font-bold text-slate-900 text-base leading-snug line-clamp-2 group-hover:text-[#062817] transition-colors">
-                        {p.name}
-                      </h3>
+                      <Link href={productDetailHref} className="block group/link">
+                        <h3 className="font-serif font-bold text-slate-900 text-base leading-snug line-clamp-2 group-hover/link:text-[#062817] transition-colors">
+                          {p.name}
+                        </h3>
 
-                      <p className="text-xs text-slate-500 mt-1 line-clamp-2 leading-relaxed">
-                        {p.description}
-                      </p>
+                        <p className="text-xs text-slate-500 mt-1 line-clamp-2 leading-relaxed">
+                          {p.description}
+                        </p>
+                      </Link>
                     </div>
 
                     <div className="pt-3 border-t border-slate-100 space-y-3">
@@ -620,7 +626,7 @@ export default function KcAariWorkTheme({
                       </div>
 
                       {/* Action Buttons: WhatsApp Order (Primary) & Add to Cart */}
-                      <div className="grid grid-cols-2 gap-2 pt-1">
+                      <div className="grid grid-cols-2 gap-2 pt-1" onClick={(e) => e.stopPropagation()}>
                         <button
                           type="button"
                           onClick={(e) => handleAddToCart(e, p)}
@@ -903,93 +909,6 @@ export default function KcAariWorkTheme({
           storeName={config?.store_name || "KC AARI WORK"}
           content={getPolicyContent(activePolicy)}
         />
-      )}
-
-      {/* ──────────────────────────────────────────────
-          9. QUICK VIEW PRODUCT MODAL
-      ────────────────────────────────────────────── */}
-      {quickViewProduct && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-[#D4AF37]/40 relative overflow-hidden">
-            <button
-              type="button"
-              onClick={() => setQuickViewProduct(null)}
-              className="absolute top-4 right-4 p-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 cursor-pointer"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-              <div className="aspect-[4/5] rounded-2xl overflow-hidden bg-slate-100">
-                <img
-                  src={quickViewProduct.thumbnail_url}
-                  alt={quickViewProduct.name}
-                  className="w-full h-full object-cover"
-                />
-              </div>
-
-              <div className="space-y-4">
-                <span className="inline-block px-3 py-1 rounded-full bg-[#062817] text-amber-200 font-bold text-[10px] uppercase">
-                  Handcrafted Pure Silk
-                </span>
-
-                <h3 className="font-serif font-black text-xl text-slate-900 leading-snug">
-                  {quickViewProduct.name}
-                </h3>
-
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  {quickViewProduct.description}
-                </p>
-
-                <div className="flex items-baseline gap-2 pt-1">
-                  <span className="text-2xl font-black text-[#062817] font-mono">
-                    ₹{(quickViewProduct.effective_price || quickViewProduct.regular_price).toLocaleString("en-IN")}
-                  </span>
-                  {quickViewProduct.sale_price && (
-                    <span className="text-sm text-slate-400 line-through font-mono">
-                      ₹{quickViewProduct.regular_price.toLocaleString("en-IN")}
-                    </span>
-                  )}
-                </div>
-
-                <div className="space-y-2 pt-2">
-                  <a
-                    href={getWhatsAppOrderUrl(quickViewProduct)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md cursor-pointer"
-                  >
-                    <MessageCircle className="w-4 h-4 fill-white" />
-                    <span>Order on WhatsApp (Custom Fitting)</span>
-                  </a>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        handleAddToCart(e, quickViewProduct);
-                        setQuickViewProduct(null);
-                      }}
-                      className="w-full py-2.5 px-3 rounded-xl border border-[#062817] text-[#062817] hover:bg-slate-50 font-bold text-xs cursor-pointer text-center"
-                    >
-                      Add to Cart
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        handleBuyNow(e, quickViewProduct);
-                        setQuickViewProduct(null);
-                      }}
-                      className="w-full py-2.5 px-3 rounded-xl bg-[#062817] text-amber-200 hover:bg-[#0A3520] font-bold text-xs cursor-pointer text-center"
-                    >
-                      Buy Now
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
       )}
     </div>
   );

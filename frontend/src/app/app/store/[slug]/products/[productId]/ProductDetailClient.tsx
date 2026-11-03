@@ -21,6 +21,7 @@ import {
   ArrowRight,
   Package,
   Heart,
+  MessageCircle,
 } from "lucide-react";
 
 export default function ProductDetailClient() {
@@ -32,6 +33,7 @@ export default function ProductDetailClient() {
 
   const [product, setProduct] = useState<any>(null);
   const [config, setConfig] = useState<any>(null);
+  const [relatedProducts, setRelatedProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedVariantId, setSelectedVariantId] = useState<string>("");
   const [activeImage, setActiveImage] = useState<string>("");
@@ -54,12 +56,16 @@ export default function ProductDetailClient() {
 
       setLoading(true);
       try {
-        const [prod, cfg] = await Promise.all([
+        const [prod, cfg, storeProds] = await Promise.all([
           platformApi.getPublicStoreProduct(s, pId),
           platformApi.getPublicStoreConfig(s),
+          platformApi.getPublicStoreProducts(s).catch(() => []),
         ]);
         setProduct(prod);
         setConfig(cfg);
+        if (storeProds && Array.isArray(storeProds)) {
+          setRelatedProducts(storeProds.filter((p: any) => p.id !== pId).slice(0, 4));
+        }
         if (prod?.has_variants && prod.variants && prod.variants.length > 0) {
           const firstVar = prod.variants[0];
           setSelectedVariantId(firstVar.id);
@@ -112,7 +118,8 @@ export default function ProductDetailClient() {
     );
   }
 
-  const primaryColor = config?.primary_color || "#2563EB";
+  const isKcAariWork = slug === "kcaariwork" || config?.store_slug === "kcaariwork" || config?.primary_color === "#062817";
+  const primaryColor = config?.primary_color || (isKcAariWork ? "#062817" : "#2563EB");
 
   if (!product) {
     return (
@@ -221,6 +228,16 @@ export default function ProductDetailClient() {
       ? Math.round(((product.regular_price - product.sale_price) / product.regular_price) * 100)
       : 0;
 
+  // Dynamic business WhatsApp and display phone
+  const rawBusinessPhone = config?.whatsapp_number || config?.contact_phone || config?.business_phone || "";
+  const cleanDigits = rawBusinessPhone.replace(/[^0-9]/g, "");
+  const whatsappPhone = cleanDigits.length === 10 ? `91${cleanDigits}` : cleanDigits;
+  const whatsappOrderUrl = whatsappPhone
+    ? `https://wa.me/${whatsappPhone}?text=${encodeURIComponent(
+        `Hello ${config?.store_name || "Store"}! I am interested in purchasing "${product?.name}" (Price: ₹${currentPrice.toLocaleString("en-IN")}${selectedVariant ? `, Variant: ${selectedVariant.name}` : ""}). Please assist with ordering & custom sizing.`
+      )}`
+    : "";
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
       <StoreHeader slug={slug} config={config} backHref={getStoreHref(slug)} backLabel="Back to Products" />
@@ -271,7 +288,7 @@ export default function ProductDetailClient() {
                   <button
                     key={i}
                     onClick={() => setActiveImage(img)}
-                    className={`w-16 h-16 rounded-xl overflow-hidden border-2 transition-all shrink-0 ${
+                    className={`w-16 h-16 rounded-xl overflow-hidden border-2 transition-all shrink-0 cursor-pointer ${
                       activeImage === img
                         ? "border-blue-600 ring-2 ring-blue-100"
                         : "border-slate-200 opacity-70 hover:opacity-100"
@@ -287,12 +304,19 @@ export default function ProductDetailClient() {
           {/* Right: Details & Purchase Actions */}
           <div className="space-y-6">
             <div>
-              {product.category_name && (
-                <span className="inline-block px-2.5 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200 mb-2">
-                  {product.category_name}
-                </span>
-              )}
-              <h1 className="text-xl sm:text-2xl font-bold text-slate-900 leading-tight">
+              <div className="flex flex-wrap items-center gap-2 mb-2">
+                {product.category_name && (
+                  <span className={`inline-block px-2.5 py-1 rounded-full text-[11px] font-bold ${isKcAariWork ? "bg-[#062817] text-amber-200 border border-[#D4AF37]/40" : "bg-blue-50 text-blue-700 border border-blue-200"}`}>
+                    {product.category_name}
+                  </span>
+                )}
+                {isKcAariWork && (
+                  <span className="inline-block px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-[#D4AF37] text-slate-950 uppercase tracking-wider shadow-xs">
+                    👑 Royal Handcrafted Aari Work
+                  </span>
+                )}
+              </div>
+              <h1 className={`text-xl sm:text-2xl font-bold text-slate-900 leading-tight ${isKcAariWork ? "font-serif sm:text-3xl text-[#062817]" : ""}`}>
                 {product.name}
               </h1>
               {product.sku && (
@@ -405,8 +429,20 @@ export default function ProductDetailClient() {
               </div>
             </div>
 
-            {/* CTA Buttons & Wishlist */}
+            {/* CTA Buttons & WhatsApp Order */}
             <div className="space-y-2.5 pt-2">
+              {whatsappOrderUrl && (
+                <a
+                  href={whatsappOrderUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer text-center"
+                >
+                  <MessageCircle className="w-4 h-4 fill-white" />
+                  <span>Order via WhatsApp (Custom Sizing Assistance)</span>
+                </a>
+              )}
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <button
                   onClick={handleAddToCart}
@@ -452,6 +488,21 @@ export default function ProductDetailClient() {
               </button>
             </div>
 
+            {/* Custom Saree Match Callout for KC Aari Work */}
+            {isKcAariWork && (
+              <div className="p-4 rounded-2xl bg-gradient-to-r from-[#062817] via-[#0A3520] to-[#041D10] text-white border border-[#D4AF37]/50 shadow-md space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm">👑</span>
+                  <span className="text-[#D4AF37] font-bold text-xs uppercase tracking-wider font-serif">
+                    Custom Saree Matching Guarantee
+                  </span>
+                </div>
+                <p className="text-[11px] text-amber-100/90 leading-relaxed font-light">
+                  Send your saree photo to our design team on WhatsApp. We match the exact thread shade, zari contrast, and neckline to your bridal saree.
+                </p>
+              </div>
+            )}
+
             {/* Shipping & Delivery Guarantee Details */}
             <div className="p-4 rounded-2xl bg-blue-50/50 border border-blue-100 space-y-2 text-xs text-slate-600">
               <div className="flex items-center gap-2 font-bold text-slate-900">
@@ -487,6 +538,64 @@ export default function ProductDetailClient() {
             )}
           </div>
         </div>
+
+        {/* Related Products from this Store */}
+        {relatedProducts.length > 0 && (
+          <section className="pt-8 border-t border-slate-200 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className={`text-base sm:text-lg font-bold text-slate-900 ${isKcAariWork ? "font-serif text-[#062817]" : ""}`}>
+                  {isKcAariWork ? "More Handcrafted Bridal Blouses" : `More from ${config?.store_name || "This Store"}`}
+                </h3>
+                <p className="text-xs text-slate-500">Explore other popular designs from our catalog</p>
+              </div>
+              <Link
+                href={getStoreHref(slug)}
+                className="text-xs font-bold hover:underline flex items-center gap-1"
+                style={{ color: primaryColor }}
+              >
+                <span>View Full Catalog</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {relatedProducts.map((rel) => {
+                const relHref = getStoreHref(slug, `/products/${rel.id}`);
+                return (
+                  <Link
+                    key={rel.id}
+                    href={relHref}
+                    className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs hover:shadow-md hover:border-slate-300 transition-all flex flex-col justify-between group"
+                  >
+                    <div className="aspect-[4/5] bg-slate-100 overflow-hidden relative">
+                      <img
+                        src={rel.thumbnail_url || "https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=600&q=80"}
+                        alt={rel.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                    </div>
+                    <div className="p-3.5 space-y-1">
+                      <h4 className={`text-xs font-bold text-slate-900 line-clamp-1 group-hover:text-blue-600 transition-colors ${isKcAariWork ? "font-serif" : ""}`}>
+                        {rel.name}
+                      </h4>
+                      <div className="flex items-baseline gap-1.5 pt-1">
+                        <span className="text-xs font-black text-slate-900 font-mono">
+                          ₹{(rel.effective_price || rel.regular_price).toLocaleString("en-IN")}
+                        </span>
+                        {rel.sale_price && (
+                          <span className="text-[10px] text-slate-400 line-through font-mono">
+                            ₹{rel.regular_price}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </section>
+        )}
       </main>
 
       {/* Mobile Sticky Bottom Action Bar */}
