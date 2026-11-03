@@ -58,6 +58,18 @@ export default function OrderDetailClient() {
     loadData();
   }, [params]);
 
+  useEffect(() => {
+    if (typeof document !== "undefined" && config?.store_name) {
+      document.title = order?.order_number
+        ? `Order #${order.order_number} | ${config.store_name}`
+        : `Order Tracking | ${config.store_name}`;
+      if (config.logo_url) {
+        let link: HTMLLinkElement | null = document.querySelector("link[rel*='icon']");
+        if (link) link.href = config.logo_url;
+      }
+    }
+  }, [order, config]);
+
   const handleCopy = () => {
     if (order?.order_number) {
       navigator.clipboard.writeText(order.order_number);

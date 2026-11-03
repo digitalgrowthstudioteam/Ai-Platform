@@ -76,6 +76,16 @@ export default function CheckoutClient() {
     } catch (e) {}
   }, [slug]);
 
+  useEffect(() => {
+    if (typeof document !== "undefined" && config?.store_name) {
+      document.title = `Checkout | ${config.store_name}`;
+      if (config.logo_url) {
+        let link: HTMLLinkElement | null = document.querySelector("link[rel*='icon']");
+        if (link) link.href = config.logo_url;
+      }
+    }
+  }, [config]);
+
   if (loading || !isLoaded) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">

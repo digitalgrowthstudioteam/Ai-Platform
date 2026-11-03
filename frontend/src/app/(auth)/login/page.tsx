@@ -8,6 +8,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { Loader2 } from "lucide-react";
+import { isSubdomainAccess, getStoreRouteParams } from "@/lib/app-platform/store-route-helper";
+import { platformApi } from "@/lib/app-platform/api";
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address" }),
@@ -21,6 +23,7 @@ export default function LoginPage() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [brandConfig, setBrandConfig] = useState<any>(null);
 
   const {
     register,
@@ -38,6 +41,33 @@ export default function LoginPage() {
       if (emailParam) {
         setValue("email", emailParam);
       }
+
+      // Check if accessing from a brand subdomain (e.g. xyz.digitalgrowthstudio.in)
+      if (isSubdomainAccess()) {
+        const { slug } = getStoreRouteParams();
+        // Check cache first
+        const cached = sessionStorage.getItem(`dgs_store_cache_${slug}`);
+        if (cached) {
+          try {
+            const parsed = JSON.parse(cached);
+            if (parsed?.cfg) {
+              setBrandConfig(parsed.cfg);
+              document.title = `Sign In | ${parsed.cfg.store_name}`;
+            }
+          } catch (e) {}
+        }
+        // Fetch fresh brand configuration
+        platformApi.getPublicStoreConfig(slug).then((cfg) => {
+          if (cfg) {
+            setBrandConfig(cfg);
+            document.title = `Sign In | ${cfg.store_name}`;
+            if (cfg.logo_url) {
+              let link: HTMLLinkElement | null = document.querySelector("link[rel*='icon']");
+              if (link) link.href = cfg.logo_url;
+            }
+          }
+        }).catch(() => {});
+      }
     }
   }, [setValue]);
 
@@ -46,7 +76,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await loginWithEmail(data.email, data.password);
-      router.push("/dashboard");
+      router.push(brandConfig ? "/" : "/dashboard");
     } catch (err: any) {
       setError(err.message || "Failed to log in. Please check your credentials.");
     } finally {
@@ -59,13 +89,15 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await loginWithGoogle();
-      router.push("/dashboard");
+      router.push(brandConfig ? "/" : "/dashboard");
     } catch (err: any) {
       setError(err.message || "Google Sign-in failed.");
     } finally {
       setLoading(false);
     }
   };
+
+  const brandPrimaryColor = brandConfig?.primary_color || "#2563EB";
 
   return (
     <div
@@ -88,25 +120,70 @@ export default function LoginPage() {
       >
         <div className="card-body" style={{ padding: "32px 24px" }}>
           {/* Header */}
-          <div style={{ textAlign: "center", marginBottom: 24 }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 8,
-                marginBottom: 8,
-              }}
-            >
-              <img src="/logo.jpg" alt="DG" style={{ width: 40, height: 40, borderRadius: 8, objectFit: "contain" }} />
+          {brandConfig ? (
+            <div style={{ textAlign: "center", marginBottom: 24 }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
+                  marginBottom: 10,
+                }}
+              >
+                {brandConfig.logo_url ? (
+                  <img
+                    src={brandConfig.logo_url}
+                    alt={brandConfig.store_name}
+                    style={{ width: 52, height: 52, borderRadius: 12, objectFit: "cover", border: "1px solid var(--border)" }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      width: 52,
+                      height: 52,
+                      borderRadius: 12,
+                      backgroundColor: brandPrimaryColor,
+                      color: "#fff",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontWeight: 700,
+                      fontSize: "1.35rem",
+                    }}
+                  >
+                    {brandConfig.store_name?.[0] || "S"}
+                  </div>
+                )}
+              </div>
+              <h2 style={{ fontSize: "1.35rem", fontWeight: 700, color: "var(--foreground)" }}>
+                {brandConfig.store_name}
+              </h2>
+              <p style={{ fontSize: "0.8125rem", color: "var(--muted-foreground)", marginTop: 4 }}>
+                Customer Account & Sign In
+              </p>
             </div>
-            <h2 style={{ fontSize: "1.25rem", fontWeight: 700 }}>
-              Digital Growth Studio
-            </h2>
-            <p style={{ fontSize: "0.8125rem", color: "var(--muted-foreground)" }}>
-              AI Ads Optimizer — Login
-            </p>
-          </div>
+          ) : (
+            <div style={{ textAlign: "center", marginBottom: 24 }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
+                  marginBottom: 8,
+                }}
+              >
+                <img src="/logo.jpg" alt="DG" style={{ width: 40, height: 40, borderRadius: 8, objectFit: "contain" }} />
+              </div>
+              <h2 style={{ fontSize: "1.25rem", fontWeight: 700 }}>
+                Digital Growth Studio
+              </h2>
+              <p style={{ fontSize: "0.8125rem", color: "var(--muted-foreground)" }}>
+                AI Ads Optimizer — Login
+              </p>
+            </div>
+          )}
 
           {/* Error Message */}
           {error && (
@@ -225,6 +302,7 @@ export default function LoginPage() {
                 alignItems: "center",
                 justifyContent: "center",
                 marginBottom: 16,
+                ...(brandConfig ? { backgroundColor: brandPrimaryColor, borderColor: brandPrimaryColor, color: "#fff" } : {}),
               }}
             >
               {loading ? (
@@ -301,7 +379,7 @@ export default function LoginPage() {
             <Link
               href="/signup"
               style={{
-                color: "var(--primary)",
+                color: brandConfig ? brandPrimaryColor : "var(--primary)",
                 fontWeight: 600,
                 textDecoration: "none",
               }}
@@ -309,6 +387,23 @@ export default function LoginPage() {
               Sign up
             </Link>
           </div>
+
+          {/* Back to store link on subdomains */}
+          {brandConfig && (
+            <div style={{ textAlign: "center", marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
+              <Link
+                href="/"
+                style={{
+                  fontSize: "0.8125rem",
+                  color: brandPrimaryColor,
+                  fontWeight: 600,
+                  textDecoration: "none",
+                }}
+              >
+                ← Return to {brandConfig.store_name}
+              </Link>
+            </div>
+          )}
         </div>
       </div>
     </div>

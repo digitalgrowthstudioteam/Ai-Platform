@@ -83,6 +83,21 @@ export default function ProductDetailClient() {
     loadData();
   }, [params]);
 
+  // Dynamic browser title & favicon
+  useEffect(() => {
+    if (typeof document !== "undefined") {
+      if (product?.name && config?.store_name) {
+        document.title = `${product.name} | ${config.store_name}`;
+      } else if (config?.store_name) {
+        document.title = config.store_name;
+      }
+      if (config?.logo_url) {
+        let link: HTMLLinkElement | null = document.querySelector("link[rel*='icon']");
+        if (link) link.href = config.logo_url;
+      }
+    }
+  }, [product, config]);
+
   const slug = activeSlug;
   const productId = activeProductId;
 

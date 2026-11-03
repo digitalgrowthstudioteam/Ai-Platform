@@ -58,6 +58,16 @@ export default function AccountClient() {
     } catch (e) {}
   }, [slug]);
 
+  useEffect(() => {
+    if (typeof document !== "undefined" && config?.store_name) {
+      document.title = `My Account & Orders | ${config.store_name}`;
+      if (config.logo_url) {
+        let link: HTMLLinkElement | null = document.querySelector("link[rel*='icon']");
+        if (link) link.href = config.logo_url;
+      }
+    }
+  }, [config]);
+
   const fetchOrders = async (phoneToSearch: string) => {
     if (!phoneToSearch || phoneToSearch.trim().length < 6) return;
     setSearching(true);

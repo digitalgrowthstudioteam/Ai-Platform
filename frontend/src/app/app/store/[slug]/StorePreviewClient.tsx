@@ -106,6 +106,19 @@ export default function StorePreviewClient() {
     return () => clearTimeout(timer);
   }, [params]);
 
+  // Update browser tab title and favicon to match store branding
+  useEffect(() => {
+    if (typeof document !== "undefined" && config?.store_name) {
+      document.title = `${config.store_name} | Official Online Store`;
+      if (config.logo_url) {
+        let link: HTMLLinkElement | null = document.querySelector("link[rel*='icon']");
+        if (link) {
+          link.href = config.logo_url;
+        }
+      }
+    }
+  }, [config]);
+
   const handleAddToCart = (e: React.MouseEvent, p: any) => {
     e.preventDefault();
     e.stopPropagation();
