@@ -17,9 +17,8 @@ export function isSubdomainAccess(): boolean {
 
 export function getStoreHref(slug: string, subpath: string = ""): string {
   const cleanSubpath = subpath ? (subpath.startsWith("/") ? subpath : `/${subpath}`) : "";
-  if (isSubdomainAccess()) {
-    return cleanSubpath || "/";
-  }
+  // In Next.js static export, all store pages are compiled under /app/store/{slug}
+  // Using the canonical route ensures Next.js client router renders product and cart pages instantly without 404 or login bails
   return `/app/store/${slug}${cleanSubpath}`;
 }
 

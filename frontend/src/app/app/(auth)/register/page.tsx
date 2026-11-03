@@ -459,7 +459,7 @@ export default function PlatformRegisterPage() {
                   </div>
                 </div>
                 <p className="text-[11px] text-slate-400 mt-1">
-                  Default: India (+91). For real-time WhatsApp order alerts & customer chat.
+                  Default: India (+91). For merchant verification & order management.
                 </p>
               </div>
 

@@ -62,7 +62,15 @@
         "destination": "/app/store/placeholder/products/sample.html"
       },
       {
+        "source": "/products/**",
+        "destination": "/app/store/placeholder/products/sample.html"
+      },
+      {
         "source": "/app/store/*/order/**",
+        "destination": "/app/store/placeholder/order/sample.html"
+      },
+      {
+        "source": "/order/**",
         "destination": "/app/store/placeholder/order/sample.html"
       },
       {
@@ -70,7 +78,15 @@
         "destination": "/app/store/placeholder/cart.html"
       },
       {
+        "source": "/cart/**",
+        "destination": "/app/store/placeholder/cart.html"
+      },
+      {
         "source": "/app/store/*/cart",
+        "destination": "/app/store/placeholder/cart.html"
+      },
+      {
+        "source": "/cart",
         "destination": "/app/store/placeholder/cart.html"
       },
       {
@@ -78,7 +94,15 @@
         "destination": "/app/store/placeholder/checkout.html"
       },
       {
+        "source": "/checkout/**",
+        "destination": "/app/store/placeholder/checkout.html"
+      },
+      {
         "source": "/app/store/*/checkout",
+        "destination": "/app/store/placeholder/checkout.html"
+      },
+      {
+        "source": "/checkout",
         "destination": "/app/store/placeholder/checkout.html"
       },
       {
@@ -86,7 +110,15 @@
         "destination": "/app/store/placeholder/account.html"
       },
       {
+        "source": "/account/**",
+        "destination": "/app/store/placeholder/account.html"
+      },
+      {
         "source": "/app/store/*/account",
+        "destination": "/app/store/placeholder/account.html"
+      },
+      {
+        "source": "/account",
         "destination": "/app/store/placeholder/account.html"
       },
       {

@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { usePlatformAuth } from "@/lib/app-platform/auth";
+import { isSubdomainAccess, getStoreRouteParams } from "@/lib/app-platform/store-route-helper";
 
 export default function PlatformRootPage() {
   const { user, loading } = usePlatformAuth();
@@ -10,6 +11,14 @@ export default function PlatformRootPage() {
 
   useEffect(() => {
     if (!loading) {
+      // 1. If on a brand subdomain, shoppers go straight to their store catalog
+      if (typeof window !== "undefined" && isSubdomainAccess()) {
+        const { slug } = getStoreRouteParams();
+        router.replace(`/app/store/${slug}`);
+        return;
+      }
+
+      // 2. SaaS platform navigation for vendors & admin
       if (!user) {
         router.replace("/app/login");
       } else if (user.role === "SUPER_ADMIN") {

@@ -104,7 +104,7 @@ async def get_setup_fee_quote(
             "Dedicated secure store subdomain (.digitalgrowthstudio.in)",
             "Unlimited product catalog with variant & image gallery hosting",
             "1GB High-Speed Cloud Storage CDN",
-            "Direct WhatsApp order alerts & automated notifications",
+            "Real-time order tracking & customer order management",
         ],
     )
 
