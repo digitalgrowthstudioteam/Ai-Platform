@@ -37,6 +37,22 @@ class PublicStoreConfigResponse(BaseModel):
     privacy_policy: Optional[str] = None
     shipping_policy: Optional[str] = None
     refund_policy: Optional[str] = None
+    meta_pixel_id: Optional[str] = None
+    gtm_id: Optional[str] = None
+    ga4_id: Optional[str] = None
+    tracking_enabled: bool = True
+
+
+class PublicStoreEventCreate(BaseModel):
+    event_type: str
+    product_id: Optional[str] = None
+    product_name: Optional[str] = None
+    value: Optional[float] = 0.0
+    source: Optional[str] = "Direct"
+    device: Optional[str] = "Mobile"
+    visitor_id: Optional[str] = None
+    city: Optional[str] = None
+    url_path: Optional[str] = None
 
 
 class PublicStorePoliciesResponse(BaseModel):

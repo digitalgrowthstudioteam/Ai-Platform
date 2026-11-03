@@ -174,6 +174,52 @@ class VendorDetailFullResponse(BaseModel):
     shipping_policy: Optional[str] = None
     refund_policy: Optional[str] = None
 
+    # Tracking & Pixels
+    meta_pixel_id: Optional[str] = None
+    gtm_id: Optional[str] = None
+    ga4_id: Optional[str] = None
+    tracking_enabled: bool = True
+    tracking_enabled: Optional[bool] = None
+
+
+class VendorPixelConfigResponse(BaseModel):
+    meta_pixel_id: Optional[str] = None
+    gtm_id: Optional[str] = None
+    ga4_id: Optional[str] = None
+    tracking_enabled: bool = True
+
+
+class VendorPixelConfigUpdateRequest(BaseModel):
+    meta_pixel_id: Optional[str] = None
+    gtm_id: Optional[str] = None
+    ga4_id: Optional[str] = None
+    tracking_enabled: Optional[bool] = None
+
+
+class VendorAnalyticsSummaryResponse(BaseModel):
+    date_range: str = "30d"
+    gross_revenue: float = 0.0
+    net_revenue: float = 0.0
+    total_orders: int = 0
+    total_units_sold: int = 0
+    average_order_value: float = 0.0
+    store_visits: int = 0
+    unique_visitors: int = 0
+    product_views: int = 0
+    add_to_cart_count: int = 0
+    checkout_count: int = 0
+    whatsapp_clicks: int = 0
+    conversion_rate: float = 0.0
+    add_to_cart_rate: float = 0.0
+    checkout_rate: float = 0.0
+    sales_trend: List[dict] = []
+    funnel_steps: List[dict] = []
+    top_products: List[dict] = []
+    traffic_sources: List[dict] = []
+    device_breakdown: List[dict] = []
+    customer_locations: List[dict] = []
+    pixel_status: dict = {}
+
     # App info
     app_name: str
     app_logo_url: Optional[str] = None
@@ -238,4 +284,50 @@ class AdminVendorFullUpdateRequest(BaseModel):
     privacy_policy: Optional[str] = None
     shipping_policy: Optional[str] = None
     refund_policy: Optional[str] = None
+
+    # Tracking & Pixels
+    meta_pixel_id: Optional[str] = None
+    gtm_id: Optional[str] = None
+    ga4_id: Optional[str] = None
+    tracking_enabled: bool = True
+    tracking_enabled: Optional[bool] = None
+
+
+class VendorPixelConfigResponse(BaseModel):
+    meta_pixel_id: Optional[str] = None
+    gtm_id: Optional[str] = None
+    ga4_id: Optional[str] = None
+    tracking_enabled: bool = True
+
+
+class VendorPixelConfigUpdateRequest(BaseModel):
+    meta_pixel_id: Optional[str] = None
+    gtm_id: Optional[str] = None
+    ga4_id: Optional[str] = None
+    tracking_enabled: Optional[bool] = None
+
+
+class VendorAnalyticsSummaryResponse(BaseModel):
+    date_range: str = "30d"
+    gross_revenue: float = 0.0
+    net_revenue: float = 0.0
+    total_orders: int = 0
+    total_units_sold: int = 0
+    average_order_value: float = 0.0
+    store_visits: int = 0
+    unique_visitors: int = 0
+    product_views: int = 0
+    add_to_cart_count: int = 0
+    checkout_count: int = 0
+    whatsapp_clicks: int = 0
+    conversion_rate: float = 0.0
+    add_to_cart_rate: float = 0.0
+    checkout_rate: float = 0.0
+    sales_trend: List[dict] = []
+    funnel_steps: List[dict] = []
+    top_products: List[dict] = []
+    traffic_sources: List[dict] = []
+    device_breakdown: List[dict] = []
+    customer_locations: List[dict] = []
+    pixel_status: dict = {}
 

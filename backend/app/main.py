@@ -97,6 +97,10 @@ async def lifespan(app: FastAPI):
                 "ALTER TABLE platform_stores ADD COLUMN IF NOT EXISTS privacy_policy TEXT;",
                 "ALTER TABLE platform_stores ADD COLUMN IF NOT EXISTS shipping_policy TEXT;",
                 "ALTER TABLE platform_stores ADD COLUMN IF NOT EXISTS refund_policy TEXT;",
+                "ALTER TABLE platform_stores ADD COLUMN IF NOT EXISTS meta_pixel_id VARCHAR(100);",
+                "ALTER TABLE platform_stores ADD COLUMN IF NOT EXISTS gtm_id VARCHAR(100);",
+                "ALTER TABLE platform_stores ADD COLUMN IF NOT EXISTS ga4_id VARCHAR(100);",
+                "ALTER TABLE platform_stores ADD COLUMN IF NOT EXISTS tracking_enabled BOOLEAN NOT NULL DEFAULT TRUE;",
                 "ALTER TABLE platform_vendor_app_configs ALTER COLUMN app_logo_url TYPE TEXT;",
                 "ALTER TABLE platform_vendor_app_configs ALTER COLUMN splash_screen_url TYPE TEXT;",
             ]

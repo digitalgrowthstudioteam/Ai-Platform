@@ -24,6 +24,7 @@ from app.schemas.platform.store_public import (
     PublicCategoryItem,
     PublicBannerItem,
     PublicProductImage,
+    PublicStoreEventCreate,
 )
 from app.schemas.platform.order import PublicOrderCreateRequest, OrderResponse, OrderItemResponse
 
@@ -100,7 +101,44 @@ async def get_store_config(slug: str, db: AsyncSession = Depends(get_db)):
         privacy_policy=policies["privacy_policy"],
         shipping_policy=policies["shipping_policy"],
         refund_policy=policies["refund_policy"],
+        meta_pixel_id=getattr(store, "meta_pixel_id", None),
+        gtm_id=getattr(store, "gtm_id", None),
+        ga4_id=getattr(store, "ga4_id", None),
+        tracking_enabled=getattr(store, "tracking_enabled", True),
     )
+
+
+@router.post("/{slug}/events")
+async def track_public_store_event(
+    slug: str,
+    payload: PublicStoreEventCreate,
+    db: AsyncSession = Depends(get_db),
+):
+    """Log an analytics event (visit, product view, add to cart, checkout, whatsapp click)."""
+    from app.models.platform.vendor import PlatformStoreEvent
+    store = await resolve_active_store(slug, db)
+    prod_uuid = None
+    if payload.product_id:
+        try:
+            prod_uuid = uuid.UUID(payload.product_id)
+        except Exception:
+            prod_uuid = None
+
+    event = PlatformStoreEvent(
+        vendor_id=store.vendor_id,
+        event_type=payload.event_type,
+        product_id=prod_uuid,
+        product_name=payload.product_name,
+        value=payload.value or 0.0,
+        source=payload.source or "Direct",
+        device=payload.device or "Mobile",
+        visitor_id=payload.visitor_id,
+        city=payload.city,
+        url_path=payload.url_path,
+    )
+    db.add(event)
+    await db.commit()
+    return {"status": "ok", "success": True, "event": payload.event_type}
 
 
 @router.get("/{slug}/policies", response_model=PublicStorePoliciesResponse)
@@ -119,6 +157,10 @@ async def get_public_store_policies(slug: str, db: AsyncSession = Depends(get_db
         privacy_policy=policies["privacy_policy"],
         shipping_policy=policies["shipping_policy"],
         refund_policy=policies["refund_policy"],
+        meta_pixel_id=getattr(store, "meta_pixel_id", None),
+        gtm_id=getattr(store, "gtm_id", None),
+        ga4_id=getattr(store, "ga4_id", None),
+        tracking_enabled=getattr(store, "tracking_enabled", True),
     )
 
 

@@ -27,6 +27,7 @@ import {
   Package,
 } from "lucide-react";
 import PolicyModal, { PolicyType } from "@/components/app-platform/store/PolicyModal";
+import { pixelTracker } from "@/lib/app-platform/pixel-tracker";
 
 interface KcAariWorkThemeProps {
   slug: string;
@@ -114,9 +115,19 @@ export default function KcAariWorkTheme({
     return `https://wa.me/${whatsappPhone}?text=${text}`;
   };
 
+  const handleWhatsAppClick = (product?: any, source: string = "general") => {
+    pixelTracker.trackWhatsAppClick(config, {
+      productName: product?.name,
+      productId: product?.id,
+      price: product?.effective_price || product?.regular_price,
+      source: source,
+    });
+  };
+
   const handleAddToCart = (e: React.MouseEvent, p: any) => {
     e.preventDefault();
     e.stopPropagation();
+    const itemPrice = p.effective_price || p.regular_price || 0;
     addItem({
       id: p.id,
       product_id: p.id,
@@ -129,11 +140,18 @@ export default function KcAariWorkTheme({
       quantity: 1,
       stock_quantity: p.stock_quantity,
     });
+    pixelTracker.trackAddToCart(config, {
+      id: p.id,
+      name: p.name,
+      price: itemPrice,
+      quantity: 1,
+    });
   };
 
   const handleBuyNow = (e: React.MouseEvent, p: any) => {
     e.preventDefault();
     e.stopPropagation();
+    const itemPrice = p.effective_price || p.regular_price || 0;
     addItem({
       id: p.id,
       product_id: p.id,
@@ -145,6 +163,16 @@ export default function KcAariWorkTheme({
       thumbnail_url: p.thumbnail_url,
       quantity: 1,
       stock_quantity: p.stock_quantity,
+    });
+    pixelTracker.trackAddToCart(config, {
+      id: p.id,
+      name: p.name,
+      price: itemPrice,
+      quantity: 1,
+    });
+    pixelTracker.trackInitiateCheckout(config, {
+      total: itemPrice,
+      itemCount: 1,
     });
     router.push(getStoreHref(slug, "/checkout"));
   };
@@ -152,6 +180,7 @@ export default function KcAariWorkTheme({
   const handleToggleWishlist = (e: React.MouseEvent, p: any) => {
     e.preventDefault();
     e.stopPropagation();
+    const currentlyInWishlist = isInWishlist(p.id);
     toggleItem({
       id: p.id,
       product_id: p.id,
@@ -164,6 +193,13 @@ export default function KcAariWorkTheme({
       category_name: p.category_name,
       in_stock: p.stock_quantity > 0,
     });
+    if (!currentlyInWishlist) {
+      pixelTracker.trackAddToWishlist(config, {
+        id: p.id,
+        name: p.name,
+        price: p.effective_price || p.regular_price || 0,
+      });
+    }
   };
 
   return (
@@ -247,6 +283,7 @@ export default function KcAariWorkTheme({
               href={getGeneralWhatsAppUrl()}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() => handleWhatsAppClick(undefined, "header_chat")}
               className="inline-flex items-center gap-1.5 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md transition-all cursor-pointer hover:shadow-emerald-600/30"
               title="Chat with Master Designer on WhatsApp"
             >
@@ -323,6 +360,7 @@ export default function KcAariWorkTheme({
                   href={getCustomSareeMatchUrl()}
                   target="_blank"
                   rel="noopener noreferrer"
+                  onClick={() => handleWhatsAppClick(undefined, "hero_custom_order")}
                   className="px-5 py-3 rounded-xl bg-white/10 hover:bg-white/15 text-amber-200 border border-[#D4AF37]/60 font-bold text-xs sm:text-sm transition-all inline-flex items-center gap-2 cursor-pointer"
                 >
                   <MessageCircle className="w-4 h-4 text-emerald-400" />
@@ -359,6 +397,7 @@ export default function KcAariWorkTheme({
                   href={getGeneralWhatsAppUrl()}
                   target="_blank"
                   rel="noopener noreferrer"
+                  onClick={() => handleWhatsAppClick(undefined, "hero_chat_button")}
                   className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600/90 hover:bg-emerald-600 text-white text-xs font-semibold transition-colors"
                 >
                   <MessageCircle className="w-3.5 h-3.5" />
@@ -638,6 +677,7 @@ export default function KcAariWorkTheme({
                           href={getWhatsAppOrderUrl(p)}
                           target="_blank"
                           rel="noopener noreferrer"
+                          onClick={() => handleWhatsAppClick(p, "product_card_whatsapp")}
                           className="w-full py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-colors shadow-xs flex items-center justify-center gap-1.5 cursor-pointer text-center"
                         >
                           <MessageCircle className="w-3.5 h-3.5 fill-white" />
@@ -699,6 +739,7 @@ export default function KcAariWorkTheme({
                   href={getCustomSareeMatchUrl()}
                   target="_blank"
                   rel="noopener noreferrer"
+                  onClick={() => handleWhatsAppClick(undefined, "saree_banner_custom_order")}
                   className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-[#D4AF37] via-amber-300 to-[#C5A059] text-slate-950 font-black text-xs sm:text-sm shadow-xl hover:scale-102 transition-transform cursor-pointer"
                 >
                   <MessageCircle className="w-4 h-4 fill-slate-950" />
@@ -796,6 +837,7 @@ export default function KcAariWorkTheme({
                 href={getGeneralWhatsAppUrl()}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={() => handleWhatsAppClick(undefined, "footer_chat_button")}
                 className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-sm transition-colors"
               >
                 <MessageCircle className="w-3.5 h-3.5 fill-white" />

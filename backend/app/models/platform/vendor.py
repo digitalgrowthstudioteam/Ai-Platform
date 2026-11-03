@@ -108,6 +108,12 @@ class PlatformStore(BaseModel):
     shipping_policy: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     refund_policy: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
+    # Analytics & Tracking Pixels (Meta Pixel, Google Tag Manager, Google Analytics 4)
+    meta_pixel_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    gtm_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    ga4_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    tracking_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
     vendor: Mapped["PlatformVendor"] = relationship("PlatformVendor", back_populates="store")
 
 
@@ -148,4 +154,20 @@ class PlatformStorageUsage(BaseModel):
     last_calculated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
 
     vendor: Mapped["PlatformVendor"] = relationship("PlatformVendor", back_populates="storage_usage")
+
+
+class PlatformStoreEvent(BaseModel):
+    """Storefront tracking event (page views, products viewed, cart additions, checkouts, purchases, whatsapp clicks)."""
+    __tablename__ = "platform_store_events"
+
+    vendor_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("platform_vendors.id", ondelete="CASCADE"), nullable=False, index=True)
+    event_type: Mapped[str] = mapped_column(String(50), nullable=False, index=True)  # page_view, view_content, add_to_cart, initiate_checkout, purchase, whatsapp_click, add_to_wishlist
+    product_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("platform_products.id", ondelete="SET NULL"), nullable=True)
+    product_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    value: Mapped[Optional[float]] = mapped_column(Float, nullable=True, default=0.0)
+    source: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, default="Direct")  # Direct, WhatsApp, Instagram, Google, Meta Ads
+    device: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, default="Mobile")  # Mobile, Desktop, Tablet
+    visitor_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    city: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    url_path: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
 

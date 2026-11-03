@@ -8,6 +8,7 @@ import { useVendorCart } from "@/lib/app-platform/cart-store";
 import { useVendorWishlist } from "@/lib/app-platform/wishlist-store";
 import StoreHeader from "@/components/app-platform/store/StoreHeader";
 import StoreFooter from "@/components/app-platform/store/StoreFooter";
+import PixelInjector from "@/components/app-platform/store/PixelInjector";
 import { getStoreRouteParams, getStoreHref } from "@/lib/app-platform/store-route-helper";
 import {
   ShoppingCart,
@@ -85,6 +86,7 @@ export default function CartClient() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
+      <PixelInjector config={config} pageTitle={`Cart | ${config?.store_name || "Store"}`} />
       <StoreHeader slug={slug} config={config} backHref={getStoreHref(slug)} backLabel="Back to Products" />
 
       <main className="max-w-6xl mx-auto px-4 py-8 pb-24 sm:pb-8 flex-1 w-full">

@@ -8,6 +8,8 @@ import { useVendorCart } from "@/lib/app-platform/cart-store";
 import { useVendorWishlist } from "@/lib/app-platform/wishlist-store";
 import StoreHeader from "@/components/app-platform/store/StoreHeader";
 import StoreFooter from "@/components/app-platform/store/StoreFooter";
+import PixelInjector from "@/components/app-platform/store/PixelInjector";
+import { pixelTracker } from "@/lib/app-platform/pixel-tracker";
 import { getStoreRouteParams, getStoreHref } from "@/lib/app-platform/store-route-helper";
 import {
   ShoppingCart,
@@ -63,6 +65,14 @@ export default function ProductDetailClient() {
         ]);
         setProduct(prod);
         setConfig(cfg);
+        if (prod && cfg) {
+          pixelTracker.trackViewContent(cfg, {
+            id: prod.id,
+            name: prod.name,
+            price: prod.effective_price || prod.sale_price || prod.regular_price || 0,
+            category: prod.category_name,
+          });
+        }
         if (storeProds && Array.isArray(storeProds)) {
           setRelatedProducts(storeProds.filter((p: any) => p.id !== pId).slice(0, 4));
         }
@@ -183,6 +193,12 @@ export default function ProductDetailClient() {
       quantity: qty,
       stock_quantity: currentStock,
     });
+    pixelTracker.trackAddToCart(config, {
+      id: product.id,
+      name: product.name,
+      price: currentPrice,
+      quantity: qty,
+    });
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
   };
@@ -202,6 +218,16 @@ export default function ProductDetailClient() {
       quantity: qty,
       stock_quantity: currentStock,
     });
+    pixelTracker.trackAddToCart(config, {
+      id: product.id,
+      name: product.name,
+      price: currentPrice,
+      quantity: qty,
+    });
+    pixelTracker.trackInitiateCheckout(config, {
+      total: currentPrice * qty,
+      itemCount: qty,
+    });
     router.push(getStoreHref(slug, "/checkout"));
   };
 
@@ -209,6 +235,7 @@ export default function ProductDetailClient() {
 
   const handleToggleWishlist = () => {
     if (!product) return;
+    const currentlyInWishlist = isInWishlist(product.id);
     toggleItem({
       id: product.id,
       product_id: product.id,
@@ -221,6 +248,13 @@ export default function ProductDetailClient() {
       category_name: product.category_name,
       in_stock: isInStock,
     });
+    if (!currentlyInWishlist) {
+      pixelTracker.trackAddToWishlist(config, {
+        id: product.id,
+        name: product.name,
+        price: currentPrice,
+      });
+    }
   };
 
   const discountPercent =
@@ -240,6 +274,7 @@ export default function ProductDetailClient() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
+      <PixelInjector config={config} pageTitle={product?.name ? `${product.name} | ${config?.store_name}` : undefined} />
       <StoreHeader slug={slug} config={config} backHref={getStoreHref(slug)} backLabel="Back to Products" />
 
       <main className="max-w-6xl mx-auto px-4 py-8 pb-24 sm:pb-8 flex-1 w-full space-y-6">
@@ -436,6 +471,14 @@ export default function ProductDetailClient() {
                   href={whatsappOrderUrl}
                   target="_blank"
                   rel="noopener noreferrer"
+                  onClick={() =>
+                    pixelTracker.trackWhatsAppClick(config, {
+                      productName: product?.name,
+                      productId: product?.id,
+                      price: currentPrice,
+                      source: "product_detail",
+                    })
+                  }
                   className="w-full py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer text-center"
                 >
                   <MessageCircle className="w-4 h-4 fill-white" />

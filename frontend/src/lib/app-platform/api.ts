@@ -21,6 +21,8 @@ import {
   CouponValidation,
   PlatformCouponItem,
   VendorPolicies,
+  VendorPixelConfig,
+  VendorAnalyticsSummary,
 } from './types';
 import { demoSandbox, DEMO_USER } from './demo-sandbox';
 
@@ -945,6 +947,128 @@ class PlatformApiClient {
     return this.request(`/api/v1/platform/admin/coupons/${couponId}`, {
       method: 'DELETE',
     });
+  }
+
+  // ──────────────────────────────────────────────
+  // Vendor Pixel & Analytics APIs
+  // ──────────────────────────────────────────────
+  async getVendorPixelConfig(): Promise<VendorPixelConfig> {
+    if (this.isDemoMode()) {
+      return {
+        meta_pixel_id: "123456789012345",
+        gtm_id: "GTM-DEMO123",
+        ga4_id: "G-DEMO12345",
+        tracking_enabled: true,
+      };
+    }
+    return this.request<VendorPixelConfig>('/api/v1/platform/vendor/pixels');
+  }
+
+  async updateVendorPixelConfig(payload: Partial<VendorPixelConfig>): Promise<VendorPixelConfig> {
+    if (this.isDemoMode()) {
+      return {
+        meta_pixel_id: payload.meta_pixel_id ?? "",
+        gtm_id: payload.gtm_id ?? "",
+        ga4_id: payload.ga4_id ?? "",
+        tracking_enabled: payload.tracking_enabled ?? true,
+      };
+    }
+    return this.request<VendorPixelConfig>('/api/v1/platform/vendor/pixels', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async getVendorAnalytics(dateRange: string = '30d'): Promise<VendorAnalyticsSummary> {
+    if (this.isDemoMode()) {
+      return {
+        date_range: dateRange,
+        gross_revenue: 148500,
+        net_revenue: 139200,
+        total_orders: 42,
+        total_units_sold: 58,
+        average_order_value: 3535,
+        store_visits: 1240,
+        unique_visitors: 890,
+        product_views: 3120,
+        add_to_cart_count: 215,
+        checkout_count: 84,
+        whatsapp_clicks: 76,
+        conversion_rate: 3.38,
+        add_to_cart_rate: 17.33,
+        checkout_rate: 6.77,
+        sales_trend: [
+          { date: "2026-10-05", sales: 7400, orders: 2, visits: 38 },
+          { date: "2026-10-10", sales: 12500, orders: 3, visits: 62 },
+          { date: "2026-10-15", sales: 18900, orders: 5, visits: 85 },
+          { date: "2026-10-20", sales: 24200, orders: 7, visits: 110 },
+          { date: "2026-10-25", sales: 38100, orders: 11, visits: 165 },
+          { date: "2026-10-30", sales: 47400, orders: 14, visits: 195 },
+        ],
+        funnel_steps: [
+          { stage: "Store Visits", count: 1240, percentage: 100 },
+          { stage: "Product Views", count: 3120, percentage: 82 },
+          { stage: "Add To Cart", count: 215, percentage: 17.3 },
+          { stage: "Initiate Checkout", count: 84, percentage: 6.8 },
+          { stage: "Purchases", count: 42, percentage: 3.4 },
+        ],
+        top_products: [
+          { id: "1", name: "Royal Peacock Heavy Zardosi Handcrafted Bridal Blouse", units_sold: 18, revenue: 89100, views: 940, conversion_rate: 1.9 },
+          { id: "2", name: "Heritage Bridal Golden Zari Full-Sleeve Silk Blouse", units_sold: 14, revenue: 72800, views: 680, conversion_rate: 2.1 },
+          { id: "3", name: "Classic Floral Maggam Work Semi-Bridal Raw Silk Blouse", units_sold: 10, revenue: 34500, views: 510, conversion_rate: 2.0 },
+        ],
+        traffic_sources: [
+          { source: "Instagram / Meta Ads", visits: 680, orders: 26, percentage: 54.8 },
+          { source: "WhatsApp Direct", visits: 310, orders: 11, percentage: 25.0 },
+          { source: "Direct / Organic Search", visits: 180, orders: 4, percentage: 14.5 },
+          { source: "Google Ads / Referrals", visits: 70, orders: 1, percentage: 5.7 },
+        ],
+        device_breakdown: [
+          { device: "Mobile (Android / iOS)", visits: 1054, percentage: 85.0 },
+          { device: "Desktop / PC", visits: 161, percentage: 13.0 },
+          { device: "Tablet", visits: 25, percentage: 2.0 },
+        ],
+        customer_locations: [
+          { city: "Pune", orders: 18, revenue: 64200 },
+          { city: "Mumbai", orders: 12, revenue: 42600 },
+          { city: "Bangalore", orders: 6, revenue: 21300 },
+          { city: "Hyderabad", orders: 4, revenue: 14200 },
+          { city: "Chennai", orders: 2, revenue: 6200 },
+        ],
+        pixel_status: {
+          meta_active: true,
+          meta_pixel_id: "123456789012345",
+          gtm_active: true,
+          gtm_id: "GTM-DEMO123",
+          ga4_active: true,
+          ga4_id: "G-DEMO12345",
+          tracking_enabled: true,
+        },
+      };
+    }
+    return this.request<VendorAnalyticsSummary>(`/api/v1/platform/vendor/analytics?date_range=${encodeURIComponent(dateRange)}`);
+  }
+
+  async trackStoreEvent(slug: string, payload: {
+    event_type: string;
+    product_id?: string;
+    product_name?: string;
+    value?: number;
+    source?: string;
+    device?: string;
+    visitor_id?: string;
+    city?: string;
+    url_path?: string;
+  }): Promise<any> {
+    try {
+      return await this.request(`/api/store/${slug}/events`, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+    } catch (e) {
+      // Event tracking is background telemetry, fail gracefully without disrupting UI
+      return null;
+    }
   }
 }
 

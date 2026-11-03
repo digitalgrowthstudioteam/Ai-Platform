@@ -408,3 +408,72 @@ export interface Addon {
   created_at: string;
 }
 
+export interface VendorPixelConfig {
+  meta_pixel_id?: string;
+  gtm_id?: string;
+  ga4_id?: string;
+  tracking_enabled: boolean;
+}
+
+export interface VendorAnalyticsSummary {
+  date_range: string;
+  gross_revenue: number;
+  net_revenue: number;
+  total_orders: number;
+  total_units_sold: number;
+  average_order_value: number;
+  store_visits: number;
+  unique_visitors: number;
+  product_views: number;
+  add_to_cart_count: number;
+  checkout_count: number;
+  whatsapp_clicks: number;
+  conversion_rate: number;
+  add_to_cart_rate: number;
+  checkout_rate: number;
+  sales_trend: Array<{
+    date: string;
+    sales: number;
+    orders: number;
+    visits: number;
+  }>;
+  funnel_steps: Array<{
+    stage: string;
+    count: number;
+    percentage: number;
+  }>;
+  top_products: Array<{
+    id: string;
+    name: string;
+    units_sold: number;
+    revenue: number;
+    views: number;
+    conversion_rate: number;
+  }>;
+  traffic_sources: Array<{
+    source: string;
+    visits: number;
+    orders: number;
+    percentage: number;
+  }>;
+  device_breakdown: Array<{
+    device: string;
+    visits: number;
+    percentage: number;
+  }>;
+  customer_locations: Array<{
+    city: string;
+    orders: number;
+    revenue: number;
+  }>;
+  pixel_status: {
+    meta_active: boolean;
+    meta_pixel_id?: string;
+    gtm_active: boolean;
+    gtm_id?: string;
+    ga4_active: boolean;
+    ga4_id?: string;
+    tracking_enabled: boolean;
+  };
+}
+

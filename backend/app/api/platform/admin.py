@@ -418,6 +418,10 @@ async def get_vendor_full_detail(
         privacy_policy=policies.get("privacy_policy"),
         shipping_policy=policies.get("shipping_policy"),
         refund_policy=policies.get("refund_policy"),
+        meta_pixel_id=s.meta_pixel_id if s else None,
+        gtm_id=s.gtm_id if s else None,
+        ga4_id=s.ga4_id if s else None,
+        tracking_enabled=getattr(s, "tracking_enabled", True) if s else True,
         # App info
         app_name=app.app_name if app else (p.business_name if p else "App"),
         app_logo_url=app.app_logo_url if app else None,
@@ -566,6 +570,14 @@ async def update_vendor_full_details_by_admin(
             s.shipping_policy = dump["shipping_policy"]
         if "refund_policy" in dump:
             s.refund_policy = dump["refund_policy"]
+        if "meta_pixel_id" in dump:
+            s.meta_pixel_id = dump["meta_pixel_id"].strip() if dump["meta_pixel_id"] else None
+        if "gtm_id" in dump:
+            s.gtm_id = dump["gtm_id"].strip() if dump["gtm_id"] else None
+        if "ga4_id" in dump:
+            s.ga4_id = dump["ga4_id"].strip() if dump["ga4_id"] else None
+        if "tracking_enabled" in dump and dump["tracking_enabled"] is not None:
+            s.tracking_enabled = bool(dump["tracking_enabled"])
 
     # Also sync app config app_name if brand/store name was changed
     if v.app_config and ("brand_name" in dump or "store_name" in dump or "business_name" in dump):

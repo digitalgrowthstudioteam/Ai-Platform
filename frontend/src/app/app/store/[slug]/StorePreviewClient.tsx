@@ -9,6 +9,8 @@ import { useVendorWishlist } from "@/lib/app-platform/wishlist-store";
 import StoreHeader from "@/components/app-platform/store/StoreHeader";
 import StoreFooter from "@/components/app-platform/store/StoreFooter";
 import KcAariWorkTheme from "@/components/app-platform/store/themes/KcAariWorkTheme";
+import PixelInjector from "@/components/app-platform/store/PixelInjector";
+import { pixelTracker } from "@/lib/app-platform/pixel-tracker";
 import { getStoreRouteParams, getStoreHref } from "@/lib/app-platform/store-route-helper";
 import {
   Store,
@@ -126,6 +128,7 @@ export default function StorePreviewClient() {
   const handleAddToCart = (e: React.MouseEvent, p: any) => {
     e.preventDefault();
     e.stopPropagation();
+    const itemPrice = p.effective_price || p.regular_price || 0;
     addItem({
       id: p.id,
       product_id: p.id,
@@ -137,6 +140,12 @@ export default function StorePreviewClient() {
       thumbnail_url: p.thumbnail_url,
       quantity: 1,
       stock_quantity: p.stock_quantity,
+    });
+    pixelTracker.trackAddToCart(config, {
+      id: p.id,
+      name: p.name,
+      price: itemPrice,
+      quantity: 1,
     });
     setAddedMap((prev) => ({ ...prev, [p.id]: true }));
     setTimeout(() => {
@@ -147,6 +156,7 @@ export default function StorePreviewClient() {
   const handleBuyNow = (e: React.MouseEvent, p: any) => {
     e.preventDefault();
     e.stopPropagation();
+    const itemPrice = p.effective_price || p.regular_price || 0;
     addItem({
       id: p.id,
       product_id: p.id,
@@ -159,12 +169,23 @@ export default function StorePreviewClient() {
       quantity: 1,
       stock_quantity: p.stock_quantity,
     });
+    pixelTracker.trackAddToCart(config, {
+      id: p.id,
+      name: p.name,
+      price: itemPrice,
+      quantity: 1,
+    });
+    pixelTracker.trackInitiateCheckout(config, {
+      total: itemPrice,
+      itemCount: 1,
+    });
     router.push(getStoreHref(slug, "/checkout"));
   };
 
   const handleToggleWishlist = (e: React.MouseEvent, p: any) => {
     e.preventDefault();
     e.stopPropagation();
+    const currentlyInWishlist = isInWishlist(p.id);
     toggleItem({
       id: p.id,
       product_id: p.id,
@@ -177,6 +198,13 @@ export default function StorePreviewClient() {
       category_name: p.category_name,
       in_stock: p.in_stock,
     });
+    if (!currentlyInWishlist) {
+      pixelTracker.trackAddToWishlist(config, {
+        id: p.id,
+        name: p.name,
+        price: p.effective_price || p.regular_price || 0,
+      });
+    }
   };
 
   if (loading) {
@@ -208,13 +236,16 @@ export default function StorePreviewClient() {
   // Custom luxury theme for KC AARI WORK boutique
   if (slug === "kcaariwork" || config?.store_slug === "kcaariwork") {
     return (
-      <KcAariWorkTheme
-        slug={slug}
-        config={config}
-        categories={categories}
-        products={products}
-        banners={banners}
-      />
+      <>
+        <PixelInjector config={config} pageTitle={config?.store_name} />
+        <KcAariWorkTheme
+          slug={slug}
+          config={config}
+          categories={categories}
+          products={products}
+          banners={banners}
+        />
+      </>
     );
   }
 
@@ -226,6 +257,7 @@ export default function StorePreviewClient() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
+      <PixelInjector config={config} pageTitle={config?.store_name} />
       <StoreHeader slug={slug} config={config} />
 
       {/* Hero Banners Carousel */}

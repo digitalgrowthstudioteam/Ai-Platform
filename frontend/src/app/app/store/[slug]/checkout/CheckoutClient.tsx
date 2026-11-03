@@ -8,6 +8,8 @@ import { useVendorCart } from "@/lib/app-platform/cart-store";
 import { useSavedAddresses } from "@/lib/app-platform/customer-address-store";
 import StoreHeader from "@/components/app-platform/store/StoreHeader";
 import StoreFooter from "@/components/app-platform/store/StoreFooter";
+import PixelInjector from "@/components/app-platform/store/PixelInjector";
+import { pixelTracker } from "@/lib/app-platform/pixel-tracker";
 import { getStoreRouteParams, getStoreHref } from "@/lib/app-platform/store-route-helper";
 import {
   CreditCard,
@@ -56,6 +58,12 @@ export default function CheckoutClient() {
         setConfig(cfg);
         if (cfg.cod_enabled === false && cfg.razorpay_enabled) {
           setPaymentMethod("ONLINE");
+        }
+        if (items.length > 0) {
+          pixelTracker.trackInitiateCheckout(cfg, {
+            total: subtotal,
+            itemCount: items.length,
+          });
         }
       } catch (e) {
         console.error("Failed to load store config:", e);
@@ -215,11 +223,23 @@ export default function CheckoutClient() {
               } catch (e) {
                 console.error("Payment confirmation failed:", e);
               }
+              pixelTracker.trackPurchase(config, {
+                id: order.id || order.order_number,
+                total_amount: grandTotal,
+                city: city.trim(),
+                items: items,
+              });
               clearCart();
               router.push(getStoreHref(slug, `/order/${order.id || order.order_number}`));
             },
             modal: {
               ondismiss: () => {
+                pixelTracker.trackPurchase(config, {
+                  id: order.id || order.order_number,
+                  total_amount: grandTotal,
+                  city: city.trim(),
+                  items: items,
+                });
                 clearCart();
                 router.push(getStoreHref(slug, `/order/${order.id || order.order_number}`));
               },
@@ -230,6 +250,14 @@ export default function CheckoutClient() {
           return;
         }
       }
+
+      // Track purchase for COD order
+      pixelTracker.trackPurchase(config, {
+        id: order.id || order.order_number,
+        total_amount: grandTotal,
+        city: city.trim(),
+        items: items,
+      });
 
       // Clear this vendor's cart for COD or fallback
       clearCart();
@@ -244,6 +272,7 @@ export default function CheckoutClient() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
+      <PixelInjector config={config} pageTitle={`Checkout | ${config?.store_name || "Store"}`} />
       <StoreHeader slug={slug} config={config} backHref={getStoreHref(slug, "/cart")} backLabel="Back to Cart" />
 
       <main className="max-w-6xl mx-auto px-4 py-8 flex-1 w-full">
