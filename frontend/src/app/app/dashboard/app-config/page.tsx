@@ -30,6 +30,8 @@ export default function VendorAppConfigPage() {
   const [submittingDev, setSubmittingDev] = useState(false);
   const [uploadingIcon, setUploadingIcon] = useState(false);
   const [uploadingSplash, setUploadingSplash] = useState(false);
+  const [iconImgError, setIconImgError] = useState(false);
+  const [splashImgError, setSplashImgError] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const iconInputRef = useRef<HTMLInputElement>(null);
@@ -70,19 +72,27 @@ export default function VendorAppConfigPage() {
     setUploadingIcon(true);
     setMessage(null);
     try {
-      let iconUrl = "";
-      if (platformApi.isDemoMode()) {
-        const reader = new FileReader();
-        iconUrl = await new Promise<string>((resolve) => {
-          reader.onload = (event) => resolve((event.target?.result as string) || "");
-          reader.readAsDataURL(file);
-        });
-      } else {
-        const uploadRes = await platformApi.uploadFile(file, "app-assets");
-        iconUrl = uploadRes.url;
+      // 1. Guaranteed local base64 fallback so it always renders without broken icons
+      const reader = new FileReader();
+      const localDataUrl = await new Promise<string>((resolve) => {
+        reader.onload = (event) => resolve((event.target?.result as string) || "");
+        reader.readAsDataURL(file);
+      });
+
+      let iconUrl = localDataUrl;
+      if (!platformApi.isDemoMode()) {
+        try {
+          const uploadRes = await platformApi.uploadFile(file, "app-assets");
+          if (uploadRes?.url && !uploadRes.url.includes("images.digitalgrowthstudio.in")) {
+            iconUrl = uploadRes.url;
+          }
+        } catch (upErr) {
+          console.warn("Upload fallback to base64 data URI:", upErr);
+        }
       }
 
       if (iconUrl) {
+        setIconImgError(false);
         // Update local state
         setConfig((prev) => (prev ? { ...prev, app_logo_url: iconUrl } : null));
 
@@ -113,8 +123,15 @@ export default function VendorAppConfigPage() {
   const handleUseStoreLogo = async () => {
     if (isDevelopmentSet) return;
     const existingLogo = store?.logo_url || profile?.logo_url;
-    if (!existingLogo) return;
+    if (!existingLogo || existingLogo.includes("images.digitalgrowthstudio.in")) {
+      setMessage({
+        type: "error",
+        text: "Store logo not uploaded yet. Click 'Replace Image' to upload your launcher icon.",
+      });
+      return;
+    }
 
+    setIconImgError(false);
     setConfig((prev) => (prev ? { ...prev, app_logo_url: existingLogo } : null));
     try {
       await platformApi.updateVendorAppConfig({ app_logo_url: existingLogo });
@@ -136,19 +153,26 @@ export default function VendorAppConfigPage() {
     setUploadingSplash(true);
     setMessage(null);
     try {
-      let splashUrl = "";
-      if (platformApi.isDemoMode()) {
-        const reader = new FileReader();
-        splashUrl = await new Promise<string>((resolve) => {
-          reader.onload = (event) => resolve((event.target?.result as string) || "");
-          reader.readAsDataURL(file);
-        });
-      } else {
-        const uploadRes = await platformApi.uploadFile(file, "app-assets");
-        splashUrl = uploadRes.url;
+      const reader = new FileReader();
+      const localDataUrl = await new Promise<string>((resolve) => {
+        reader.onload = (event) => resolve((event.target?.result as string) || "");
+        reader.readAsDataURL(file);
+      });
+
+      let splashUrl = localDataUrl;
+      if (!platformApi.isDemoMode()) {
+        try {
+          const uploadRes = await platformApi.uploadFile(file, "app-assets");
+          if (uploadRes?.url && !uploadRes.url.includes("images.digitalgrowthstudio.in")) {
+            splashUrl = uploadRes.url;
+          }
+        } catch (upErr) {
+          console.warn("Upload fallback to base64 data URI:", upErr);
+        }
       }
 
       if (splashUrl) {
+        setSplashImgError(false);
         setConfig((prev) => (prev ? { ...prev, splash_screen_url: splashUrl } : null));
         await platformApi.updateVendorAppConfig({ splash_screen_url: splashUrl });
         setMessage({
@@ -423,13 +447,14 @@ export default function VendorAppConfigPage() {
                 className="hidden"
               />
 
-              {config?.app_logo_url ? (
+              {config?.app_logo_url && !config.app_logo_url.includes("images.digitalgrowthstudio.in") && !iconImgError ? (
                 <div className="flex items-center gap-4 p-4 bg-slate-50 border border-slate-200 rounded-2xl">
                   {/* Android Adaptive Icon Preview */}
                   <div className="relative shrink-0">
                     <img
                       src={config.app_logo_url}
                       alt="App Icon"
+                      onError={() => setIconImgError(true)}
                       className="w-18 h-18 rounded-2xl object-cover shadow-md border-2 border-white ring-1 ring-slate-200"
                     />
                     <div className="absolute -bottom-1 -right-1 bg-blue-600 text-white p-1 rounded-full shadow-xs">
@@ -503,13 +528,14 @@ export default function VendorAppConfigPage() {
                 className="hidden"
               />
 
-              {config?.splash_screen_url ? (
+              {config?.splash_screen_url && !config.splash_screen_url.includes("images.digitalgrowthstudio.in") && !splashImgError ? (
                 <div className="flex items-center gap-4 p-4 bg-slate-50 border border-slate-200 rounded-2xl">
                   {/* Portrait Splash Preview */}
                   <div className="w-14 h-24 rounded-xl overflow-hidden shrink-0 border border-slate-300 shadow-xs bg-slate-800">
                     <img
                       src={config.splash_screen_url}
                       alt="Splash Screen Graphic"
+                      onError={() => setSplashImgError(true)}
                       className="w-full h-full object-cover"
                     />
                   </div>
@@ -547,18 +573,18 @@ export default function VendorAppConfigPage() {
                       : "bg-slate-50/50 hover:bg-blue-50/40 hover:border-blue-300 cursor-pointer"
                   }`}
                 >
-                  <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-600 flex items-center justify-center mx-auto mb-2">
+                  <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto mb-2">
                     {uploadingSplash ? (
-                      <RefreshCw className="w-5 h-5 animate-spin text-blue-600" />
+                      <RefreshCw className="w-5 h-5 animate-spin" />
                     ) : (
-                      <ImageIcon className="w-6 h-6" />
+                      <UploadCloud className="w-6 h-6" />
                     )}
                   </div>
                   <p className="text-xs font-bold text-slate-800">
-                    {uploadingSplash ? "Uploading Splash Graphic..." : "Click or drag to add Splash Screen Image"}
+                    {uploadingSplash ? "Uploading Graphic..." : "Click or drag to add Splash Screen Graphic"}
                   </p>
                   <p className="text-[11px] text-slate-400 mt-1">
-                    Portrait 1080×1920 (PNG / JPG) • Shown during Android app cold starts
+                    1080×1920 Portrait PNG/JPEG recommended
                   </p>
                 </div>
               )}

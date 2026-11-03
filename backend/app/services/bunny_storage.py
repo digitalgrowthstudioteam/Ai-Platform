@@ -2,6 +2,7 @@
 Digital Growth Studio — Bunny.net CDN & Edge Storage Service
 Handles asset uploads (logos, product photos, banners, splash screens) to Bunny Storage.
 """
+import base64
 import httpx
 import uuid
 import structlog
@@ -42,16 +43,30 @@ class BunnyStorageService:
         unique_filename = f"{uuid.uuid4().hex[:12]}.{ext}"
         relative_path = f"{folder}/{vendor_id}/{unique_filename}"
 
+        def make_base64_url(b: bytes, f_ext: str) -> str:
+            mime = "image/jpeg"
+            if f_ext in ["png"]:
+                mime = "image/png"
+            elif f_ext in ["webp"]:
+                mime = "image/webp"
+            elif f_ext in ["svg"]:
+                mime = "image/svg+xml"
+            elif f_ext in ["gif"]:
+                mime = "image/gif"
+            encoded = base64.b64encode(b).decode("utf-8")
+            return f"data:{mime};base64,{encoded}"
+
         if not self.storage_zone or not self.api_key:
-            # Fallback when Bunny credentials are not yet configured in env
-            logger.warning("bunny_storage_unconfigured_using_fallback", filename=filename)
-            fallback_url = f"https://images.digitalgrowthstudio.in/{relative_path}"
+            # Fallback when Bunny credentials are not yet configured in env:
+            # Return inline base64 image data URI so browser & mobile apps render the image directly without broken icon
+            logger.warning("bunny_storage_unconfigured_using_base64_fallback", filename=filename)
+            fallback_url = make_base64_url(file_bytes, ext)
             return {
                 "url": fallback_url,
                 "bytes": file_size,
                 "path": relative_path,
                 "filename": filename,
-                "stored_at": "placeholder"
+                "stored_at": "inline_base64",
             }
 
         endpoint = f"{self.base_storage_url}/{relative_path}"
@@ -78,13 +93,13 @@ class BunnyStorageService:
                     raise RuntimeError(f"Bunny storage upload failed: {res.text}")
         except Exception as e:
             logger.error("bunny_storage_exception", error=str(e))
-            fallback_url = f"https://images.digitalgrowthstudio.in/{relative_path}"
+            fallback_url = make_base64_url(file_bytes, ext)
             return {
                 "url": fallback_url,
                 "bytes": file_size,
                 "path": relative_path,
                 "filename": filename,
-                "stored_at": "fallback"
+                "stored_at": "inline_base64_fallback"
             }
 
     async def delete_file(self, relative_path: str) -> bool:
