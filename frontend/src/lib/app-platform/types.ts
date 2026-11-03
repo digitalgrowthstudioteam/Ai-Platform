@@ -16,6 +16,9 @@ export interface PlatformUser {
   setup_fee_paid?: boolean;
   setup_fee_waived?: boolean;
   subscription_status?: string;
+  subscription_expires_at?: string;
+  is_subscription_expired?: boolean;
+  monthly_price_inr?: number;
   apk_user_approved?: boolean;
 }
 

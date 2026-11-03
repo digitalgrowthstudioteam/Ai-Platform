@@ -807,6 +807,45 @@ class PlatformApiClient {
     });
   }
 
+  async createSubscriptionOrder(): Promise<{
+    order_id: string;
+    amount: number;
+    currency: string;
+    key_id: string;
+    is_mock: boolean;
+    plan_name: string;
+    monthly_price_inr: number;
+  }> {
+    if (this.isDemoMode()) {
+      return {
+        order_id: `order_mock_sub_${Date.now()}`,
+        amount: 49900,
+        currency: 'INR',
+        key_id: 'rzp_test_platform_mock',
+        is_mock: true,
+        plan_name: 'Starter Store Plan',
+        monthly_price_inr: 499,
+      };
+    }
+    return this.request('/api/v1/platform/payments/create-subscription-order', {
+      method: 'POST',
+    });
+  }
+
+  async verifySubscriptionPayment(payload: {
+    razorpay_order_id: string;
+    razorpay_payment_id: string;
+    razorpay_signature: string;
+  }): Promise<any> {
+    if (this.isDemoMode()) {
+      return { success: true, message: "Subscription renewed successfully in demo sandbox!", status: "active" };
+    }
+    return this.request('/api/v1/platform/payments/verify-subscription-payment', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
   // Admin Setup Fee & Pricing controls
   async updateVendorSetupFeeByAdmin(vendorId: string, payload: { waive_fee?: boolean; custom_price_inr?: number }): Promise<any> {
     return this.request(`/api/v1/platform/admin/vendors/${vendorId}/setup-fee`, {

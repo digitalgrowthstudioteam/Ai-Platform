@@ -142,26 +142,80 @@ export default function VendorSubscriptionPage() {
     }
   };
 
-  // Vendor tests and approves submitted APK
+  // Vendor tests and approves submitted APK with ₹499 Razorpay payment
   const handleApproveApk = async () => {
-    const confirmed = window.confirm(
-      "Have you tested your submitted Android APK?\n\nBy approving this build, your official ₹499/month recurring auto-debit subscription will be activated to keep your app live and synced with your product catalog."
-    );
-    if (!confirmed) return;
-
     setApprovingApk(true);
     setNotification(null);
+
     try {
-      await platformApi.approveApkAndActivateSubscription();
-      setNotification({
-        type: "success",
-        message: "🚀 Final APK approved! Your ₹499/mo Android App subscription is now active.",
-      });
-      await loadData();
+      // 1. Create Razorpay order for ₹499
+      const orderRes = await platformApi.createSubscriptionOrder();
+
+      if (orderRes.is_mock) {
+        await platformApi.verifySubscriptionPayment({
+          razorpay_order_id: orderRes.order_id,
+          razorpay_payment_id: `pay_mock_sub_${Date.now()}`,
+          razorpay_signature: "mock_signature_approved",
+        });
+        setNotification({
+          type: "success",
+          message: "🎉 Final APK approved & ₹499/mo membership activated successfully!",
+        });
+        await loadData();
+        return;
+      }
+
+      const scriptLoaded = await loadRazorpayScript();
+      if (!scriptLoaded) {
+        setNotification({
+          type: "error",
+          message: "Failed to load Razorpay Checkout SDK. Please check your internet connection.",
+        });
+        return;
+      }
+
+      const options = {
+        key: orderRes.key_id,
+        amount: orderRes.amount,
+        currency: orderRes.currency,
+        name: "Digital Growth Studio",
+        description: "Starter Store Membership (₹499/mo) & APK Confirmation",
+        order_id: orderRes.order_id,
+        theme: {
+          color: "#2563EB",
+        },
+        handler: async (response: any) => {
+          try {
+            await platformApi.verifySubscriptionPayment({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+            });
+            setNotification({
+              type: "success",
+              message: "🎉 APK confirmed & ₹499/mo membership successfully activated via Razorpay!",
+            });
+            await loadData();
+          } catch (err: any) {
+            setNotification({
+              type: "error",
+              message: err.message || "Payment verification failed. Please contact support.",
+            });
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            setApprovingApk(false);
+          },
+        },
+      };
+
+      const rzp = new (window as any).Razorpay(options);
+      rzp.open();
     } catch (err: any) {
       setNotification({
         type: "error",
-        message: err.message || "Failed to activate subscription.",
+        message: err.message || "Failed to initiate Razorpay checkout.",
       });
     } finally {
       setApprovingApk(false);
@@ -260,9 +314,9 @@ export default function VendorSubscriptionPage() {
               {approvingApk ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
-                <CheckCheck className="w-4 h-4" />
+                <CreditCard className="w-4 h-4" />
               )}
-              Confirm APK & Enroll in ₹499/mo Membership
+              Confirm APK & Pay ₹499 via Razorpay
             </button>
           </div>
         </div>

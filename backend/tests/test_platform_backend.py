@@ -837,7 +837,40 @@ async def test_platform_end_to_end_security_and_isolation():
         assert approve_data["subscription_status"] == "active"
         assert approve_data["subscription_auto_debit_active"] is True
 
-        print("\nALL 21 MULTI-VENDOR ISOLATION, SECURITY, SETUP FEE GATE, RECURRING APP SUBSCRIPTIONS, AND PLATFORM RAZORPAY TESTS PASSED PERFECTLY!")
+        # ──────────────────────────────────────────────
+        # Test 22: Razorpay Order Creation and Renewal for ₹499/mo Membership
+        # ──────────────────────────────────────────────
+        sub_order_res = await client.post(
+            "/api/v1/platform/payments/create-subscription-order",
+            headers=new_vendor_headers,
+        )
+        assert sub_order_res.status_code == 200
+        sub_order_data = sub_order_res.json()
+        assert sub_order_data["amount"] == 49900
+        assert sub_order_data["currency"] == "INR"
+        assert sub_order_data["monthly_price_inr"] == 499.0
+
+        sub_verify_res = await client.post(
+            "/api/v1/platform/payments/verify-subscription-payment",
+            headers=new_vendor_headers,
+            json={
+                "razorpay_order_id": sub_order_data["order_id"],
+                "razorpay_payment_id": f"pay_test_{sub_order_data['order_id']}",
+                "razorpay_signature": "mock_signature_test",
+            },
+        )
+        assert sub_verify_res.status_code == 200
+        sub_verify_data = sub_verify_res.json()
+        assert sub_verify_data["success"] is True
+        assert sub_verify_data["status"] == "active"
+
+        # Check /me reports the renewed subscription
+        me_check = await client.get("/api/v1/platform/auth/me", headers=new_vendor_headers)
+        assert me_check.status_code == 200
+        assert me_check.json()["subscription_status"] == "active"
+        assert me_check.json()["is_subscription_expired"] is False
+
+        print("\nALL 22 MULTI-VENDOR ISOLATION, SECURITY, SETUP FEE GATE, RECURRING APP SUBSCRIPTIONS, AND PLATFORM RAZORPAY TESTS PASSED PERFECTLY!")
 
 
 if __name__ == "__main__":

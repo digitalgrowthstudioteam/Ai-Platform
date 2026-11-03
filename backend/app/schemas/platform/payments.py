@@ -67,6 +67,23 @@ class AddonVerifyRequest(BaseModel):
     razorpay_signature: str
 
 
+class SubscriptionOrderResponse(BaseModel):
+    order_id: str
+    amount: int
+    currency: str = "INR"
+    key_id: str
+    is_mock: bool = False
+    plan_name: str = "Starter Store Plan"
+    monthly_price_inr: float = 499.0
+    message: Optional[str] = None
+
+
+class SubscriptionVerifyRequest(BaseModel):
+    razorpay_order_id: str
+    razorpay_payment_id: str
+    razorpay_signature: str
+
+
 class AdminCouponCreateRequest(BaseModel):
     code: str
     discount_type: str = "FIXED_INR"  # FIXED_INR or PERCENTAGE

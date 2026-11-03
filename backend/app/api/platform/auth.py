@@ -424,9 +424,13 @@ async def get_my_platform_session(
     setup_fee_paid = True
     setup_fee_waived = False
     subscription_status = "active"
+    subscription_expires_at = None
+    is_subscription_expired = False
+    monthly_price_inr = 499.0
     apk_user_approved = False
 
     if user.role == "VENDOR_ADMIN":
+        now = datetime.now(timezone.utc)
         stmt = (
             select(PlatformVendor)
             .where(PlatformVendor.user_id == user.id)
@@ -458,6 +462,16 @@ async def get_my_platform_session(
                 setup_fee_waived = sub.setup_fee_waived
                 setup_fee_cleared = sub.setup_fee_paid or sub.setup_fee_waived
                 subscription_status = sub.status
+                subscription_expires_at = sub.expires_at
+                monthly_price_inr = sub.monthly_price_inr or 499.0
+
+                if setup_fee_cleared:
+                    if sub.status in ("expired", "past_due", "cancelled"):
+                        is_subscription_expired = True
+                    elif sub.expires_at:
+                        sub_exp = sub.expires_at if sub.expires_at.tzinfo else sub.expires_at.replace(tzinfo=timezone.utc)
+                        if sub_exp < now:
+                            is_subscription_expired = True
             else:
                 setup_fee_cleared = False
                 setup_fee_paid = False
@@ -476,5 +490,8 @@ async def get_my_platform_session(
         setup_fee_paid=setup_fee_paid,
         setup_fee_waived=setup_fee_waived,
         subscription_status=subscription_status,
+        subscription_expires_at=subscription_expires_at,
+        is_subscription_expired=is_subscription_expired,
+        monthly_price_inr=monthly_price_inr,
         apk_user_approved=apk_user_approved,
     )

@@ -35,6 +35,8 @@ from app.schemas.platform.payments import (
     SetupFeeVerifyRequest,
     AddonOrderCreateRequest,
     AddonVerifyRequest,
+    SubscriptionOrderResponse,
+    SubscriptionVerifyRequest,
 )
 
 try:
@@ -507,5 +509,148 @@ async def approve_apk_and_activate_subscription(
         "subscription_status": "active",
         "subscription_auto_debit_active": True,
         "next_renewal_date": (now + timedelta(days=30)).isoformat(),
+    }
+
+
+# ──────────────────────────────────────────────
+# 7. Create Monthly Subscription (₹499/mo) Razorpay Order
+# ──────────────────────────────────────────────
+@router.post("/create-subscription-order", response_model=SubscriptionOrderResponse)
+async def create_subscription_order(
+    current: CurrentVendor = Depends(require_vendor_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Generate official Razorpay order for ₹499/mo Starter Store subscription activation or renewal."""
+    vid = current.vendor.id
+    sub_stmt = select(PlatformSubscription).where(PlatformSubscription.vendor_id == vid).order_by(desc(PlatformSubscription.created_at))
+    sub = (await db.execute(sub_stmt)).scalars().first()
+    if not sub:
+        raise HTTPException(status_code=404, detail="Subscription record not found.")
+
+    plan_stmt = select(PlatformPlan).where(PlatformPlan.slug == "starter-store")
+    plan = (await db.execute(plan_stmt)).scalar_one_or_none()
+    monthly_price = plan.monthly_price_inr if plan else 499.0
+    amount_paise = int(round(monthly_price * 100))
+
+    is_mock = True
+    order_id = f"order_mock_sub_{uuid.uuid4().hex[:10]}"
+
+    if settings.RAZORPAY_KEY_ID and settings.RAZORPAY_KEY_SECRET and razorpay:
+        try:
+            client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
+            order_data = {
+                "amount": amount_paise,
+                "currency": "INR",
+                "receipt": f"sub_{current.vendor.vendor_code}_{uuid.uuid4().hex[:6]}",
+                "notes": {
+                    "vendor_id": str(vid),
+                    "vendor_code": current.vendor.vendor_code,
+                    "payment_type": "SUBSCRIPTION_MONTHLY",
+                },
+            }
+            rzp_order = client.order.create(order_data)
+            order_id = rzp_order["id"]
+            is_mock = False
+        except Exception as e:
+            logger.error("razorpay_subscription_order_failed", error=str(e))
+            raise HTTPException(status_code=500, detail="Failed to initiate Razorpay subscription order.")
+
+    sub.razorpay_order_id = order_id
+    await db.commit()
+
+    return SubscriptionOrderResponse(
+        order_id=order_id,
+        amount=amount_paise,
+        currency="INR",
+        key_id=settings.RAZORPAY_KEY_ID or "rzp_test_platform_mock",
+        is_mock=is_mock,
+        plan_name=plan.name if plan else "Starter Store Plan",
+        monthly_price_inr=monthly_price,
+    )
+
+
+# ──────────────────────────────────────────────
+# 8. Verify Monthly Subscription Payment & Renew for 30 Days
+# ──────────────────────────────────────────────
+@router.post("/verify-subscription-payment")
+async def verify_subscription_payment(
+    payload: SubscriptionVerifyRequest,
+    current: CurrentVendor = Depends(require_vendor_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Verify Razorpay payment signature for ₹499 monthly subscription.
+    Activates or extends subscription for 30 days and removes dashboard blur.
+    """
+    vid = current.vendor.id
+    sub_stmt = select(PlatformSubscription).where(PlatformSubscription.vendor_id == vid).order_by(desc(PlatformSubscription.created_at))
+    sub = (await db.execute(sub_stmt)).scalars().first()
+    if not sub:
+        raise HTTPException(status_code=404, detail="Subscription record not found.")
+
+    is_mock = (
+        payload.razorpay_order_id.startswith("order_mock_")
+        or payload.razorpay_payment_id.startswith("pay_mock_")
+        or payload.razorpay_signature.startswith("mock_")
+        or not bool(settings.RAZORPAY_KEY_ID)
+    )
+
+    if not is_mock and settings.RAZORPAY_KEY_ID and settings.RAZORPAY_KEY_SECRET and razorpay:
+        try:
+            client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
+            client.utility.verify_payment_signature({
+                "razorpay_order_id": payload.razorpay_order_id,
+                "razorpay_payment_id": payload.razorpay_payment_id,
+                "razorpay_signature": payload.razorpay_signature,
+            })
+        except Exception as e:
+            logger.error("razorpay_subscription_signature_invalid", error=str(e))
+            raise HTTPException(status_code=400, detail="Razorpay signature verification failed.")
+
+    now = datetime.now(timezone.utc)
+    base_date = now
+    if sub.expires_at:
+        sub_exp = sub.expires_at if sub.expires_at.tzinfo else sub.expires_at.replace(tzinfo=timezone.utc)
+        if sub_exp > now and sub.status == "active":
+            base_date = sub_exp
+
+    new_expiry = base_date + timedelta(days=30)
+    sub.status = "active"
+    sub.starts_at = now if (not sub.starts_at or sub.status != "active") else sub.starts_at
+    sub.expires_at = new_expiry
+    sub.next_renewal_date = new_expiry
+    sub.razorpay_order_id = payload.razorpay_order_id
+    sub.razorpay_payment_id = payload.razorpay_payment_id
+
+    # If app config exists, mark APK approved and auto-debit active
+    cfg = current.vendor.app_config
+    if cfg:
+        cfg.apk_user_approved = True
+        if not cfg.apk_user_approved_at:
+            cfg.apk_user_approved_at = now
+        cfg.subscription_auto_debit_active = True
+
+    current.vendor.status = "active"
+
+    # Record payment transaction
+    db.add(PlatformPayment(
+        vendor_id=vid,
+        subscription_id=sub.id,
+        amount_inr=sub.monthly_price_inr or 499.0,
+        payment_type="SUBSCRIPTION",
+        gateway="RAZORPAY",
+        reference_id=payload.razorpay_payment_id,
+        status="SUCCESS",
+    ))
+
+    await db.commit()
+    logger.info("subscription_renewed_via_razorpay", vendor_id=str(vid), new_expiry=new_expiry.isoformat())
+
+    return {
+        "success": True,
+        "message": f"Starter Store plan successfully activated/renewed until {new_expiry.strftime('%d %b %Y')}!",
+        "status": "active",
+        "expires_at": new_expiry.isoformat(),
+        "next_renewal_date": new_expiry.isoformat(),
     }
 

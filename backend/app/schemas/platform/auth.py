@@ -2,6 +2,7 @@
 Digital Growth Studio — Platform Auth Schemas
 """
 import uuid
+from datetime import datetime
 from typing import Optional
 from pydantic import BaseModel, EmailStr, Field
 
@@ -64,5 +65,8 @@ class PlatformUserMeResponse(BaseModel):
     setup_fee_paid: bool = True
     setup_fee_waived: bool = False
     subscription_status: Optional[str] = None
+    subscription_expires_at: Optional[datetime] = None
+    is_subscription_expired: bool = False
+    monthly_price_inr: float = 499.0
     apk_user_approved: bool = False
 
