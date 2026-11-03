@@ -18,6 +18,13 @@ import {
   CreditCard,
   Truck,
   Image as ImageIcon,
+  CheckCircle2,
+  Globe,
+  Sparkles,
+  ShieldCheck,
+  ChevronDown,
+  X,
+  Upload,
 } from "lucide-react";
 
 const COUNTRY_CODES = [
@@ -33,7 +40,7 @@ const COUNTRY_CODES = [
 ];
 
 export default function PlatformRegisterPage() {
-  const { register, loginWithGoogle } = usePlatformAuth();
+  const { register } = usePlatformAuth();
 
   // Wizard Stage: "signup" (Sign up first) -> "step1" (Owner details) -> "step2" (Business details)
   const [stage, setStage] = useState<"signup" | "step1" | "step2">("signup");
@@ -164,7 +171,7 @@ export default function PlatformRegisterPage() {
       const dataUrl = event.target?.result as string;
       if (!dataUrl) return;
 
-      // Downscale to max 512x512 via HTML canvas to ensure fast and lightweight transfer
+      // Downscale to max 512x512 via HTML canvas
       const img = new Image();
       img.onload = () => {
         const maxDim = 512;
@@ -285,50 +292,85 @@ export default function PlatformRegisterPage() {
   };
 
   return (
-    <div className="flex-1 flex flex-col justify-center items-center py-12 px-4 sm:px-6 lg:px-8 bg-slate-50">
-      <div className="sm:mx-auto sm:w-full sm:max-w-xl text-center">
-        <img
-          src="/logo.jpg"
-          alt="Digital Growth Studio"
-          className="inline-block w-14 h-14 rounded-2xl object-contain shadow-sm mb-4 border border-slate-200 bg-white"
-        />
-        <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
-          Launch Your Branded Android App
-        </h2>
+    <div className="flex-1 min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-50 py-10 px-4 sm:px-6 lg:px-8">
+      {/* Top Header */}
+      <div className="sm:mx-auto sm:w-full sm:max-w-2xl text-center">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 border border-blue-200/80 text-blue-700 text-xs font-semibold shadow-2xs mb-4">
+          <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+          <span>Launch Your Online Business</span>
+        </div>
+
+        <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-slate-900">
+          Launch Your Branded Store & App
+        </h1>
         <p className="mt-2 text-xs sm:text-sm text-slate-600 max-w-md mx-auto leading-relaxed">
           {stage === "signup"
-            ? "Sign up with your email to start setting up your customized mobile app and storefront."
-            : "Get your customized mobile shopping app and online storefront in 2 simple steps."}
+            ? "Create your account to start provisioning your storefront and mobile shopping app."
+            : "Complete your store setup in 2 simple steps to generate your live portal."}
         </p>
 
-        {/* Multi-Step Indicator Bar (Only for Step 1 & Step 2) */}
+        {/* Modern Interactive Stepper Bar (Only for Step 1 & Step 2) */}
         {stage !== "signup" && (
-          <div className="mt-6 max-w-xs mx-auto">
-            <div className="flex items-center justify-center gap-2">
+          <div className="mt-6 max-w-md mx-auto">
+            <div className="flex items-center justify-center gap-3">
+              {/* Step 1 Pill */}
+              <button
+                type="button"
+                onClick={() => setStage("step1")}
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+                  stage === "step1"
+                    ? "bg-blue-600 text-white shadow-xs"
+                    : "bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100"
+                }`}
+              >
+                {stage === "step2" ? (
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                ) : (
+                  <span className="w-4 h-4 rounded-full bg-white text-blue-600 text-[10px] font-bold flex items-center justify-center">
+                    1
+                  </span>
+                )}
+                <span>Owner & Contact</span>
+              </button>
+
+              {/* Connecting Divider */}
               <div
-                className={`flex-1 h-1.5 rounded-full transition-all ${
-                  stage === "step1" ? "bg-blue-600" : "bg-emerald-500"
+                className={`w-8 h-0.5 rounded-full transition-colors ${
+                  stage === "step2" ? "bg-emerald-500" : "bg-slate-200"
                 }`}
               />
+
+              {/* Step 2 Pill */}
               <div
-                className={`flex-1 h-1.5 rounded-full transition-all ${
-                  stage === "step2" ? "bg-blue-600" : "bg-slate-200"
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                  stage === "step2"
+                    ? "bg-blue-600 text-white shadow-xs"
+                    : "bg-slate-100 text-slate-400 border border-slate-200"
                 }`}
-              />
+              >
+                <span
+                  className={`w-4 h-4 rounded-full text-[10px] font-bold flex items-center justify-center ${
+                    stage === "step2" ? "bg-white text-blue-600" : "bg-slate-300 text-white"
+                  }`}
+                >
+                  2
+                </span>
+                <span>Store & Brand Details</span>
+              </div>
             </div>
-            <p className="mt-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-              {stage === "step1" ? "Step 1 of 2: Owner Details" : "Step 2 of 2: Business & App Details"}
-            </p>
           </div>
         )}
       </div>
 
-      <div className="mt-6 sm:mx-auto sm:w-full sm:max-w-xl">
-        <div className="bg-white py-8 px-6 shadow-sm border border-slate-200 rounded-3xl sm:px-10">
+      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-2xl">
+        <div className="bg-white py-8 px-6 sm:px-10 shadow-sm border border-slate-200/90 rounded-3xl">
           {error && (
-            <div className="mb-6 p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs sm:text-sm flex items-start gap-2.5">
+            <div className="mb-6 p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs sm:text-sm flex items-start gap-3 shadow-2xs">
               <AlertCircle className="w-5 h-5 shrink-0 mt-0.5 text-rose-600" />
-              <span>{error}</span>
+              <div className="flex-1">
+                <p className="font-semibold text-rose-900">Registration Notice</p>
+                <p className="mt-0.5 text-rose-700">{error}</p>
+              </div>
             </div>
           )}
 
@@ -336,13 +378,13 @@ export default function PlatformRegisterPage() {
           {/* STAGE 0: SIGN UP FIRST                                   */}
           {/* ======================================================== */}
           {stage === "signup" && (
-            <form onSubmit={handleSignUpFirst} className="space-y-5">
+            <form onSubmit={handleSignUpFirst} className="space-y-6">
               <div>
                 <button
                   type="button"
                   onClick={handleGoogleSignUp}
                   disabled={loading || googleLoading}
-                  className="w-full flex items-center justify-center gap-3 py-2.5 px-4 rounded-xl text-sm font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 shadow-xs transition-all disabled:opacity-50 hover:border-slate-400 cursor-pointer"
+                  className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-xl text-sm font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 shadow-2xs transition-all disabled:opacity-50 hover:border-slate-400 cursor-pointer"
                 >
                   {googleLoading ? (
                     <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
@@ -368,8 +410,11 @@ export default function PlatformRegisterPage() {
                   )}
                   <span>{googleLoading ? "Connecting with Google..." : "Sign up with Google"}</span>
                 </button>
+                <p className="mt-2 text-center text-[11px] text-slate-400">
+                  Instant Google verification. Pre-fills your email and name.
+                </p>
 
-                <div className="relative my-5 flex items-center justify-center">
+                <div className="relative my-6 flex items-center justify-center">
                   <div className="absolute inset-0 flex items-center">
                     <div className="w-full border-t border-slate-200" />
                   </div>
@@ -393,7 +438,7 @@ export default function PlatformRegisterPage() {
                     value={formData.email}
                     onChange={handleChange}
                     placeholder="e.g. vendor@example.com"
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full h-11 pl-10 pr-4 bg-white border border-slate-200 rounded-xl text-sm focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 transition-all shadow-2xs"
                   />
                 </div>
               </div>
@@ -412,17 +457,17 @@ export default function PlatformRegisterPage() {
                     value={formData.password}
                     onChange={handleChange}
                     placeholder="••••••••••••"
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full h-11 pl-10 pr-4 bg-white border border-slate-200 rounded-xl text-sm focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 transition-all shadow-2xs"
                   />
                 </div>
-                <p className="text-[11px] text-slate-400 mt-1">At least 6 characters.</p>
+                <p className="text-[11px] text-slate-400 mt-1.5">At least 6 characters.</p>
               </div>
 
               <button
                 type="submit"
-                className="w-full mt-6 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-xs transition-colors cursor-pointer"
+                className="w-full mt-4 flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md hover:shadow-lg transition-all cursor-pointer"
               >
-                Sign Up & Start Setup
+                <span>Continue to Step 1: Owner Details</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </form>
@@ -432,7 +477,17 @@ export default function PlatformRegisterPage() {
           {/* STEP 1: OWNER FULL NAME, EMAIL, WHATSAPP                 */}
           {/* ======================================================== */}
           {stage === "step1" && (
-            <form onSubmit={handleNextToStep2} className="space-y-5">
+            <form onSubmit={handleNextToStep2} className="space-y-6">
+              <div className="p-4 rounded-2xl bg-blue-50/60 border border-blue-200/60 flex items-start gap-3">
+                <User className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+                <div className="text-xs text-blue-900 leading-relaxed">
+                  <p className="font-bold">Merchant Ownership & Direct Alerts</p>
+                  <p className="text-blue-700 mt-0.5">
+                    Your contact number is used to deliver real-time order alerts, payment confirmation, and platform verification.
+                  </p>
+                </div>
+              </div>
+
               {/* Owner Full Name */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
@@ -446,21 +501,22 @@ export default function PlatformRegisterPage() {
                     name="owner_name"
                     value={formData.owner_name}
                     onChange={handleChange}
-                    placeholder="e.g. Ananya Sharma"
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="e.g. Vikram Wadkar"
+                    className="w-full h-11 pl-10 pr-4 bg-white border border-slate-200 rounded-xl text-sm focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 transition-all shadow-2xs"
                   />
                 </div>
               </div>
 
-              {/* Email Address (Pre-filled from Sign up) */}
+              {/* Email Address */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-                    Email Address <span className="text-rose-500">*</span>
+                    Account Email <span className="text-rose-500">*</span>
                   </label>
                   {isGoogleSignUp && (
-                    <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded font-bold">
-                      ✓ Connected with Google
+                    <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                      <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                      Google Verified
                     </span>
                   )}
                 </div>
@@ -474,10 +530,10 @@ export default function PlatformRegisterPage() {
                     value={formData.email}
                     onChange={handleChange}
                     placeholder="vendor@example.com"
-                    className={`w-full pl-10 pr-4 py-2.5 rounded-xl text-sm focus:outline-none ${
+                    className={`w-full h-11 pl-10 pr-4 rounded-xl text-sm transition-all shadow-2xs ${
                       isGoogleSignUp
-                        ? "bg-slate-100 text-slate-600 border border-slate-200 cursor-not-allowed"
-                        : "bg-slate-50 border border-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-500"
+                        ? "bg-slate-100/80 text-slate-600 border border-slate-200 cursor-not-allowed"
+                        : "bg-white border border-slate-200 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10"
                     }`}
                   />
                 </div>
@@ -486,21 +542,24 @@ export default function PlatformRegisterPage() {
               {/* WhatsApp Number with Country Code */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  WhatsApp Number (with Country Code) <span className="text-rose-500">*</span>
+                  WhatsApp Number (For Order Updates) <span className="text-rose-500">*</span>
                 </label>
                 <div className="flex gap-2">
-                  <select
-                    name="country_code"
-                    value={formData.country_code}
-                    onChange={handleChange}
-                    className="w-36 px-2.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    {COUNTRY_CODES.map((c) => (
-                      <option key={c.code} value={c.code}>
-                        {c.flag} {c.code} ({c.country})
-                      </option>
-                    ))}
-                  </select>
+                  <div className="relative w-36">
+                    <select
+                      name="country_code"
+                      value={formData.country_code}
+                      onChange={handleChange}
+                      className="w-full h-11 pl-3 pr-8 bg-white border border-slate-200 rounded-xl text-xs font-semibold appearance-none focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 shadow-2xs cursor-pointer"
+                    >
+                      {COUNTRY_CODES.map((c) => (
+                        <option key={c.code} value={c.code}>
+                          {c.flag} {c.code}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-4 pointer-events-none" />
+                  </div>
                   <div className="relative flex-1">
                     <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
                     <input
@@ -510,20 +569,21 @@ export default function PlatformRegisterPage() {
                       value={formData.whatsapp_number}
                       onChange={handleChange}
                       placeholder="9876543210"
-                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full h-11 pl-10 pr-4 bg-white border border-slate-200 rounded-xl text-sm font-mono focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 transition-all shadow-2xs"
                     />
                   </div>
                 </div>
-                <p className="text-[11px] text-slate-400 mt-1">
-                  Default: India (+91). For merchant verification & order management.
+                <p className="text-[11px] text-slate-400 mt-1.5">
+                  Default: India (+91). Used for merchant notifications and customer order updates.
                 </p>
               </div>
 
-              <div className="flex items-center justify-between gap-3 pt-3">
+              {/* Action Buttons */}
+              <div className="flex items-center justify-between gap-3 pt-4 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setStage("signup")}
-                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 transition-all cursor-pointer shadow-2xs"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" />
                   Back
@@ -531,9 +591,9 @@ export default function PlatformRegisterPage() {
 
                 <button
                   type="submit"
-                  className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-xs transition-colors cursor-pointer"
+                  className="flex-1 flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md hover:shadow-lg transition-all cursor-pointer"
                 >
-                  Continue to Business Details
+                  <span>Continue to Step 2: Store & Brand</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
@@ -544,252 +604,388 @@ export default function PlatformRegisterPage() {
           {/* STEP 2: BUSINESS & STORE DETAILS                         */}
           {/* ======================================================== */}
           {stage === "step2" && (
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Business/Store Name */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    Business / Store Name <span className="text-rose-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <Store className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
-                    <input
-                      type="text"
-                      required
-                      name="business_name"
-                      value={formData.business_name}
-                      onChange={handleChange}
-                      placeholder="e.g. ABC Fashion"
-                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* ─────────────────────────────────────────────────── */}
+              {/* SECTION 1: STORE IDENTITY & LIVE SUBDOMAIN          */}
+              {/* ─────────────────────────────────────────────────── */}
+              <div className="space-y-4">
+                <div className="border-b border-slate-100 pb-2">
+                  <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                    <Store className="w-4 h-4 text-blue-600" />
+                    1. Storefront & Brand Identity
+                  </h3>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Define your customer-facing store name and dedicated web subdomain.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Business / Store Name */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                      Business / Store Name <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <Store className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
+                      <input
+                        type="text"
+                        required
+                        name="business_name"
+                        value={formData.business_name}
+                        onChange={handleChange}
+                        placeholder="e.g. DGS Fashion"
+                        className="w-full h-11 pl-10 pr-4 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 transition-all shadow-2xs"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Brand Name */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                        Brand Name <span className="text-rose-500">*</span>
+                      </label>
+                      <span className="text-[10px] text-slate-500 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
+                        <Lock className="w-2.5 h-2.5 text-slate-400" /> App & Receipt Title
+                      </span>
+                    </div>
+                    <div className="relative">
+                      <Tag className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
+                      <input
+                        type="text"
+                        required
+                        name="brand_name"
+                        value={formData.brand_name}
+                        onChange={handleChange}
+                        placeholder="e.g. DGS"
+                        className="w-full h-11 pl-10 pr-4 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 transition-all shadow-2xs"
+                      />
+                    </div>
                   </div>
                 </div>
 
-                {/* Brand Name (Fetched from Business Name + Editable + Admin Approval Notice) */}
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-                      Brand Name <span className="text-rose-500">*</span>
+                {/* Subdomain Input & Live URL Preview */}
+                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                      <Globe className="w-3.5 h-3.5 text-blue-600" />
+                      Dedicated Store Subdomain
                     </label>
-                    <span className="text-[10px] bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded font-bold flex items-center gap-1">
-                      <Lock className="w-2.5 h-2.5" /> Changing requires Admin Approval
+                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                      ✓ Instant HTTPS Live Setup
                     </span>
                   </div>
-                  <div className="relative">
-                    <Tag className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
+
+                  <div className="flex rounded-xl shadow-2xs overflow-hidden border border-slate-200 bg-white focus-within:border-blue-600 focus-within:ring-4 focus-within:ring-blue-500/10 transition-all">
+                    <span className="inline-flex items-center pl-3.5 text-slate-400 text-xs font-mono select-none">
+                      https://
+                    </span>
                     <input
                       type="text"
                       required
-                      name="brand_name"
-                      value={formData.brand_name}
+                      name="store_slug"
+                      value={formData.store_slug}
                       onChange={handleChange}
-                      placeholder="e.g. ABC Fashion"
-                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-amber-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="dgs"
+                      className="w-full min-w-0 flex-1 px-1.5 py-2.5 text-sm font-mono font-semibold text-blue-600 focus:outline-none"
                     />
+                    <span className="inline-flex items-center px-3.5 bg-slate-100 text-slate-600 text-xs font-mono font-medium border-l border-slate-200">
+                      .digitalgrowthstudio.in
+                    </span>
                   </div>
-                  <p className="text-[10px] text-amber-800 mt-1">
-                    Auto-fetched from Store Name. Editable now, but changing Brand Name later will need Admin Approval.
+
+                  <p className="text-[11px] text-slate-500">
+                    Customers will shop directly on{" "}
+                    <strong className="text-slate-700 font-mono">
+                      https://{formData.store_slug || "yourstore"}.digitalgrowthstudio.in
+                    </strong>
                   </p>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Business Number (Website support) */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    Business Number <span className="text-[11px] text-slate-400 font-normal">(shown on website)</span>
-                  </label>
-                  <div className="relative">
-                    <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
-                    <input
-                      type="text"
-                      name="business_phone"
-                      value={formData.business_phone}
-                      onChange={handleChange}
-                      placeholder="e.g. +91 98765 43210"
-                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
+              {/* ─────────────────────────────────────────────────── */}
+              {/* SECTION 2: CATEGORY, DESCRIPTION & BRAND LOGO       */}
+              {/* ─────────────────────────────────────────────────── */}
+              <div className="space-y-4 pt-2">
+                <div className="border-b border-slate-100 pb-2">
+                  <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                    <Tag className="w-4 h-4 text-blue-600" />
+                    2. Business Profile & Branding
+                  </h3>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Business Category */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                      Business Category <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <select
+                        name="category"
+                        value={formData.category}
+                        onChange={handleChange}
+                        className="w-full h-11 pl-3.5 pr-10 bg-white border border-slate-200 rounded-xl text-sm font-medium appearance-none focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 transition-all shadow-2xs cursor-pointer"
+                      >
+                        <option value="Clothing & Apparel">Clothing & Apparel</option>
+                        <option value="Footwear & Shoes">Footwear & Shoes</option>
+                        <option value="Health, Beauty & Cosmetics">Health, Beauty & Cosmetics</option>
+                        <option value="Electronics & Mobile Accessories">Electronics & Mobile Accessories</option>
+                        <option value="Grocery, Gourmet & Food">Grocery, Gourmet & Food</option>
+                        <option value="Home, Living & Kitchen">Home, Living & Kitchen</option>
+                        <option value="Jewelry & Watches">Jewelry & Watches</option>
+                        <option value="General Retail">General Retail</option>
+                      </select>
+                      <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3.5 top-3.5 pointer-events-none" />
+                    </div>
                   </div>
-                </div>
 
-                {/* Business Category */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    Business Category <span className="text-rose-500">*</span>
-                  </label>
-                  <select
-                    name="category"
-                    value={formData.category}
-                    onChange={handleChange}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="Clothing & Apparel">Clothing & Apparel</option>
-                    <option value="Footwear & Shoes">Footwear & Shoes</option>
-                    <option value="Health, Beauty & Cosmetics">Health, Beauty & Cosmetics</option>
-                    <option value="Electronics & Mobile Accessories">Electronics & Mobile Accessories</option>
-                    <option value="Grocery, Gourmet & Food">Grocery, Gourmet & Food</option>
-                    <option value="Home, Living & Kitchen">Home, Living & Kitchen</option>
-                    <option value="Jewelry & Watches">Jewelry & Watches</option>
-                    <option value="General Retail">General Retail</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Business Description */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Business Description
-                </label>
-                <textarea
-                  rows={2}
-                  name="description"
-                  value={formData.description}
-                  onChange={handleChange}
-                  placeholder="Briefly describe what your store specializes in..."
-                  className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              {/* Brand Logo Upload */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Brand Logo
-                </label>
-                <div className="flex items-center gap-3">
-                  {formData.logo_url ? (
-                    <div className="w-12 h-12 rounded-xl border border-slate-200 overflow-hidden bg-slate-100 shrink-0">
-                      <img
-                        src={formData.logo_url}
-                        alt="Logo Preview"
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src =
-                            "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=100&q=80";
-                        }}
+                  {/* Business Contact Phone */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                      Support Phone <span className="text-[10px] text-slate-400 font-normal">(Shown on Store)</span>
+                    </label>
+                    <div className="relative">
+                      <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
+                      <input
+                        type="text"
+                        name="business_phone"
+                        value={formData.business_phone}
+                        onChange={handleChange}
+                        placeholder={formData.whatsapp_number ? `${formData.country_code} ${formData.whatsapp_number}` : "+91 9270278119"}
+                        className="w-full h-11 pl-10 pr-4 bg-white border border-slate-200 rounded-xl text-sm focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 transition-all shadow-2xs"
                       />
                     </div>
-                  ) : (
-                    <div className="w-12 h-12 rounded-xl border border-dashed border-slate-300 flex items-center justify-center text-slate-400 bg-slate-50 shrink-0">
-                      <ImageIcon className="w-5 h-5" />
-                    </div>
-                  )}
-
-                  <div className="flex-1 space-y-1.5">
-                    <div className="flex items-center gap-2">
-                      <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold transition-colors">
-                        <span>Upload Logo Photo</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={handleLogoUpload}
-                          className="hidden"
-                        />
-                      </label>
-                      <span className="text-[10px] text-slate-400">PNG, JPG, SVG square recommended</span>
-                    </div>
-                    {formData.logo_url && (
-                      <p className="text-[10px] text-emerald-600 font-medium truncate">
-                        ✓ Logo photo uploaded successfully
-                      </p>
-                    )}
                   </div>
                 </div>
-              </div>
 
-              {/* Address Full */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Full Business Address
-                </label>
-                <textarea
-                  rows={2}
-                  name="address"
-                  value={formData.address}
-                  onChange={handleChange}
-                  placeholder="e.g. Shop 12, Phoenix Marketcity, Kurla West, Mumbai, Maharashtra - 400070"
-                  className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              {/* Dropdown 1: Do You have any Payment Gateway? (1 question on 1 line) */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                  <CreditCard className="w-3.5 h-3.5 text-blue-600" />
-                  Do You have any Payment Gateway?
-                </label>
-                <select
-                  name="has_payment_gateway"
-                  value={formData.has_payment_gateway}
-                  onChange={handleChange}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="No">No (COD / Assisted)</option>
-                  <option value="Yes">Yes (Razorpay / Paytm / PhonePe)</option>
-                </select>
-              </div>
-
-              {/* Dropdown 2: Will you need help to register with any Delivery Partner? (1 question on 1 line) */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                  <Truck className="w-3.5 h-3.5 text-blue-600" />
-                  Will you need help to register with any Delivery Partner?
-                </label>
-                <select
-                  name="needs_delivery_help"
-                  value={formData.needs_delivery_help}
-                  onChange={handleChange}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="No">No (Self managed / Own delivery)</option>
-                  <option value="Yes">Yes (Shiprocket / Delivery Partner help)</option>
-                </select>
-              </div>
-
-              {/* Desired Store Subdomain (Auto-fetched from Business Name + Editable) */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Desired Store Subdomain <span className="text-rose-500">*</span>
-                </label>
-                <div className="flex rounded-xl shadow-xs">
-                  <input
-                    type="text"
-                    required
-                    name="store_slug"
-                    value={formData.store_slug}
+                {/* Business Description */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Store Bio / Short Description
+                  </label>
+                  <textarea
+                    rows={2}
+                    name="description"
+                    value={formData.description}
                     onChange={handleChange}
-                    placeholder="abc"
-                    className="w-full min-w-0 flex-1 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-l-xl text-sm font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Briefly describe what your store specializes in (e.g. Premium handcrafted apparel and organic accessories)..."
+                    className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 transition-all shadow-2xs resize-none"
                   />
-                  <span className="inline-flex items-center px-3.5 rounded-r-xl border border-l-0 border-slate-200 bg-slate-100 text-slate-600 text-xs font-mono font-medium">
-                    .digitalgrowthstudio.in
-                  </span>
                 </div>
-                <p className="text-[11px] text-slate-400 mt-1">
-                  Auto-fetched from Store Name and fully editable.
-                </p>
+
+                {/* Brand Logo Uploader Component */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Brand Logo <span className="text-[10px] text-slate-400 font-normal">(Optional)</span>
+                  </label>
+
+                  {formData.logo_url ? (
+                    <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={formData.logo_url}
+                          alt="Logo Preview"
+                          className="w-14 h-14 rounded-xl object-contain bg-white border border-slate-200 shadow-2xs"
+                        />
+                        <div>
+                          <p className="text-xs font-bold text-slate-800">Logo Uploaded</p>
+                          <p className="text-[11px] text-emerald-600 font-medium">✓ Ready for Storefront & Android App icon</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <label className="cursor-pointer px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 text-xs font-semibold shadow-2xs transition-colors">
+                          <span>Change</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleLogoUpload}
+                            className="hidden"
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setFormData((p) => ({ ...p, logo_url: "" }))}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                          title="Remove logo"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <label className="cursor-pointer group flex flex-col sm:flex-row items-center justify-between p-4 rounded-2xl border-2 border-dashed border-slate-200 hover:border-blue-400 bg-slate-50/70 hover:bg-blue-50/30 transition-all gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-11 h-11 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 group-hover:text-blue-600 group-hover:border-blue-200 transition-colors shadow-2xs">
+                          <Upload className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-slate-800 group-hover:text-blue-600 transition-colors">
+                            Upload Store / App Logo
+                          </p>
+                          <p className="text-[11px] text-slate-400">
+                            Square PNG, JPG or SVG (Recommended 512×512)
+                          </p>
+                        </div>
+                      </div>
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 text-xs font-semibold shadow-2xs group-hover:border-blue-300">
+                        Choose File
+                      </span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleLogoUpload}
+                        className="hidden"
+                      />
+                    </label>
+                  )}
+                </div>
+
+                {/* Full Address */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Physical Store / Dispatch Address
+                  </label>
+                  <textarea
+                    rows={2}
+                    name="address"
+                    value={formData.address}
+                    onChange={handleChange}
+                    placeholder="e.g. Shop 12, Commercial Complex, MG Road, Pune, Maharashtra - 411001"
+                    className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 transition-all shadow-2xs resize-none"
+                  />
+                </div>
+              </div>
+
+              {/* ─────────────────────────────────────────────────── */}
+              {/* SECTION 3: OPERATIONS & PAYMENT SETUP               */}
+              {/* ─────────────────────────────────────────────────── */}
+              <div className="space-y-4 pt-2">
+                <div className="border-b border-slate-100 pb-2">
+                  <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                    <CreditCard className="w-4 h-4 text-blue-600" />
+                    3. Payments & Logistics Options
+                  </h3>
+                </div>
+
+                {/* Payment Gateway Toggle Cards */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                    Online Payment Gateway Status
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setFormData((p) => ({ ...p, has_payment_gateway: "No" }))}
+                      className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
+                        formData.has_payment_gateway === "No"
+                          ? "bg-blue-50/70 border-blue-500 ring-2 ring-blue-500/20 shadow-xs"
+                          : "bg-white border-slate-200 hover:border-slate-300"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-900">COD & Assisted UPI</span>
+                        {formData.has_payment_gateway === "No" && (
+                          <CheckCircle2 className="w-4 h-4 text-blue-600" />
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-1">
+                        Collect payment on delivery or via manual QR. No merchant gateway required.
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setFormData((p) => ({ ...p, has_payment_gateway: "Yes" }))}
+                      className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
+                        formData.has_payment_gateway === "Yes"
+                          ? "bg-blue-50/70 border-blue-500 ring-2 ring-blue-500/20 shadow-xs"
+                          : "bg-white border-slate-200 hover:border-slate-300"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-900">Razorpay / Online PG</span>
+                        {formData.has_payment_gateway === "Yes" && (
+                          <CheckCircle2 className="w-4 h-4 text-blue-600" />
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-1">
+                        I already have or want automated online checkout via Razorpay/Paytm.
+                      </p>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Delivery Partner Toggle Cards */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                    Shipping & Delivery Fulfillment
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setFormData((p) => ({ ...p, needs_delivery_help: "No" }))}
+                      className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
+                        formData.needs_delivery_help === "No"
+                          ? "bg-blue-50/70 border-blue-500 ring-2 ring-blue-500/20 shadow-xs"
+                          : "bg-white border-slate-200 hover:border-slate-300"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-900">Self Managed Delivery</span>
+                        {formData.needs_delivery_help === "No" && (
+                          <CheckCircle2 className="w-4 h-4 text-blue-600" />
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-1">
+                        We deliver using our own delivery staff or local courier partners.
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setFormData((p) => ({ ...p, needs_delivery_help: "Yes" }))}
+                      className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
+                        formData.needs_delivery_help === "Yes"
+                          ? "bg-blue-50/70 border-blue-500 ring-2 ring-blue-500/20 shadow-xs"
+                          : "bg-white border-slate-200 hover:border-slate-300"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-900">Shiprocket Assistance</span>
+                        {formData.needs_delivery_help === "Yes" && (
+                          <CheckCircle2 className="w-4 h-4 text-blue-600" />
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-1">
+                        Connect with Shiprocket for discounted multi-courier pickup across India.
+                      </p>
+                    </button>
+                  </div>
+                </div>
               </div>
 
               {/* Action Buttons */}
-              <div className="flex items-center justify-between gap-3 pt-3">
+              <div className="flex items-center justify-between gap-3 pt-6 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setStage("step1")}
-                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-4 py-3 rounded-xl text-xs font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 transition-all cursor-pointer shadow-2xs"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" />
-                  Back
+                  Back to Owner Details
                 </button>
 
                 <button
                   type="submit"
                   disabled={loading}
-                  className="flex-1 inline-flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-sm transition-colors disabled:opacity-50 cursor-pointer"
+                  className="flex-1 inline-flex items-center justify-center gap-2 py-3.5 px-6 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md hover:shadow-lg transition-all disabled:opacity-50 cursor-pointer"
                 >
                   {loading ? (
                     <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   ) : (
                     <>
-                      Register & Launch My App 🚀
+                      <span>Register & Launch My App 🚀</span>
                       <ArrowRight className="w-4 h-4" />
                     </>
                   )}
