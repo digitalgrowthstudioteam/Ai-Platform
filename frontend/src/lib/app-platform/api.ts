@@ -40,7 +40,7 @@ class PlatformApiClient {
     return token ? { Authorization: `Bearer ${token}` } : {};
   }
 
-  private async request<T>(endpoint: string, options: RequestInit & { timeout?: number } = {}): Promise<T> {
+  private async request<T>(endpoint: string, options: RequestInit & { timeout?: number; retries?: number } = {}): Promise<T> {
     const baseUrl = getPlatformBaseUrl();
     const url = endpoint.startsWith('http') ? endpoint : `${baseUrl}${endpoint}`;
     const headers = {
@@ -49,46 +49,68 @@ class PlatformApiClient {
       ...(options.headers || {}),
     };
 
-    const controller = new AbortController();
-    const timeoutMs = options.timeout ?? 8000;
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    const maxRetries = options.retries ?? 1;
+    const timeoutMs = options.timeout ?? 30000;
 
-    let res: Response;
-    try {
-      res = await fetch(url, {
-        ...options,
-        headers,
-        signal: options.signal || controller.signal,
-      });
-    } catch (netErr: any) {
-      if (netErr?.name === 'AbortError') {
-        const err = new Error('Connection timed out. Retrying in background...');
-        (err as any).status = 408;
-        throw err;
+    let lastError: any = null;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+      try {
+        const res = await fetch(url, {
+          ...options,
+          headers,
+          signal: options.signal || controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!res.ok) {
+          let errorMsg = 'An error occurred';
+          try {
+            const errJson = await res.json();
+            errorMsg = errJson.detail || errJson.message || errorMsg;
+          } catch {
+            errorMsg = await res.text() || res.statusText;
+          }
+          const err = new Error(errorMsg);
+          (err as any).status = res.status;
+          throw err;
+        }
+
+        return await res.json();
+      } catch (err: any) {
+        clearTimeout(timeoutId);
+        lastError = err;
+
+        // If it was a client HTTP error (400-499), do not retry
+        if (err?.status && err.status >= 400 && err.status < 500) {
+          throw err;
+        }
+
+        // On transient network failure or timeout, wait 1s before retrying
+        if (attempt < maxRetries) {
+          await new Promise((r) => setTimeout(r, 1000));
+          continue;
+        }
       }
-      if (netErr?.message === 'Failed to fetch' || netErr?.name === 'TypeError') {
-        const err = new Error('Unable to connect to platform server. Please check your internet or retry.');
-        (err as any).status = 503;
-        throw err;
-      }
-      throw netErr;
-    } finally {
-      clearTimeout(timeoutId);
     }
 
-    if (!res.ok) {
-      let errorMsg = 'An error occurred';
-      try {
-        const errJson = await res.json();
-        errorMsg = errJson.detail || errJson.message || errorMsg;
-      } catch {
-        errorMsg = await res.text() || res.statusText;
-      }
-      const err = new Error(errorMsg);
-      (err as any).status = res.status;
+    if (lastError?.name === 'AbortError') {
+      const err = new Error('Connection timed out. Please check your internet connection or retry in a moment.');
+      (err as any).status = 408;
       throw err;
     }
-    return res.json();
+
+    if (lastError?.message === 'Failed to fetch' || lastError?.name === 'TypeError') {
+      const err = new Error('Unable to connect to platform server. Please check your internet or retry.');
+      (err as any).status = 503;
+      throw err;
+    }
+
+    throw lastError;
   }
 
   // ──────────────────────────────────────────────

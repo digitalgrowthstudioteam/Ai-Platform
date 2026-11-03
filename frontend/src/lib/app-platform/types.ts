@@ -283,6 +283,8 @@ export interface SuperAdminOverview {
   trial_vendors: number;
   expired_subscriptions: number;
   total_mrr_inr: number;
+  total_razorpay_funds_inr?: number;
+  total_payments_count?: number;
   total_orders_all_vendors: number;
   total_products_all_vendors: number;
   new_registrations_this_month: number;

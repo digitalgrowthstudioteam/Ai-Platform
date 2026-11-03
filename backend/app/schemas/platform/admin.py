@@ -14,6 +14,8 @@ class SuperAdminOverviewResponse(BaseModel):
     trial_vendors: int
     expired_subscriptions: int
     total_mrr_inr: float
+    total_razorpay_funds_inr: float = 0.0
+    total_payments_count: int = 0
     total_orders_all_vendors: int
     total_products_all_vendors: int
     new_registrations_this_month: int

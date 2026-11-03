@@ -87,11 +87,36 @@ async def get_admin_overview(
         select(func.count(PlatformSubscription.id)).where(PlatformSubscription.status == "expired")
     )).scalar() or 0
 
-    # Monthly Recurring Revenue (sum of active subscriptions)
-    mrr_query = select(func.sum(PlatformSubscription.monthly_price_inr)).where(
-        PlatformSubscription.status.in_(["active", "trial"])
+    # Real funds received on Razorpay (confirmed successful payments)
+    rzp_revenue_stmt = select(func.coalesce(func.sum(PlatformPayment.amount_inr), 0.0)).where(
+        PlatformPayment.gateway == "RAZORPAY",
+        PlatformPayment.status == "SUCCESS",
+        or_(
+            PlatformPayment.reference_id.is_(None),
+            ~PlatformPayment.reference_id.startswith("pay_mock_")
+        )
     )
-    total_mrr = (await db.execute(mrr_query)).scalar() or 0.0
+    total_razorpay_funds = float((await db.execute(rzp_revenue_stmt)).scalar() or 0.0)
+
+    # Number of confirmed Razorpay payments
+    rzp_count_stmt = select(func.count(PlatformPayment.id)).where(
+        PlatformPayment.gateway == "RAZORPAY",
+        PlatformPayment.status == "SUCCESS",
+        or_(
+            PlatformPayment.reference_id.is_(None),
+            ~PlatformPayment.reference_id.startswith("pay_mock_")
+        )
+    )
+    total_payments_count = (await db.execute(rzp_count_stmt)).scalar() or 0
+
+    # Monthly Recurring Revenue (MRR) - Only genuine active subscriptions paid via Razorpay
+    mrr_query = select(func.coalesce(func.sum(PlatformSubscription.monthly_price_inr), 0.0)).where(
+        PlatformSubscription.status == "active",
+        PlatformSubscription.setup_fee_paid.is_(True),
+        PlatformSubscription.razorpay_payment_id.isnot(None),
+        ~PlatformSubscription.razorpay_payment_id.startswith("pay_mock_")
+    )
+    total_mrr = float((await db.execute(mrr_query)).scalar() or 0.0)
 
     total_orders = (await db.execute(select(func.count(PlatformOrder.id)))).scalar() or 0
     total_products = (await db.execute(select(func.count(PlatformProduct.id)))).scalar() or 0
@@ -111,7 +136,9 @@ async def get_admin_overview(
         inactive_vendors=inactive_vendors,
         trial_vendors=trial_vendors,
         expired_subscriptions=expired_subs,
-        total_mrr_inr=float(total_mrr),
+        total_mrr_inr=total_mrr,
+        total_razorpay_funds_inr=total_razorpay_funds,
+        total_payments_count=total_payments_count,
         total_orders_all_vendors=total_orders,
         total_products_all_vendors=total_products,
         new_registrations_this_month=new_regs,

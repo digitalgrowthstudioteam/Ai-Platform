@@ -179,7 +179,8 @@ async def test_platform_end_to_end_security_and_isolation():
         assert admin_success.status_code == 200
         overview_data = admin_success.json()
         assert overview_data["total_vendors"] >= 2
-        assert overview_data["total_mrr_inr"] > 0
+        assert overview_data["total_mrr_inr"] >= 0
+        assert "total_razorpay_funds_inr" in overview_data
 
         # ──────────────────────────────────────────────
         # Test 9: Expired/Suspended Vendor Restrictions

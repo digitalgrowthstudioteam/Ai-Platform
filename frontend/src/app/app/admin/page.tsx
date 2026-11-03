@@ -34,11 +34,13 @@ export default function SuperAdminOverviewPage() {
       if (cached) {
         try {
           const parsed = JSON.parse(cached);
-          if (parsed?.stats) {
+          if (parsed?.stats && "total_razorpay_funds_inr" in parsed.stats) {
             setOverview(parsed.stats);
             setRecentVendors(parsed.vendors || []);
             setLoading(false);
             hasCache = true;
+          } else {
+            sessionStorage.removeItem("dgs_admin_overview_cache");
           }
         } catch (e) {}
       }
@@ -125,11 +127,14 @@ export default function SuperAdminOverviewPage() {
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          title="Monthly Recurring Revenue"
-          value={`₹${(overview?.total_mrr_inr || 0).toLocaleString("en-IN")}`}
-          subtitle="From active vendor memberships"
+          title="Razorpay Funds Received"
+          value={`₹${(overview?.total_razorpay_funds_inr || 0).toLocaleString("en-IN")}`}
+          subtitle={
+            (overview?.total_razorpay_funds_inr || 0) > 0
+              ? `${overview?.total_payments_count || 0} verified Razorpay transaction${(overview?.total_payments_count || 0) === 1 ? "" : "s"}`
+              : "No funds received on Razorpay yet"
+          }
           icon={CreditCard}
-          trend={{ value: "+28% MoM", isPositive: true }}
           accentColor="text-emerald-600 bg-emerald-50"
         />
         <StatCard
