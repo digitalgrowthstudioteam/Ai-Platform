@@ -19,9 +19,9 @@ export default function PlatformRootLayout({ children }: { children: React.React
   return (
     <AppPlatformAuthProvider>
       <MobileNavProvider>
-        <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
+        <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-slate-50 text-slate-900 flex flex-col font-sans">
           {!isPublicStorefront && <AppHeader />}
-          <main className="flex-1 flex flex-col">{children}</main>
+          <main className="flex-1 flex flex-col w-full max-w-full overflow-x-hidden">{children}</main>
         </div>
       </MobileNavProvider>
     </AppPlatformAuthProvider>

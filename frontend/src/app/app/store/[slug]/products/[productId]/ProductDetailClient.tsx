@@ -273,28 +273,28 @@ export default function ProductDetailClient() {
     : "";
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
+    <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-slate-50 text-slate-900 flex flex-col font-sans">
       <PixelInjector config={config} pageTitle={product?.name ? `${product.name} | ${config?.store_name}` : undefined} />
       <StoreHeader slug={slug} config={config} backHref={getStoreHref(slug)} backLabel="Back to Products" />
 
-      <main className="max-w-6xl mx-auto px-4 py-8 pb-24 sm:pb-8 flex-1 w-full space-y-6">
+      <main className="max-w-6xl mx-auto px-3 sm:px-4 py-6 sm:py-8 pb-24 sm:pb-8 flex-1 w-full max-w-full overflow-hidden space-y-6">
         {/* Breadcrumb */}
-        <div className="flex items-center gap-2 text-xs text-slate-500">
-          <Link href={getStoreHref(slug)} className="hover:text-blue-600 transition-colors">
+        <div className="flex items-center gap-2 text-xs text-slate-500 overflow-hidden truncate">
+          <Link href={getStoreHref(slug)} className="hover:text-blue-600 transition-colors shrink-0">
             {config?.store_name}
           </Link>
-          <span>/</span>
+          <span className="shrink-0">/</span>
           {product.category_name && (
             <>
-              <span className="text-slate-500">{product.category_name}</span>
-              <span>/</span>
+              <span className="text-slate-500 shrink-0">{product.category_name}</span>
+              <span className="shrink-0">/</span>
             </>
           )}
-          <span className="font-semibold text-slate-900 line-clamp-1">{product.name}</span>
+          <span className="font-semibold text-slate-900 truncate">{product.name}</span>
         </div>
 
         {/* Product Card Container */}
-        <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-xs grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12 items-start">
+        <div className="bg-white rounded-3xl border border-slate-200 p-4 sm:p-6 md:p-8 shadow-xs grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-12 items-start w-full max-w-full">
           {/* Left: Gallery */}
           <div className="space-y-4">
             <div className="aspect-square w-full rounded-2xl bg-slate-100 overflow-hidden border border-slate-200 relative group">

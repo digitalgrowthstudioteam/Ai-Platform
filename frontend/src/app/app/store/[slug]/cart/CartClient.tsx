@@ -85,11 +85,11 @@ export default function CartClient() {
   const amountNeededForFree = freeMin > subtotal ? freeMin - subtotal : 0;
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
+    <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-slate-50 text-slate-900 flex flex-col font-sans">
       <PixelInjector config={config} pageTitle={`Cart | ${config?.store_name || "Store"}`} />
       <StoreHeader slug={slug} config={config} backHref={getStoreHref(slug)} backLabel="Back to Products" />
 
-      <main className="max-w-6xl mx-auto px-4 py-8 pb-24 sm:pb-8 flex-1 w-full">
+      <main className="max-w-6xl mx-auto px-3 sm:px-4 py-6 sm:py-8 pb-24 sm:pb-8 flex-1 w-full max-w-full overflow-hidden">
         {/* Page Title */}
         <div className="flex items-center justify-between pb-6 border-b border-slate-200">
           <div>

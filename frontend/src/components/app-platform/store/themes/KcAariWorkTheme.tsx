@@ -203,27 +203,27 @@ export default function KcAariWorkTheme({
   };
 
   return (
-    <div className="min-h-screen bg-[#FDFBF7] text-slate-900 font-sans selection:bg-[#D4AF37]/30">
+    <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-[#FDFBF7] text-slate-900 font-sans selection:bg-[#D4AF37]/30">
       {/* ──────────────────────────────────────────────
           1. TOP ANNOUNCEMENT BAR
       ────────────────────────────────────────────── */}
-      <div className="bg-[#041D10] border-b border-[#D4AF37]/25 text-amber-100 text-[11px] sm:text-xs py-2 px-4">
-        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-1 text-center sm:text-left">
-          <div className="flex items-center gap-2">
-            <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="font-medium text-amber-200">
+      <div className="bg-[#041D10] border-b border-[#D4AF37]/25 text-amber-100 text-[11px] sm:text-xs py-2 px-3 sm:px-4 w-full max-w-full overflow-hidden">
+        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-1.5 text-center sm:text-left">
+          <div className="flex items-center justify-center sm:justify-start gap-1.5 max-w-full">
+            <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+            <span className="font-medium text-amber-200 text-[10px] sm:text-xs line-clamp-1 sm:line-clamp-none">
               ✨ Flat 10% Off on Pre-Bridal Orders | Free Pan-India Delivery on Orders above ₹2,999
             </span>
           </div>
-          <div className="flex items-center gap-3 text-[11px] text-amber-200/80">
-            <span>Est. Dispatch: 3-5 Business Days</span>
-            <span>•</span>
+          <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 text-[10px] sm:text-[11px] text-amber-200/80">
+            <span className="hidden xs:inline">Est. Dispatch: 3-5 Days</span>
+            <span className="hidden xs:inline">•</span>
             <a
               href={`tel:${whatsappPhone}`}
               className="hover:text-amber-300 font-semibold transition-colors flex items-center gap-1"
             >
-              <Phone className="w-3 h-3 text-[#D4AF37]" />
-              {displayPhone}
+              <Phone className="w-3 h-3 text-[#D4AF37] shrink-0" />
+              <span>{displayPhone}</span>
             </a>
           </div>
         </div>
@@ -232,34 +232,34 @@ export default function KcAariWorkTheme({
       {/* ──────────────────────────────────────────────
           2. LUXURY STOREFRONT HEADER
       ────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-40 bg-[#062817]/95 backdrop-blur-md border-b border-[#D4AF37]/30 shadow-md">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-3 sm:gap-6">
+      <header className="sticky top-0 z-40 bg-[#062817]/95 backdrop-blur-md border-b border-[#D4AF37]/30 shadow-md w-full max-w-full overflow-hidden">
+        <div className="max-w-6xl mx-auto px-3 sm:px-4 py-2.5 sm:py-3 flex items-center justify-between gap-2 sm:gap-4">
           {/* Brand Logo & Title */}
-          <Link href={getStoreHref(slug)} className="flex items-center gap-3 shrink-0 group">
-            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-br from-[#D4AF37] via-amber-200 to-[#C5A059] p-0.5 shadow-md group-hover:scale-105 transition-transform">
-              <div className="w-full h-full bg-[#062817] rounded-[14px] flex items-center justify-center text-[#D4AF37] font-serif font-black text-xl tracking-tighter">
+          <Link href={getStoreHref(slug)} className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1 group">
+            <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-gradient-to-br from-[#D4AF37] via-amber-200 to-[#C5A059] p-0.5 shadow-md group-hover:scale-105 transition-transform shrink-0">
+              <div className="w-full h-full bg-[#062817] rounded-[10px] sm:rounded-[14px] flex items-center justify-center text-[#D4AF37] font-serif font-black text-base sm:text-xl tracking-tighter">
                 KC
               </div>
             </div>
-            <div>
-              <span className="font-serif font-black text-base sm:text-lg text-white tracking-wider uppercase block leading-tight group-hover:text-amber-300 transition-colors">
+            <div className="min-w-0 flex-1">
+              <span className="font-serif font-black text-sm sm:text-lg text-white tracking-wider uppercase block leading-tight truncate group-hover:text-amber-300 transition-colors">
                 KC AARI WORK
               </span>
-              <span className="text-[10px] text-amber-200/90 tracking-widest uppercase font-medium">
+              <span className="text-[9px] sm:text-[10px] text-amber-200/90 tracking-wide sm:tracking-widest uppercase font-medium block truncate">
                 Royal Bridal & Handcrafted Blouses
               </span>
             </div>
           </Link>
 
           {/* Search Box (Desktop) */}
-          <div className="hidden md:flex flex-1 max-w-md mx-2">
+          <div className="hidden lg:flex flex-1 max-w-sm mx-2">
             <div className="relative w-full">
               <input
                 type="text"
                 placeholder="Search bridal blouses, maggam motifs, zardosi designs..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 rounded-full bg-white/10 border border-[#D4AF37]/30 text-white placeholder-amber-100/50 text-xs focus:outline-none focus:border-[#D4AF37] focus:bg-white/15 transition-all"
+                className="w-full pl-9 pr-4 py-1.5 rounded-full bg-white/10 border border-[#D4AF37]/30 text-white placeholder-amber-100/50 text-xs focus:outline-none focus:border-[#D4AF37] focus:bg-white/15 transition-all"
               />
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-200/70 text-xs">
                 🔍
@@ -276,31 +276,31 @@ export default function KcAariWorkTheme({
             </div>
           </div>
 
-          {/* Actions & WhatsApp Direct Order */}
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          {/* Actions: WhatsApp Chat, Wishlist, Cart */}
+          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
             {/* WhatsApp Direct Order Button */}
             <a
               href={getGeneralWhatsAppUrl()}
               target="_blank"
               rel="noopener noreferrer"
               onClick={() => handleWhatsAppClick(undefined, "header_chat")}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md transition-all cursor-pointer hover:shadow-emerald-600/30"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md transition-all cursor-pointer hover:shadow-emerald-600/30"
               title="Chat with Master Designer on WhatsApp"
             >
-              <MessageCircle className="w-4 h-4 fill-white" />
-              <span className="hidden sm:inline">Chat on WhatsApp</span>
-              <span className="sm:hidden font-sans">Chat</span>
+              <MessageCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-white shrink-0" />
+              <span className="hidden md:inline">Chat on WhatsApp</span>
+              <span className="inline md:hidden text-[11px]">Chat</span>
             </a>
 
             {/* Wishlist Link */}
             <Link
               href={getStoreHref(slug, "/account")}
-              className="relative p-2 rounded-full bg-white/10 hover:bg-white/20 text-white border border-[#D4AF37]/30 transition-colors"
+              className="relative p-1.5 sm:p-2 rounded-full bg-white/10 hover:bg-white/20 text-white border border-[#D4AF37]/30 transition-colors"
               title="Saved Wishlist"
             >
-              <Heart className="w-4 h-4 text-amber-200" />
+              <Heart className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-200" />
               {wishlistCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#D4AF37] text-slate-900 font-extrabold text-[10px] flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#D4AF37] text-slate-900 font-extrabold text-[9px] flex items-center justify-center">
                   {wishlistCount}
                 </span>
               )}
@@ -309,12 +309,12 @@ export default function KcAariWorkTheme({
             {/* Cart Link */}
             <Link
               href={getStoreHref(slug, "/cart")}
-              className="relative p-2 rounded-full bg-gradient-to-r from-[#D4AF37] via-amber-300 to-[#C5A059] text-slate-900 font-bold shadow-md hover:scale-105 transition-transform"
+              className="relative p-1.5 sm:p-2 rounded-full bg-gradient-to-r from-[#D4AF37] via-amber-300 to-[#C5A059] text-slate-900 font-bold shadow-md hover:scale-105 transition-transform"
               title="Shopping Cart"
             >
-              <ShoppingCart className="w-4 h-4" />
+              <ShoppingCart className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               {cartCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-600 text-white font-extrabold text-[10px] flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-600 text-white font-extrabold text-[9px] flex items-center justify-center">
                   {cartCount}
                 </span>
               )}
@@ -324,35 +324,35 @@ export default function KcAariWorkTheme({
       </header>
 
       {/* ──────────────────────────────────────────────
-          3. ROYAL HERO SECTION (Matches Screenshot!)
+          3. ROYAL HERO SECTION (100% Mobile Responsive)
       ────────────────────────────────────────────── */}
-      <section className="relative bg-gradient-to-b from-[#062817] via-[#093520] to-[#041D10] text-white pt-8 pb-12 sm:pt-14 sm:pb-16 overflow-hidden border-b border-[#D4AF37]/30">
+      <section className="relative bg-gradient-to-b from-[#062817] via-[#093520] to-[#041D10] text-white pt-6 pb-10 sm:pt-12 sm:pb-16 overflow-hidden border-b border-[#D4AF37]/30 w-full max-w-full">
         {/* Subtle Decorative Gold Patterns in Background */}
-        <div className="absolute top-0 right-0 w-96 h-96 bg-amber-400/5 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 left-0 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-0 right-0 w-80 h-80 bg-amber-400/5 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-72 h-72 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="max-w-6xl mx-auto px-4 relative z-10">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+        <div className="max-w-6xl mx-auto px-4 relative z-10 w-full">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-center">
             {/* Left Content */}
-            <div className="lg:col-span-7 space-y-4 sm:space-y-5 text-center lg:text-left">
-              <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-gradient-to-r from-amber-500/20 to-yellow-500/10 border border-[#D4AF37]/60 text-amber-200 text-xs font-semibold uppercase tracking-wider">
-                <Sparkles className="w-3.5 h-3.5 text-[#D4AF37]" />
-                <span>Handcrafted Luxury Heritage • Direct from Artisans</span>
+            <div className="lg:col-span-7 space-y-4 sm:space-y-5 text-center lg:text-left min-w-0">
+              <div className="inline-flex max-w-full items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-amber-500/20 to-yellow-500/10 border border-[#D4AF37]/60 text-amber-200 text-[10px] sm:text-xs font-semibold uppercase tracking-wider overflow-hidden">
+                <Sparkles className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#D4AF37] shrink-0" />
+                <span className="truncate">Handcrafted Luxury Heritage • Direct from Artisans</span>
               </div>
 
-              <h1 className="text-2xl sm:text-4xl lg:text-5xl font-serif font-black tracking-tight leading-tight text-transparent bg-clip-text bg-gradient-to-r from-amber-100 via-amber-200 to-yellow-400">
+              <h1 className="text-xl sm:text-3xl md:text-4xl lg:text-5xl font-serif font-black tracking-tight leading-snug sm:leading-tight text-transparent bg-clip-text bg-gradient-to-r from-amber-100 via-amber-200 to-yellow-400 break-words">
                 ROYAL HANDCRAFTED BRIDAL AARI WORK BLOUSES
               </h1>
 
-              <p className="text-xs sm:text-sm text-amber-100/85 max-w-xl mx-auto lg:mx-0 leading-relaxed font-light">
+              <p className="text-xs sm:text-sm text-amber-100/85 max-w-xl mx-auto lg:mx-0 leading-relaxed font-light break-words">
                 Exquisite Zardosi, Maggam, and Cutdana embroidery hand-stitched by master artisans. Tailored to your custom bridal measurements with 100% matching guarantee on every fabric.
               </p>
 
-              {/* Call to Action Buttons */}
-              <div className="flex flex-wrap items-center justify-center lg:justify-start gap-3 pt-2">
+              {/* Call to Action Buttons: Stack on mobile, side-by-side on tablet/desktop */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center lg:justify-start gap-2.5 sm:gap-3 pt-2 w-full max-w-md mx-auto lg:mx-0">
                 <a
                   href="#collections"
-                  className="px-6 py-3 rounded-xl bg-gradient-to-r from-[#D4AF37] via-amber-300 to-[#C5A059] text-slate-950 font-black text-xs sm:text-sm shadow-lg hover:shadow-amber-400/25 transition-all cursor-pointer hover:scale-102"
+                  className="w-full sm:w-auto px-6 py-3 rounded-xl bg-gradient-to-r from-[#D4AF37] via-amber-300 to-[#C5A059] text-slate-950 font-black text-xs sm:text-sm shadow-lg hover:shadow-amber-400/25 transition-all cursor-pointer text-center"
                 >
                   Shop All Blouses
                 </a>
@@ -361,53 +361,53 @@ export default function KcAariWorkTheme({
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={() => handleWhatsAppClick(undefined, "hero_custom_order")}
-                  className="px-5 py-3 rounded-xl bg-white/10 hover:bg-white/15 text-amber-200 border border-[#D4AF37]/60 font-bold text-xs sm:text-sm transition-all inline-flex items-center gap-2 cursor-pointer"
+                  className="w-full sm:w-auto px-5 py-3 rounded-xl bg-white/10 hover:bg-white/15 text-amber-200 border border-[#D4AF37]/60 font-bold text-xs sm:text-sm transition-all inline-flex items-center justify-center gap-2 cursor-pointer text-center"
                 >
-                  <MessageCircle className="w-4 h-4 text-emerald-400" />
+                  <MessageCircle className="w-4 h-4 text-emerald-400 shrink-0" />
                   <span>Order Custom on WhatsApp</span>
                 </a>
               </div>
 
               {/* Social Proof Metrics Bar */}
-              <div className="pt-4 border-t border-white/10 flex flex-wrap items-center justify-center lg:justify-start gap-6 text-xs text-amber-200/90 font-medium">
-                <div className="flex items-center gap-1.5">
-                  <span className="font-bold text-white font-mono text-sm">2,500+</span>
-                  <span className="text-[11px] text-amber-200/70">Happy Brides</span>
+              <div className="pt-4 border-t border-white/10 grid grid-cols-3 gap-2 sm:gap-6 text-center text-xs text-amber-200/90 font-medium max-w-md mx-auto lg:mx-0">
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5">
+                  <span className="font-bold text-white font-mono text-xs sm:text-sm">2,500+</span>
+                  <span className="text-[10px] sm:text-[11px] text-amber-200/70">Happy Brides</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="font-bold text-white font-mono text-sm">100%</span>
-                  <span className="text-[11px] text-amber-200/70">Custom Fitting</span>
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5">
+                  <span className="font-bold text-white font-mono text-xs sm:text-sm">100%</span>
+                  <span className="text-[10px] sm:text-[11px] text-amber-200/70">Custom Fit</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="font-bold text-amber-300 font-mono text-sm">4.9/5 ★</span>
-                  <span className="text-[11px] text-amber-200/70">Verified Reviews</span>
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5">
+                  <span className="font-bold text-amber-300 font-mono text-xs sm:text-sm">4.9/5 ★</span>
+                  <span className="text-[10px] sm:text-[11px] text-amber-200/70">Reviews</span>
                 </div>
               </div>
 
               {/* Quick Actions Bar */}
-              <div className="pt-2 flex flex-wrap items-center justify-center lg:justify-start gap-3">
+              <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-center lg:justify-start gap-2.5 sm:gap-3 w-full max-w-md mx-auto lg:mx-0">
                 <a
                   href={`tel:${whatsappPhone}`}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white/10 border border-white/20 text-white text-xs font-semibold hover:bg-white/15 transition-colors"
+                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-white/10 border border-white/20 text-white text-xs font-semibold hover:bg-white/15 transition-colors text-center"
                 >
-                  <Phone className="w-3.5 h-3.5 text-amber-300" />
-                  <span>Call Us: {displayPhone}</span>
+                  <Phone className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+                  <span className="truncate">Call Us: {displayPhone}</span>
                 </a>
                 <a
                   href={getGeneralWhatsAppUrl()}
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={() => handleWhatsAppClick(undefined, "hero_chat_button")}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600/90 hover:bg-emerald-600 text-white text-xs font-semibold transition-colors"
+                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-600/90 hover:bg-emerald-600 text-white text-xs font-semibold transition-colors text-center"
                 >
-                  <MessageCircle className="w-3.5 h-3.5" />
+                  <MessageCircle className="w-3.5 h-3.5 shrink-0" />
                   <span>Chat with Designer</span>
                 </a>
               </div>
             </div>
 
             {/* Right Hero Spotlight Card (Strictly links to dedicated product page) */}
-            <div className="lg:col-span-5 flex justify-center">
+            <div className="lg:col-span-5 flex justify-center w-full">
               <div
                 onClick={() => {
                   const targetProduct = products && products.length > 0 ? products[0] : null;
@@ -457,45 +457,45 @@ export default function KcAariWorkTheme({
       {/* ──────────────────────────────────────────────
           4. TRUST BADGES STRIP (Cream Background)
       ────────────────────────────────────────────── */}
-      <section className="bg-white border-b border-amber-900/10 py-6 sm:py-8 shadow-xs">
-        <div className="max-w-6xl mx-auto px-4 grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-          <div className="flex items-center gap-3 p-3 rounded-2xl bg-[#FDFBF7] border border-amber-900/5">
-            <div className="w-10 h-10 rounded-xl bg-amber-100/70 text-amber-900 flex items-center justify-center shrink-0">
-              <Scissors className="w-5 h-5 text-[#C5A059]" />
+      <section className="bg-white border-b border-amber-900/10 py-5 sm:py-8 shadow-xs w-full max-w-full overflow-hidden">
+        <div className="max-w-6xl mx-auto px-3 sm:px-4 grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4 lg:gap-6 w-full">
+          <div className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-2xl bg-[#FDFBF7] border border-amber-900/5 min-w-0">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-amber-100/70 text-amber-900 flex items-center justify-center shrink-0">
+              <Scissors className="w-4 h-4 sm:w-5 sm:h-5 text-[#C5A059]" />
             </div>
-            <div>
-              <h4 className="font-serif font-bold text-slate-900 text-xs sm:text-sm">100% Handcrafted</h4>
-              <p className="text-[11px] text-slate-500">Authentic Zari & Maggam Work</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 p-3 rounded-2xl bg-[#FDFBF7] border border-amber-900/5">
-            <div className="w-10 h-10 rounded-xl bg-amber-100/70 text-amber-900 flex items-center justify-center shrink-0">
-              <Ruler className="w-5 h-5 text-[#C5A059]" />
-            </div>
-            <div>
-              <h4 className="font-serif font-bold text-slate-900 text-xs sm:text-sm">Custom Fit Guarantee</h4>
-              <p className="text-[11px] text-slate-500">Tailored to exact measurements</p>
+            <div className="min-w-0 flex-1">
+              <h4 className="font-serif font-bold text-slate-900 text-xs sm:text-sm truncate">100% Handcrafted</h4>
+              <p className="text-[10px] sm:text-[11px] text-slate-500 truncate">Authentic Zari Work</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 p-3 rounded-2xl bg-[#FDFBF7] border border-amber-900/5">
-            <div className="w-10 h-10 rounded-xl bg-amber-100/70 text-amber-900 flex items-center justify-center shrink-0">
-              <Truck className="w-5 h-5 text-[#C5A059]" />
+          <div className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-2xl bg-[#FDFBF7] border border-amber-900/5 min-w-0">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-amber-100/70 text-amber-900 flex items-center justify-center shrink-0">
+              <Ruler className="w-4 h-4 sm:w-5 sm:h-5 text-[#C5A059]" />
             </div>
-            <div>
-              <h4 className="font-serif font-bold text-slate-900 text-xs sm:text-sm">Express Pan-India</h4>
-              <p className="text-[11px] text-slate-500">Insured doorstep dispatch</p>
+            <div className="min-w-0 flex-1">
+              <h4 className="font-serif font-bold text-slate-900 text-xs sm:text-sm truncate">Custom Fit Guarantee</h4>
+              <p className="text-[10px] sm:text-[11px] text-slate-500 truncate">Exact measurements</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 p-3 rounded-2xl bg-[#FDFBF7] border border-amber-900/5">
-            <div className="w-10 h-10 rounded-xl bg-amber-100/70 text-amber-900 flex items-center justify-center shrink-0">
-              <ShieldCheck className="w-5 h-5 text-[#C5A059]" />
+          <div className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-2xl bg-[#FDFBF7] border border-amber-900/5 min-w-0">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-amber-100/70 text-amber-900 flex items-center justify-center shrink-0">
+              <Truck className="w-4 h-4 sm:w-5 sm:h-5 text-[#C5A059]" />
             </div>
-            <div>
-              <h4 className="font-serif font-bold text-slate-900 text-xs sm:text-sm">Direct Artisan Chat</h4>
-              <p className="text-[11px] text-slate-500">Video call measurement help</p>
+            <div className="min-w-0 flex-1">
+              <h4 className="font-serif font-bold text-slate-900 text-xs sm:text-sm truncate">Express Pan-India</h4>
+              <p className="text-[10px] sm:text-[11px] text-slate-500 truncate">Insured doorstep</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-2xl bg-[#FDFBF7] border border-amber-900/5 min-w-0">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-amber-100/70 text-amber-900 flex items-center justify-center shrink-0">
+              <ShieldCheck className="w-4 h-4 sm:w-5 sm:h-5 text-[#C5A059]" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h4 className="font-serif font-bold text-slate-900 text-xs sm:text-sm truncate">Direct Artisan Chat</h4>
+              <p className="text-[10px] sm:text-[11px] text-slate-500 truncate">Video call guidance</p>
             </div>
           </div>
         </div>
@@ -696,26 +696,26 @@ export default function KcAariWorkTheme({
       {/* ──────────────────────────────────────────────
           6. CUSTOM SAREE COLOR MATCHING & MEASUREMENTS (Screenshot Match!)
       ────────────────────────────────────────────── */}
-      <section className="max-w-6xl mx-auto px-4 py-8">
-        <div className="rounded-3xl bg-gradient-to-r from-[#062817] via-[#0A3520] to-[#041D10] text-white p-6 sm:p-10 border-2 border-[#D4AF37]/50 shadow-2xl relative overflow-hidden">
+      <section className="max-w-6xl mx-auto px-3 sm:px-4 py-8 w-full max-w-full overflow-hidden">
+        <div className="rounded-3xl bg-gradient-to-r from-[#062817] via-[#0A3520] to-[#041D10] text-white p-5 sm:p-8 lg:p-10 border-2 border-[#D4AF37]/50 shadow-2xl relative overflow-hidden w-full">
           {/* Gold Glow Accent */}
           <div className="absolute top-0 right-0 w-80 h-80 bg-amber-400/10 rounded-full blur-3xl pointer-events-none" />
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center relative z-10">
-            <div className="lg:col-span-7 space-y-4">
-              <span className="text-[11px] font-bold tracking-widest text-[#D4AF37] uppercase font-serif">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-center relative z-10 w-full">
+            <div className="lg:col-span-7 space-y-3 sm:space-y-4 min-w-0">
+              <span className="text-[10px] sm:text-[11px] font-bold tracking-widest text-[#D4AF37] uppercase font-serif block">
                 NEED CUSTOM MEASUREMENTS?
               </span>
 
-              <h2 className="text-xl sm:text-3xl font-serif font-black tracking-tight text-white leading-tight">
+              <h2 className="text-lg sm:text-2xl md:text-3xl font-serif font-black tracking-tight text-white leading-tight break-words">
                 CUSTOM SAREE COLOR MATCHING & MEASUREMENTS
               </h2>
 
-              <p className="text-xs sm:text-sm text-amber-100/85 leading-relaxed font-light">
+              <p className="text-xs sm:text-sm text-amber-100/85 leading-relaxed font-light break-words">
                 Send us your saree photo on WhatsApp. Our master designers will suggest matching aari work motifs, thread colors, and take your exact blouse measurements over video call or chat.
               </p>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs text-amber-100/90 pt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-amber-100/90 pt-1">
                 <div className="flex items-center gap-2">
                   <span className="text-[#D4AF37] font-bold">✓</span>
                   <span>100% Saree Color Match Guarantee</span>
@@ -726,35 +726,36 @@ export default function KcAariWorkTheme({
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-[#D4AF37] font-bold">✓</span>
-                  <span>Front, Back & Sleeve Neck Customization</span>
+                  <span>Front, Back & Sleeve Customization</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-[#D4AF37] font-bold">✓</span>
-                  <span>Premium Latkans & Hand-rolled Tassels Included</span>
+                  <span>Premium Latkans & Tassels Included</span>
                 </div>
               </div>
 
-              <div className="pt-3">
+              <div className="pt-2 sm:pt-3">
                 <a
                   href={getCustomSareeMatchUrl()}
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={() => handleWhatsAppClick(undefined, "saree_banner_custom_order")}
-                  className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-[#D4AF37] via-amber-300 to-[#C5A059] text-slate-950 font-black text-xs sm:text-sm shadow-xl hover:scale-102 transition-transform cursor-pointer"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 sm:px-6 py-3 sm:py-3.5 rounded-xl bg-gradient-to-r from-[#D4AF37] via-amber-300 to-[#C5A059] text-slate-950 font-black text-xs sm:text-sm shadow-xl hover:scale-102 transition-transform cursor-pointer text-center"
                 >
-                  <MessageCircle className="w-4 h-4 fill-slate-950" />
-                  <span>Get Free Design Recommendation on WhatsApp</span>
+                  <MessageCircle className="w-4 h-4 fill-slate-950 shrink-0" />
+                  <span className="sm:hidden">Free Design Help on WhatsApp</span>
+                  <span className="hidden sm:inline">Get Free Design Recommendation on WhatsApp</span>
                 </a>
               </div>
             </div>
 
             {/* Right Photo Illustration */}
-            <div className="lg:col-span-5 flex justify-center">
+            <div className="lg:col-span-5 flex justify-center w-full">
               <div className="w-full max-w-sm rounded-2xl overflow-hidden border border-[#D4AF37]/40 shadow-xl">
                 <img
                   src="https://images.unsplash.com/photo-1594938298603-c8148c4dae35?w=600&q=80"
                   alt="Aari Work Threads and Needlework"
-                  className="w-full h-56 object-cover"
+                  className="w-full h-48 sm:h-56 object-cover"
                 />
               </div>
             </div>

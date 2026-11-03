@@ -62,38 +62,38 @@ export default function StoreHeader({
       </div>
 
       {/* Main Storefront Navigation */}
-      <div className="max-w-6xl mx-auto px-4 py-3.5 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
+      <div className="max-w-6xl mx-auto px-3 sm:px-4 py-2.5 sm:py-3.5 flex items-center justify-between gap-2 sm:gap-4 w-full max-w-full overflow-hidden">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
           {backHref && (
             <Link
               href={backHref}
-              className="p-1.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors mr-1"
+              className="p-1.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors mr-0.5 shrink-0"
               title={backLabel || "Go back"}
             >
               <ArrowLeft className="w-4 h-4" />
             </Link>
           )}
 
-          <Link href={getStoreHref(slug)} className="flex items-center gap-3 group">
+          <Link href={getStoreHref(slug)} className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1 group">
             {config?.logo_url ? (
               <img
                 src={config.logo_url}
                 alt={config.store_name}
-                className="w-10 h-10 rounded-xl object-cover border border-slate-200 shadow-xs group-hover:scale-105 transition-transform"
+                className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl object-cover border border-slate-200 shadow-xs group-hover:scale-105 transition-transform shrink-0"
               />
             ) : (
               <div
-                className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-xs group-hover:scale-105 transition-transform"
+                className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-white font-bold text-base sm:text-lg shadow-xs group-hover:scale-105 transition-transform shrink-0"
                 style={{ backgroundColor: primaryColor }}
               >
                 {config?.store_name ? config.store_name[0] : "S"}
               </div>
             )}
-            <div>
-              <h1 className="text-base sm:text-lg font-bold text-slate-900 leading-tight group-hover:text-blue-600 transition-colors">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-sm sm:text-lg font-bold text-slate-900 leading-tight group-hover:text-blue-600 transition-colors truncate max-w-[150px] sm:max-w-xs md:max-w-md">
                 {config?.store_name || "Online Store"}
               </h1>
-              <p className="text-[11px] text-slate-500 line-clamp-1">
+              <p className="text-[10px] sm:text-[11px] text-slate-500 line-clamp-1 truncate">
                 {config?.description || "Official Online Storefront"}
               </p>
             </div>
@@ -101,16 +101,16 @@ export default function StoreHeader({
         </div>
 
         {/* Action Buttons: Wishlist, Account & Cart */}
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
           <Link
             href={getStoreHref(slug, "/account?tab=wishlist")}
-            className="relative flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors border border-slate-200"
+            className="relative flex items-center gap-1.5 px-2 py-1.5 sm:px-3 sm:py-2 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors border border-slate-200"
             title="My Wishlist"
           >
             <Heart className={`w-3.5 h-3.5 ${wishlistCount > 0 ? "fill-rose-500 text-rose-500" : "text-slate-500"}`} />
-            <span className="hidden sm:inline">Wishlist</span>
+            <span className="hidden md:inline">Wishlist</span>
             {wishlistCount > 0 && (
-              <span className="inline-flex items-center justify-center min-w-4.5 h-4.5 px-1 text-[10px] font-black rounded-full bg-rose-500 text-white shadow-2xs">
+              <span className="inline-flex items-center justify-center min-w-4 h-4 px-1 text-[9px] font-black rounded-full bg-rose-500 text-white shadow-2xs">
                 {wishlistCount}
               </span>
             )}
@@ -118,25 +118,26 @@ export default function StoreHeader({
 
           <Link
             href={getStoreHref(slug, "/account")}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors border border-slate-200"
+            className="flex items-center gap-1.5 px-2 py-1.5 sm:px-3 sm:py-2 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors border border-slate-200"
+            title="My Account"
           >
             <User className="w-3.5 h-3.5 text-slate-500" />
-            <span className="hidden sm:inline">My Account</span>
+            <span className="hidden md:inline">Account</span>
           </Link>
 
           <Link
             href={getStoreHref(slug, "/cart")}
-            className="relative flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold text-white shadow-xs hover:opacity-95 transition-opacity"
+            className="relative flex items-center gap-1.5 sm:gap-2 px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-semibold text-white shadow-xs hover:opacity-95 transition-opacity"
             style={{ backgroundColor: primaryColor }}
           >
-            <ShoppingCart className="w-4 h-4" />
+            <ShoppingCart className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             <span className="hidden sm:inline">Cart</span>
             {itemCount > 0 ? (
-              <span className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 text-[11px] font-black rounded-full bg-white text-slate-900 shadow-xs">
+              <span className="inline-flex items-center justify-center min-w-4.5 h-4.5 px-1 text-[10px] font-black rounded-full bg-white text-slate-900 shadow-xs">
                 {itemCount}
               </span>
             ) : (
-              <span className="text-[11px] opacity-80">(0)</span>
+              <span className="text-[10px] opacity-80">(0)</span>
             )}
           </Link>
         </div>

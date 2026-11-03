@@ -271,11 +271,11 @@ export default function CheckoutClient() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
+    <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-slate-50 text-slate-900 flex flex-col font-sans">
       <PixelInjector config={config} pageTitle={`Checkout | ${config?.store_name || "Store"}`} />
       <StoreHeader slug={slug} config={config} backHref={getStoreHref(slug, "/cart")} backLabel="Back to Cart" />
 
-      <main className="max-w-6xl mx-auto px-4 py-8 flex-1 w-full">
+      <main className="max-w-6xl mx-auto px-3 sm:px-4 py-6 sm:py-8 flex-1 w-full max-w-full overflow-hidden">
         {/* Breadcrumb / Step Indicator */}
         <div className="flex items-center gap-2 text-xs text-slate-500 mb-6">
           <Link href={getStoreHref(slug)} className="hover:text-blue-600 transition-colors">

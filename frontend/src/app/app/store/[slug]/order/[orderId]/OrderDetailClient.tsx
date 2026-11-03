@@ -135,10 +135,10 @@ export default function OrderDetailClient() {
   const activeIdx = currentStepIdx === -1 ? 0 : currentStepIdx;
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
+    <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-slate-50 text-slate-900 flex flex-col font-sans">
       <StoreHeader slug={slug} config={config} />
 
-      <main className="max-w-4xl mx-auto px-4 py-8 flex-1 w-full space-y-6">
+      <main className="max-w-4xl mx-auto px-3 sm:px-4 py-6 sm:py-8 flex-1 w-full max-w-full overflow-hidden space-y-6">
         {/* Success Header Card */}
         <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-xs text-center space-y-4 relative overflow-hidden">
           <div className="w-16 h-16 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto shadow-xs">

@@ -327,10 +327,10 @@ export default function AccountClient() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
+    <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-slate-50 text-slate-900 flex flex-col font-sans">
       <StoreHeader slug={slug} config={config} backHref={getStoreHref(slug)} backLabel="Back to Store" />
 
-      <main className="max-w-6xl mx-auto px-4 py-6 sm:py-8 flex-1 w-full space-y-6">
+      <main className="max-w-6xl mx-auto px-3 sm:px-4 py-6 sm:py-8 flex-1 w-full max-w-full overflow-hidden space-y-6">
         {/* Customer Header Bar */}
         <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div className="flex items-center gap-4">

@@ -136,7 +136,7 @@ export default function AdminAnalyticsClient() {
   const topUnitsVendor = data?.top_vendor_by_units;
 
   return (
-    <div className="space-y-8 pb-12">
+    <div className="space-y-8 pb-12 w-full max-w-full overflow-x-hidden">
       {/* ────────────────────────────────────────────── */}
       {/* 1. Header & Controls */}
       {/* ────────────────────────────────────────────── */}
@@ -897,3 +897,4 @@ export default function AdminAnalyticsClient() {
     </div>
   );
 }
+

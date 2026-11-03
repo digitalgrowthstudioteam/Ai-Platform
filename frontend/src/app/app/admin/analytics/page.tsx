@@ -9,3 +9,4 @@ export const metadata = {
 export default function AdminAnalyticsPage() {
   return <AdminAnalyticsClient />;
 }
+

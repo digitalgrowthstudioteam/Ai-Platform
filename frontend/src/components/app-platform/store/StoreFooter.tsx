@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { ShieldCheck, Truck, RefreshCcw, Headphones, FileText, RotateCcw } from "lucide-react";
 import PolicyModal, { PolicyType } from "./PolicyModal";
+import { getStoreHref } from "@/lib/app-platform/store-route-helper";
 
 interface StoreFooterProps {
   slug: string;
@@ -30,46 +31,46 @@ export default function StoreFooter({ slug, config }: StoreFooterProps) {
 
   return (
     <>
-      <footer className="bg-white border-t border-slate-200 mt-16 pt-10 pb-8 text-xs text-slate-500">
+      <footer className="bg-white border-t border-slate-200 mt-16 pt-10 pb-8 text-xs text-slate-500 w-full max-w-full overflow-hidden">
         {/* Trust Badges */}
-        <div className="max-w-6xl mx-auto px-4 pb-10 mb-8 border-b border-slate-100 grid grid-cols-2 md:grid-cols-4 gap-6">
-          <div className="flex items-center gap-3">
+        <div className="max-w-6xl mx-auto px-4 pb-10 mb-8 border-b border-slate-100 grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
+          <div className="flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
               <Truck className="w-5 h-5" />
             </div>
-            <div>
-              <h5 className="font-bold text-slate-900 text-xs">Direct Fast Delivery</h5>
-              <p className="text-[11px] text-slate-400">{config?.estimated_delivery_days || "3-5 Business Days"}</p>
+            <div className="min-w-0 flex-1">
+              <h5 className="font-bold text-slate-900 text-xs truncate">Direct Fast Delivery</h5>
+              <p className="text-[11px] text-slate-400 truncate">{config?.estimated_delivery_days || "3-5 Business Days"}</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
               <ShieldCheck className="w-5 h-5" />
             </div>
-            <div>
-              <h5 className="font-bold text-slate-900 text-xs">Cash on Delivery</h5>
-              <p className="text-[11px] text-slate-400">Pay conveniently at your door</p>
+            <div className="min-w-0 flex-1">
+              <h5 className="font-bold text-slate-900 text-xs truncate">Cash on Delivery</h5>
+              <p className="text-[11px] text-slate-400 truncate">Pay at your door</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
               <RefreshCcw className="w-5 h-5" />
             </div>
-            <div>
-              <h5 className="font-bold text-slate-900 text-xs">Genuine Products</h5>
-              <p className="text-[11px] text-slate-400">100% verified merchant store</p>
+            <div className="min-w-0 flex-1">
+              <h5 className="font-bold text-slate-900 text-xs truncate">Genuine Products</h5>
+              <p className="text-[11px] text-slate-400 truncate">100% verified merchant</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
               <Headphones className="w-5 h-5" />
             </div>
-            <div>
-              <h5 className="font-bold text-slate-900 text-xs">Dedicated Support</h5>
-              <p className="text-[11px] text-slate-400">{config?.contact_phone || "Store Helpdesk"}</p>
+            <div className="min-w-0 flex-1">
+              <h5 className="font-bold text-slate-900 text-xs truncate">Dedicated Support</h5>
+              <p className="text-[11px] text-slate-400 truncate">{config?.contact_phone || "Store Helpdesk"}</p>
             </div>
           </div>
         </div>
@@ -90,22 +91,22 @@ export default function StoreFooter({ slug, config }: StoreFooterProps) {
             <h4 className="font-bold text-slate-900 mb-2">Store Navigation</h4>
             <ul className="space-y-1.5 text-xs">
               <li>
-                <Link href={`/app/store/${slug}`} className="hover:text-blue-600 transition-colors">
+                <Link href={getStoreHref(slug)} className="hover:text-blue-600 transition-colors">
                   All Products
                 </Link>
               </li>
               <li>
-                <Link href={`/app/store/${slug}/cart`} className="hover:text-blue-600 transition-colors">
+                <Link href={getStoreHref(slug, "/cart")} className="hover:text-blue-600 transition-colors">
                   My Shopping Cart
                 </Link>
               </li>
               <li>
-                <Link href={`/app/store/${slug}/checkout`} className="hover:text-blue-600 transition-colors">
+                <Link href={getStoreHref(slug, "/checkout")} className="hover:text-blue-600 transition-colors">
                   Direct Checkout
                 </Link>
               </li>
               <li>
-                <Link href={`/app/store/${slug}/account`} className="hover:text-blue-600 transition-colors">
+                <Link href={getStoreHref(slug, "/account")} className="hover:text-blue-600 transition-colors">
                   My Orders & Account
                 </Link>
               </li>

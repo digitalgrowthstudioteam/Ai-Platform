@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, Geist } from "next/font/google";
 import "./globals.css";
 import AppWrapper from "@/components/layout/AppWrapper";
@@ -14,6 +14,12 @@ const inter = Inter({
   display: "swap",
 });
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+};
+
 export const metadata: Metadata = {
   title: "Digital Growth Studio — AI Ads Optimizer",
   description:
@@ -28,8 +34,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={cn(inter.variable, "font-sans", geist.variable)}>
-      <body>
+    <html lang="en" className={cn(inter.variable, "font-sans", geist.variable, "w-full max-w-full overflow-x-hidden")}>
+      <body className="w-full max-w-full overflow-x-hidden">
         <GoogleAnalytics />
         <MetaPixel />
         <AppWrapper>{children}</AppWrapper>

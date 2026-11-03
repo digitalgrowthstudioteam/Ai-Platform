@@ -104,10 +104,10 @@ export default function StorePolicyClient() {
   })();
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
+    <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-slate-50 text-slate-900 flex flex-col font-sans">
       <StoreHeader slug={slug} config={config} />
 
-      <main className="max-w-4xl mx-auto px-4 py-8 flex-1 w-full space-y-6">
+      <main className="max-w-4xl mx-auto px-3 sm:px-4 py-6 sm:py-8 flex-1 w-full max-w-full overflow-hidden space-y-6">
         {/* Back Link */}
         <div>
           <Link

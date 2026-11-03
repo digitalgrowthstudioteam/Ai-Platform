@@ -256,13 +256,13 @@ export default function StorePreviewClient() {
   const primaryColor = config.primary_color || "#2563EB";
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
+    <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-slate-50 text-slate-900 flex flex-col font-sans">
       <PixelInjector config={config} pageTitle={config?.store_name} />
       <StoreHeader slug={slug} config={config} />
 
       {/* Hero Banners Carousel */}
       {banners.length > 0 && (
-        <section className="max-w-6xl mx-auto px-4 pt-6 w-full">
+        <section className="max-w-6xl mx-auto px-3 sm:px-4 pt-4 sm:pt-6 w-full max-w-full overflow-hidden">
           <div className="relative rounded-3xl overflow-hidden shadow-xs border border-slate-200">
             {banners.map((b, i) => (
               <div key={b.id || i} className="relative h-48 sm:h-64 md:h-80 w-full overflow-hidden">
@@ -289,10 +289,10 @@ export default function StorePreviewClient() {
       )}
 
       {/* Main Catalog View */}
-      <main className="max-w-6xl mx-auto px-4 py-8 flex-1 w-full space-y-6">
+      <main className="max-w-6xl mx-auto px-3 sm:px-4 py-6 sm:py-8 flex-1 w-full max-w-full overflow-hidden space-y-6">
         {/* Category Filter Pills */}
         {categories.length > 0 && (
-          <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+          <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none w-full max-w-full">
             <button
               onClick={() => setSelectedCat("")}
               className={`px-4 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors ${
