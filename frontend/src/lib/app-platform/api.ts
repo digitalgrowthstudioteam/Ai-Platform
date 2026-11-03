@@ -49,8 +49,8 @@ class PlatformApiClient {
       ...(options.headers || {}),
     };
 
-    const maxRetries = options.retries ?? 1;
-    const timeoutMs = options.timeout ?? 30000;
+    const maxRetries = options.retries ?? 2;
+    const timeoutMs = options.timeout ?? 45000;
 
     let lastError: any = null;
 
@@ -110,9 +110,9 @@ class PlatformApiClient {
           throw err;
         }
 
-        // On transient network failure or timeout, wait 1s before retrying
+        // On transient network failure or timeout, wait before retrying (exponential backoff)
         if (attempt < maxRetries) {
-          await new Promise((r) => setTimeout(r, 1000));
+          await new Promise((r) => setTimeout(r, (attempt + 1) * 1500));
           continue;
         }
       }
@@ -472,6 +472,13 @@ class PlatformApiClient {
     return this.request(`/api/v1/platform/admin/vendors/${id}/status`, {
       method: 'PATCH',
       body: JSON.stringify({ status }),
+    });
+  }
+
+  async updateVendorSubdomain(id: string, storeSlug: string): Promise<any> {
+    return this.request(`/api/v1/platform/admin/vendors/${id}/subdomain`, {
+      method: 'PATCH',
+      body: JSON.stringify({ store_slug: storeSlug }),
     });
   }
 

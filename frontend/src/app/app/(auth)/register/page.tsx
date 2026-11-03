@@ -904,13 +904,13 @@ export default function PlatformRegisterPage() {
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-slate-900">Razorpay / Online PG</span>
+                        <span className="text-xs font-bold text-slate-900">Razorpay Payment Gateway</span>
                         {formData.has_payment_gateway === "Yes" && (
                           <CheckCircle2 className="w-4 h-4 text-blue-600" />
                         )}
                       </div>
                       <p className="text-[11px] text-slate-500 mt-1">
-                        I already have or want automated online checkout via Razorpay/Paytm.
+                        Automated online checkout powered by Razorpay.
                       </p>
                     </button>
                   </div>

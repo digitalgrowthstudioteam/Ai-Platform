@@ -2,6 +2,7 @@
 Digital Growth Studio — Super Admin Control Panel API Endpoints
 Restricted exclusively to authenticated Super Admin accounts.
 """
+import re
 import json
 import uuid
 from typing import List, Optional
@@ -55,6 +56,7 @@ from app.schemas.platform.admin import (
     SuperAdminOverviewResponse,
     VendorListItem,
     VendorStatusUpdateRequest,
+    VendorSubdomainUpdateRequest,
     VendorCreateByAdminRequest,
     PlanCreateOrUpdateRequest,
     PlanResponse,
@@ -442,6 +444,83 @@ async def update_vendor_status(
     db.add(audit)
     await db.commit()
     return {"message": f"Vendor status updated to {payload.status}"}
+
+
+@router.patch("/vendors/{vendor_id}/subdomain")
+async def update_vendor_subdomain(
+    vendor_id: str,
+    payload: VendorSubdomainUpdateRequest,
+    admin: PlatformUser = Depends(require_super_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Super Admin updates the dedicated store slug / subdomain of any vendor."""
+    target_uuid = None
+    try:
+        target_uuid = uuid.UUID(vendor_id)
+    except (ValueError, AttributeError):
+        pass
+
+    stmt = select(PlatformVendor).where(
+        or_(PlatformVendor.id == target_uuid, PlatformVendor.vendor_code == vendor_id)
+        if target_uuid
+        else PlatformVendor.vendor_code == vendor_id
+    ).options(
+        selectinload(PlatformVendor.store),
+        selectinload(PlatformVendor.profile),
+        selectinload(PlatformVendor.app_config),
+    )
+    v = (await db.execute(stmt)).scalar_one_or_none()
+    if not v:
+        raise HTTPException(status_code=404, detail="Vendor not found")
+
+    new_slug = re.sub(r"[^a-zA-Z0-9]+", "-", payload.store_slug.lower()).strip("-")
+    if not new_slug:
+        raise HTTPException(status_code=400, detail="Invalid store subdomain slug")
+
+    # Check uniqueness against other stores
+    existing_store_stmt = select(PlatformStore).where(
+        PlatformStore.store_slug == new_slug,
+        PlatformStore.vendor_id != v.id
+    )
+    existing_store = (await db.execute(existing_store_stmt)).scalar_one_or_none()
+    if existing_store:
+        raise HTTPException(status_code=400, detail=f"Subdomain '{new_slug}' is already taken by another store")
+
+    new_subdomain = f"{new_slug}.digitalgrowthstudio.in"
+
+    if v.store:
+        v.store.store_slug = new_slug
+        v.store.subdomain = new_subdomain
+    else:
+        v.store = PlatformStore(
+            vendor_id=v.id,
+            store_name=v.profile.business_name if v.profile else "Store",
+            store_slug=new_slug,
+            subdomain=new_subdomain,
+            status="active",
+        )
+        db.add(v.store)
+
+    if v.app_config:
+        v.app_config.package_id = f"in.digitalgrowthstudio.{new_slug.replace('-', '_')}"
+
+    audit = PlatformAuditLog(
+        actor_id=admin.id,
+        actor_role="SUPER_ADMIN",
+        vendor_id=v.id,
+        action="UPDATE_SUBDOMAIN",
+        resource_type="STORE",
+        resource_id=new_subdomain,
+        changes=f"Changed subdomain to {new_subdomain}",
+    )
+    db.add(audit)
+    await db.commit()
+
+    return {
+        "message": f"Subdomain successfully updated to {new_subdomain}",
+        "store_slug": new_slug,
+        "subdomain": new_subdomain,
+    }
 
 
 @router.delete("/vendors/{vendor_id}", status_code=status.HTTP_200_OK)

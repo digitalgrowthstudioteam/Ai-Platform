@@ -44,6 +44,10 @@ class VendorStatusUpdateRequest(BaseModel):
     status: str  # active, inactive, suspended, trial
 
 
+class VendorSubdomainUpdateRequest(BaseModel):
+    store_slug: str = Field(min_length=2, max_length=100)
+
+
 class VendorCreateByAdminRequest(BaseModel):
     email: str
     password: str = Field(min_length=6)
