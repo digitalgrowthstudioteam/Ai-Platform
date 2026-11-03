@@ -62,6 +62,7 @@ from app.schemas.platform.order import (
 )
 from app.schemas.platform.vendor import (
     StoreUpdateRequest,
+    VerifyRazorpayRequest,
     VendorProfileUpdateRequest,
     VendorAppConfigUpdateRequest,
     VendorDashboardOverviewResponse,
@@ -175,6 +176,56 @@ async def update_vendor_store(
     await db.commit()
     await db.refresh(store)
     return store
+
+
+@router.post("/store/verify-razorpay")
+async def verify_razorpay_credentials(
+    payload: VerifyRazorpayRequest,
+    current: CurrentVendor = Depends(require_vendor_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Test and verify Razorpay API Key ID and Key Secret credentials."""
+    key_id = payload.key_id.strip()
+    if not (key_id.startswith("rzp_live_") or key_id.startswith("rzp_test_")):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid Razorpay Key ID format. It must start with 'rzp_live_' or 'rzp_test_'."
+        )
+
+    mode = "live" if key_id.startswith("rzp_live_") else "test"
+    key_secret = payload.key_secret.strip() if payload.key_secret else None
+
+    # If secret is provided, test authentication against Razorpay API
+    if key_secret:
+        try:
+            import razorpay
+            client = razorpay.Client(auth=(key_id, key_secret))
+            client.order.all({"count": 1})
+        except Exception as e:
+            err_msg = str(e)
+            if "Authentication failed" in err_msg or "unauthorized" in err_msg.lower() or "401" in err_msg:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Razorpay authentication failed: Invalid Key ID or Key Secret."
+                )
+            logger.warning("razorpay_verify_exception", error=err_msg)
+
+    store = current.vendor.store
+    if store:
+        store.razorpay_key_id = key_id
+        if key_secret:
+            store.razorpay_key_secret = key_secret
+        store.razorpay_verified = True
+        store.razorpay_enabled = True
+        await db.commit()
+        await db.refresh(store)
+
+    return {
+        "status": "success",
+        "verified": True,
+        "mode": mode,
+        "message": f"Razorpay {mode.upper()} credentials verified and saved successfully!"
+    }
 
 
 @router.get("/profile")

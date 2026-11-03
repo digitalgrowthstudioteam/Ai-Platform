@@ -7,6 +7,11 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 
+class VerifyRazorpayRequest(BaseModel):
+    key_id: str = Field(..., description="Razorpay Key ID (rzp_live_... or rzp_test_...)")
+    key_secret: Optional[str] = Field(None, description="Razorpay Key Secret")
+
+
 class StoreUpdateRequest(BaseModel):
     store_name: Optional[str] = None
     description: Optional[str] = None
@@ -21,6 +26,8 @@ class StoreUpdateRequest(BaseModel):
     cod_enabled: Optional[bool] = None
     razorpay_enabled: Optional[bool] = None
     razorpay_key_id: Optional[str] = None
+    razorpay_key_secret: Optional[str] = None
+    razorpay_verified: Optional[bool] = None
     shipping_enabled: Optional[bool] = None
     shipping_charge: Optional[float] = None
     free_shipping_min_order: Optional[float] = None
@@ -116,6 +123,7 @@ class VendorDetailFullResponse(BaseModel):
     cod_enabled: bool
     razorpay_enabled: bool
     razorpay_key_id: Optional[str] = None
+    razorpay_verified: bool = False
     # App info
     app_name: str
     app_logo_url: Optional[str] = None

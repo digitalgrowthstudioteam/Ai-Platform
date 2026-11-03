@@ -330,14 +330,22 @@ export default function VendorStoreSettingsPage() {
 
         {/* Logistics & Payment Setup Overview */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs">
-          <div className="flex items-center gap-2.5">
-            <CreditCard className="w-4 h-4 text-blue-600 shrink-0" />
-            <div>
-              <span className="font-bold text-slate-800">Payment Gateway Status: </span>
-              <span className="font-semibold text-blue-700">
-                {profile?.has_payment_gateway === "Yes" ? "Configured / Active" : "Assisted (COD Default)"}
-              </span>
+          <div className="flex items-center justify-between gap-2.5">
+            <div className="flex items-center gap-2.5">
+              <CreditCard className="w-4 h-4 text-blue-600 shrink-0" />
+              <div>
+                <span className="font-bold text-slate-800">Payment Gateway Status: </span>
+                <span className="font-semibold text-blue-700">
+                  {profile?.has_payment_gateway === "Yes" ? "Configured / Active" : "Assisted (COD Default)"}
+                </span>
+              </div>
             </div>
+            <Link
+              href="/app/dashboard/payments"
+              className="px-2.5 py-1 text-[11px] font-bold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition-colors"
+            >
+              Configure Razorpay &rarr;
+            </Link>
           </div>
 
           <div className="flex items-center gap-2.5">

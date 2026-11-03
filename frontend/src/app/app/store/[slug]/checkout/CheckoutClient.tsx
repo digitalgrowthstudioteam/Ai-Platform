@@ -175,7 +175,63 @@ export default function CheckoutClient() {
 
       const order = await platformApi.createPublicOrder(slug, orderPayload);
 
-      // Clear this vendor's cart
+      // If Razorpay Online Payment is selected, trigger official Razorpay Checkout modal
+      if (paymentMethod === "ONLINE" && config?.razorpay_key_id) {
+        const loadScript = () => {
+          return new Promise<boolean>((resolve) => {
+            if ((window as any).Razorpay) return resolve(true);
+            const script = document.createElement("script");
+            script.src = "https://checkout.razorpay.com/v1/checkout.js";
+            script.onload = () => resolve(true);
+            script.onerror = () => resolve(false);
+            document.body.appendChild(script);
+          });
+        };
+
+        const loaded = await loadScript();
+        if (loaded && (window as any).Razorpay) {
+          const rzpOptions = {
+            key: config.razorpay_key_id,
+            amount: Math.round(grandTotal * 100),
+            currency: "INR",
+            name: config.store_name || "Online Store",
+            description: `Order ${order.order_number}`,
+            image: config.logo_url || "/logo.jpg",
+            prefill: {
+              name: customerName.trim(),
+              contact: customerPhone.trim(),
+              email: customerEmail.trim() || undefined,
+            },
+            theme: {
+              color: config.primary_color || "#2563EB",
+            },
+            handler: async (resp: any) => {
+              try {
+                await platformApi.confirmPublicOrderPayment(slug, order.id || order.order_number, {
+                  razorpay_payment_id: resp.razorpay_payment_id,
+                  razorpay_order_id: resp.razorpay_order_id,
+                  razorpay_signature: resp.razorpay_signature,
+                });
+              } catch (e) {
+                console.error("Payment confirmation failed:", e);
+              }
+              clearCart();
+              router.push(getStoreHref(slug, `/order/${order.id || order.order_number}`));
+            },
+            modal: {
+              ondismiss: () => {
+                clearCart();
+                router.push(getStoreHref(slug, `/order/${order.id || order.order_number}`));
+              },
+            },
+          };
+          const rzp = new (window as any).Razorpay(rzpOptions);
+          rzp.open();
+          return;
+        }
+      }
+
+      // Clear this vendor's cart for COD or fallback
       clearCart();
 
       // Navigate directly to the dedicated Order Detail Page

@@ -203,6 +203,8 @@ export interface StoreSettings {
   cod_enabled: boolean;
   razorpay_enabled: boolean;
   razorpay_key_id?: string;
+  razorpay_key_secret?: string;
+  razorpay_verified?: boolean;
   shipping_enabled?: boolean;
   shipping_charge?: number;
   free_shipping_min_order?: number;
@@ -347,6 +349,8 @@ export interface VendorDetailFull {
   cod_enabled: boolean;
   razorpay_enabled: boolean;
   razorpay_key_id?: string;
+  razorpay_key_secret?: string;
+  razorpay_verified?: boolean;
   app_name: string;
   app_logo_url?: string;
   splash_screen_url?: string;

@@ -85,6 +85,7 @@ class PlatformStore(BaseModel):
     cod_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     razorpay_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     razorpay_key_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    razorpay_key_secret: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     razorpay_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     # Shipping & Logistics Settings

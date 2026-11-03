@@ -258,6 +258,21 @@ class PlatformApiClient {
     });
   }
 
+  async verifyRazorpay(payload: { key_id: string; key_secret?: string }): Promise<any> {
+    if (this.isDemoMode()) {
+      return {
+        status: 'success',
+        verified: true,
+        mode: payload.key_id.startsWith('rzp_live_') ? 'live' : 'test',
+        message: 'Razorpay credentials verified successfully! (Demo Sandbox)',
+      };
+    }
+    return this.request('/api/v1/platform/vendor/store/verify-razorpay', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
   async getVendorAppConfig(): Promise<AppConfig> {
     if (this.isDemoMode()) return demoSandbox.getAppConfig();
     return this.request<AppConfig>('/api/v1/platform/vendor/app-config');
@@ -642,6 +657,16 @@ class PlatformApiClient {
       return demoSandbox.createPublicOrder(payload);
     }
     return this.request(`/api/store/${slug}/orders`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async confirmPublicOrderPayment(slug: string, orderId: string, payload: { razorpay_payment_id: string; razorpay_order_id?: string; razorpay_signature?: string }): Promise<any> {
+    if (this.isDemoMode() || slug === 'demo' || slug === 'demo-store') {
+      return { status: 'success', payment_status: 'PAID' };
+    }
+    return this.request(`/api/store/${slug}/orders/${orderId}/confirm-payment`, {
       method: 'POST',
       body: JSON.stringify(payload),
     });

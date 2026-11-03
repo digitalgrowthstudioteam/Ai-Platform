@@ -5,6 +5,7 @@ All routes dynamically resolve by store slug and expose only sanitized customer-
 import uuid
 import json
 from typing import List, Optional
+from pydantic import BaseModel
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select, desc, or_
@@ -565,6 +566,51 @@ async def get_store_order_status(
             ) for it in order.items
         ]
     )
+
+
+class ConfirmStorePaymentRequest(BaseModel):
+    razorpay_payment_id: str
+    razorpay_order_id: Optional[str] = None
+    razorpay_signature: Optional[str] = None
+
+
+@router.post("/{slug}/orders/{order_id}/confirm-payment")
+async def confirm_store_order_payment(
+    slug: str,
+    order_id: str,
+    payload: ConfirmStorePaymentRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Confirm online payment for a customer order via Razorpay."""
+    store = await resolve_active_store(slug, db)
+    parsed_uuid = None
+    try:
+        parsed_uuid = uuid.UUID(order_id)
+    except (ValueError, AttributeError):
+        pass
+
+    stmt = select(PlatformOrder).where(PlatformOrder.vendor_id == store.vendor_id)
+    if parsed_uuid:
+        stmt = stmt.where(or_(PlatformOrder.id == parsed_uuid, PlatformOrder.order_number == order_id))
+    else:
+        stmt = stmt.where(PlatformOrder.order_number == order_id)
+
+    order = (await db.execute(stmt)).scalar_one_or_none()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    order.payment_status = "PAID"
+    existing_notes = order.notes or ""
+    order.notes = f"{existing_notes} [Razorpay Paid: {payload.razorpay_payment_id}]".strip()
+    await db.commit()
+    await db.refresh(order)
+
+    return {
+        "status": "success",
+        "payment_status": "PAID",
+        "razorpay_payment_id": payload.razorpay_payment_id,
+        "message": "Payment confirmed successfully"
+    }
 
 
 @router.get("/{slug}/customer-orders", response_model=List[OrderResponse])

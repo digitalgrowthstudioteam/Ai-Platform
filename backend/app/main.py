@@ -91,6 +91,8 @@ async def lifespan(app: FastAPI):
                 "ALTER TABLE platform_vendor_profiles ALTER COLUMN logo_url TYPE TEXT;",
                 "ALTER TABLE platform_stores ALTER COLUMN logo_url TYPE TEXT;",
                 "ALTER TABLE platform_stores ALTER COLUMN banner_url TYPE TEXT;",
+                "ALTER TABLE platform_stores ADD COLUMN IF NOT EXISTS razorpay_key_secret VARCHAR(255);",
+                "ALTER TABLE platform_stores ADD COLUMN IF NOT EXISTS razorpay_verified BOOLEAN NOT NULL DEFAULT FALSE;",
                 "ALTER TABLE platform_vendor_app_configs ALTER COLUMN app_logo_url TYPE TEXT;",
                 "ALTER TABLE platform_vendor_app_configs ALTER COLUMN splash_screen_url TYPE TEXT;",
             ]
