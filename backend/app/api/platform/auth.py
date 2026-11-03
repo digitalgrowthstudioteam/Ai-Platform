@@ -69,9 +69,21 @@ async def register_vendor(payload: PlatformRegisterRequest, db: AsyncSession = D
     vendor_code = await generate_next_vendor_code(db)
 
     # 4. Create User
+    pwd = payload.password
+    if not pwd and payload.google_id_token:
+        claims = await verify_firebase_token(payload.google_id_token)
+        if not claims or not claims.get("email"):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or expired Google authentication credentials."
+            )
+        pwd = secrets.token_urlsafe(32)
+    elif not pwd:
+        pwd = secrets.token_urlsafe(32)
+
     user = PlatformUser(
         email=payload.email.lower().strip(),
-        hashed_password=hash_password(payload.password),
+        hashed_password=hash_password(pwd),
         name=payload.owner_name.strip(),
         role="VENDOR_ADMIN",
         status="active",
@@ -391,104 +403,10 @@ async def google_login_platform(
             store_slug=store_slug,
         )
 
-    # New user signing in with Google: Auto-provision as new Vendor Admin
-    user = PlatformUser(
-        email=email,
-        name=name,
-        hashed_password=hash_password(secrets.token_urlsafe(32)),
-        role="VENDOR_ADMIN",
-        status="active",
-    )
-    db.add(user)
-    await db.flush()
-
-    # Auto-provision unique sequential vendor code (e.g. VND0007)
-    vendor_code = await generate_next_vendor_code(db)
-
-    vendor = PlatformVendor(
-        vendor_code=vendor_code,
-        user_id=user.id,
-        status="active",
-    )
-    db.add(vendor)
-    await db.flush()
-
-    business_name = f"{name}'s Store"
-    profile = PlatformVendorProfile(
-        vendor_id=vendor.id,
-        business_name=business_name,
-        owner_name=name,
-        email=email,
-        phone="",
-        category="General",
-        address="",
-        description="Welcome to my online store powered by Digital Growth Studio.",
-    )
-    db.add(profile)
-
-    base_slug = slugify(name) or "store"
-    desired_slug = f"{base_slug}-{vendor_code.lower()}"
-    store = PlatformStore(
-        vendor_id=vendor.id,
-        store_name=business_name,
-        store_slug=desired_slug,
-        subdomain=f"{desired_slug}.digitalgrowthstudio.in",
-        status="active",
-        contact_email=email,
-    )
-    db.add(store)
-
-    app_config = PlatformVendorAppConfig(
-        vendor_id=vendor.id,
-        app_name=business_name,
-        package_id=f"in.digitalgrowthstudio.{desired_slug.replace('-', '_')}",
-        app_build_status="NOT_REQUESTED",
-    )
-    db.add(app_config)
-
-    storage_usage = PlatformStorageUsage(
-        vendor_id=vendor.id,
-        total_bytes_used=0,
-        image_bytes_used=0,
-        product_count=0,
-        limit_bytes=1073741824,
-    )
-    db.add(storage_usage)
-
-    plan_stmt = select(PlatformPlan).where(PlatformPlan.slug == "starter-store")
-    plan = (await db.execute(plan_stmt)).scalar_one_or_none()
-    now = datetime.now(timezone.utc)
-    if plan:
-        sub = PlatformSubscription(
-            vendor_id=vendor.id,
-            plan_id=plan.id,
-            status="trial",
-            starts_at=now,
-            expires_at=now + timedelta(days=14),
-            next_renewal_date=now + timedelta(days=14),
-        )
-        db.add(sub)
-
-    await db.commit()
-
-    token = create_platform_access_token({
-        "sub": str(user.id),
-        "email": user.email,
-        "role": user.role,
-        "vendor_id": str(vendor.id),
-        "vendor_code": vendor.vendor_code,
-    })
-
-    return PlatformTokenResponse(
-        access_token=token,
-        token_type="bearer",
-        user_id=user.id,
-        email=user.email,
-        name=user.name,
-        role=user.role,
-        vendor_id=vendor.id,
-        vendor_code=vendor.vendor_code,
-        store_slug=desired_slug,
+    # User has not registered yet:
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="No store account found for this Google email. Please register your store first to configure your business name and details.",
     )
 
 

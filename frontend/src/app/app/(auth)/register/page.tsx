@@ -2,6 +2,8 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { signInWithPopup, GoogleAuthProvider } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 import { usePlatformAuth } from "@/lib/app-platform/auth";
 import {
   Lock,
@@ -65,6 +67,8 @@ export default function PlatformRegisterPage() {
 
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [googleIdToken, setGoogleIdToken] = useState<string | null>(null);
+  const [isGoogleSignUp, setIsGoogleSignUp] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const slugify = (text: string) =>
@@ -78,8 +82,45 @@ export default function PlatformRegisterPage() {
     setError(null);
     setGoogleLoading(true);
     try {
-      await loginWithGoogle();
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: "select_account" });
+      const credential = await signInWithPopup(auth, provider);
+      const googleUser = credential.user;
+      const idToken = await googleUser.getIdToken();
+
+      const googleName = googleUser.displayName || "";
+      const googleEmail = googleUser.email || "";
+
+      setFormData((prev) => {
+        const updated = {
+          ...prev,
+          owner_name: googleName || prev.owner_name,
+          email: googleEmail || prev.email,
+          password: prev.password || "GoogleAuthSecretPass@123",
+        };
+        // Auto-fetch default business name from owner name if blank
+        if (!updated.business_name && googleName) {
+          updated.business_name = `${googleName}'s Store`;
+          if (!brandNameManuallyEdited) {
+            updated.brand_name = `${googleName}'s Store`;
+          }
+          if (!subdomainManuallyEdited) {
+            updated.store_slug = slugify(googleName);
+          }
+        }
+        return updated;
+      });
+
+      setGoogleIdToken(idToken);
+      setIsGoogleSignUp(true);
+
+      // Advance directly to Slide 1 (Owner Details)
+      setStage("step1");
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err: any) {
+      if (err.code === "auth/popup-closed-by-user" || err.message?.includes("popup-closed")) {
+        return;
+      }
       setError(err.message || "Google Sign-in failed. Please try again.");
     } finally {
       setGoogleLoading(false);
@@ -219,7 +260,8 @@ export default function PlatformRegisterPage() {
     const payload = {
       owner_name: formData.owner_name.trim(),
       email: formData.email.toLowerCase().trim(),
-      password: formData.password,
+      password: formData.password || "GoogleAuthSecretPass@123",
+      google_id_token: googleIdToken || undefined,
       whatsapp_number: fullWhatsappNumber,
       phone: fullWhatsappNumber,
       business_name: formData.business_name.trim(),
@@ -412,19 +454,31 @@ export default function PlatformRegisterPage() {
 
               {/* Email Address (Pre-filled from Sign up) */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Email Address <span className="text-rose-500">*</span>
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    Email Address <span className="text-rose-500">*</span>
+                  </label>
+                  {isGoogleSignUp && (
+                    <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded font-bold">
+                      ✓ Connected with Google
+                    </span>
+                  )}
+                </div>
                 <div className="relative">
                   <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
                   <input
                     type="email"
                     required
+                    readOnly={isGoogleSignUp}
                     name="email"
                     value={formData.email}
                     onChange={handleChange}
                     placeholder="vendor@example.com"
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className={`w-full pl-10 pr-4 py-2.5 rounded-xl text-sm focus:outline-none ${
+                      isGoogleSignUp
+                        ? "bg-slate-100 text-slate-600 border border-slate-200 cursor-not-allowed"
+                        : "bg-slate-50 border border-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-500"
+                    }`}
                   />
                 </div>
               </div>

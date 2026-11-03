@@ -10,7 +10,8 @@ class PlatformRegisterRequest(BaseModel):
     # Slide 1: Owner Details
     owner_name: str
     email: EmailStr
-    password: str = Field(min_length=6)
+    password: Optional[str] = None
+    google_id_token: Optional[str] = None
     whatsapp_number: Optional[str] = None
     phone: Optional[str] = None
 

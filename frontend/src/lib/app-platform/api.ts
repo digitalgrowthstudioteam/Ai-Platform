@@ -164,11 +164,20 @@ class PlatformApiClient {
 
   async register(payload: {
     email: string;
-    password: string;
     owner_name: string;
     business_name: string;
-    phone: string;
+    password?: string;
+    google_id_token?: string;
+    phone?: string;
+    whatsapp_number?: string;
+    business_phone?: string;
     category?: string;
+    brand_name?: string;
+    description?: string;
+    logo_url?: string;
+    address?: string;
+    has_payment_gateway?: string;
+    needs_delivery_help?: string;
     store_slug?: string;
   }): Promise<PlatformTokenResponse> {
     const res = await this.request<PlatformTokenResponse>('/api/v1/platform/auth/register', {
