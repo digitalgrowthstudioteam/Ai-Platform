@@ -30,9 +30,11 @@ export default function PlatformLoginPage() {
   return (
     <div className="flex-1 flex flex-col justify-center items-center py-14 px-4 sm:px-6 lg:px-8 bg-slate-50">
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
-        <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-blue-600 text-white font-bold text-2xl shadow-sm mb-4">
-          D
-        </div>
+        <img
+          src="/logo.jpg"
+          alt="Digital Growth Studio"
+          className="inline-block w-14 h-14 rounded-2xl object-contain shadow-sm mb-4 border border-slate-200 bg-white"
+        />
         <h2 className="text-2xl font-bold tracking-tight text-slate-900">
           Sign in to Digital Growth Studio
         </h2>

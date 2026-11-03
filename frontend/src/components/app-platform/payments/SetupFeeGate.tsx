@@ -176,9 +176,11 @@ export default function SetupFeeGate() {
     <div className="max-w-2xl mx-auto my-8 p-6 sm:p-8 bg-white border border-slate-200 rounded-3xl shadow-sm">
       {/* Brand & Lock Badge */}
       <div className="text-center mb-8">
-        <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-blue-600 text-white font-bold text-2xl shadow-sm mb-4">
-          D
-        </div>
+        <img
+          src="/logo.jpg"
+          alt="Digital Growth Studio"
+          className="inline-block w-14 h-14 rounded-2xl object-contain shadow-sm mb-4 border border-slate-200 bg-white"
+        />
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200 mb-3">
           <Lock className="w-3.5 h-3.5 text-amber-600" />
           <span>One-Time Setup Required</span>

@@ -57,10 +57,12 @@ export default function AppHeader() {
           </button>
         )}
 
-        <Link href="/app" className="flex items-center gap-2">
-          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-base sm:text-lg shadow-sm shrink-0">
-            D
-          </div>
+        <Link href="/app" className="flex items-center gap-2.5">
+          <img
+            src="/logo.jpg"
+            alt="Digital Growth Studio"
+            className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl object-contain border border-slate-200 shadow-xs shrink-0 bg-white"
+          />
           <div>
             <span className="font-bold text-slate-900 tracking-tight text-sm sm:text-base">Digital Growth Studio</span>
             <span className="hidden sm:inline-block ml-2 text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
