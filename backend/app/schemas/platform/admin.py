@@ -136,3 +136,88 @@ class PlatformAuditLogItem(BaseModel):
     details_json: Optional[str] = None
     created_at: datetime
 
+
+# ──────────────────────────────────────────────
+# Detailed Platform Admin Analytics Schemas
+# ──────────────────────────────────────────────
+class AdminVendorSalesPerformanceItem(BaseModel):
+    vendor_id: uuid.UUID
+    vendor_code: str
+    business_name: str
+    owner_name: str
+    email: str
+    phone: str
+    store_slug: str
+    subdomain: str
+    status: str
+    total_products: int = 0
+    in_stock_products: int = 0
+    total_orders: int = 0
+    units_sold: int = 0
+    gross_revenue_inr: float = 0.0
+    average_order_value_inr: float = 0.0
+    store_visits: int = 0
+    conversion_rate: float = 0.0
+    whatsapp_clicks: int = 0
+    has_sales: bool = False
+    last_sale_date: Optional[str] = None
+    joined_at: datetime
+
+
+class AdminTopSellingProductItem(BaseModel):
+    product_id: str
+    product_name: str
+    vendor_code: str
+    vendor_business_name: str
+    store_slug: str
+    units_sold: int = 0
+    revenue_inr: float = 0.0
+    price_inr: float = 0.0
+    stock_quantity: int = 0
+
+
+class AdminCategoryDistributionItem(BaseModel):
+    category: str
+    vendor_count: int = 0
+    product_count: int = 0
+    total_revenue_inr: float = 0.0
+
+
+class AdminVendorOnboardingTrendItem(BaseModel):
+    period: str
+    new_vendors: int = 0
+    total_cumulative_vendors: int = 0
+    orders: int = 0
+    gmv_inr: float = 0.0
+
+
+class AdminDetailedAnalyticsResponse(BaseModel):
+    total_vendors: int = 0
+    active_vendors: int = 0
+    inactive_vendors: int = 0
+    trial_vendors: int = 0
+    vendors_with_sales: int = 0
+    vendors_without_sales: int = 0
+    total_products: int = 0
+    in_stock_products: int = 0
+    out_of_stock_products: int = 0
+    avg_products_per_vendor: float = 0.0
+    total_orders_platform: int = 0
+    total_units_sold_platform: int = 0
+    total_platform_gmv_inr: float = 0.0
+    platform_average_order_value_inr: float = 0.0
+    total_store_visits: int = 0
+    platform_conversion_rate: float = 0.0
+    total_whatsapp_leads: int = 0
+    top_vendor_by_revenue: Optional[AdminVendorSalesPerformanceItem] = None
+    top_vendor_by_units: Optional[AdminVendorSalesPerformanceItem] = None
+    vendor_leaderboard: List[AdminVendorSalesPerformanceItem] = []
+    top_selling_products: List[AdminTopSellingProductItem] = []
+    category_distribution: List[AdminCategoryDistributionItem] = []
+    growth_trend: List[AdminVendorOnboardingTrendItem] = []
+    meta_pixels_connected: int = 0
+    ga4_connected: int = 0
+    gtm_connected: int = 0
+    total_tracking_events_logged: int = 0
+
+

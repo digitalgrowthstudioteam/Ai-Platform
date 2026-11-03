@@ -4,6 +4,8 @@ Tests pixel settings (Meta Pixel, GA4, GTM), public storefront event ingestion,
 and multi-dimensional analytics calculation.
 """
 import pytest
+import uuid
+from datetime import datetime, timezone
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -183,3 +185,39 @@ async def test_vendor_analytics_summary(setup_test_vendor):
         assert "pixel_status" in data
 
     app.dependency_overrides.pop(require_vendor_admin, None)
+
+
+@pytest.mark.asyncio
+async def test_admin_detailed_analytics(setup_test_vendor):
+    """Test GET /api/v1/platform/admin/analytics returns platform leaderboards, totals, and catalog stats."""
+    from app.core.platform_auth import require_super_admin
+
+    admin_user = PlatformUser(
+        id=uuid.uuid4(),
+        email="superadmin@dgs.com",
+        name="Super Admin",
+        role="SUPER_ADMIN",
+        status="active",
+        created_at=datetime.now(timezone.utc),
+    )
+    app.dependency_overrides[require_super_admin] = lambda: admin_user
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        res = await client.get("/api/v1/platform/admin/analytics?date_range=30d")
+        assert res.status_code == 200
+        data = res.json()
+        assert "total_vendors" in data
+        assert data["total_vendors"] >= 1
+        assert "vendor_leaderboard" in data
+        assert isinstance(data["vendor_leaderboard"], list)
+        assert len(data["vendor_leaderboard"]) >= 1
+        assert "top_selling_products" in data
+        assert "category_distribution" in data
+        assert "growth_trend" in data
+        assert len(data["growth_trend"]) == 6
+        assert "meta_pixels_connected" in data
+        assert "total_tracking_events_logged" in data
+
+    app.dependency_overrides.pop(require_super_admin, None)
+

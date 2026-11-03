@@ -14,6 +14,7 @@ import {
   Sliders,
   FileText,
   BarChart3,
+  TrendingUp,
   X,
 } from "lucide-react";
 
@@ -23,6 +24,7 @@ export default function AdminSidebar() {
 
   const links = [
     { label: "Overview", href: "/app/admin", icon: BarChart3 },
+    { label: "Platform Analytics", href: "/app/admin/analytics", icon: TrendingUp },
     { label: "Vendor Management", href: "/app/admin/vendors", icon: Users },
     { label: "Subscriptions & Plans", href: "/app/admin/subscriptions", icon: CreditCard },
     { label: "Add-on Services", href: "/app/admin/addons", icon: PlusCircle },

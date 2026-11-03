@@ -477,3 +477,88 @@ export interface VendorAnalyticsSummary {
   };
 }
 
+// ──────────────────────────────────────────────
+// Platform Super Admin Analytics Types
+// ──────────────────────────────────────────────
+export interface AdminVendorSalesPerformance {
+  vendor_id: string;
+  vendor_code: string;
+  business_name: string;
+  owner_name: string;
+  email: string;
+  phone: string;
+  store_slug: string;
+  subdomain: string;
+  status: string;
+  total_products: number;
+  in_stock_products: number;
+  total_orders: number;
+  units_sold: number;
+  gross_revenue_inr: number;
+  average_order_value_inr: number;
+  store_visits: number;
+  conversion_rate: number;
+  whatsapp_clicks: number;
+  has_sales: boolean;
+  last_sale_date?: string | null;
+  joined_at: string;
+}
+
+export interface AdminTopSellingProduct {
+  product_id: string;
+  product_name: string;
+  vendor_code: string;
+  vendor_business_name: string;
+  store_slug: string;
+  units_sold: number;
+  revenue_inr: number;
+  price_inr: number;
+  stock_quantity: number;
+}
+
+export interface AdminCategoryDistribution {
+  category: string;
+  vendor_count: number;
+  product_count: number;
+  total_revenue_inr: number;
+}
+
+export interface AdminVendorOnboardingTrend {
+  period: string;
+  new_vendors: number;
+  total_cumulative_vendors: number;
+  orders: number;
+  gmv_inr: number;
+}
+
+export interface AdminDetailedAnalytics {
+  total_vendors: number;
+  active_vendors: number;
+  inactive_vendors: number;
+  trial_vendors: number;
+  vendors_with_sales: number;
+  vendors_without_sales: number;
+  total_products: number;
+  in_stock_products: number;
+  out_of_stock_products: number;
+  avg_products_per_vendor: number;
+  total_orders_platform: number;
+  total_units_sold_platform: number;
+  total_platform_gmv_inr: number;
+  platform_average_order_value_inr: number;
+  total_store_visits: number;
+  platform_conversion_rate: number;
+  total_whatsapp_leads: number;
+  top_vendor_by_revenue?: AdminVendorSalesPerformance | null;
+  top_vendor_by_units?: AdminVendorSalesPerformance | null;
+  vendor_leaderboard: AdminVendorSalesPerformance[];
+  top_selling_products: AdminTopSellingProduct[];
+  category_distribution: AdminCategoryDistribution[];
+  growth_trend: AdminVendorOnboardingTrend[];
+  meta_pixels_connected: number;
+  ga4_connected: number;
+  gtm_connected: number;
+  total_tracking_events_logged: number;
+}
+
+

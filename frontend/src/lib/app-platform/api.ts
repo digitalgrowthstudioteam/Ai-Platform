@@ -23,6 +23,7 @@ import {
   VendorPolicies,
   VendorPixelConfig,
   VendorAnalyticsSummary,
+  AdminDetailedAnalytics,
 } from './types';
 import { demoSandbox, DEMO_USER } from './demo-sandbox';
 
@@ -518,6 +519,10 @@ class PlatformApiClient {
   // ──────────────────────────────────────────────
   async getSuperAdminOverview(): Promise<SuperAdminOverview> {
     return this.request<SuperAdminOverview>('/api/v1/platform/admin/overview');
+  }
+
+  async getAdminDetailedAnalytics(dateRange: string = '30d'): Promise<AdminDetailedAnalytics> {
+    return this.request<AdminDetailedAnalytics>(`/api/v1/platform/admin/analytics?date_range=${encodeURIComponent(dateRange)}`);
   }
 
   async getAdminVendors(search?: string, statusFilter?: string): Promise<VendorListItem[]> {

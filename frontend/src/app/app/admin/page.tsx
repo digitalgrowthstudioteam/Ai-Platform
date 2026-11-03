@@ -109,6 +109,13 @@ export default function SuperAdminOverviewPage() {
 
         <div className="flex flex-wrap items-center gap-3">
           <Link
+            href="/app/admin/analytics"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs shadow-xs transition-all hover:scale-105"
+          >
+            <TrendingUp className="w-4 h-4 text-slate-950" />
+            Detailed Analytics & Leaderboard
+          </Link>
+          <Link
             href="/app/admin/vendors"
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white text-purple-900 font-semibold text-xs shadow-xs hover:bg-purple-50 transition-colors"
           >

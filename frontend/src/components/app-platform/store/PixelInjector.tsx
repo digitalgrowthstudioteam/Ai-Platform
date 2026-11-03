@@ -95,3 +95,4 @@ export default function PixelInjector({ config, pageTitle }: PixelInjectorProps)
 
   return null;
 }
+

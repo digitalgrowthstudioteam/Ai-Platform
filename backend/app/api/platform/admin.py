@@ -8,7 +8,7 @@ import uuid
 from typing import List, Optional
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select, func, desc, update, delete, or_
+from sqlalchemy import select, func, desc, update, delete, or_, case
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -21,6 +21,7 @@ from app.models.platform.vendor import (
     PlatformStore,
     PlatformVendorAppConfig,
     PlatformStorageUsage,
+    PlatformStoreEvent,
 )
 from app.models.platform.catalog import (
     PlatformProduct,
@@ -66,6 +67,11 @@ from app.schemas.platform.admin import (
     VendorAppStatusUpdateRequest,
     VendorStorageLimitUpdateRequest,
     PlatformAuditLogItem,
+    AdminDetailedAnalyticsResponse,
+    AdminVendorSalesPerformanceItem,
+    AdminTopSellingProductItem,
+    AdminCategoryDistributionItem,
+    AdminVendorOnboardingTrendItem,
 )
 from app.schemas.platform.vendor import (
     VendorDetailFullResponse,
@@ -149,6 +155,349 @@ async def get_admin_overview(
         total_products_all_vendors=total_products,
         new_registrations_this_month=new_regs,
         total_storage_used_mb=total_storage_mb,
+    )
+
+
+# ──────────────────────────────────────────────
+# Detailed Platform Admin Analytics
+# ──────────────────────────────────────────────
+@router.get("/analytics", response_model=AdminDetailedAnalyticsResponse)
+async def get_admin_detailed_analytics(
+    date_range: str = "30d",
+    admin: PlatformUser = Depends(require_super_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Compute exhaustive platform-wide vendor analytics, sales leaderboards, and catalog statistics."""
+    # 1. Fetch all vendors with eager loaded relations
+    stmt_v = (
+        select(PlatformVendor)
+        .options(
+            selectinload(PlatformVendor.profile),
+            selectinload(PlatformVendor.store),
+            selectinload(PlatformVendor.user),
+        )
+        .order_by(PlatformVendor.created_at.desc())
+    )
+    vendors = (await db.execute(stmt_v)).scalars().all()
+
+    # 2. Product metrics by vendor
+    stmt_prod = (
+        select(
+            PlatformProduct.vendor_id,
+            func.count(PlatformProduct.id).label("total_products"),
+            func.sum(case((PlatformProduct.stock_quantity > 0, 1), else_=0)).label("in_stock_products"),
+        )
+        .group_by(PlatformProduct.vendor_id)
+    )
+    prod_rows = (await db.execute(stmt_prod)).all()
+    prod_map = {row[0]: {"total": row[1] or 0, "in_stock": int(row[2] or 0)} for row in prod_rows}
+
+    # 3. Order metrics by vendor
+    stmt_ord = (
+        select(
+            PlatformOrder.vendor_id,
+            func.count(PlatformOrder.id).label("total_orders"),
+            func.coalesce(func.sum(PlatformOrder.total_amount), 0.0).label("gross_revenue"),
+            func.max(PlatformOrder.created_at).label("last_sale"),
+        )
+        .where(
+            PlatformOrder.order_status != "CANCELLED",
+            PlatformOrder.payment_status != "FAILED",
+        )
+        .group_by(PlatformOrder.vendor_id)
+    )
+    ord_rows = (await db.execute(stmt_ord)).all()
+    ord_map = {
+        row[0]: {
+            "total_orders": row[1] or 0,
+            "gross_revenue": float(row[2] or 0.0),
+            "last_sale": row[3].strftime("%Y-%m-%d %H:%M") if row[3] else None,
+        }
+        for row in ord_rows
+    }
+
+    # 4. Units sold by vendor from order items
+    stmt_units = (
+        select(
+            PlatformOrderItem.vendor_id,
+            func.coalesce(func.sum(PlatformOrderItem.quantity), 0).label("units_sold"),
+        )
+        .join(PlatformOrder, PlatformOrderItem.order_id == PlatformOrder.id)
+        .where(PlatformOrder.order_status != "CANCELLED")
+        .group_by(PlatformOrderItem.vendor_id)
+    )
+    units_rows = (await db.execute(stmt_units)).all()
+    units_map = {row[0]: int(row[1] or 0) for row in units_rows}
+
+    # 5. Storefront events by vendor (visits & whatsapp leads)
+    stmt_events = (
+        select(
+            PlatformStoreEvent.vendor_id,
+            PlatformStoreEvent.event_type,
+            func.count(PlatformStoreEvent.id),
+        )
+        .group_by(PlatformStoreEvent.vendor_id, PlatformStoreEvent.event_type)
+    )
+    event_rows = (await db.execute(stmt_events)).all()
+    event_map = {}
+    for vid, etype, count in event_rows:
+        if vid not in event_map:
+            event_map[vid] = {"visits": 0, "whatsapp": 0}
+        if etype == "page_view":
+            event_map[vid]["visits"] += count
+        elif etype == "whatsapp_click":
+            event_map[vid]["whatsapp"] += count
+
+    # 6. Build Vendor Sales Leaderboard items
+    leaderboard: List[AdminVendorSalesPerformanceItem] = []
+    vendors_with_sales = 0
+    vendors_without_sales = 0
+    total_products_platform = 0
+    total_in_stock_platform = 0
+    total_orders_platform = 0
+    total_units_sold_platform = 0
+    total_platform_gmv = 0.0
+    total_store_visits = 0
+    total_whatsapp_leads = 0
+
+    category_stats = {}
+
+    for v in vendors:
+        p_info = prod_map.get(v.id, {"total": 0, "in_stock": 0})
+        o_info = ord_map.get(v.id, {"total_orders": 0, "gross_revenue": 0.0, "last_sale": None})
+        u_sold = units_map.get(v.id, 0)
+        e_info = event_map.get(v.id, {"visits": 0, "whatsapp": 0})
+
+        gross_rev = o_info["gross_revenue"]
+        orders_count = o_info["total_orders"]
+        aov = round(gross_rev / orders_count, 2) if orders_count > 0 else 0.0
+        visits_count = e_info["visits"]
+        conv_rate = round((orders_count / visits_count) * 100, 2) if visits_count > 0 else (100.0 if orders_count > 0 else 0.0)
+        has_sales = orders_count > 0 and gross_rev > 0
+
+        if has_sales:
+            vendors_with_sales += 1
+        else:
+            vendors_without_sales += 1
+
+        total_products_platform += p_info["total"]
+        total_in_stock_platform += p_info["in_stock"]
+        total_orders_platform += orders_count
+        total_units_sold_platform += u_sold
+        total_platform_gmv += gross_rev
+        total_store_visits += visits_count
+        total_whatsapp_leads += e_info["whatsapp"]
+
+        biz_name = getattr(v.profile, "business_name", None) or "Store"
+        owner_name = getattr(v.profile, "owner_name", None) or (v.user.name if v.user else "Owner")
+        email = getattr(v.profile, "email", None) or (v.user.email if v.user else "")
+        phone = getattr(v.profile, "phone", None) or ""
+        cat = getattr(v.profile, "category", None) or "General"
+        slug = getattr(v.store, "store_slug", None) or v.vendor_code.lower()
+        subd = getattr(v.store, "subdomain", None) or slug
+
+        if cat not in category_stats:
+            category_stats[cat] = {"vendors": 0, "products": 0, "revenue": 0.0}
+        category_stats[cat]["vendors"] += 1
+        category_stats[cat]["products"] += p_info["total"]
+        category_stats[cat]["revenue"] += gross_rev
+
+        item = AdminVendorSalesPerformanceItem(
+            vendor_id=v.id,
+            vendor_code=v.vendor_code,
+            business_name=biz_name,
+            owner_name=owner_name,
+            email=email,
+            phone=phone,
+            store_slug=slug,
+            subdomain=subd,
+            status=v.status,
+            total_products=p_info["total"],
+            in_stock_products=p_info["in_stock"],
+            total_orders=orders_count,
+            units_sold=u_sold,
+            gross_revenue_inr=gross_rev,
+            average_order_value_inr=aov,
+            store_visits=visits_count,
+            conversion_rate=conv_rate,
+            whatsapp_clicks=e_info["whatsapp"],
+            has_sales=has_sales,
+            last_sale_date=o_info["last_sale"],
+            joined_at=v.created_at,
+        )
+        leaderboard.append(item)
+
+    # Sort leaderboard: vendors with sales ranked by revenue desc, then units desc, then others by product count
+    leaderboard.sort(key=lambda x: (x.has_sales, x.gross_revenue_inr, x.units_sold, x.total_products), reverse=True)
+
+    # Top selling vendor spotlights
+    top_by_revenue = leaderboard[0] if leaderboard and leaderboard[0].gross_revenue_inr > 0 else None
+    top_by_units = max(leaderboard, key=lambda x: x.units_sold) if leaderboard and any(x.units_sold > 0 for x in leaderboard) else None
+
+    # 7. Top 10 Best Selling Products platform-wide
+    stmt_top_prods = (
+        select(
+            PlatformOrderItem.product_id,
+            PlatformOrderItem.product_name,
+            PlatformOrderItem.vendor_id,
+            func.sum(PlatformOrderItem.quantity).label("units_sold"),
+            func.sum(PlatformOrderItem.total).label("revenue"),
+            func.avg(PlatformOrderItem.price).label("avg_price"),
+        )
+        .join(PlatformOrder, PlatformOrderItem.order_id == PlatformOrder.id)
+        .where(PlatformOrder.order_status != "CANCELLED")
+        .group_by(PlatformOrderItem.product_id, PlatformOrderItem.product_name, PlatformOrderItem.vendor_id)
+        .order_by(desc("units_sold"), desc("revenue"))
+        .limit(10)
+    )
+    top_prod_rows = (await db.execute(stmt_top_prods)).all()
+
+    vendor_lookup = {v.id: v for v in vendors}
+    top_selling_products: List[AdminTopSellingProductItem] = []
+    for r in top_prod_rows:
+        pid = str(r[0]) if r[0] else "custom"
+        pname = r[1] or "Custom Order Item"
+        v_entity = vendor_lookup.get(r[2])
+        v_code = v_entity.vendor_code if v_entity else "N/A"
+        v_bname = (getattr(v_entity.profile, "business_name", None) if v_entity else None) or "Store"
+        v_slug = (getattr(v_entity.store, "store_slug", None) if v_entity else None) or "store"
+
+        # Check stock quantity
+        stock_qty = 0
+        if r[0]:
+            p_res = await db.execute(select(PlatformProduct.stock_quantity).where(PlatformProduct.id == r[0]))
+            stock_qty = p_res.scalar() or 0
+
+        top_selling_products.append(
+            AdminTopSellingProductItem(
+                product_id=pid,
+                product_name=pname,
+                vendor_code=v_code,
+                vendor_business_name=v_bname,
+                store_slug=v_slug,
+                units_sold=int(r[3] or 0),
+                revenue_inr=float(r[4] or 0.0),
+                price_inr=float(r[5] or 0.0),
+                stock_quantity=stock_qty,
+            )
+        )
+
+    # 8. Category distribution items
+    category_distribution = [
+        AdminCategoryDistributionItem(
+            category=cat_name,
+            vendor_count=cdata["vendors"],
+            product_count=cdata["products"],
+            total_revenue_inr=round(cdata["revenue"], 2),
+        )
+        for cat_name, cdata in category_stats.items()
+    ]
+    category_distribution.sort(key=lambda x: (x.total_revenue_inr, x.vendor_count), reverse=True)
+
+    # 9. Vendor growth trend (monthly buckets over the past 6 months)
+    now = datetime.now(timezone.utc)
+    growth_trend: List[AdminVendorOnboardingTrendItem] = []
+    running_cumulative = 0
+
+    for i in range(5, -1, -1):
+        # Target month
+        year = now.year
+        month = now.month - i
+        while month <= 0:
+            month += 12
+            year -= 1
+
+        period_label = datetime(year, month, 1).strftime("%b %Y")
+        start_of_month = datetime(year, month, 1, tzinfo=timezone.utc)
+        if month == 12:
+            end_of_month = datetime(year + 1, 1, 1, tzinfo=timezone.utc)
+        else:
+            end_of_month = datetime(year, month + 1, 1, tzinfo=timezone.utc)
+
+        # Count new vendors onboarded this month
+        def _to_utc(dt: Optional[datetime]) -> Optional[datetime]:
+            if dt is None:
+                return None
+            return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt.astimezone(timezone.utc)
+
+        new_v = sum(1 for v in vendors if v.created_at and start_of_month <= _to_utc(v.created_at) < end_of_month)
+        running_cumulative += new_v
+
+        # Orders and GMV placed this month
+        stmt_m_orders = (
+            select(
+                func.count(PlatformOrder.id),
+                func.coalesce(func.sum(PlatformOrder.total_amount), 0.0),
+            )
+            .where(
+                PlatformOrder.created_at >= start_of_month,
+                PlatformOrder.created_at < end_of_month,
+                PlatformOrder.order_status != "CANCELLED",
+            )
+        )
+        m_row = (await db.execute(stmt_m_orders)).first()
+        m_orders = (m_row[0] if m_row else 0) or 0
+        m_gmv = float((m_row[1] if m_row else 0.0) or 0.0)
+
+        growth_trend.append(
+            AdminVendorOnboardingTrendItem(
+                period=period_label,
+                new_vendors=new_v,
+                total_cumulative_vendors=running_cumulative,
+                orders=m_orders,
+                gmv_inr=m_gmv,
+            )
+        )
+
+    # 10. Pixel & Tag Adoption tracking
+    stmt_meta = select(func.count(PlatformStore.id)).where(PlatformStore.meta_pixel_id.isnot(None), PlatformStore.meta_pixel_id != "")
+    meta_count = (await db.execute(stmt_meta)).scalar() or 0
+
+    stmt_ga4 = select(func.count(PlatformStore.id)).where(PlatformStore.ga4_id.isnot(None), PlatformStore.ga4_id != "")
+    ga4_count = (await db.execute(stmt_ga4)).scalar() or 0
+
+    stmt_gtm = select(func.count(PlatformStore.id)).where(PlatformStore.gtm_id.isnot(None), PlatformStore.gtm_id != "")
+    gtm_count = (await db.execute(stmt_gtm)).scalar() or 0
+
+    stmt_tot_events = select(func.count(PlatformStoreEvent.id))
+    total_events_logged = (await db.execute(stmt_tot_events)).scalar() or 0
+
+    total_vendors = len(vendors)
+    active_vendors = sum(1 for v in vendors if v.status == "active")
+    inactive_vendors = sum(1 for v in vendors if v.status == "inactive")
+    trial_vendors = sum(1 for v in vendors if v.status == "trial")
+    avg_prods = round(total_products_platform / total_vendors, 1) if total_vendors > 0 else 0.0
+    platform_aov = round(total_platform_gmv / total_orders_platform, 2) if total_orders_platform > 0 else 0.0
+    platform_conv = round((total_orders_platform / total_store_visits) * 100, 2) if total_store_visits > 0 else 0.0
+
+    return AdminDetailedAnalyticsResponse(
+        total_vendors=total_vendors,
+        active_vendors=active_vendors,
+        inactive_vendors=inactive_vendors,
+        trial_vendors=trial_vendors,
+        vendors_with_sales=vendors_with_sales,
+        vendors_without_sales=vendors_without_sales,
+        total_products=total_products_platform,
+        in_stock_products=total_in_stock_platform,
+        out_of_stock_products=max(0, total_products_platform - total_in_stock_platform),
+        avg_products_per_vendor=avg_prods,
+        total_orders_platform=total_orders_platform,
+        total_units_sold_platform=total_units_sold_platform,
+        total_platform_gmv_inr=total_platform_gmv,
+        platform_average_order_value_inr=platform_aov,
+        total_store_visits=total_store_visits,
+        platform_conversion_rate=platform_conv,
+        total_whatsapp_leads=total_whatsapp_leads,
+        top_vendor_by_revenue=top_by_revenue,
+        top_vendor_by_units=top_by_units,
+        vendor_leaderboard=leaderboard,
+        top_selling_products=top_selling_products,
+        category_distribution=category_distribution,
+        growth_trend=growth_trend,
+        meta_pixels_connected=meta_count,
+        ga4_connected=ga4_count,
+        gtm_connected=gtm_count,
+        total_tracking_events_logged=total_events_logged,
     )
 
 
