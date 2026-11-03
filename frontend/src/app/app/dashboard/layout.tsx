@@ -49,7 +49,14 @@ export default function VendorDashboardLayout({ children }: { children: React.Re
     user.role === "VENDOR_ADMIN" &&
     !isDemo &&
     user.setup_fee_cleared !== false &&
-    user.is_subscription_expired
+    (
+      user.is_subscription_expired ||
+      user.status === "inactive" ||
+      user.status === "suspended" ||
+      user.subscription_status === "inactive" ||
+      user.subscription_status === "expired" ||
+      user.subscription_status === "past_due"
+    )
   );
 
   return (

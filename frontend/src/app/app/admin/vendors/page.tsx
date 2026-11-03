@@ -17,6 +17,8 @@ import {
   Trash2,
   AlertTriangle,
   Loader2,
+  Clock,
+  Calendar,
 } from "lucide-react";
 
 export default function AdminVendorsPage() {
@@ -40,6 +42,40 @@ export default function AdminVendorsPage() {
   const [creating, setCreating] = useState(false);
   const [vendorToDelete, setVendorToDelete] = useState<VendorListItem | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [vendorToGrant, setVendorToGrant] = useState<VendorListItem | null>(null);
+  const [grantMonths, setGrantMonths] = useState<string>("1");
+  const [grantingAccess, setGrantingAccess] = useState(false);
+  const [togglingStatus, setTogglingStatus] = useState(false);
+
+  const handleGrantAccessFromTable = async (monthsToGrant: number) => {
+    if (!vendorToGrant) return;
+    setGrantingAccess(true);
+    try {
+      const res = await platformApi.grantVendorAccessMonths(vendorToGrant.id, monthsToGrant);
+      alert(res.message || `Granted ${monthsToGrant} month(s) of access!`);
+      setVendorToGrant(null);
+      await loadVendors();
+    } catch (err: any) {
+      alert(err.message || "Failed to grant access");
+    } finally {
+      setGrantingAccess(false);
+    }
+  };
+
+  const handleToggleStatusFromTable = async (targetStatus: string) => {
+    if (!vendorToGrant) return;
+    setTogglingStatus(true);
+    try {
+      await platformApi.updateVendorStatus(vendorToGrant.id, targetStatus);
+      alert(`Vendor status set to ${targetStatus}!`);
+      setVendorToGrant(null);
+      await loadVendors();
+    } catch (err: any) {
+      alert(err.message || "Failed to update vendor status");
+    } finally {
+      setTogglingStatus(false);
+    }
+  };
 
   const loadVendors = async () => {
     try {
@@ -202,6 +238,18 @@ export default function AdminVendorsPage() {
                     </td>
                     <td className="py-3.5 px-4 text-right">
                       <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setVendorToGrant(v);
+                            setGrantMonths("1");
+                          }}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-100 transition-colors cursor-pointer"
+                          title="Grant Platform Access / Months"
+                        >
+                          <Clock className="w-3.5 h-3.5" />
+                          Access
+                        </button>
                         <Link
                           href={`/app/admin/vendors/${v.id}`}
                           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-purple-700 bg-purple-50 border border-purple-200 hover:bg-purple-100 transition-colors cursor-pointer"
@@ -380,6 +428,118 @@ export default function AdminVendorsPage() {
                   </>
                 )}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Grant Months Access Modal */}
+      {vendorToGrant && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+            <div className="flex items-start justify-between pb-3 border-b border-slate-100">
+              <div className="space-y-0.5">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                  <Clock className="w-3 h-3" />
+                  Super Admin Access Control
+                </div>
+                <h3 className="text-base font-bold text-slate-900 pt-1">
+                  Grant Access to {vendorToGrant.business_name}
+                </h3>
+                <p className="text-xs text-slate-500 font-mono">
+                  {vendorToGrant.vendor_code} • Current: <span className="font-semibold">{vendorToGrant.status}</span>
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setVendorToGrant(null)}
+                className="text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="font-bold text-slate-700 block mb-1.5">
+                  Quick Grant Preset
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[1, 2, 3, 6, 12].map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      disabled={grantingAccess}
+                      onClick={() => handleGrantAccessFromTable(m)}
+                      className="py-2 px-2.5 rounded-xl text-xs font-bold bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 transition-colors cursor-pointer disabled:opacity-50 text-center"
+                    >
+                      +{m} {m === 1 ? "Month" : "Months"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1.5">
+                  Or Specify Custom Months
+                </label>
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <input
+                      type="number"
+                      min="1"
+                      max="120"
+                      value={grantMonths}
+                      onChange={(e) => setGrantMonths(e.target.value)}
+                      placeholder="e.g. 1"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">months</span>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={grantingAccess}
+                    onClick={() => {
+                      const m = parseInt(grantMonths, 10);
+                      if (!m || m < 1) {
+                        alert("Please enter a valid number of months.");
+                        return;
+                      }
+                      handleGrantAccessFromTable(m);
+                    }}
+                    className="py-2 px-4 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white shadow-xs transition-colors cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5"
+                  >
+                    {grantingAccess ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                    <span>Grant</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Status Action */}
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+                <span className="text-slate-500 text-xs">Set Status Directly:</span>
+                <div className="flex items-center gap-2">
+                  {vendorToGrant.status === "active" ? (
+                    <button
+                      type="button"
+                      disabled={togglingStatus}
+                      onClick={() => handleToggleStatusFromTable("inactive")}
+                      className="px-3 py-1.5 rounded-xl text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 hover:bg-rose-100 transition-colors cursor-pointer"
+                    >
+                      {togglingStatus ? "Updating..." : "Deactivate (Lock & Blur)"}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={togglingStatus}
+                      onClick={() => handleToggleStatusFromTable("active")}
+                      className="px-3 py-1.5 rounded-xl text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 transition-colors cursor-pointer"
+                    >
+                      {togglingStatus ? "Updating..." : "Activate Account"}
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </div>

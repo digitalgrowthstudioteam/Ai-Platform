@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { platformApi } from "@/lib/app-platform/api";
+import { usePlatformAuth } from "@/lib/app-platform/auth";
 import StatusBadge from "@/components/app-platform/shared/StatusBadge";
 import {
   Sparkles,
@@ -21,6 +22,7 @@ import {
 } from "lucide-react";
 
 export default function VendorSubscriptionPage() {
+  const { user } = usePlatformAuth();
   const [data, setData] = useState<any>(null);
   const [appConfig, setAppConfig] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -244,6 +246,20 @@ export default function VendorSubscriptionPage() {
 
   const isApkApproved = Boolean(appConfig?.apk_user_approved);
 
+  const isAccountActive = Boolean(
+    user?.status === "active" &&
+    sub?.status === "active" &&
+    !user?.is_subscription_expired &&
+    isApkApproved
+  );
+
+  const currentStatus =
+    user?.status === "inactive" || sub?.status === "inactive"
+      ? "inactive"
+      : user?.is_subscription_expired || sub?.status === "expired"
+      ? "expired"
+      : sub?.status || "PENDING_APK_APPROVAL";
+
   return (
     <div className="max-w-4xl space-y-8">
       <div>
@@ -326,20 +342,31 @@ export default function VendorSubscriptionPage() {
       <div className="bg-white rounded-2xl border border-slate-200 p-6 md:p-8 shadow-xs">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-100">
           <div>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200">
-                Active Membership
+            <div className="flex flex-wrap items-center gap-2 mb-2">
+              <span
+                className={`text-xs font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
+                  isAccountActive
+                    ? "text-blue-700 bg-blue-50 border-blue-200"
+                    : "text-rose-700 bg-rose-50 border-rose-200"
+                }`}
+              >
+                {isAccountActive ? "Active Membership" : "Membership Inactive / Expired"}
               </span>
-              <StatusBadge status={isApkApproved ? "active" : sub?.status || "PENDING_APK_APPROVAL"} />
-              {isApkApproved ? (
+              <StatusBadge status={currentStatus} />
+              {isAccountActive ? (
                 <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1">
                   <Check className="w-3 h-3 text-emerald-600" />
                   Auto-Debit Active
                 </span>
               ) : (
-                <span className="text-[11px] font-bold text-amber-700 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200">
-                  Pending APK Confirmation
-                </span>
+                <button
+                  type="button"
+                  onClick={handleApproveApk}
+                  className="inline-flex items-center gap-1.5 text-[11px] font-bold text-white bg-blue-600 hover:bg-blue-700 px-3.5 py-1 rounded-full cursor-pointer shadow-xs transition-colors"
+                >
+                  <CreditCard className="w-3 h-3" />
+                  Pay ₹499 via Razorpay to Activate
+                </button>
               )}
             </div>
             <h2 className="text-2xl font-bold text-slate-900">{plan?.name || "Starter Store Plan"}</h2>
@@ -365,9 +392,9 @@ export default function VendorSubscriptionPage() {
               Monthly Auto-Debit
             </p>
             <p className="text-[11px] text-slate-500 mt-1">
-              {isApkApproved
+              {isAccountActive
                 ? `Next renewal: ${sub?.next_renewal_date ? new Date(sub.next_renewal_date).toLocaleDateString() : "Active"}`
-                : "Starts upon final APK approval"}
+                : "Membership inactive or awaiting renewal payment"}
             </p>
           </div>
 

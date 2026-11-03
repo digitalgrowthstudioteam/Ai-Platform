@@ -466,8 +466,12 @@ async def get_my_platform_session(
                 monthly_price_inr = sub.monthly_price_inr or 499.0
 
                 if setup_fee_cleared:
-                    if sub.status in ("expired", "past_due", "cancelled"):
+                    if vendor.status in ("inactive", "suspended"):
                         is_subscription_expired = True
+                        subscription_status = vendor.status
+                    elif sub.status in ("inactive", "expired", "past_due", "cancelled"):
+                        is_subscription_expired = True
+                        subscription_status = sub.status
                     elif sub.expires_at:
                         sub_exp = sub.expires_at if sub.expires_at.tzinfo else sub.expires_at.replace(tzinfo=timezone.utc)
                         if sub_exp < now:

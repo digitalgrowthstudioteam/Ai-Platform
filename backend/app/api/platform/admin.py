@@ -57,6 +57,7 @@ from app.schemas.platform.admin import (
     VendorListItem,
     VendorStatusUpdateRequest,
     VendorSubdomainUpdateRequest,
+    AdminGrantAccessRequest,
     VendorCreateByAdminRequest,
     PlanCreateOrUpdateRequest,
     PlanResponse,
@@ -429,12 +430,39 @@ async def update_vendor_status(
         or_(PlatformVendor.id == target_uuid, PlatformVendor.vendor_code == vendor_id)
         if target_uuid
         else PlatformVendor.vendor_code == vendor_id
+    ).options(
+        selectinload(PlatformVendor.app_config),
     )
     v = (await db.execute(stmt)).scalar_one_or_none()
     if not v:
         raise HTTPException(status_code=404, detail="Vendor not found")
 
     v.status = payload.status
+    now = datetime.now(timezone.utc)
+
+    # Synchronize subscription status and app auto debit with vendor status
+    sub_stmt = select(PlatformSubscription).where(PlatformSubscription.vendor_id == v.id).order_by(desc(PlatformSubscription.created_at))
+    sub = (await db.execute(sub_stmt)).scalars().first()
+
+    if payload.status in ("inactive", "suspended"):
+        if sub:
+            sub.status = payload.status
+            # Immediately expire subscription so dashboard blur activates
+            sub.expires_at = now - timedelta(seconds=1)
+        if v.app_config:
+            v.app_config.subscription_auto_debit_active = False
+            v.app_config.apk_user_approved = False
+    elif payload.status == "active":
+        if sub:
+            sub.status = "active"
+            sub_exp = sub.expires_at if sub.expires_at.tzinfo else sub.expires_at.replace(tzinfo=timezone.utc)
+            if sub_exp < now:
+                sub.expires_at = now + timedelta(days=30)
+                sub.next_renewal_date = sub.expires_at
+        if v.app_config:
+            v.app_config.subscription_auto_debit_active = True
+            v.app_config.apk_user_approved = True
+
     audit = PlatformAuditLog(
         actor_id=admin.id,
         actor_role="SUPER_ADMIN",
@@ -446,6 +474,92 @@ async def update_vendor_status(
     db.add(audit)
     await db.commit()
     return {"message": f"Vendor status updated to {payload.status}"}
+
+
+@router.post("/vendors/{vendor_id}/grant-access")
+async def grant_vendor_access_months(
+    vendor_id: str,
+    payload: AdminGrantAccessRequest,
+    admin: PlatformUser = Depends(require_super_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Super Admin grants a specific number of months of platform access to a vendor account."""
+    target_uuid = None
+    try:
+        target_uuid = uuid.UUID(vendor_id)
+    except (ValueError, AttributeError):
+        pass
+
+    stmt = select(PlatformVendor).where(
+        or_(PlatformVendor.id == target_uuid, PlatformVendor.vendor_code == vendor_id)
+        if target_uuid
+        else PlatformVendor.vendor_code == vendor_id
+    ).options(
+        selectinload(PlatformVendor.app_config),
+    )
+    v = (await db.execute(stmt)).scalar_one_or_none()
+    if not v:
+        raise HTTPException(status_code=404, detail="Vendor not found")
+
+    now = datetime.now(timezone.utc)
+    sub_stmt = select(PlatformSubscription).where(PlatformSubscription.vendor_id == v.id).order_by(desc(PlatformSubscription.created_at))
+    sub = (await db.execute(sub_stmt)).scalars().first()
+    if not sub:
+        plan_stmt = select(PlatformPlan).where(PlatformPlan.slug == "starter-store")
+        plan = (await db.execute(plan_stmt)).scalar_one_or_none()
+        if not plan:
+            plan = PlatformPlan(name="Starter Store", slug="starter-store", monthly_price_inr=499.0)
+            db.add(plan)
+            await db.flush()
+        new_expiry = now + timedelta(days=30 * payload.months)
+        sub = PlatformSubscription(
+            vendor_id=v.id,
+            plan_id=plan.id,
+            status="active",
+            starts_at=now,
+            expires_at=new_expiry,
+            next_renewal_date=new_expiry,
+            monthly_price_inr=499.0,
+            setup_fee_paid=True,
+        )
+        db.add(sub)
+    else:
+        base_date = now
+        if sub.expires_at:
+            sub_exp = sub.expires_at if sub.expires_at.tzinfo else sub.expires_at.replace(tzinfo=timezone.utc)
+            if sub_exp > now and sub.status == "active":
+                base_date = sub_exp
+        new_expiry = base_date + timedelta(days=30 * payload.months)
+        sub.status = "active"
+        sub.expires_at = new_expiry
+        sub.next_renewal_date = new_expiry
+        sub.setup_fee_paid = True
+
+    v.status = "active"
+    if v.app_config:
+        v.app_config.apk_user_approved = True
+        v.app_config.subscription_auto_debit_active = True
+
+    # Audit Log
+    db.add(PlatformAuditLog(
+        actor_id=admin.id,
+        actor_role="SUPER_ADMIN",
+        vendor_id=v.id,
+        action="GRANT_ACCESS",
+        resource_type="SUBSCRIPTION",
+        resource_id=f"{payload.months}_MONTHS",
+    ))
+
+    await db.commit()
+
+    new_exp_str = sub.expires_at.strftime('%d %b %Y')
+    return {
+        "success": True,
+        "message": f"Successfully granted {payload.months} month(s) of access to {v.vendor_code}. Valid until {new_exp_str}.",
+        "status": "active",
+        "expires_at": sub.expires_at.isoformat(),
+        "next_renewal_date": sub.next_renewal_date.isoformat(),
+    }
 
 
 @router.patch("/vendors/{vendor_id}/subdomain")

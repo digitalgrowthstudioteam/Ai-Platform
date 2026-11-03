@@ -118,6 +118,8 @@ async def get_vendor_overview(
         .order_by(PlatformSubscription.expires_at.desc())
     )
     sub = (await db.execute(sub_stmt)).scalar_one_or_none()
+    if sub and current.vendor.status in ("inactive", "suspended"):
+        sub.status = current.vendor.status
 
     plan_name = sub.plan.name if sub and sub.plan else "Starter Store"
     sub_status = sub.status if sub else current.vendor.status
@@ -1151,6 +1153,8 @@ async def get_vendor_subscription_info(
         .order_by(PlatformSubscription.expires_at.desc())
     )
     sub = (await db.execute(sub_stmt)).scalar_one_or_none()
+    if sub and current.vendor.status in ("inactive", "suspended"):
+        sub.status = current.vendor.status
 
     addons_stmt = select(PlatformAddon).where(PlatformAddon.is_active == True)
     addons = (await db.execute(addons_stmt)).scalars().all()

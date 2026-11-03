@@ -59,6 +59,8 @@ export default function VendorDetailClient() {
   const [updatingSubdomain, setUpdatingSubdomain] = useState(false);
   const [updatingSetupFee, setUpdatingSetupFee] = useState(false);
   const [customPriceInput, setCustomPriceInput] = useState<string>("");
+  const [grantMonthsInput, setGrantMonthsInput] = useState<string>("1");
+  const [grantingAccess, setGrantingAccess] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deletingStore, setDeletingStore] = useState(false);
@@ -125,12 +127,41 @@ export default function VendorDetailClient() {
     setMessage(null);
     try {
       await platformApi.updateVendorStatus(vendor.id, newStatus);
-      setVendor((prev: any) => (prev ? { ...prev, status: newStatus } : null));
+      setVendor((prev: any) => (prev ? { ...prev, status: newStatus, subscription_status: newStatus } : null));
       setMessage({ type: "success", text: `Account status updated to "${newStatus}" successfully!` });
     } catch (err: any) {
       setMessage({ type: "error", text: err.message || "Failed to update vendor status" });
     } finally {
       setUpdatingStatus(false);
+    }
+  };
+
+  // Handle Granting Specific Months of Platform Access
+  const handleGrantAccess = async (monthsToGrant: number) => {
+    if (!vendor) return;
+    setGrantingAccess(true);
+    setMessage(null);
+    try {
+      const res = await platformApi.grantVendorAccessMonths(vendor.id, monthsToGrant);
+      setVendor((prev: any) =>
+        prev
+          ? {
+              ...prev,
+              status: "active",
+              subscription_status: "active",
+              renewal_date: res.expires_at,
+              apk_user_approved: true,
+            }
+          : null
+      );
+      setMessage({
+        type: "success",
+        text: res.message || `Granted ${monthsToGrant} month(s) of access!`,
+      });
+    } catch (err: any) {
+      setMessage({ type: "error", text: err.message || "Failed to grant access" });
+    } finally {
+      setGrantingAccess(false);
     }
   };
 
@@ -767,6 +798,94 @@ export default function VendorDetailClient() {
                   </span>
                 </div>
               )}
+            </div>
+
+            {/* Grant Specific Months Access Controls */}
+            <div className="pt-3 border-t border-slate-100 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-slate-800 text-[11px] uppercase flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-purple-600" />
+                  Grant Platform Access / Months
+                </span>
+                <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200">
+                  Super Admin Control
+                </span>
+              </div>
+
+              <p className="text-[11px] text-slate-500 leading-relaxed">
+                Add specific months of active service to this account. Sets subscription to active and extends validity.
+              </p>
+
+              <div className="flex flex-wrap items-center gap-1.5">
+                {[1, 2, 3, 6, 12].map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => handleGrantAccess(m)}
+                    disabled={grantingAccess}
+                    className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    +{m} {m === 1 ? "Month" : "Months"}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <input
+                    type="number"
+                    min="1"
+                    max="60"
+                    value={grantMonthsInput}
+                    onChange={(e) => setGrantMonthsInput(e.target.value)}
+                    placeholder="e.g. 1"
+                    className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-900"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-[11px]">months</span>
+                </div>
+                <button
+                  type="button"
+                  disabled={grantingAccess}
+                  onClick={() => {
+                    const m = parseInt(grantMonthsInput, 10);
+                    if (!m || m < 1) {
+                      alert("Please enter a valid number of months.");
+                      return;
+                    }
+                    handleGrantAccess(m);
+                  }}
+                  className="px-4 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5"
+                >
+                  {grantingAccess ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Calendar className="w-3.5 h-3.5" />}
+                  <span>Grant Access</span>
+                </button>
+              </div>
+
+              {/* Status Toggle Button */}
+              <div className="pt-2 flex items-center justify-between">
+                <span className="text-slate-500 text-[11px]">Account Access Status:</span>
+                <div className="flex items-center gap-2">
+                  {vendor.status === "active" ? (
+                    <button
+                      type="button"
+                      disabled={updatingStatus}
+                      onClick={() => handleUpdateStatus("inactive")}
+                      className="px-3 py-1 rounded-lg text-[11px] font-bold text-rose-700 bg-rose-50 border border-rose-200 hover:bg-rose-100 transition-colors cursor-pointer"
+                    >
+                      {updatingStatus ? "Updating..." : "Mark Inactive / Lock"}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={updatingStatus}
+                      onClick={() => handleUpdateStatus("active")}
+                      className="px-3 py-1 rounded-lg text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 transition-colors cursor-pointer"
+                    >
+                      {updatingStatus ? "Updating..." : "Mark Active"}
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </div>

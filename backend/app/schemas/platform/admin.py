@@ -50,6 +50,11 @@ class VendorSubdomainUpdateRequest(BaseModel):
     store_slug: str = Field(min_length=2, max_length=100)
 
 
+class AdminGrantAccessRequest(BaseModel):
+    months: int = Field(default=1, ge=1, le=120)
+    reason: Optional[str] = "Admin granted access"
+
+
 class VendorCreateByAdminRequest(BaseModel):
     email: str
     password: str = Field(min_length=6)

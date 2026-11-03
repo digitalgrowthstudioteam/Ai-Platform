@@ -490,6 +490,13 @@ class PlatformApiClient {
     });
   }
 
+  async grantVendorAccessMonths(id: string, months: number): Promise<any> {
+    return this.request(`/api/v1/platform/admin/vendors/${id}/grant-access`, {
+      method: 'POST',
+      body: JSON.stringify({ months }),
+    });
+  }
+
   async updateVendorSubdomain(id: string, storeSlug: string): Promise<any> {
     return this.request(`/api/v1/platform/admin/vendors/${id}/subdomain`, {
       method: 'PATCH',
