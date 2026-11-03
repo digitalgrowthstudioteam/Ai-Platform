@@ -2,8 +2,10 @@
 
 import React from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { usePlatformAuth } from "@/lib/app-platform/auth";
 import { useMobileNav } from "@/lib/app-platform/mobile-nav";
+import { isSubdomainAccess } from "@/lib/app-platform/store-route-helper";
 import {
   Store,
   ExternalLink,
@@ -16,6 +18,30 @@ import {
 export default function AppHeader() {
   const { user, logout } = usePlatformAuth();
   const { isOpen, toggle } = useMobileNav();
+  const pathname = usePathname();
+
+  // 1. Never render on customer storefront pages or custom brand subdomains
+  if (
+    pathname.startsWith("/app/store") ||
+    pathname.startsWith("/store") ||
+    (typeof window !== "undefined" && isSubdomainAccess())
+  ) {
+    return null;
+  }
+
+  // 2. Do not render on customer authentication pages
+  if (pathname === "/app/login" || pathname === "/app/register") {
+    return null;
+  }
+
+  // 3. Only show header to Super Admin and Vendor Admins
+  const isManagementRole =
+    user?.role === "SUPER_ADMIN" ||
+    user?.role === "VENDOR_ADMIN";
+
+  if (!user || !isManagementRole) {
+    return null;
+  }
 
   return (
     <header className="h-16 border-b border-slate-200 bg-white sticky top-0 z-30 px-4 sm:px-6 flex items-center justify-between">
