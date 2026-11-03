@@ -399,6 +399,12 @@ class PlatformApiClient {
     });
   }
 
+  async deleteVendor(id: string): Promise<any> {
+    return this.request(`/api/v1/platform/admin/vendors/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
   async updateVendorAppConfigByAdmin(id: string, payload: any): Promise<any> {
     return this.request(`/api/v1/platform/admin/vendors/${id}/app-config`, {
       method: 'PATCH',

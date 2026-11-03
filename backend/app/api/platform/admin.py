@@ -2,6 +2,7 @@
 Digital Growth Studio — Super Admin Control Panel API Endpoints
 Restricted exclusively to authenticated Super Admin accounts.
 """
+import json
 import uuid
 from typing import List, Optional
 from datetime import datetime, timedelta, timezone
@@ -20,8 +21,18 @@ from app.models.platform.vendor import (
     PlatformVendorAppConfig,
     PlatformStorageUsage,
 )
-from app.models.platform.catalog import PlatformProduct
-from app.models.platform.order import PlatformOrder
+from app.models.platform.catalog import (
+    PlatformProduct,
+    PlatformProductVariant,
+    PlatformProductImage,
+    PlatformCategory,
+    PlatformBanner,
+)
+from app.models.platform.order import (
+    PlatformOrder,
+    PlatformOrderItem,
+    PlatformCustomer,
+)
 from app.models.platform.subscription import (
     PlatformPlan,
     PlatformSubscription,
@@ -30,7 +41,11 @@ from app.models.platform.subscription import (
     PlatformPayment,
     PlatformCoupon,
 )
-from app.models.platform.system import PlatformAuditLog, PlatformSetting
+from app.models.platform.system import (
+    PlatformAuditLog,
+    PlatformSetting,
+    PlatformNotification,
+)
 from app.schemas.platform.payments import (
     AdminCouponCreateRequest,
     AdminVendorSetupFeeUpdateRequest,
@@ -401,6 +416,122 @@ async def update_vendor_status(
     db.add(audit)
     await db.commit()
     return {"message": f"Vendor status updated to {payload.status}"}
+
+
+@router.delete("/vendors/{vendor_id}", status_code=status.HTTP_200_OK)
+async def delete_vendor(
+    vendor_id: str,
+    admin: PlatformUser = Depends(require_super_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Permanently delete a vendor store and all associated resources.
+    Cascade deletes: products, variants, images, categories, banners, orders, order items,
+    customers, subscriptions, addons, payments, storage usage, app config, store, and profile.
+    If the associated user has no other vendors and is not a SUPER_ADMIN, cleans up the user too.
+    Accessible only to Super Admins.
+    """
+    target_uuid = None
+    try:
+        target_uuid = uuid.UUID(vendor_id)
+    except (ValueError, AttributeError):
+        pass
+
+    stmt = select(PlatformVendor).where(
+        or_(PlatformVendor.id == target_uuid, PlatformVendor.vendor_code == vendor_id)
+        if target_uuid
+        else PlatformVendor.vendor_code == vendor_id
+    ).options(
+        selectinload(PlatformVendor.profile),
+        selectinload(PlatformVendor.store),
+    )
+    v = (await db.execute(stmt)).scalar_one_or_none()
+    if not v:
+        raise HTTPException(status_code=404, detail="Vendor not found")
+
+    vendor_code = v.vendor_code
+    business_name = (
+        (v.profile.business_name if v.profile and v.profile.business_name else None)
+        or (v.store.store_name if v.store and v.store.store_name else None)
+        or vendor_code
+    )
+    user_id = v.user_id
+
+    # Cascade delete in strict dependency order
+    # 1. Order items & orders
+    await db.execute(delete(PlatformOrderItem).where(PlatformOrderItem.vendor_id == v.id))
+    await db.execute(delete(PlatformOrder).where(PlatformOrder.vendor_id == v.id))
+
+    # 2. Variants, images, products, categories, banners
+    await db.execute(delete(PlatformProductVariant).where(PlatformProductVariant.vendor_id == v.id))
+    await db.execute(delete(PlatformProductImage).where(PlatformProductImage.vendor_id == v.id))
+    await db.execute(delete(PlatformProduct).where(PlatformProduct.vendor_id == v.id))
+    await db.execute(delete(PlatformCategory).where(PlatformCategory.vendor_id == v.id))
+    await db.execute(delete(PlatformBanner).where(PlatformBanner.vendor_id == v.id))
+
+    # 3. Customers
+    await db.execute(delete(PlatformCustomer).where(PlatformCustomer.vendor_id == v.id))
+
+    # 4. Addons, payments, subscriptions, coupons
+    await db.execute(delete(PlatformVendorAddon).where(PlatformVendorAddon.vendor_id == v.id))
+    await db.execute(delete(PlatformPayment).where(PlatformPayment.vendor_id == v.id))
+    await db.execute(delete(PlatformSubscription).where(PlatformSubscription.vendor_id == v.id))
+    await db.execute(delete(PlatformCoupon).where(PlatformCoupon.vendor_id == v.id))
+
+    # 5. Notifications
+    await db.execute(delete(PlatformNotification).where(PlatformNotification.vendor_id == v.id))
+
+    # 6. Usage, App config, Store, Profile
+    await db.execute(delete(PlatformStorageUsage).where(PlatformStorageUsage.vendor_id == v.id))
+    await db.execute(delete(PlatformVendorAppConfig).where(PlatformVendorAppConfig.vendor_id == v.id))
+    await db.execute(delete(PlatformStore).where(PlatformStore.vendor_id == v.id))
+    await db.execute(delete(PlatformVendorProfile).where(PlatformVendorProfile.vendor_id == v.id))
+
+    # 7. Unlink any existing audit logs referencing this vendor to prevent foreign key errors
+    await db.execute(
+        update(PlatformAuditLog)
+        .where(PlatformAuditLog.vendor_id == v.id)
+        .values(vendor_id=None)
+    )
+
+    # 8. Record audit log of deletion
+    audit = PlatformAuditLog(
+        actor_id=admin.id,
+        actor_role="SUPER_ADMIN",
+        vendor_id=None,
+        action="DELETE_VENDOR",
+        resource_type="VENDOR",
+        resource_id=vendor_code,
+        details_json=json.dumps({
+            "vendor_code": vendor_code,
+            "business_name": business_name,
+            "deleted_by": admin.email,
+        }),
+    )
+    db.add(audit)
+
+    # 9. Delete the vendor
+    await db.delete(v)
+    await db.flush()
+
+    # 10. Clean up user if they have no other vendors and are not SUPER_ADMIN
+    if user_id:
+        other_vendors = (await db.execute(
+            select(func.count(PlatformVendor.id)).where(PlatformVendor.user_id == user_id)
+        )).scalar() or 0
+        if other_vendors == 0:
+            target_user = (await db.execute(
+                select(PlatformUser).where(PlatformUser.id == user_id)
+            )).scalar_one_or_none()
+            if target_user and target_user.role != "SUPER_ADMIN":
+                await db.delete(target_user)
+
+    await db.commit()
+    return {
+        "message": f"Store '{business_name}' ({vendor_code}) permanently deleted successfully",
+        "vendor_code": vendor_code,
+        "vendor_id": str(v.id),
+    }
 
 
 @router.patch("/vendors/{vendor_id}/app-config")
