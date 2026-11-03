@@ -76,7 +76,8 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await loginWithEmail(data.email, data.password);
-      router.push(brandConfig ? "/" : "/dashboard");
+      const isSub = (typeof window !== "undefined" && isSubdomainAccess()) || Boolean(brandConfig);
+      router.push(isSub ? "/" : "/dashboard");
     } catch (err: any) {
       setError(err.message || "Failed to log in. Please check your credentials.");
     } finally {
@@ -89,7 +90,8 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await loginWithGoogle();
-      router.push(brandConfig ? "/" : "/dashboard");
+      const isSub = (typeof window !== "undefined" && isSubdomainAccess()) || Boolean(brandConfig);
+      router.push(isSub ? "/" : "/dashboard");
     } catch (err: any) {
       setError(err.message || "Google Sign-in failed.");
     } finally {

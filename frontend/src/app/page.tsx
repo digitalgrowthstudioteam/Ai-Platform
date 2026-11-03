@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { event as trackGAEvent } from "@/lib/analytics";
+import { isSubdomainAccess } from "@/lib/app-platform/store-route-helper";
+import StorePreviewClient from "@/app/app/store/[slug]/StorePreviewClient";
 import {
   Sparkles,
   Zap,
@@ -45,12 +47,27 @@ export default function LandingPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
 
+  // If accessed from a brand subdomain (e.g. xyz.digitalgrowthstudio.in), render the brand's storefront
+  const [isSubdomain, setIsSubdomain] = useState(() => {
+    if (typeof window !== "undefined") {
+      return isSubdomainAccess();
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && isSubdomainAccess()) {
+      setIsSubdomain(true);
+    }
+  }, []);
+
   // Interactive mock dashboard state
   const [mockDatePreset, setMockDatePreset] = useState<"7d" | "30d">("30d");
 
   const [starterAvailable, setStarterAvailable] = useState(true);
 
   useEffect(() => {
+    if (isSubdomain) return;
     async function checkAvailability() {
       try {
         const res = await api.getPlansAvailability();
@@ -60,7 +77,12 @@ export default function LandingPage() {
       }
     }
     checkAvailability();
-  }, []);
+  }, [isSubdomain]);
+
+  // When browsing any brand subdomain, show ONLY that brand's storefront
+  if (isSubdomain) {
+    return <StorePreviewClient />;
+  }
 
   const faqs = [
     {

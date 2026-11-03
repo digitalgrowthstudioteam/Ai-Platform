@@ -75,7 +75,8 @@ export default function SignupPage() {
     setLoading(true);
     try {
       await signUpWithEmail(data.email, data.password, data.name);
-      router.push(brandConfig ? "/" : "/dashboard");
+      const isSub = (typeof window !== "undefined" && isSubdomainAccess()) || Boolean(brandConfig);
+      router.push(isSub ? "/" : "/dashboard");
     } catch (err: any) {
       setError(err.message || "Failed to create account.");
     } finally {
@@ -88,7 +89,8 @@ export default function SignupPage() {
     setLoading(true);
     try {
       await loginWithGoogle();
-      router.push(brandConfig ? "/" : "/dashboard");
+      const isSub = (typeof window !== "undefined" && isSubdomainAccess()) || Boolean(brandConfig);
+      router.push(isSub ? "/" : "/dashboard");
     } catch (err: any) {
       setError(err.message || "Google Sign-in failed.");
     } finally {
