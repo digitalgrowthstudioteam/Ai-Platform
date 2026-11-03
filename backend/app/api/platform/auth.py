@@ -4,6 +4,7 @@ Digital Growth Studio — Platform Authentication Endpoints
 import re
 import uuid
 import secrets
+import structlog
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, func, desc
@@ -17,7 +18,10 @@ from app.core.platform_auth import (
     verify_password,
     create_platform_access_token,
     get_current_platform_user,
+    generate_next_vendor_code,
 )
+
+logger = structlog.get_logger()
 from app.models.platform.vendor import (
     PlatformUser,
     PlatformVendor,
@@ -61,10 +65,8 @@ async def register_vendor(payload: PlatformRegisterRequest, db: AsyncSession = D
     if (await db.execute(slug_stmt)).scalar_one_or_none():
         desired_slug = f"{desired_slug}-{uuid.uuid4().hex[:4]}"
 
-    # 3. Generate sequential vendor code (e.g. VND0001, VND0002)
-    count_stmt = select(func.count(PlatformVendor.id))
-    total_vendors = (await db.execute(count_stmt)).scalar() or 0
-    vendor_code = f"VND{(total_vendors + 1):04d}"
+    # 3. Generate unique sequential vendor code (e.g. VND0007)
+    vendor_code = await generate_next_vendor_code(db)
 
     # 4. Create User
     user = PlatformUser(
@@ -400,9 +402,8 @@ async def google_login_platform(
     db.add(user)
     await db.flush()
 
-    count_stmt = select(func.count(PlatformVendor.id))
-    current_count = (await db.execute(count_stmt)).scalar() or 0
-    vendor_code = f"VND{current_count + 1:04d}"
+    # Auto-provision unique sequential vendor code (e.g. VND0007)
+    vendor_code = await generate_next_vendor_code(db)
 
     vendor = PlatformVendor(
         vendor_code=vendor_code,

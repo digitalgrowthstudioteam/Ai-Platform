@@ -160,3 +160,27 @@ async def require_vendor_admin(
 
     return CurrentVendor(user=user, vendor=vendor)
 
+
+async def generate_next_vendor_code(db: AsyncSession) -> str:
+    """
+    Safely generates the next sequential vendor code (e.g. VND0007)
+    by finding the maximum existing numeric suffix in platform_vendors.
+    Guarantees no unique constraint collisions even after vendor deletions.
+    """
+    stmt = select(PlatformVendor.vendor_code)
+    codes = (await db.execute(stmt)).scalars().all()
+    max_num = 0
+    existing = set()
+    for code in codes:
+        if code:
+            existing.add(code)
+            if code.startswith("VND"):
+                num_part = code[3:]
+                if num_part.isdigit():
+                    max_num = max(max_num, int(num_part))
+    candidate_num = max_num + 1
+    while f"VND{candidate_num:04d}" in existing:
+        candidate_num += 1
+    return f"VND{candidate_num:04d}"
+
+

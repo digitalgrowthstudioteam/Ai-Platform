@@ -67,26 +67,46 @@ class PlatformApiClient {
 
         clearTimeout(timeoutId);
 
+        // Read response body once as text to prevent stream already read errors
+        const rawText = await res.text();
+        let responseData: any = null;
+        try {
+          responseData = rawText ? JSON.parse(rawText) : null;
+        } catch {
+          responseData = null;
+        }
+
         if (!res.ok) {
-          let errorMsg = 'An error occurred';
-          try {
-            const errJson = await res.json();
-            errorMsg = errJson.detail || errJson.message || errorMsg;
-          } catch {
-            errorMsg = await res.text() || res.statusText;
+          let errorMsg = `Server error (${res.status})`;
+          if (responseData) {
+            if (typeof responseData.detail === 'string') {
+              errorMsg = responseData.detail;
+            } else if (Array.isArray(responseData.detail)) {
+              errorMsg = responseData.detail
+                .map((d: any) => (typeof d === 'string' ? d : d.msg || JSON.stringify(d)))
+                .join(', ');
+            } else if (typeof responseData.message === 'string') {
+              errorMsg = responseData.message;
+            } else {
+              errorMsg = JSON.stringify(responseData);
+            }
+          } else if (rawText) {
+            errorMsg = rawText.slice(0, 160) || res.statusText || errorMsg;
+          } else if (res.statusText) {
+            errorMsg = res.statusText;
           }
           const err = new Error(errorMsg);
           (err as any).status = res.status;
           throw err;
         }
 
-        return await res.json();
+        return responseData as T;
       } catch (err: any) {
         clearTimeout(timeoutId);
         lastError = err;
 
-        // If it was a client HTTP error (400-499), do not retry
-        if (err?.status && err.status >= 400 && err.status < 500) {
+        // If it was a real HTTP response from the server, do not retry 4xx errors
+        if (typeof err?.status === 'number' && err.status >= 400 && err.status < 500) {
           throw err;
         }
 
@@ -98,13 +118,17 @@ class PlatformApiClient {
       }
     }
 
+    if (lastError?.status) {
+      throw lastError;
+    }
+
     if (lastError?.name === 'AbortError') {
       const err = new Error('Connection timed out. Please check your internet connection or retry in a moment.');
       (err as any).status = 408;
       throw err;
     }
 
-    if (lastError?.message === 'Failed to fetch' || lastError?.name === 'TypeError') {
+    if (lastError?.message === 'Failed to fetch') {
       const err = new Error('Unable to connect to platform server. Please check your internet or retry.');
       (err as any).status = 503;
       throw err;

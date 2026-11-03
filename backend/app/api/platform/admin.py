@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
-from app.core.platform_auth import require_super_admin, hash_password
+from app.core.platform_auth import require_super_admin, hash_password, generate_next_vendor_code
 from app.models.platform.vendor import (
     PlatformUser,
     PlatformVendor,
@@ -233,8 +233,7 @@ async def create_vendor_manually(
     if existing:
         raise HTTPException(status_code=400, detail="User email already exists")
 
-    total_vendors = (await db.execute(select(func.count(PlatformVendor.id)))).scalar() or 0
-    vendor_code = f"VND{(total_vendors + 1):04d}"
+    vendor_code = await generate_next_vendor_code(db)
 
     user = PlatformUser(
         email=payload.email.lower(),
