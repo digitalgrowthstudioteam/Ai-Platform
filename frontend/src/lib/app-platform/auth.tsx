@@ -107,15 +107,33 @@ export function AppPlatformAuthProvider({ children }: { children: React.ReactNod
 
   const login = async (email: string, pass: string) => {
     const res = await platformApi.login({ email, password: pass });
-    const profile = await platformApi.getMe();
+    const initialProfile: PlatformUser = {
+      user_id: res.user_id,
+      email: res.email,
+      name: res.name,
+      role: res.role as "SUPER_ADMIN" | "VENDOR_ADMIN",
+      vendor_id: res.vendor_id || undefined,
+      vendor_code: res.vendor_code || undefined,
+      store_slug: res.store_slug || undefined,
+      status: "active",
+      setup_fee_cleared: res.role === "SUPER_ADMIN" ? true : undefined,
+    };
     if (typeof window !== "undefined") {
-      localStorage.setItem("dgs_platform_user", JSON.stringify(profile));
+      localStorage.setItem("dgs_platform_user", JSON.stringify(initialProfile));
     }
-    setUser(profile);
-    if (profile.role === "SUPER_ADMIN") {
-      router.push("/app/admin");
+    setUser(initialProfile);
+
+    platformApi.getMe().then((fullProfile) => {
+      if (typeof window !== "undefined") {
+        localStorage.setItem("dgs_platform_user", JSON.stringify(fullProfile));
+      }
+      setUser(fullProfile);
+    }).catch((e) => console.warn("Background profile fetch:", e));
+
+    if (res.role === "SUPER_ADMIN") {
+      window.location.replace("/app/admin");
     } else {
-      router.push("/app/dashboard");
+      window.location.replace("/app/dashboard");
     }
   };
 
@@ -129,16 +147,38 @@ export function AppPlatformAuthProvider({ children }: { children: React.ReactNod
       provider.setCustomParameters({ prompt: "select_account" });
       const credential = await signInWithPopup(auth, provider);
       const idToken = await credential.user.getIdToken();
-      await platformApi.googleLogin(idToken);
-      const profile = await platformApi.getMe();
+      const tokenRes = await platformApi.googleLogin(idToken);
+
+      // Immediately establish authenticated session from token response
+      const initialProfile: PlatformUser = {
+        user_id: tokenRes.user_id,
+        email: tokenRes.email,
+        name: tokenRes.name,
+        role: tokenRes.role as "SUPER_ADMIN" | "VENDOR_ADMIN",
+        vendor_id: tokenRes.vendor_id || undefined,
+        vendor_code: tokenRes.vendor_code || undefined,
+        store_slug: tokenRes.store_slug || undefined,
+        status: "active",
+        setup_fee_cleared: tokenRes.role === "SUPER_ADMIN" ? true : undefined,
+      };
+
       if (typeof window !== "undefined") {
-        localStorage.setItem("dgs_platform_user", JSON.stringify(profile));
+        localStorage.setItem("dgs_platform_user", JSON.stringify(initialProfile));
       }
-      setUser(profile);
-      if (profile.role === "SUPER_ADMIN") {
-        router.push("/app/admin");
+      setUser(initialProfile);
+
+      // Non-blocking background revalidation
+      platformApi.getMe().then((fullProfile) => {
+        if (typeof window !== "undefined") {
+          localStorage.setItem("dgs_platform_user", JSON.stringify(fullProfile));
+        }
+        setUser(fullProfile);
+      }).catch((e) => console.warn("Background profile fetch:", e));
+
+      if (tokenRes.role === "SUPER_ADMIN") {
+        window.location.replace("/app/admin");
       } else {
-        router.push("/app/dashboard");
+        window.location.replace("/app/dashboard");
       }
     } finally {
       setLoading(false);

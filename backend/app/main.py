@@ -145,28 +145,17 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-from starlette.middleware.base import BaseHTTPMiddleware
-from fastapi.responses import Response
+from fastapi.middleware.cors import CORSMiddleware
 
-class CustomCORSMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request, call_next):
-        origin = request.headers.get("origin")
-        if request.method == "OPTIONS":
-            response = Response(status_code=200)
-            if origin:
-                response.headers["Access-Control-Allow-Origin"] = origin
-                response.headers["Access-Control-Allow-Credentials"] = "true"
-                response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
-                response.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type, Accept, Origin, X-Requested-With, X-CSRF-Token"
-            return response
-        
-        response = await call_next(request)
-        if origin:
-            response.headers["Access-Control-Allow-Origin"] = origin
-            response.headers["Access-Control-Allow-Credentials"] = "true"
-        return response
-
-app.add_middleware(CustomCORSMiddleware)
+# Official ASGI CORSMiddleware ensuring all preflight, normal, and error responses include full CORS headers
+app.add_middleware(
+    CORSMiddleware,
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|.*\.digitalgrowthstudio\.in|digitalgrowthstudio\.in|.*\.web\.app|.*\.firebaseapp\.com|.*\.onrender\.com)(:\d+)?$",
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["*"],
+)
 
 # Mount API v1 router
 app.include_router(api_v1_router, prefix="/api/v1")
