@@ -8,6 +8,7 @@ import { useVendorCart } from "@/lib/app-platform/cart-store";
 import { useVendorWishlist } from "@/lib/app-platform/wishlist-store";
 import StoreHeader from "@/components/app-platform/store/StoreHeader";
 import StoreFooter from "@/components/app-platform/store/StoreFooter";
+import KcAariWorkTheme from "@/components/app-platform/store/themes/KcAariWorkTheme";
 import { getStoreRouteParams, getStoreHref } from "@/lib/app-platform/store-route-helper";
 import {
   Store,
@@ -201,6 +202,19 @@ export default function StorePreviewClient() {
           <p className="text-xs text-slate-500">{error || "Could not resolve store configuration for this address."}</p>
         </div>
       </div>
+    );
+  }
+
+  // Custom luxury theme for KC AARI WORK boutique
+  if (slug === "kcaariwork" || config?.store_slug === "kcaariwork") {
+    return (
+      <KcAariWorkTheme
+        slug={slug}
+        config={config}
+        categories={categories}
+        products={products}
+        banners={banners}
+      />
     );
   }
 
