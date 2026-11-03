@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { platformApi } from "@/lib/app-platform/api";
 import { useVendorCart } from "@/lib/app-platform/cart-store";
+import { useVendorWishlist } from "@/lib/app-platform/wishlist-store";
 import StoreHeader from "@/components/app-platform/store/StoreHeader";
 import StoreFooter from "@/components/app-platform/store/StoreFooter";
 import { getStoreRouteParams, getStoreHref } from "@/lib/app-platform/store-route-helper";
@@ -16,6 +17,7 @@ import {
   Zap,
   ArrowRight,
   Package,
+  Heart,
 } from "lucide-react";
 
 export default function StorePreviewClient() {
@@ -36,6 +38,7 @@ export default function StorePreviewClient() {
   const [addedMap, setAddedMap] = useState<Record<string, boolean>>({});
 
   const { addItem } = useVendorCart(slug);
+  const { isInWishlist, toggleItem } = useVendorWishlist(slug);
 
   useEffect(() => {
     const resolvedSlug = getStoreRouteParams(params as any).slug;
@@ -156,6 +159,23 @@ export default function StorePreviewClient() {
       stock_quantity: p.stock_quantity,
     });
     router.push(getStoreHref(slug, "/checkout"));
+  };
+
+  const handleToggleWishlist = (e: React.MouseEvent, p: any) => {
+    e.preventDefault();
+    e.stopPropagation();
+    toggleItem({
+      id: p.id,
+      product_id: p.id,
+      name: p.name,
+      slug: p.slug,
+      regular_price: p.regular_price,
+      effective_price: p.effective_price,
+      sale_price: p.sale_price,
+      thumbnail_url: p.thumbnail_url,
+      category_name: p.category_name,
+      in_stock: p.in_stock,
+    });
   };
 
   if (loading) {
@@ -279,13 +299,28 @@ export default function StorePreviewClient() {
                         alt={p.name}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       />
+
+                      {/* Wishlist Heart Button */}
+                      <button
+                        type="button"
+                        onClick={(e) => handleToggleWishlist(e, p)}
+                        className="absolute top-2.5 right-2.5 w-8 h-8 rounded-full bg-white/90 hover:bg-white flex items-center justify-center shadow-xs transition-all z-10 cursor-pointer active:scale-90"
+                        title={isInWishlist(p.id) ? "Remove from Wishlist" : "Add to Wishlist"}
+                      >
+                        <Heart
+                          className={`w-4 h-4 transition-colors ${
+                            isInWishlist(p.id) ? "fill-rose-500 text-rose-500" : "text-slate-400 hover:text-rose-500"
+                          }`}
+                        />
+                      </button>
+
                       {p.is_featured && (
                         <span className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-md bg-amber-500 text-white text-[10px] font-bold shadow-xs flex items-center gap-1">
                           <Star className="w-2.5 h-2.5 fill-white" /> Featured
                         </span>
                       )}
                       {p.sale_price && p.sale_price > 0 && (
-                        <span className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-md bg-rose-600 text-white text-[10px] font-bold shadow-xs">
+                        <span className="absolute bottom-2.5 left-2.5 px-2 py-0.5 rounded-md bg-rose-600 text-white text-[10px] font-bold shadow-xs">
                           SALE
                         </span>
                       )}

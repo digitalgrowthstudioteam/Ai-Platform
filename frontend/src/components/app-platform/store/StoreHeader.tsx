@@ -3,10 +3,12 @@
 import React from "react";
 import Link from "next/link";
 import { useVendorCart } from "@/lib/app-platform/cart-store";
+import { useVendorWishlist } from "@/lib/app-platform/wishlist-store";
 import { getStoreHref } from "@/lib/app-platform/store-route-helper";
 import {
   ShoppingCart,
   User,
+  Heart,
   Truck,
   CheckCircle2,
   Clock,
@@ -27,6 +29,7 @@ export default function StoreHeader({
   backLabel,
 }: StoreHeaderProps) {
   const { itemCount } = useVendorCart(slug);
+  const { itemCount: wishlistCount } = useVendorWishlist(slug);
   const primaryColor = config?.primary_color || "#2563EB";
 
   return (
@@ -97,8 +100,22 @@ export default function StoreHeader({
           </Link>
         </div>
 
-        {/* Action Buttons: Account & Cart */}
+        {/* Action Buttons: Wishlist, Account & Cart */}
         <div className="flex items-center gap-2 sm:gap-3">
+          <Link
+            href={getStoreHref(slug, "/account?tab=wishlist")}
+            className="relative flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors border border-slate-200"
+            title="My Wishlist"
+          >
+            <Heart className={`w-3.5 h-3.5 ${wishlistCount > 0 ? "fill-rose-500 text-rose-500" : "text-slate-500"}`} />
+            <span className="hidden sm:inline">Wishlist</span>
+            {wishlistCount > 0 && (
+              <span className="inline-flex items-center justify-center min-w-4.5 h-4.5 px-1 text-[10px] font-black rounded-full bg-rose-500 text-white shadow-2xs">
+                {wishlistCount}
+              </span>
+            )}
+          </Link>
+
           <Link
             href={getStoreHref(slug, "/account")}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors border border-slate-200"

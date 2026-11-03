@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { platformApi } from "@/lib/app-platform/api";
 import { useVendorCart } from "@/lib/app-platform/cart-store";
+import { useVendorWishlist } from "@/lib/app-platform/wishlist-store";
 import StoreHeader from "@/components/app-platform/store/StoreHeader";
 import StoreFooter from "@/components/app-platform/store/StoreFooter";
 import { getStoreRouteParams, getStoreHref } from "@/lib/app-platform/store-route-helper";
@@ -19,6 +20,7 @@ import {
   Check,
   ArrowRight,
   Package,
+  Heart,
 } from "lucide-react";
 
 export default function ProductDetailClient() {
@@ -37,6 +39,7 @@ export default function ProductDetailClient() {
   const [added, setAdded] = useState(false);
 
   const { addItem } = useVendorCart(activeSlug);
+  const { isInWishlist, toggleItem } = useVendorWishlist(activeSlug);
 
   useEffect(() => {
     async function loadData() {
@@ -193,6 +196,24 @@ export default function ProductDetailClient() {
       stock_quantity: currentStock,
     });
     router.push(getStoreHref(slug, "/checkout"));
+  };
+
+  const isWishlisted = Boolean(product?.id && isInWishlist(product.id));
+
+  const handleToggleWishlist = () => {
+    if (!product) return;
+    toggleItem({
+      id: product.id,
+      product_id: product.id,
+      name: product.name,
+      slug: product.slug,
+      regular_price: product.regular_price,
+      effective_price: currentPrice,
+      sale_price: product.sale_price,
+      thumbnail_url: product.thumbnail_url || (imagesList.length > 0 ? imagesList[0] : undefined),
+      category_name: product.category_name,
+      in_stock: isInStock,
+    });
   };
 
   const discountPercent =
@@ -384,35 +405,50 @@ export default function ProductDetailClient() {
               </div>
             </div>
 
-            {/* CTA Buttons */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-              <button
-                onClick={handleAddToCart}
-                disabled={!isInStock}
-                className="py-3 px-5 rounded-xl text-xs font-bold border-2 transition-all flex items-center justify-center gap-2 hover:bg-slate-50 disabled:opacity-50 cursor-pointer"
-                style={{ borderColor: primaryColor, color: primaryColor }}
-              >
-                {added ? (
-                  <>
-                    <Check className="w-4 h-4 text-emerald-600" />
-                    <span className="text-emerald-700">Added to Cart!</span>
-                  </>
-                ) : (
-                  <>
-                    <ShoppingCart className="w-4 h-4" />
-                    <span>Add to Cart</span>
-                  </>
-                )}
-              </button>
+            {/* CTA Buttons & Wishlist */}
+            <div className="space-y-2.5 pt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
+                  onClick={handleAddToCart}
+                  disabled={!isInStock}
+                  className="py-3 px-5 rounded-xl text-xs font-bold border-2 transition-all flex items-center justify-center gap-2 hover:bg-slate-50 disabled:opacity-50 cursor-pointer"
+                  style={{ borderColor: primaryColor, color: primaryColor }}
+                >
+                  {added ? (
+                    <>
+                      <Check className="w-4 h-4 text-emerald-600" />
+                      <span className="text-emerald-700">Added to Cart!</span>
+                    </>
+                  ) : (
+                    <>
+                      <ShoppingCart className="w-4 h-4" />
+                      <span>Add to Cart</span>
+                    </>
+                  )}
+                </button>
+
+                <button
+                  onClick={handleBuyNow}
+                  disabled={!isInStock}
+                  className="py-3 px-5 rounded-xl text-xs font-bold text-white shadow-xs hover:opacity-95 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+                  style={{ backgroundColor: primaryColor }}
+                >
+                  <Zap className="w-4 h-4" />
+                  <span>Buy Now (Checkout)</span>
+                </button>
+              </div>
 
               <button
-                onClick={handleBuyNow}
-                disabled={!isInStock}
-                className="py-3 px-5 rounded-xl text-xs font-bold text-white shadow-xs hover:opacity-95 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
-                style={{ backgroundColor: primaryColor }}
+                type="button"
+                onClick={handleToggleWishlist}
+                className={`w-full py-2.5 px-4 rounded-xl text-xs font-semibold border transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                  isWishlisted
+                    ? "bg-rose-50 border-rose-200 text-rose-700 shadow-2xs"
+                    : "bg-white border-slate-200 text-slate-700 hover:bg-rose-50/50 hover:border-rose-200 hover:text-rose-600"
+                }`}
               >
-                <Zap className="w-4 h-4" />
-                <span>Buy Now (Checkout)</span>
+                <Heart className={`w-4 h-4 ${isWishlisted ? "fill-rose-500 text-rose-500" : "text-slate-400"}`} />
+                <span>{isWishlisted ? "Saved in Your Wishlist (Click to Remove)" : "Save to Wishlist"}</span>
               </button>
             </div>
 
@@ -455,12 +491,20 @@ export default function ProductDetailClient() {
 
       {/* Mobile Sticky Bottom Action Bar */}
       <div className="sm:hidden fixed bottom-0 left-0 right-0 p-3 bg-white/95 backdrop-blur-md border-t border-slate-200 z-40 flex items-center gap-2 shadow-lg">
-        <div className="flex-1 min-w-0 pr-2">
+        <div className="flex-1 min-w-0 pr-1">
           <p className="text-[10px] text-slate-500 font-medium truncate">
             {selectedVariant ? `${product.name} (${selectedVariant.name})` : product.name}
           </p>
           <p className="text-sm font-black text-slate-900 font-mono">₹{currentPrice.toLocaleString("en-IN")}</p>
         </div>
+        <button
+          type="button"
+          onClick={handleToggleWishlist}
+          className="p-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors shrink-0"
+          title="Wishlist"
+        >
+          <Heart className={`w-4 h-4 ${isWishlisted ? "fill-rose-500 text-rose-500" : "text-slate-400"}`} />
+        </button>
         <button
           onClick={handleAddToCart}
           disabled={!isInStock}

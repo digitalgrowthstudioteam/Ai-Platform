@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { platformApi } from "@/lib/app-platform/api";
 import { useVendorCart } from "@/lib/app-platform/cart-store";
+import { useSavedAddresses } from "@/lib/app-platform/customer-address-store";
 import StoreHeader from "@/components/app-platform/store/StoreHeader";
 import StoreFooter from "@/components/app-platform/store/StoreFooter";
 import { getStoreRouteParams, getStoreHref } from "@/lib/app-platform/store-route-helper";
@@ -18,6 +19,7 @@ import {
   ArrowRight,
   ShoppingBag,
   CheckCircle2,
+  MapPin,
 } from "lucide-react";
 
 export default function CheckoutClient() {
@@ -31,6 +33,7 @@ export default function CheckoutClient() {
   const [error, setError] = useState<string | null>(null);
 
   const { items, subtotal, clearCart, isLoaded } = useVendorCart(slug);
+  const { addresses, addAddress, defaultAddress } = useSavedAddresses(slug);
 
   // Form Fields
   const [customerName, setCustomerName] = useState("");
@@ -141,6 +144,18 @@ export default function CheckoutClient() {
         localStorage.setItem("dgs_customer_name", customerName);
         localStorage.setItem("dgs_customer_phone", customerPhone);
         localStorage.setItem("dgs_customer_address", streetAddress);
+        if (customerEmail) localStorage.setItem("dgs_customer_email", customerEmail);
+        addAddress({
+          name: customerName.trim(),
+          phone: customerPhone.trim(),
+          email: customerEmail.trim() || undefined,
+          street_address: streetAddress.trim(),
+          city: city.trim(),
+          state: stateName.trim(),
+          pincode: pincode.trim(),
+          tag: "HOME",
+          is_default: addresses.length === 0,
+        });
       } catch (e) {}
 
       const orderPayload = {
@@ -284,6 +299,36 @@ export default function CheckoutClient() {
                 </div>
 
                 <div className="space-y-4 text-xs">
+                  {/* Saved Address Quick Selector */}
+                  {addresses.length > 0 && (
+                    <div className="p-3 bg-blue-50/70 rounded-xl border border-blue-100 space-y-1.5">
+                      <span className="text-[11px] font-bold text-blue-900 flex items-center gap-1.5">
+                        <MapPin className="w-3.5 h-3.5 text-blue-600" />
+                        Quick Fill from Saved Address Book:
+                      </span>
+                      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+                        {addresses.map((a) => (
+                          <button
+                            key={a.id}
+                            type="button"
+                            onClick={() => {
+                              if (a.name) setCustomerName(a.name);
+                              if (a.phone) setCustomerPhone(a.phone);
+                              if (a.email) setCustomerEmail(a.email);
+                              setStreetAddress(a.street_address);
+                              setCity(a.city);
+                              setStateName(a.state);
+                              setPincode(a.pincode);
+                            }}
+                            className="px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-white border border-blue-200 text-blue-800 hover:bg-blue-600 hover:text-white transition-all shadow-2xs whitespace-nowrap cursor-pointer"
+                          >
+                            📍 {a.tag}: {a.name} ({a.city} - {a.pincode})
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   <div>
                     <label className="font-semibold text-slate-700 block mb-1">
                       Street Address / House No. / Building <span className="text-rose-500">*</span>

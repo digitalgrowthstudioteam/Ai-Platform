@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { platformApi } from "@/lib/app-platform/api";
 import { useVendorCart } from "@/lib/app-platform/cart-store";
+import { useVendorWishlist } from "@/lib/app-platform/wishlist-store";
 import StoreHeader from "@/components/app-platform/store/StoreHeader";
 import StoreFooter from "@/components/app-platform/store/StoreFooter";
 import { getStoreRouteParams, getStoreHref } from "@/lib/app-platform/store-route-helper";
@@ -18,6 +19,7 @@ import {
   Truck,
   ShieldCheck,
   CheckCircle2,
+  Heart,
 } from "lucide-react";
 
 export default function CartClient() {
@@ -29,6 +31,7 @@ export default function CartClient() {
   const [loading, setLoading] = useState(true);
   const { items, itemCount, subtotal, updateQty, removeItem, clearCart, isLoaded } =
     useVendorCart(slug);
+  const { toggleItem: toggleWishlist } = useVendorWishlist(slug);
 
   useEffect(() => {
     const resolvedSlug = getStoreRouteParams(params as any).slug;
@@ -229,13 +232,35 @@ export default function CartClient() {
                         </p>
                       </div>
 
-                      <button
-                        onClick={() => removeItem(item.id)}
-                        className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                        title="Remove item"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            toggleWishlist({
+                              id: item.product_id,
+                              product_id: item.product_id,
+                              name: item.name,
+                              slug: item.slug,
+                              regular_price: item.price,
+                              effective_price: item.effective_price,
+                              thumbnail_url: item.thumbnail_url,
+                              in_stock: true,
+                            });
+                            removeItem(item.id);
+                          }}
+                          className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                          title="Move to Wishlist"
+                        >
+                          <Heart className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => removeItem(item.id)}
+                          className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                          title="Remove item"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
