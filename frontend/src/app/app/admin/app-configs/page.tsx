@@ -16,6 +16,7 @@ export default function AdminAppConfigsPage() {
     playstore_url: "",
     app_version: "1.0.0",
     apk_download_url: "",
+    apk_user_approved: false,
   });
   const [submitting, setSubmitting] = useState(false);
 
@@ -44,6 +45,7 @@ export default function AdminAppConfigsPage() {
         playstore_url: detail.playstore_url || "",
         app_version: detail.app_version || "1.0.0",
         apk_download_url: detail.apk_download_url || "",
+        apk_user_approved: detail.apk_user_approved || false,
       });
     } catch (e: any) {
       alert(e.message);
@@ -111,7 +113,7 @@ export default function AdminAppConfigsPage() {
                     <StatusBadge status={v.app_build_status} />
                   </td>
                   <td className="py-3.5 px-4">
-                    <span className="font-mono text-[11px] text-slate-600">{v.status}</span>
+                    <StatusBadge status={v.publication_status || "UNPUBLISHED"} />
                   </td>
                   <td className="py-3.5 px-4 text-right">
                     <button
@@ -201,16 +203,34 @@ export default function AdminAppConfigsPage() {
               </div>
 
               <div>
-                <label className="font-semibold text-slate-700 block mb-1">Final APK Download URL (Submitted to Vendor)</label>
+                <label className="font-semibold text-slate-700 block mb-1">Final APK Download URL (Optional if sent via WhatsApp)</label>
                 <input
                   type="url"
                   value={formData.apk_download_url}
                   onChange={(e) => setFormData({ ...formData, apk_download_url: e.target.value })}
-                  placeholder="https://... (APK download link)"
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono"
+                  placeholder="https://... (APK download link or leave empty if sent via WhatsApp)"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs"
                 />
                 <p className="text-[10px] text-slate-400 mt-0.5">
-                  When submitted with BUILT status, vendor can test and approve the build to activate ₹499/mo subscription.
+                  If you send the APK manually on WhatsApp, you can leave this empty.
+                </p>
+              </div>
+
+              {/* WhatsApp Confirmation Toggle */}
+              <div className="p-3.5 bg-purple-50/70 rounded-xl border border-purple-200 space-y-1.5">
+                <label className="flex items-center gap-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.apk_user_approved}
+                    onChange={(e) => setFormData({ ...formData, apk_user_approved: e.target.checked })}
+                    className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500"
+                  />
+                  <span className="font-bold text-xs text-purple-950">
+                    Vendor Approved APK (Confirmed on WhatsApp)
+                  </span>
+                </label>
+                <p className="text-[11px] text-purple-800 leading-relaxed pl-6">
+                  Check this when the vendor tests the APK and confirms via WhatsApp. This immediately activates their official ₹499/month membership.
                 </p>
               </div>
 

@@ -37,6 +37,8 @@ class VendorListItem(BaseModel):
     total_products: int
     total_orders: int
     app_build_status: str
+    publication_status: str = "UNPUBLISHED"
+    apk_user_approved: bool = False
     created_at: datetime
 
 
@@ -112,6 +114,7 @@ class VendorAppStatusUpdateRequest(BaseModel):
     app_version: Optional[str] = None
     is_locked: Optional[bool] = None
     apk_download_url: Optional[str] = None
+    apk_user_approved: Optional[bool] = None
 
 
 class VendorStorageLimitUpdateRequest(BaseModel):

@@ -474,10 +474,10 @@ async def approve_apk_and_activate_subscription(
     if not cfg:
         raise HTTPException(status_code=404, detail="App configuration not found.")
 
-    if cfg.app_build_status != "BUILT" or not cfg.apk_download_url:
+    if cfg.app_build_status not in ("BUILT", "PUBLISHED"):
         raise HTTPException(
             status_code=400,
-            detail="The final APK has not yet been submitted by our Android engineering team.",
+            detail="The APK build has not yet been marked as BUILT or PUBLISHED by the engineering team.",
         )
 
     now = datetime.now(timezone.utc)

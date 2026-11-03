@@ -308,6 +308,8 @@ export interface VendorListItem {
   total_products: number;
   total_orders: number;
   app_build_status: string;
+  publication_status: string;
+  apk_user_approved?: boolean;
   created_at: string;
 }
 

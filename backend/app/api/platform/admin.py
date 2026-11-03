@@ -219,6 +219,8 @@ async def list_all_vendors(
             total_products=prod_count,
             total_orders=order_count,
             app_build_status=app.app_build_status if app else "NOT_REQUESTED",
+            publication_status=app.publication_status if app else "UNPUBLISHED",
+            apk_user_approved=app.apk_user_approved if app else False,
             created_at=v.created_at,
         ))
     return items
@@ -669,8 +671,35 @@ async def update_vendor_app_build_status(
     for field, val in payload.model_dump(exclude_unset=True).items():
         setattr(app_cfg, field, val)
 
+    now = datetime.now(timezone.utc)
+
     if payload.apk_download_url and not app_cfg.apk_submitted_at:
-        app_cfg.apk_submitted_at = datetime.now(timezone.utc)
+        app_cfg.apk_submitted_at = now
+
+    # When marked as PUBLISHED or when admin marks APK as approved (confirmed via WhatsApp):
+    if payload.apk_user_approved is True or payload.publication_status == "PUBLISHED":
+        app_cfg.apk_user_approved = True
+        if not app_cfg.apk_user_approved_at:
+            app_cfg.apk_user_approved_at = now
+        app_cfg.subscription_auto_debit_active = True
+
+        # Activate the vendor's subscription immediately
+        sub_stmt = (
+            select(PlatformSubscription)
+            .where(PlatformSubscription.vendor_id == v.id)
+            .order_by(desc(PlatformSubscription.created_at))
+        )
+        sub = (await db.execute(sub_stmt)).scalars().first()
+        if sub and sub.status != "active":
+            sub.status = "active"
+            sub.starts_at = now
+            sub.next_renewal_date = now + timedelta(days=30)
+            sub.expires_at = now + timedelta(days=30)
+
+        if v.status in ("trial", "inactive", "pending"):
+            v.status = "active"
+    elif payload.apk_user_approved is False:
+        app_cfg.apk_user_approved = False
 
     # Automatically enforce lock when development/build is set, unless explicitly unlocked by admin
     if payload.is_locked is None and app_cfg.app_build_status in {"QUEUED", "IN_DEVELOPMENT", "BUILT", "PUBLISHED"}:

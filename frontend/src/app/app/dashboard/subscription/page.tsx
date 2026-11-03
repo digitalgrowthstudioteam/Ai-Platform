@@ -17,6 +17,7 @@ import {
   Loader2,
   Check,
   CheckCheck,
+  ExternalLink,
 } from "lucide-react";
 
 export default function VendorSubscriptionPage() {
@@ -184,8 +185,7 @@ export default function VendorSubscriptionPage() {
   const storageLimitMb = storage ? (storage.limit_bytes / (1024 * 1024)).toFixed(0) : "1024";
 
   const isApkReadyForApproval =
-    appConfig?.app_build_status === "BUILT" &&
-    appConfig?.apk_download_url &&
+    (appConfig?.app_build_status === "BUILT" || appConfig?.app_build_status === "PUBLISHED") &&
     !appConfig?.apk_user_approved;
 
   const isApkApproved = Boolean(appConfig?.apk_user_approved);
@@ -216,46 +216,53 @@ export default function VendorSubscriptionPage() {
         </div>
       )}
 
-      {/* APK Delivery & Approval Banner (Requirement 2) */}
+      {/* APK Delivery & Approval Banner */}
       {isApkReadyForApproval && (
         <div className="p-6 rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-300 shadow-sm space-y-4">
           <div className="flex items-start justify-between gap-4">
             <div className="space-y-1">
               <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-600 text-white">
-                <Zap className="w-3 h-3" /> Action Required: Review Final APK
+                <Zap className="w-3 h-3" /> Action Required: Review & Confirm Tested APK
               </span>
               <h3 className="text-base font-bold text-slate-900">
-                Your Final Android APK is Ready for Testing!
+                Your Branded Android APK is Compiled & Ready!
               </h3>
               <p className="text-xs text-slate-600 leading-relaxed max-w-xl">
-                Our Android engineers have compiled your production APK. Download and test it on your device. Once you approve the app, your ₹499/month recurring auto-debit subscription will begin.
+                Our Android engineers have compiled your production APK (sent to your WhatsApp or available for download below). Test the app on your phone. Once you confirm the APK is working, enroll in your ₹499/month recurring membership to keep your app synced and initiate Google Play Store publication.
               </p>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-3 pt-2">
-            <a
-              href={appConfig.apk_download_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-slate-800 bg-white border border-slate-300 hover:bg-slate-50 shadow-2xs transition-colors"
-            >
-              <Download className="w-4 h-4 text-blue-600" />
-              Download Android APK
-            </a>
+            {appConfig?.apk_download_url ? (
+              <a
+                href={appConfig.apk_download_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-slate-800 bg-white border border-slate-300 hover:bg-slate-50 shadow-2xs transition-colors"
+              >
+                <Download className="w-4 h-4 text-blue-600" />
+                Download Android APK
+              </a>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-emerald-800 bg-emerald-100/80 border border-emerald-200">
+                <Check className="w-3.5 h-3.5 text-emerald-600" />
+                APK Sent Directly via WhatsApp
+              </span>
+            )}
 
             <button
               type="button"
               disabled={approvingApk}
               onClick={handleApproveApk}
-              className="inline-flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-sm transition-colors disabled:opacity-50 cursor-pointer"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-sm transition-colors disabled:opacity-50 cursor-pointer"
             >
               {approvingApk ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
                 <CheckCheck className="w-4 h-4" />
               )}
-              Approve APK & Start ₹499/mo Auto-Debit
+              Confirm APK & Enroll in ₹499/mo Membership
             </button>
           </div>
         </div>
@@ -269,11 +276,15 @@ export default function VendorSubscriptionPage() {
               <span className="text-xs font-bold uppercase tracking-wider text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200">
                 Active Membership
               </span>
-              <StatusBadge status={sub?.status || "active"} />
-              {isApkApproved && (
+              <StatusBadge status={isApkApproved ? "active" : sub?.status || "PENDING_APK_APPROVAL"} />
+              {isApkApproved ? (
                 <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1">
                   <Check className="w-3 h-3 text-emerald-600" />
                   Auto-Debit Active
+                </span>
+              ) : (
+                <span className="text-[11px] font-bold text-amber-700 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200">
+                  Pending APK Confirmation
                 </span>
               )}
             </div>
@@ -319,9 +330,26 @@ export default function VendorSubscriptionPage() {
             <span className="text-xs text-slate-400 block mb-1">Android Application</span>
             <p className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
               <Zap className="w-4 h-4 text-emerald-600" />
-              {isApkApproved ? "Production Build Active" : "In Development Pipeline"}
+              {appConfig?.publication_status === "PUBLISHED"
+                ? "Live on Google Play Store"
+                : isApkApproved
+                ? "Production Build Approved"
+                : "In Development Pipeline"}
             </p>
-            <p className="text-[11px] text-slate-500 mt-1">Directly connects to live store feed</p>
+            <p className="text-[11px] text-slate-500 mt-1">
+              {appConfig?.publication_status === "PUBLISHED" && appConfig?.playstore_url ? (
+                <a
+                  href={appConfig.playstore_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:underline font-semibold inline-flex items-center gap-1"
+                >
+                  View on Play Store <ExternalLink className="w-3 h-3" />
+                </a>
+              ) : (
+                "Directly connects to live store feed"
+              )}
+            </p>
           </div>
         </div>
       </div>
