@@ -26,6 +26,7 @@ import {
   ArrowRight,
   Package,
 } from "lucide-react";
+import PolicyModal, { PolicyType } from "@/components/app-platform/store/PolicyModal";
 
 interface KcAariWorkThemeProps {
   slug: string;
@@ -50,8 +51,39 @@ export default function KcAariWorkTheme({
   const { addItem, itemCount: cartCount } = useVendorCart(slug);
   const { isInWishlist, toggleItem, itemCount: wishlistCount } = useVendorWishlist(slug);
 
-  const whatsappPhone = "919270278119";
-  const displayPhone = "+91 92702 78119";
+  // Dynamic business WhatsApp and display phone for this specific business/subdomain
+  const rawBusinessPhone =
+    config?.whatsapp_number ||
+    config?.contact_phone ||
+    config?.business_phone ||
+    "";
+  const cleanDigits = rawBusinessPhone.replace(/[^0-9]/g, "");
+  // Indian 10-digit mobile numbers get prefixed with 91 for WhatsApp international format
+  const whatsappPhone = cleanDigits.length === 10 ? `91${cleanDigits}` : cleanDigits;
+  const displayPhone = rawBusinessPhone.trim()
+    ? (rawBusinessPhone.startsWith("+") ? rawBusinessPhone : (cleanDigits.length === 10 ? `+91 ${cleanDigits}` : `+${cleanDigits}`))
+    : (whatsappPhone ? `+${whatsappPhone}` : "+91 8999899577");
+
+  const storeDisplayName = config?.store_name || "KC AARI WORK";
+  const storeDisplayAddress = config?.business_address || "Pune, Maharashtra, India";
+  const storeDisplayEmail = config?.contact_email || "support@digitalgrowthstudio.in";
+
+  const [activePolicy, setActivePolicy] = useState<PolicyType | null>(null);
+
+  const getPolicyContent = (type: PolicyType): string => {
+    switch (type) {
+      case "terms":
+        return config?.terms_and_conditions || "";
+      case "privacy":
+        return config?.privacy_policy || "";
+      case "shipping":
+        return config?.shipping_policy || "";
+      case "refund":
+        return config?.refund_policy || "";
+      default:
+        return "";
+    }
+  };
 
   const filteredProducts = products.filter((p) => {
     const matchesCat = selectedCat ? p.category_id === selectedCat : true;
@@ -64,21 +96,21 @@ export default function KcAariWorkTheme({
 
   const getWhatsAppOrderUrl = (product: any) => {
     const text = encodeURIComponent(
-      `Hi KC AARI WORK! 🌟\n\nI want to order this bridal blouse from your website:\n*${product.name}*\nPrice: ₹${product.effective_price || product.regular_price}\nSKU: ${product.sku || "N/A"}\n\nPlease share blouse customization options, saree color matching, and measurement details.`
+      `Hi ${storeDisplayName}! 🌟\n\nI want to order this bridal blouse from your website:\n*${product.name}*\nPrice: ₹${product.effective_price || product.regular_price}\nSKU: ${product.sku || "N/A"}\n\nPlease share blouse customization options, saree color matching, and measurement details.`
     );
     return `https://wa.me/${whatsappPhone}?text=${text}`;
   };
 
   const getGeneralWhatsAppUrl = () => {
     const text = encodeURIComponent(
-      "Hi KC AARI WORK! 🌸 I am visiting your website and want to consult with your master designer regarding a custom bridal aari work blouse."
+      `Hi ${storeDisplayName}! 🌸 I am visiting your website and want to consult with your master designer regarding a custom bridal aari work blouse.`
     );
     return `https://wa.me/${whatsappPhone}?text=${text}`;
   };
 
   const getCustomSareeMatchUrl = () => {
     const text = encodeURIComponent(
-      "Hi KC AARI WORK! 🧵 I have a saree photo and need your design recommendation for a matching bridal aari / maggam work blouse. Can I share the photos and discuss measurements?"
+      `Hi ${storeDisplayName}! 🧵 I have a saree photo and need your design recommendation for a matching bridal aari / maggam work blouse. Can I share the photos and discuss measurements?`
     );
     return `https://wa.me/${whatsappPhone}?text=${text}`;
   };
@@ -813,7 +845,7 @@ export default function KcAariWorkTheme({
             <ul className="space-y-2 text-amber-200/80">
               <li>📞 Direct: {displayPhone}</li>
               <li>💬 WhatsApp: {displayPhone}</li>
-              <li>📍 Studio: Maharashtra, India</li>
+              <li>📍 Studio: {storeDisplayAddress}</li>
               <li>⏰ Hours: Mon - Sat: 10 AM - 8:30 PM</li>
               <li className="text-[11px] text-emerald-400 font-semibold">✓ Custom Orders Open</li>
             </ul>
@@ -822,12 +854,56 @@ export default function KcAariWorkTheme({
 
         <div className="max-w-6xl mx-auto px-4 pt-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] text-amber-200/60 text-center sm:text-left">
           <p>© {new Date().getFullYear()} KC AARI WORK. All Rights Reserved.</p>
+          <div className="flex flex-wrap items-center justify-center gap-2.5 text-amber-200/80">
+            <button
+              type="button"
+              onClick={() => setActivePolicy("terms")}
+              className="hover:text-amber-300 transition-colors cursor-pointer"
+            >
+              Terms & Conditions
+            </button>
+            <span>•</span>
+            <button
+              type="button"
+              onClick={() => setActivePolicy("privacy")}
+              className="hover:text-amber-300 transition-colors cursor-pointer"
+            >
+              Privacy Policy
+            </button>
+            <span>•</span>
+            <button
+              type="button"
+              onClick={() => setActivePolicy("shipping")}
+              className="hover:text-amber-300 transition-colors cursor-pointer"
+            >
+              Shipping & Delivery
+            </button>
+            <span>•</span>
+            <button
+              type="button"
+              onClick={() => setActivePolicy("refund")}
+              className="hover:text-amber-300 transition-colors cursor-pointer"
+            >
+              Return & Refund
+            </button>
+          </div>
           <p className="flex items-center justify-center gap-1.5">
             <span>Powered by</span>
             <span className="font-bold text-amber-300">Digital Growth Studio</span>
           </p>
         </div>
       </footer>
+
+      {/* Boutique Policy Modal */}
+      {activePolicy && (
+        <PolicyModal
+          isOpen={Boolean(activePolicy)}
+          onClose={() => setActivePolicy(null)}
+          type={activePolicy}
+          storeName={config?.store_name || "KC AARI WORK"}
+          content={getPolicyContent(activePolicy)}
+        />
+      )}
 
       {/* ──────────────────────────────────────────────
           9. QUICK VIEW PRODUCT MODAL

@@ -18,6 +18,7 @@ import {
   Sparkles,
   Smartphone,
   ExternalLink,
+  FileText,
   X,
 } from "lucide-react";
 
@@ -36,6 +37,7 @@ export default function VendorSidebar() {
     { label: "Customers", href: "/app/dashboard/customers", icon: Users },
     ...(!isDemo ? [{ label: "Payment Settings", href: "/app/dashboard/payments", icon: CreditCard }] : []),
     { label: "Shipping Settings", href: "/app/dashboard/shipping", icon: Truck },
+    { label: "Legal & Policies", href: "/app/dashboard/policies", icon: FileText },
     { label: "Subscription & Add-ons", href: "/app/dashboard/subscription", icon: Sparkles },
     { label: "Android App Config", href: "/app/dashboard/app-config", icon: Smartphone },
   ];

@@ -29,6 +29,15 @@ import {
   Globe,
   Trash2,
   AlertTriangle,
+  Edit3,
+  User,
+  Building2,
+  FileText,
+  Shield,
+  RotateCcw,
+  Truck,
+  MessageCircle,
+  X,
 } from "lucide-react";
 
 export default function VendorDetailClient() {
@@ -64,6 +73,114 @@ export default function VendorDetailClient() {
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deletingStore, setDeletingStore] = useState(false);
+
+  // Modals for Super Admin editing
+  const [editOwnerModalOpen, setEditOwnerModalOpen] = useState(false);
+  const [editBusinessModalOpen, setEditBusinessModalOpen] = useState(false);
+  const [editStoreModalOpen, setEditStoreModalOpen] = useState(false);
+  const [activePolicyTab, setActivePolicyTab] = useState<"terms" | "privacy" | "shipping" | "refund">("terms");
+  const [savingDetails, setSavingDetails] = useState(false);
+
+  // Forms
+  const [ownerForm, setOwnerForm] = useState({
+    owner_name: "",
+    owner_email: "",
+    owner_phone: "",
+  });
+
+  const [businessForm, setBusinessForm] = useState({
+    business_name: "",
+    brand_name: "",
+    category: "",
+    gst_number: "",
+    business_email: "",
+    business_phone: "",
+    whatsapp_number: "",
+    address: "",
+    description: "",
+  });
+
+  const [storeForm, setStoreForm] = useState({
+    store_name: "",
+    primary_color: "",
+    secondary_color: "",
+    cod_enabled: true,
+    razorpay_enabled: false,
+    razorpay_key_id: "",
+    razorpay_key_secret: "",
+    shipping_charge: 0,
+    free_shipping_min_order: 999,
+    estimated_delivery_days: "3-5 Business Days",
+    terms_and_conditions: "",
+    privacy_policy: "",
+    shipping_policy: "",
+    refund_policy: "",
+  });
+
+  const openEditOwner = () => {
+    if (!vendor) return;
+    setOwnerForm({
+      owner_name: vendor.owner_name || "",
+      owner_email: vendor.owner_email || vendor.email || "",
+      owner_phone: vendor.owner_phone || vendor.phone || "",
+    });
+    setEditOwnerModalOpen(true);
+  };
+
+  const openEditBusiness = () => {
+    if (!vendor) return;
+    setBusinessForm({
+      business_name: vendor.business_name || "",
+      brand_name: vendor.brand_name || vendor.business_name || "",
+      category: vendor.category || "General",
+      gst_number: vendor.gst_number || "",
+      business_email: vendor.business_email || vendor.email || "",
+      business_phone: vendor.business_phone || vendor.phone || "",
+      whatsapp_number: vendor.whatsapp_number || vendor.phone || "",
+      address: vendor.address || "",
+      description: vendor.description || "",
+    });
+    setEditBusinessModalOpen(true);
+  };
+
+  const openEditStore = () => {
+    if (!vendor) return;
+    setStoreForm({
+      store_name: vendor.store_name || vendor.business_name || "",
+      primary_color: vendor.primary_color || "#2563EB",
+      secondary_color: vendor.secondary_color || "#1E293B",
+      cod_enabled: Boolean(vendor.cod_enabled),
+      razorpay_enabled: Boolean(vendor.razorpay_enabled),
+      razorpay_key_id: vendor.razorpay_key_id || "",
+      razorpay_key_secret: vendor.razorpay_key_secret || "",
+      shipping_charge: vendor.shipping_charge || 0,
+      free_shipping_min_order: vendor.free_shipping_min_order || 999,
+      estimated_delivery_days: vendor.estimated_delivery_days || "3-5 Business Days",
+      terms_and_conditions: vendor.terms_and_conditions || "",
+      privacy_policy: vendor.privacy_policy || "",
+      shipping_policy: vendor.shipping_policy || "",
+      refund_policy: vendor.refund_policy || "",
+    });
+    setEditStoreModalOpen(true);
+  };
+
+  const handleSaveDetails = async (payload: any) => {
+    if (!vendor) return;
+    setSavingDetails(true);
+    setMessage(null);
+    try {
+      const updated = await platformApi.updateVendorDetailsByAdmin(vendor.id, payload);
+      setVendor(updated);
+      setMessage({ type: "success", text: "Vendor details successfully updated!" });
+      setEditOwnerModalOpen(false);
+      setEditBusinessModalOpen(false);
+      setEditStoreModalOpen(false);
+    } catch (err: any) {
+      setMessage({ type: "error", text: err.message || "Failed to update vendor details" });
+    } finally {
+      setSavingDetails(false);
+    }
+  };
 
   // Load vendor details
   const loadVendorData = async (identifier: string) => {
@@ -425,19 +542,78 @@ export default function VendorDetailClient() {
 
       {/* MAIN TWO-COLUMN LAYOUT */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* LEFT COLUMN: 1. Business Info & 2. Storefront */}
+        {/* LEFT COLUMN: 1. Owner Info, 2. Business Info & 3. Storefront & Policies */}
         <div className="space-y-6">
-          {/* 1. Business Information */}
+          {/* 1. Owner Information (Personal Account) */}
           <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
-            <h3 className="font-bold text-slate-800 uppercase tracking-wider text-xs flex items-center gap-2 pb-2 border-b border-slate-100">
-              <Store className="w-4 h-4 text-purple-600" />
-              1. Business Information
-            </h3>
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <h3 className="font-bold text-slate-800 uppercase tracking-wider text-xs flex items-center gap-2">
+                <User className="w-4 h-4 text-purple-600" />
+                1. Owner Information (Personal Account)
+              </h3>
+              <button
+                type="button"
+                onClick={openEditOwner}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 transition-colors cursor-pointer"
+              >
+                <Edit3 className="w-3 h-3" />
+                <span>Edit Owner</span>
+              </button>
+            </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
               <div>
-                <span className="text-slate-400 block text-[11px] uppercase font-bold">Owner Name</span>
-                <p className="font-bold text-slate-900 text-sm mt-0.5">{vendor.owner_name}</p>
+                <span className="text-slate-400 block text-[11px] uppercase font-bold">Owner Full Name</span>
+                <p className="font-bold text-slate-900 text-sm mt-0.5">{vendor.owner_name || "N/A"}</p>
+              </div>
+
+              <div>
+                <span className="text-slate-400 block text-[11px] uppercase font-bold">Personal Mobile / Phone</span>
+                <a href={`tel:${vendor.owner_phone || vendor.phone}`} className="font-mono text-slate-900 font-bold mt-0.5 block hover:underline">
+                  {vendor.owner_phone || vendor.phone || "N/A"}
+                </a>
+              </div>
+
+              <div className="sm:col-span-2">
+                <span className="text-slate-400 block text-[11px] uppercase font-bold">Dashboard Login / Personal Email</span>
+                <a href={`mailto:${vendor.owner_email || vendor.email}`} className="text-blue-600 hover:underline font-semibold mt-0.5 block truncate">
+                  {vendor.owner_email || vendor.email}
+                </a>
+                <p className="text-[10px] text-slate-400 mt-0.5">
+                  Used by the store owner to log in and receive personal billing notifications.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* 2. Business & Brand Information */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <h3 className="font-bold text-slate-800 uppercase tracking-wider text-xs flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-blue-600" />
+                2. Business & Brand Information
+              </h3>
+              <button
+                type="button"
+                onClick={openEditBusiness}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-colors cursor-pointer"
+              >
+                <Edit3 className="w-3 h-3" />
+                <span>Edit Business</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+              <div>
+                <span className="text-slate-400 block text-[11px] uppercase font-bold">Business Legal Name</span>
+                <p className="font-bold text-slate-900 text-sm mt-0.5">{vendor.business_name}</p>
+              </div>
+
+              <div>
+                <span className="text-slate-400 block text-[11px] uppercase font-bold">Brand Display Name</span>
+                <p className="font-bold text-slate-900 mt-0.5 flex items-center gap-1.5">
+                  {vendor.brand_name || vendor.business_name}
+                </p>
               </div>
 
               <div>
@@ -446,38 +622,55 @@ export default function VendorDetailClient() {
               </div>
 
               <div>
-                <span className="text-slate-400 block text-[11px] uppercase font-bold">Email Address</span>
-                <a href={`mailto:${vendor.email}`} className="text-blue-600 hover:underline mt-0.5 block truncate">
-                  {vendor.email}
-                </a>
-              </div>
-
-              <div>
-                <span className="text-slate-400 block text-[11px] uppercase font-bold">Phone Number</span>
-                <a href={`tel:${vendor.phone}`} className="font-mono text-slate-800 mt-0.5 block">
-                  {vendor.phone}
-                </a>
-              </div>
-
-              <div>
                 <span className="text-slate-400 block text-[11px] uppercase font-bold">GST Number</span>
                 <p className="font-mono text-slate-800 mt-0.5">{vendor.gst_number || "Not provided"}</p>
               </div>
 
-              <div>
-                <span className="text-slate-400 block text-[11px] uppercase font-bold">Brand Name</span>
-                <p className="font-bold text-slate-900 mt-0.5 flex items-center gap-1.5">
-                  {vendor.brand_name || vendor.business_name}
-                  {vendor.brand_name_locked && (
-                    <span className="px-1.5 py-0.2 rounded text-[10px] bg-amber-50 text-amber-700 border border-amber-200">
-                      Locked
-                    </span>
-                  )}
+              {/* Dedicated Business WhatsApp with Callout */}
+              <div className="sm:col-span-2 p-3 bg-emerald-50/70 border border-emerald-200 rounded-xl space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-emerald-900 block text-[11px] uppercase font-bold flex items-center gap-1.5">
+                    <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
+                    Business WhatsApp Chat Number
+                  </span>
+                  <span className="text-[10px] bg-emerald-600 text-white font-extrabold px-2 py-0.5 rounded-full">
+                    Active on Storefront & App
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <p className="font-mono font-bold text-slate-900 text-sm">
+                    {vendor.whatsapp_number || vendor.phone || "N/A"}
+                  </p>
+                  <a
+                    href={`https://wa.me/${(vendor.whatsapp_number || vendor.phone || "").replace(/[^0-9]/g, "")}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[11px] text-emerald-700 hover:underline font-semibold"
+                  >
+                    (Test WhatsApp Chat ↗)
+                  </a>
+                </div>
+                <p className="text-[10px] text-emerald-800">
+                  All &quot;Order on WhatsApp&quot;, designer consultation, and support buttons on <strong>{vendor.subdomain || vendor.store_slug}</strong> strictly dial this exact number.
                 </p>
               </div>
 
+              <div>
+                <span className="text-slate-400 block text-[11px] uppercase font-bold">Customer Support Phone</span>
+                <a href={`tel:${vendor.business_phone || vendor.phone}`} className="font-mono text-slate-800 mt-0.5 block font-semibold hover:underline">
+                  {vendor.business_phone || vendor.phone}
+                </a>
+              </div>
+
+              <div>
+                <span className="text-slate-400 block text-[11px] uppercase font-bold">Customer Support Email</span>
+                <a href={`mailto:${vendor.business_email || vendor.email}`} className="text-blue-600 hover:underline mt-0.5 block truncate font-medium">
+                  {vendor.business_email || vendor.email}
+                </a>
+              </div>
+
               <div className="sm:col-span-2">
-                <span className="text-slate-400 block text-[11px] uppercase font-bold">Full Address</span>
+                <span className="text-slate-400 block text-[11px] uppercase font-bold">Full Registered Business Address</span>
                 <p className="text-slate-800 mt-0.5 leading-relaxed bg-slate-50 p-2.5 rounded-xl border border-slate-100">
                   {vendor.address || "N/A"}
                 </p>
@@ -492,12 +685,22 @@ export default function VendorDetailClient() {
             </div>
           </div>
 
-          {/* 2. Storefront & Quota */}
+          {/* 3. Storefront, Theme & Policies */}
           <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
-            <h3 className="font-bold text-slate-800 uppercase tracking-wider text-xs flex items-center gap-2 pb-2 border-b border-slate-100">
-              <HardDrive className="w-4 h-4 text-blue-600" />
-              2. Storefront & Quota
-            </h3>
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <h3 className="font-bold text-slate-800 uppercase tracking-wider text-xs flex items-center gap-2">
+                <HardDrive className="w-4 h-4 text-indigo-600" />
+                3. Storefront, Theme & Policies
+              </h3>
+              <button
+                type="button"
+                onClick={openEditStore}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition-colors cursor-pointer"
+              >
+                <Edit3 className="w-3 h-3" />
+                <span>Edit Storefront & Policies</span>
+              </button>
+            </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
               {editingSubdomain ? (
@@ -588,25 +791,17 @@ export default function VendorDetailClient() {
               )}
 
               <div>
+                <span className="text-slate-400 block text-[11px] uppercase font-bold">Store Display Name</span>
+                <p className="font-bold text-slate-900 mt-0.5">
+                  {vendor.store_name || vendor.business_name}
+                </p>
+              </div>
+
+              <div>
                 <span className="text-slate-400 block text-[11px] uppercase font-bold">Catalog Size</span>
                 <p className="font-bold text-slate-900 mt-0.5">
                   {vendor.total_products} products • {vendor.total_orders} orders
                 </p>
-              </div>
-
-              <div className="sm:col-span-2">
-                <div className="flex items-center justify-between text-[11px] font-bold text-slate-600 uppercase mb-1">
-                  <span>Cloud Storage CDN Consumption</span>
-                  <span>{vendor.storage_used_mb} MB / {vendor.storage_limit_mb} MB</span>
-                </div>
-                <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden border border-slate-200">
-                  <div
-                    className="bg-blue-600 h-2 rounded-full transition-all"
-                    style={{
-                      width: `${Math.min(100, Math.round(((vendor.storage_used_mb || 0) / (vendor.storage_limit_mb || 1024)) * 100))}%`,
-                    }}
-                  />
-                </div>
               </div>
 
               <div>
@@ -628,23 +823,60 @@ export default function VendorDetailClient() {
                 </div>
               </div>
 
-              <div>
+              <div className="sm:col-span-2">
                 <span className="text-slate-400 block text-[11px] uppercase font-bold">Payment Methods</span>
                 <p className="font-semibold text-slate-800 mt-1">
                   COD: {vendor.cod_enabled ? "✓ Enabled" : "✗ Disabled"} • Razorpay: {vendor.razorpay_enabled ? "✓ Active" : "✗ Inactive"}
+                  {vendor.razorpay_key_id && (
+                    <span className="ml-2 font-mono text-[11px] text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
+                      Key: {vendor.razorpay_key_id}
+                    </span>
+                  )}
                 </p>
+              </div>
+
+              {/* Legal Policies Quick Status */}
+              <div className="sm:col-span-2 pt-2 border-t border-slate-100">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-slate-500 font-bold text-[11px] uppercase flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5 text-slate-400" />
+                    Brand Legal Policies
+                  </span>
+                  <button
+                    type="button"
+                    onClick={openEditStore}
+                    className="text-[11px] text-blue-600 font-bold hover:underline cursor-pointer"
+                  >
+                    Edit All Policies
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {[
+                    { label: "Terms & Conditions", hasCustom: Boolean(vendor.terms_and_conditions) },
+                    { label: "Privacy Policy", hasCustom: Boolean(vendor.privacy_policy) },
+                    { label: "Shipping Policy", hasCustom: Boolean(vendor.shipping_policy) },
+                    { label: "Return & Refund", hasCustom: Boolean(vendor.refund_policy) },
+                  ].map((pol, idx) => (
+                    <div key={idx} className="p-2 rounded-xl bg-slate-50 border border-slate-200 text-center">
+                      <p className="text-[10px] font-bold text-slate-700 truncate">{pol.label}</p>
+                      <span className={`inline-block mt-0.5 text-[9px] font-bold px-1.5 py-0.2 rounded ${pol.hasCustom ? "bg-blue-100 text-blue-800" : "bg-emerald-100 text-emerald-800"}`}>
+                        {pol.hasCustom ? "Custom" : "Standard"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* RIGHT COLUMN: 3. Android App, 4. Setup Fee & 5. Subscriptions */}
+        {/* RIGHT COLUMN: 4. Android App, 5. Setup Fee & 6. Subscriptions */}
         <div className="space-y-6">
-          {/* 3. Android Mobile App Configuration */}
+          {/* 4. Android Mobile App Configuration */}
           <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
             <h3 className="font-bold text-slate-800 uppercase tracking-wider text-xs flex items-center gap-2 pb-2 border-b border-slate-100">
               <Smartphone className="w-4 h-4 text-emerald-600" />
-              3. Android Mobile App Configuration
+              4. Android Mobile App Configuration
             </h3>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
@@ -688,12 +920,12 @@ export default function VendorDetailClient() {
             </div>
           </div>
 
-          {/* 4. One-Time Setup Fee & Custom Pricing Waiver */}
+          {/* 5. One-Time Setup Fee & Custom Pricing Waiver */}
           <div className="bg-gradient-to-br from-indigo-50/70 via-purple-50/40 to-white rounded-2xl border border-indigo-200 p-5 shadow-xs space-y-4">
             <div className="flex items-center justify-between pb-2 border-b border-indigo-100">
               <h3 className="font-bold text-indigo-950 uppercase tracking-wider text-xs flex items-center gap-2">
                 <CreditCard className="w-4 h-4 text-indigo-600" />
-                4. Setup Fee Waiver & Custom Pricing
+                5. Setup Fee Waiver & Custom Pricing
               </h3>
               {vendor.setup_fee_paid || vendor.setup_fee_waived ? (
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
@@ -765,11 +997,11 @@ export default function VendorDetailClient() {
             </div>
           </div>
 
-          {/* 5. Android Monthly Subscription & APK Release */}
+          {/* 6. Android Monthly Subscription & APK Release */}
           <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-3 text-xs">
             <h3 className="font-bold text-slate-800 uppercase tracking-wider text-xs flex items-center gap-2 pb-2 border-b border-slate-100">
               <Zap className="w-4 h-4 text-purple-600" />
-              5. Monthly Android App Subscription & APK Release
+              6. Monthly Android App Subscription & APK Release
             </h3>
 
             <div className="space-y-2">
@@ -890,6 +1122,575 @@ export default function VendorDetailClient() {
           </div>
         </div>
       </div>
+
+      {/* 1. EDIT OWNER DETAILS MODAL */}
+      {editOwnerModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center text-purple-700">
+                  <User className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Edit Owner Information</h3>
+                  <p className="text-xs text-slate-500">Personal account owner & login credentials</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditOwnerModalOpen(false)}
+                className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs">
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">Owner Full Name</label>
+                <input
+                  type="text"
+                  value={ownerForm.owner_name}
+                  onChange={(e) => setOwnerForm({ ...ownerForm, owner_name: e.target.value })}
+                  placeholder="e.g. Abhishek Rathod"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:bg-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">Owner Login Email</label>
+                <input
+                  type="email"
+                  value={ownerForm.owner_email}
+                  onChange={(e) => setOwnerForm({ ...ownerForm, owner_email: e.target.value })}
+                  placeholder="e.g. abhishek@example.com"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:bg-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none"
+                />
+                <p className="text-[11px] text-amber-600 mt-1 flex items-center gap-1 font-medium">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  Updating this email modifies the vendor's dashboard sign-in credentials.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">Owner Personal Phone / Mobile</label>
+                <input
+                  type="tel"
+                  value={ownerForm.owner_phone}
+                  onChange={(e) => setOwnerForm({ ...ownerForm, owner_phone: e.target.value })}
+                  placeholder="e.g. +91 8999899577"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:bg-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none"
+                />
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Private account mobile number used for security verifications.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                disabled={savingDetails}
+                onClick={() => setEditOwnerModalOpen(false)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={savingDetails}
+                onClick={() => handleSaveDetails(ownerForm)}
+                className="px-5 py-2 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white shadow-xs transition-colors disabled:opacity-50 inline-flex items-center gap-1.5 cursor-pointer"
+              >
+                {savingDetails ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Saving Changes...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Save Owner Details</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 2. EDIT BUSINESS & BRAND DETAILS MODAL */}
+      {editBusinessModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 space-y-5 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-blue-700">
+                  <Building2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Edit Business & Brand Details</h3>
+                  <p className="text-xs text-slate-500">Commercial identity, customer contacts & store profile</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditBusinessModalOpen(false)}
+                className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs">
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">Business / Legal Name</label>
+                <input
+                  type="text"
+                  value={businessForm.business_name}
+                  onChange={(e) => setBusinessForm({ ...businessForm, business_name: e.target.value })}
+                  placeholder="e.g. Abhishek Rathod's Store"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">Brand Name (Customer Facing)</label>
+                <input
+                  type="text"
+                  value={businessForm.brand_name}
+                  onChange={(e) => setBusinessForm({ ...businessForm, brand_name: e.target.value })}
+                  placeholder="e.g. KC Aari Work"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">Business Category</label>
+                <input
+                  type="text"
+                  value={businessForm.category}
+                  onChange={(e) => setBusinessForm({ ...businessForm, category: e.target.value })}
+                  placeholder="e.g. Clothing & Apparel"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">GSTIN Number (Optional)</label>
+                <input
+                  type="text"
+                  value={businessForm.gst_number}
+                  onChange={(e) => setBusinessForm({ ...businessForm, gst_number: e.target.value })}
+                  placeholder="e.g. 27ABCDE1234F1Z5"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1 flex items-center gap-1.5">
+                  <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
+                  Official Business WhatsApp
+                </label>
+                <input
+                  type="tel"
+                  value={businessForm.whatsapp_number}
+                  onChange={(e) => setBusinessForm({ ...businessForm, whatsapp_number: e.target.value })}
+                  placeholder="+91 8999899577"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none"
+                />
+                <p className="text-[10px] text-emerald-700 mt-1 font-medium">
+                  Used by customer WhatsApp buttons on this brand's website.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1 flex items-center gap-1.5">
+                  <Phone className="w-3.5 h-3.5 text-slate-500" />
+                  Customer Support Calling Phone
+                </label>
+                <input
+                  type="tel"
+                  value={businessForm.business_phone}
+                  onChange={(e) => setBusinessForm({ ...businessForm, business_phone: e.target.value })}
+                  placeholder="+91 8999899577"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block text-slate-700 font-bold mb-1 flex items-center gap-1.5">
+                  <Mail className="w-3.5 h-3.5 text-slate-500" />
+                  Public Support Email
+                </label>
+                <input
+                  type="email"
+                  value={businessForm.business_email}
+                  onChange={(e) => setBusinessForm({ ...businessForm, business_email: e.target.value })}
+                  placeholder="contact@brand.in"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block text-slate-700 font-bold mb-1 flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-slate-500" />
+                  Studio / Registered Business Address
+                </label>
+                <textarea
+                  rows={2}
+                  value={businessForm.address}
+                  onChange={(e) => setBusinessForm({ ...businessForm, address: e.target.value })}
+                  placeholder="e.g. Swamiraj Sunkul, Manajinagar, Narhe 411041 Pune"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block text-slate-700 font-bold mb-1">Business Description / About Us</label>
+                <textarea
+                  rows={3}
+                  value={businessForm.description}
+                  onChange={(e) => setBusinessForm({ ...businessForm, description: e.target.value })}
+                  placeholder="Describe your brand, heritage, craftsmanship and offerings..."
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                disabled={savingDetails}
+                onClick={() => setEditBusinessModalOpen(false)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={savingDetails}
+                onClick={() => handleSaveDetails(businessForm)}
+                className="px-5 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-xs transition-colors disabled:opacity-50 inline-flex items-center gap-1.5 cursor-pointer"
+              >
+                {savingDetails ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Saving Changes...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Save Business Details</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 3. EDIT STOREFRONT & POLICIES MODAL */}
+      {editStoreModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 space-y-5 max-h-[92vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center text-purple-700">
+                  <Globe className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Edit Storefront & Brand Policies</h3>
+                  <p className="text-xs text-slate-500">Theme colors, checkout payments, delivery charges & legal policies</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditStoreModalOpen(false)}
+                className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-5 text-xs">
+              {/* Section A: Store Appearance & Theme */}
+              <div className="space-y-3">
+                <h4 className="font-bold text-slate-800 uppercase tracking-wider text-[11px] pb-1 border-b border-slate-100">
+                  Storefront Branding & Appearance
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="sm:col-span-3">
+                    <label className="block text-slate-700 font-bold mb-1">Store Display Title</label>
+                    <input
+                      type="text"
+                      value={storeForm.store_name}
+                      onChange={(e) => setStoreForm({ ...storeForm, store_name: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-700 font-bold mb-1">Primary Color</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={storeForm.primary_color || "#2563EB"}
+                        onChange={(e) => setStoreForm({ ...storeForm, primary_color: e.target.value })}
+                        className="w-8 h-8 rounded-lg cursor-pointer border border-slate-200 p-0.5"
+                      />
+                      <input
+                        type="text"
+                        value={storeForm.primary_color}
+                        onChange={(e) => setStoreForm({ ...storeForm, primary_color: e.target.value })}
+                        className="flex-1 px-2.5 py-1.5 font-mono text-xs bg-slate-50 border border-slate-200 rounded-lg"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-700 font-bold mb-1">Secondary Color</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={storeForm.secondary_color || "#1E293B"}
+                        onChange={(e) => setStoreForm({ ...storeForm, secondary_color: e.target.value })}
+                        className="w-8 h-8 rounded-lg cursor-pointer border border-slate-200 p-0.5"
+                      />
+                      <input
+                        type="text"
+                        value={storeForm.secondary_color}
+                        onChange={(e) => setStoreForm({ ...storeForm, secondary_color: e.target.value })}
+                        className="flex-1 px-2.5 py-1.5 font-mono text-xs bg-slate-50 border border-slate-200 rounded-lg"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-700 font-bold mb-1">Estimated Delivery</label>
+                    <input
+                      type="text"
+                      value={storeForm.estimated_delivery_days}
+                      onChange={(e) => setStoreForm({ ...storeForm, estimated_delivery_days: e.target.value })}
+                      placeholder="e.g. 3-5 Business Days"
+                      className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Section B: Delivery & Charges */}
+              <div className="space-y-3">
+                <h4 className="font-bold text-slate-800 uppercase tracking-wider text-[11px] pb-1 border-b border-slate-100">
+                  Shipping & Delivery Rules
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-700 font-bold mb-1">Standard Shipping Charge (₹)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={storeForm.shipping_charge}
+                      onChange={(e) => setStoreForm({ ...storeForm, shipping_charge: Number(e.target.value) || 0 })}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-700 font-bold mb-1">Free Shipping Threshold (₹)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={storeForm.free_shipping_min_order}
+                      onChange={(e) => setStoreForm({ ...storeForm, free_shipping_min_order: Number(e.target.value) || 0 })}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Section C: Payment Methods */}
+              <div className="space-y-3">
+                <h4 className="font-bold text-slate-800 uppercase tracking-wider text-[11px] pb-1 border-b border-slate-100">
+                  Payment Methods & Gateway Credentials
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <label className="flex items-center gap-2.5 p-3 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={storeForm.cod_enabled}
+                      onChange={(e) => setStoreForm({ ...storeForm, cod_enabled: e.target.checked })}
+                      className="w-4 h-4 text-purple-600 rounded border-slate-300"
+                    />
+                    <div>
+                      <span className="font-bold text-slate-900 block">Cash on Delivery (COD)</span>
+                      <span className="text-[10px] text-slate-500">Allow customers to pay cash at delivery</span>
+                    </div>
+                  </label>
+
+                  <label className="flex items-center gap-2.5 p-3 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={storeForm.razorpay_enabled}
+                      onChange={(e) => setStoreForm({ ...storeForm, razorpay_enabled: e.target.checked })}
+                      className="w-4 h-4 text-purple-600 rounded border-slate-300"
+                    />
+                    <div>
+                      <span className="font-bold text-slate-900 block">Razorpay Online Gateway</span>
+                      <span className="text-[10px] text-slate-500">Accept UPI, Cards, NetBanking</span>
+                    </div>
+                  </label>
+
+                  <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <div>
+                      <label className="block text-slate-700 font-bold mb-1">Razorpay Key ID</label>
+                      <input
+                        type="text"
+                        value={storeForm.razorpay_key_id}
+                        onChange={(e) => setStoreForm({ ...storeForm, razorpay_key_id: e.target.value })}
+                        placeholder="rzp_live_..."
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-700 font-bold mb-1">Razorpay Key Secret</label>
+                      <input
+                        type="text"
+                        value={storeForm.razorpay_key_secret}
+                        onChange={(e) => setStoreForm({ ...storeForm, razorpay_key_secret: e.target.value })}
+                        placeholder="Leave blank to keep unchanged"
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section D: Legal & Policies */}
+              <div className="space-y-3 pt-2 border-t border-slate-100">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-bold text-slate-800 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                    <Shield className="w-3.5 h-3.5 text-purple-600" />
+                    Brand Legal Policies
+                  </h4>
+                  <span className="text-[10px] text-slate-400">
+                    Empty text automatically uses clean standard template
+                  </span>
+                </div>
+
+                {/* Policy Tabs */}
+                <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl overflow-x-auto">
+                  {[
+                    { id: "terms", label: "Terms & Conditions", icon: FileText },
+                    { id: "privacy", label: "Privacy Policy", icon: Shield },
+                    { id: "shipping", label: "Shipping Policy", icon: Truck },
+                    { id: "refund", label: "Return & Refund", icon: RotateCcw },
+                  ].map((tab) => {
+                    const Icon = tab.icon;
+                    const isActive = activePolicyTab === tab.id;
+                    return (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => setActivePolicyTab(tab.id as any)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                          isActive
+                            ? "bg-white text-purple-700 shadow-xs"
+                            : "text-slate-600 hover:text-slate-900"
+                        }`}
+                      >
+                        <Icon className="w-3.5 h-3.5" />
+                        <span>{tab.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Policy Editor Textarea based on active tab */}
+                <div>
+                  {activePolicyTab === "terms" && (
+                    <div className="space-y-1">
+                      <textarea
+                        rows={7}
+                        value={storeForm.terms_and_conditions}
+                        onChange={(e) => setStoreForm({ ...storeForm, terms_and_conditions: e.target.value })}
+                        placeholder="Leave blank to use default auto-generated standard Terms & Conditions..."
+                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-800 focus:bg-white focus:ring-2 focus:ring-purple-500 outline-none leading-relaxed"
+                      />
+                    </div>
+                  )}
+
+                  {activePolicyTab === "privacy" && (
+                    <div className="space-y-1">
+                      <textarea
+                        rows={7}
+                        value={storeForm.privacy_policy}
+                        onChange={(e) => setStoreForm({ ...storeForm, privacy_policy: e.target.value })}
+                        placeholder="Leave blank to use default auto-generated Privacy Policy..."
+                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-800 focus:bg-white focus:ring-2 focus:ring-purple-500 outline-none leading-relaxed"
+                      />
+                    </div>
+                  )}
+
+                  {activePolicyTab === "shipping" && (
+                    <div className="space-y-1">
+                      <textarea
+                        rows={7}
+                        value={storeForm.shipping_policy}
+                        onChange={(e) => setStoreForm({ ...storeForm, shipping_policy: e.target.value })}
+                        placeholder="Leave blank to use default auto-generated Shipping & Delivery Policy..."
+                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-800 focus:bg-white focus:ring-2 focus:ring-purple-500 outline-none leading-relaxed"
+                      />
+                    </div>
+                  )}
+
+                  {activePolicyTab === "refund" && (
+                    <div className="space-y-1">
+                      <textarea
+                        rows={7}
+                        value={storeForm.refund_policy}
+                        onChange={(e) => setStoreForm({ ...storeForm, refund_policy: e.target.value })}
+                        placeholder="Leave blank to use default auto-generated Return & Refund Policy..."
+                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-800 focus:bg-white focus:ring-2 focus:ring-purple-500 outline-none leading-relaxed"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                disabled={savingDetails}
+                onClick={() => setEditStoreModalOpen(false)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={savingDetails}
+                onClick={() => handleSaveDetails(storeForm)}
+                className="px-5 py-2 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white shadow-xs transition-colors disabled:opacity-50 inline-flex items-center gap-1.5 cursor-pointer"
+              >
+                {savingDetails ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Saving Store & Policies...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Save Storefront & Policies</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Permanent Delete Store Confirmation Modal */}
       {deleteModalOpen && (

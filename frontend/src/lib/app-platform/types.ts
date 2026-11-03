@@ -220,6 +220,23 @@ export interface StoreSettings {
   shiprocket_email?: string;
   shiprocket_password?: string;
   shiprocket_auto_fulfill?: boolean;
+  terms_and_conditions?: string;
+  privacy_policy?: string;
+  shipping_policy?: string;
+  refund_policy?: string;
+}
+
+export interface VendorPolicies {
+  store_name: string;
+  store_slug: string;
+  terms_and_conditions: string;
+  privacy_policy: string;
+  shipping_policy: string;
+  refund_policy: string;
+  is_custom_terms?: boolean;
+  is_custom_privacy?: boolean;
+  is_custom_shipping?: boolean;
+  is_custom_refund?: boolean;
 }
 
 export interface AppConfig {

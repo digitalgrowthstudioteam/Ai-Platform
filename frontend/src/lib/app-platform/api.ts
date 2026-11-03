@@ -20,6 +20,7 @@ import {
   SetupFeeQuote,
   CouponValidation,
   PlatformCouponItem,
+  VendorPolicies,
 } from './types';
 import { demoSandbox, DEMO_USER } from './demo-sandbox';
 
@@ -256,6 +257,52 @@ class PlatformApiClient {
       method: 'PUT',
       body: JSON.stringify(payload),
     });
+  }
+
+  async getVendorPolicies(): Promise<VendorPolicies> {
+    if (this.isDemoMode()) {
+      const s = demoSandbox.getStore();
+      return {
+        store_name: s.store_name,
+        store_slug: s.store_slug,
+        terms_and_conditions: s.terms_and_conditions || `# Terms & Conditions for ${s.store_name}\n\nWelcome to ${s.store_name}. By browsing or purchasing from our store, you agree to our standard terms of sale, transparent pricing, and secure order fulfillment.`,
+        privacy_policy: s.privacy_policy || `# Privacy Policy for ${s.store_name}\n\nWe prioritize customer privacy. Your details are strictly used to fulfill your orders and are never shared or sold.`,
+        shipping_policy: s.shipping_policy || `# Shipping & Delivery Policy for ${s.store_name}\n\nOrders are delivered within 3-5 business days across India with real-time tracking updates.`,
+        refund_policy: s.refund_policy || `# Return & Refund Policy for ${s.store_name}\n\nWe offer a 7-day return and exchange window for unused items or damaged transit issues.`,
+        is_custom_terms: Boolean(s.terms_and_conditions),
+        is_custom_privacy: Boolean(s.privacy_policy),
+        is_custom_shipping: Boolean(s.shipping_policy),
+        is_custom_refund: Boolean(s.refund_policy),
+      };
+    }
+    return this.request<VendorPolicies>('/api/v1/platform/vendor/policies');
+  }
+
+  async updateVendorPolicies(payload: Partial<VendorPolicies>): Promise<VendorPolicies> {
+    if (this.isDemoMode()) {
+      demoSandbox.updateStore(payload as any);
+      return this.getVendorPolicies();
+    }
+    return this.request<VendorPolicies>('/api/v1/platform/vendor/policies', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async resetVendorPolicies(policyType: string = 'all'): Promise<VendorPolicies> {
+    if (this.isDemoMode()) {
+      return this.getVendorPolicies();
+    }
+    return this.request<VendorPolicies>(`/api/v1/platform/vendor/policies/reset-default?policy_type=${policyType}`, {
+      method: 'POST',
+    });
+  }
+
+  async getPublicStorePolicies(slug: string): Promise<VendorPolicies> {
+    if (this.isDemoMode() || slug === 'demo' || slug === 'demo-store') {
+      return this.getVendorPolicies();
+    }
+    return this.request<VendorPolicies>(`/api/store/${slug}/policies`);
   }
 
   async verifyRazorpay(payload: { key_id: string; key_secret?: string }): Promise<any> {
@@ -501,6 +548,13 @@ class PlatformApiClient {
     return this.request(`/api/v1/platform/admin/vendors/${id}/subdomain`, {
       method: 'PATCH',
       body: JSON.stringify({ store_slug: storeSlug }),
+    });
+  }
+
+  async updateVendorDetailsByAdmin(id: string, payload: any): Promise<any> {
+    return this.request(`/api/v1/platform/admin/vendors/${id}/details`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
     });
   }
 

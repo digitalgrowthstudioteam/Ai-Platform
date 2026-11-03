@@ -62,6 +62,8 @@ from app.schemas.platform.order import (
 )
 from app.schemas.platform.vendor import (
     StoreUpdateRequest,
+    VendorPoliciesUpdateRequest,
+    VendorPoliciesResponse,
     VerifyRazorpayRequest,
     VendorProfileUpdateRequest,
     VendorAppConfigUpdateRequest,
@@ -178,6 +180,118 @@ async def update_vendor_store(
     await db.commit()
     await db.refresh(store)
     return store
+
+
+@router.get("/policies", response_model=VendorPoliciesResponse)
+async def get_vendor_policies(
+    current: CurrentVendor = Depends(require_vendor_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Fetch current vendor brand legal policies with fallback to default templates."""
+    store = current.vendor.store
+    if not store:
+        raise HTTPException(status_code=404, detail="Store record not found")
+
+    vendor_profile = current.vendor.profile
+    from app.services.platform.policies import get_store_policies
+    policies = get_store_policies(store, vendor_profile)
+
+    return VendorPoliciesResponse(
+        store_name=store.store_name,
+        store_slug=store.store_slug,
+        terms_and_conditions=policies["terms_and_conditions"],
+        privacy_policy=policies["privacy_policy"],
+        shipping_policy=policies["shipping_policy"],
+        refund_policy=policies["refund_policy"],
+        is_custom_terms=bool(store.terms_and_conditions and store.terms_and_conditions.strip()),
+        is_custom_privacy=bool(store.privacy_policy and store.privacy_policy.strip()),
+        is_custom_shipping=bool(store.shipping_policy and store.shipping_policy.strip()),
+        is_custom_refund=bool(store.refund_policy and store.refund_policy.strip()),
+    )
+
+
+@router.put("/policies", response_model=VendorPoliciesResponse)
+async def update_vendor_policies(
+    payload: VendorPoliciesUpdateRequest,
+    current: CurrentVendor = Depends(require_vendor_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update custom terms, privacy, shipping, or refund policies for the vendor brand."""
+    store = current.vendor.store
+    if not store:
+        raise HTTPException(status_code=404, detail="Store record not found")
+
+    dump = payload.model_dump(exclude_unset=True)
+    if "terms_and_conditions" in dump:
+        store.terms_and_conditions = dump["terms_and_conditions"]
+    if "privacy_policy" in dump:
+        store.privacy_policy = dump["privacy_policy"]
+    if "shipping_policy" in dump:
+        store.shipping_policy = dump["shipping_policy"]
+    if "refund_policy" in dump:
+        store.refund_policy = dump["refund_policy"]
+
+    await db.commit()
+    await db.refresh(store)
+
+    vendor_profile = current.vendor.profile
+    from app.services.platform.policies import get_store_policies
+    policies = get_store_policies(store, vendor_profile)
+
+    return VendorPoliciesResponse(
+        store_name=store.store_name,
+        store_slug=store.store_slug,
+        terms_and_conditions=policies["terms_and_conditions"],
+        privacy_policy=policies["privacy_policy"],
+        shipping_policy=policies["shipping_policy"],
+        refund_policy=policies["refund_policy"],
+        is_custom_terms=bool(store.terms_and_conditions and store.terms_and_conditions.strip()),
+        is_custom_privacy=bool(store.privacy_policy and store.privacy_policy.strip()),
+        is_custom_shipping=bool(store.shipping_policy and store.shipping_policy.strip()),
+        is_custom_refund=bool(store.refund_policy and store.refund_policy.strip()),
+    )
+
+
+@router.post("/policies/reset-default", response_model=VendorPoliciesResponse)
+async def reset_vendor_policies_to_default(
+    policy_type: Optional[str] = None,
+    current: CurrentVendor = Depends(require_vendor_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Reset one or all brand policies back to the standard auto-generated template."""
+    store = current.vendor.store
+    if not store:
+        raise HTTPException(status_code=404, detail="Store record not found")
+
+    pt = (policy_type or "all").lower()
+    if pt in ["all", "terms", "terms_and_conditions"]:
+        store.terms_and_conditions = None
+    if pt in ["all", "privacy", "privacy_policy"]:
+        store.privacy_policy = None
+    if pt in ["all", "shipping", "shipping_policy"]:
+        store.shipping_policy = None
+    if pt in ["all", "refund", "refund_policy"]:
+        store.refund_policy = None
+
+    await db.commit()
+    await db.refresh(store)
+
+    vendor_profile = current.vendor.profile
+    from app.services.platform.policies import get_store_policies
+    policies = get_store_policies(store, vendor_profile)
+
+    return VendorPoliciesResponse(
+        store_name=store.store_name,
+        store_slug=store.store_slug,
+        terms_and_conditions=policies["terms_and_conditions"],
+        privacy_policy=policies["privacy_policy"],
+        shipping_policy=policies["shipping_policy"],
+        refund_policy=policies["refund_policy"],
+        is_custom_terms=bool(store.terms_and_conditions and store.terms_and_conditions.strip()),
+        is_custom_privacy=bool(store.privacy_policy and store.privacy_policy.strip()),
+        is_custom_shipping=bool(store.shipping_policy and store.shipping_policy.strip()),
+        is_custom_refund=bool(store.refund_policy and store.refund_policy.strip()),
+    )
 
 
 @router.post("/store/verify-razorpay")

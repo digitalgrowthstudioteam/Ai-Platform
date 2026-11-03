@@ -102,6 +102,12 @@ class PlatformStore(BaseModel):
     shiprocket_password: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     shiprocket_auto_fulfill: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
+    # Brand Legal Policies
+    terms_and_conditions: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    privacy_policy: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    shipping_policy: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    refund_policy: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
     vendor: Mapped["PlatformVendor"] = relationship("PlatformVendor", back_populates="store")
 
 

@@ -67,7 +67,10 @@ from app.schemas.platform.admin import (
     VendorStorageLimitUpdateRequest,
     PlatformAuditLogItem,
 )
-from app.schemas.platform.vendor import VendorDetailFullResponse
+from app.schemas.platform.vendor import (
+    VendorDetailFullResponse,
+    AdminVendorFullUpdateRequest,
+)
 
 router = APIRouter(prefix="/platform/admin", tags=["Super Admin Panel"])
 
@@ -337,6 +340,7 @@ async def get_vendor_full_detail(
             else PlatformVendor.vendor_code == vendor_id
         )
         .options(
+            selectinload(PlatformVendor.user),
             selectinload(PlatformVendor.profile),
             selectinload(PlatformVendor.store),
             selectinload(PlatformVendor.app_config),
@@ -347,6 +351,7 @@ async def get_vendor_full_detail(
     if not v:
         raise HTTPException(status_code=404, detail="Vendor not found")
 
+    u = v.user
     p = v.profile
     s = v.store
     app = v.app_config
@@ -363,30 +368,57 @@ async def get_vendor_full_detail(
     prod_count = (await db.execute(select(func.count(PlatformProduct.id)).where(PlatformProduct.vendor_id == v.id))).scalar() or 0
     order_count = (await db.execute(select(func.count(PlatformOrder.id)).where(PlatformOrder.vendor_id == v.id))).scalar() or 0
 
+    from app.services.platform.policies import get_store_policies
+    policies = get_store_policies(s, p) if s else {}
+
     return VendorDetailFullResponse(
         id=v.id,
         vendor_code=v.vendor_code,
         status=v.status,
         created_at=v.created_at,
-        business_name=p.business_name if p else "N/A",
-        owner_name=p.owner_name if p else "N/A",
-        email=p.email if p else "N/A",
+        # Owner (Personal) info
+        owner_name=p.owner_name if p else (u.name if u else "N/A"),
+        owner_email=u.email if u else (p.email if p else "N/A"),
+        owner_phone=p.phone if p else "N/A",
+        # Legacy aliases
+        email=p.email if p else (u.email if u else "N/A"),
         phone=p.phone if p else "N/A",
+        # Business info
+        business_name=p.business_name if p else "N/A",
+        brand_name=p.brand_name if p else None,
         category=p.category if p else "General",
-        address=p.address if p else None,
-        description=p.description if p else None,
+        business_email=s.contact_email if (s and s.contact_email) else (p.email if p else None),
+        business_phone=p.business_phone if (p and p.business_phone) else (s.contact_phone if s else (p.phone if p else None)),
+        whatsapp_number=p.whatsapp_number if (p and p.whatsapp_number) else (s.contact_phone if s else None),
+        address=p.address if p else (s.business_address if s else None),
+        description=p.description if p else (s.description if s else None),
         gst_number=p.gst_number if p else None,
-        logo_url=p.logo_url if p else None,
+        logo_url=p.logo_url if p else (s.logo_url if s else None),
         website=p.website if p else None,
+        # Store info
+        store_name=s.store_name if s else (p.business_name if p else "N/A"),
         store_slug=s.store_slug if s else "N/A",
         subdomain=s.subdomain if s else "N/A",
         store_status=s.status if s else "active",
         store_created_at=s.created_at if s else v.created_at,
+        contact_email=s.contact_email if s else None,
+        contact_phone=s.contact_phone if s else None,
         primary_color=s.primary_color if s else "#2563EB",
         secondary_color=s.secondary_color if s else "#1E293B",
         cod_enabled=s.cod_enabled if s else True,
         razorpay_enabled=s.razorpay_enabled if s else False,
         razorpay_key_id=s.razorpay_key_id if s else None,
+        razorpay_key_secret=s.razorpay_key_secret if s else None,
+        razorpay_verified=s.razorpay_verified if s else False,
+        shipping_charge=s.shipping_charge if s else 0.0,
+        free_shipping_min_order=s.free_shipping_min_order if s else 999.0,
+        estimated_delivery_days=s.estimated_delivery_days if s else "3-5 Business Days",
+        # Policies
+        terms_and_conditions=policies.get("terms_and_conditions"),
+        privacy_policy=policies.get("privacy_policy"),
+        shipping_policy=policies.get("shipping_policy"),
+        refund_policy=policies.get("refund_policy"),
+        # App info
         app_name=app.app_name if app else (p.business_name if p else "App"),
         app_logo_url=app.app_logo_url if app else None,
         splash_screen_url=app.splash_screen_url if app else None,
@@ -410,6 +442,144 @@ async def get_vendor_full_detail(
         apk_user_approved=app.apk_user_approved if app else False,
         apk_download_url=app.apk_download_url if app else None,
     )
+
+
+@router.put("/vendors/{vendor_id}/details", response_model=VendorDetailFullResponse)
+async def update_vendor_full_details_by_admin(
+    vendor_id: str,
+    payload: AdminVendorFullUpdateRequest,
+    admin: PlatformUser = Depends(require_super_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Super Admin master update endpoint:
+    Allows Super Admin to edit every detail of any vendor account:
+    - Personal Owner Details (name, login email, phone)
+    - Business Details (business name, brand name, category, GST, address, phone/WhatsApp, description)
+    - Storefront & Settings (store name, slug, colors, payment keys, shipping fees, policies)
+    """
+    target_uuid = None
+    try:
+        target_uuid = uuid.UUID(vendor_id)
+    except (ValueError, AttributeError):
+        pass
+
+    stmt = (
+        select(PlatformVendor)
+        .where(
+            or_(PlatformVendor.id == target_uuid, PlatformVendor.vendor_code == vendor_id)
+            if target_uuid
+            else PlatformVendor.vendor_code == vendor_id
+        )
+        .options(
+            selectinload(PlatformVendor.user),
+            selectinload(PlatformVendor.profile),
+            selectinload(PlatformVendor.store),
+            selectinload(PlatformVendor.app_config),
+            selectinload(PlatformVendor.storage_usage),
+        )
+    )
+    v = (await db.execute(stmt)).scalar_one_or_none()
+    if not v:
+        raise HTTPException(status_code=404, detail="Vendor not found")
+
+    u = v.user
+    p = v.profile
+    s = v.store
+
+    dump = payload.model_dump(exclude_unset=True)
+
+    # 1. Update Owner (Personal) Information
+    if "owner_name" in dump and dump["owner_name"]:
+        clean_name = dump["owner_name"].strip()
+        if p:
+            p.owner_name = clean_name
+        if u:
+            u.name = clean_name
+    if "owner_email" in dump and dump["owner_email"]:
+        new_email = dump["owner_email"].strip().lower()
+        if u:
+            u.email = new_email
+        if p:
+            p.email = new_email
+    if "owner_phone" in dump and dump["owner_phone"]:
+        clean_phone = dump["owner_phone"].strip()
+        if p:
+            p.phone = clean_phone
+
+    # 2. Update Business Information
+    if p:
+        if "business_name" in dump and dump["business_name"] is not None:
+            p.business_name = dump["business_name"].strip()
+        if "brand_name" in dump and dump["brand_name"] is not None:
+            p.brand_name = dump["brand_name"].strip()
+        if "category" in dump and dump["category"] is not None:
+            p.category = dump["category"].strip()
+        if "gst_number" in dump:
+            p.gst_number = dump["gst_number"].strip() if dump["gst_number"] else None
+        if "business_phone" in dump:
+            p.business_phone = dump["business_phone"].strip() if dump["business_phone"] else None
+        if "whatsapp_number" in dump:
+            p.whatsapp_number = dump["whatsapp_number"].strip() if dump["whatsapp_number"] else None
+        if "address" in dump:
+            p.address = dump["address"].strip() if dump["address"] else None
+        if "description" in dump:
+            p.description = dump["description"].strip() if dump["description"] else None
+
+    # 3. Update Storefront Information
+    if s:
+        if "store_name" in dump and dump["store_name"] is not None:
+            s.store_name = dump["store_name"].strip()
+        if "store_slug" in dump and dump["store_slug"]:
+            clean_slug = dump["store_slug"].strip().lower().replace(" ", "-")
+            s.store_slug = clean_slug
+            s.subdomain = f"{clean_slug}.digitalgrowthstudio.in"
+        if "contact_email" in dump:
+            s.contact_email = dump["contact_email"].strip() if dump["contact_email"] else None
+        if "contact_phone" in dump:
+            s.contact_phone = dump["contact_phone"].strip() if dump["contact_phone"] else None
+        if "primary_color" in dump and dump["primary_color"]:
+            s.primary_color = dump["primary_color"].strip()
+        if "secondary_color" in dump and dump["secondary_color"]:
+            s.secondary_color = dump["secondary_color"].strip()
+        if "cod_enabled" in dump and dump["cod_enabled"] is not None:
+            s.cod_enabled = bool(dump["cod_enabled"])
+        if "razorpay_enabled" in dump and dump["razorpay_enabled"] is not None:
+            s.razorpay_enabled = bool(dump["razorpay_enabled"])
+        if "razorpay_key_id" in dump:
+            s.razorpay_key_id = dump["razorpay_key_id"].strip() if dump["razorpay_key_id"] else None
+        if "razorpay_key_secret" in dump:
+            s.razorpay_key_secret = dump["razorpay_key_secret"].strip() if dump["razorpay_key_secret"] else None
+        if "shipping_charge" in dump and dump["shipping_charge"] is not None:
+            s.shipping_charge = float(dump["shipping_charge"])
+        if "free_shipping_min_order" in dump:
+            s.free_shipping_min_order = float(dump["free_shipping_min_order"]) if dump["free_shipping_min_order"] is not None else None
+        if "estimated_delivery_days" in dump and dump["estimated_delivery_days"]:
+            s.estimated_delivery_days = dump["estimated_delivery_days"].strip()
+
+        # Policies
+        if "terms_and_conditions" in dump:
+            s.terms_and_conditions = dump["terms_and_conditions"]
+        if "privacy_policy" in dump:
+            s.privacy_policy = dump["privacy_policy"]
+        if "shipping_policy" in dump:
+            s.shipping_policy = dump["shipping_policy"]
+        if "refund_policy" in dump:
+            s.refund_policy = dump["refund_policy"]
+
+    # Also sync app config app_name if brand/store name was changed
+    if v.app_config and ("brand_name" in dump or "store_name" in dump or "business_name" in dump):
+        v.app_config.app_name = (
+            dump.get("brand_name")
+            or dump.get("store_name")
+            or dump.get("business_name")
+            or v.app_config.app_name
+        )
+
+    await db.commit()
+    await db.refresh(v)
+
+    return await get_vendor_full_detail(vendor_id=vendor_id, admin=admin, db=db)
 
 
 @router.patch("/vendors/{vendor_id}/status")

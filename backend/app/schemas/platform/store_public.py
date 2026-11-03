@@ -17,6 +17,8 @@ class PublicStoreConfigResponse(BaseModel):
     banner_url: Optional[str] = None
     contact_email: Optional[str] = None
     contact_phone: Optional[str] = None
+    whatsapp_number: Optional[str] = None
+    business_phone: Optional[str] = None
     business_address: Optional[str] = None
     opening_hours: str
     cod_enabled: bool
@@ -31,6 +33,19 @@ class PublicStoreConfigResponse(BaseModel):
     allowed_countries: str = "India"
     serviceable_pincodes_type: str = "all"
     serviceable_pincodes: Optional[str] = None
+    terms_and_conditions: Optional[str] = None
+    privacy_policy: Optional[str] = None
+    shipping_policy: Optional[str] = None
+    refund_policy: Optional[str] = None
+
+
+class PublicStorePoliciesResponse(BaseModel):
+    store_name: str
+    store_slug: str
+    terms_and_conditions: str
+    privacy_policy: str
+    shipping_policy: str
+    refund_policy: str
 
 
 from app.schemas.platform.catalog import ProductVariantResponse

@@ -19,6 +19,7 @@ from app.models.platform.order import PlatformCustomer, PlatformOrder, PlatformO
 from app.schemas.platform.catalog import ProductVariantResponse
 from app.schemas.platform.store_public import (
     PublicStoreConfigResponse,
+    PublicStorePoliciesResponse,
     PublicProductItem,
     PublicCategoryItem,
     PublicBannerItem,
@@ -35,7 +36,8 @@ async def resolve_active_store(slug: str, db: AsyncSession) -> PlatformStore:
         select(PlatformStore)
         .where(PlatformStore.store_slug == slug.lower().strip())
         .options(
-            selectinload(PlatformStore.vendor).selectinload(PlatformVendor.app_config)
+            selectinload(PlatformStore.vendor).selectinload(PlatformVendor.app_config),
+            selectinload(PlatformStore.vendor).selectinload(PlatformVendor.profile),
         )
     )
     store = (await db.execute(stmt)).scalar_one_or_none()
@@ -59,9 +61,13 @@ async def resolve_active_store(slug: str, db: AsyncSession) -> PlatformStore:
 
 @router.get("/{slug}/config", response_model=PublicStoreConfigResponse)
 async def get_store_config(slug: str, db: AsyncSession = Depends(get_db)):
-    """Fetch live store branding and payment options for the Android app and web storefront."""
+    """Fetch live store branding, policies, and payment options for the Android app and web storefront."""
     store = await resolve_active_store(slug, db)
     app_cfg = store.vendor.app_config
+    vendor_profile = getattr(store.vendor, "profile", None)
+
+    from app.services.platform.policies import get_store_policies
+    policies = get_store_policies(store, vendor_profile)
 
     return PublicStoreConfigResponse(
         store_name=store.store_name,
@@ -72,8 +78,10 @@ async def get_store_config(slug: str, db: AsyncSession = Depends(get_db)):
         secondary_color=store.secondary_color,
         logo_url=store.logo_url,
         banner_url=store.banner_url,
-        contact_email=store.contact_email,
-        contact_phone=store.contact_phone,
+        contact_email=store.contact_email or (vendor_profile.email if vendor_profile else None),
+        contact_phone=store.contact_phone or (vendor_profile.business_phone or vendor_profile.phone if vendor_profile else None),
+        whatsapp_number=(vendor_profile.whatsapp_number if vendor_profile else None) or store.contact_phone,
+        business_phone=(vendor_profile.business_phone if vendor_profile else None) or store.contact_phone,
         business_address=store.business_address,
         opening_hours=store.opening_hours,
         cod_enabled=store.cod_enabled,
@@ -88,6 +96,29 @@ async def get_store_config(slug: str, db: AsyncSession = Depends(get_db)):
         allowed_countries=getattr(store, "allowed_countries", "India"),
         serviceable_pincodes_type=getattr(store, "serviceable_pincodes_type", "all"),
         serviceable_pincodes=getattr(store, "serviceable_pincodes", None),
+        terms_and_conditions=policies["terms_and_conditions"],
+        privacy_policy=policies["privacy_policy"],
+        shipping_policy=policies["shipping_policy"],
+        refund_policy=policies["refund_policy"],
+    )
+
+
+@router.get("/{slug}/policies", response_model=PublicStorePoliciesResponse)
+async def get_public_store_policies(slug: str, db: AsyncSession = Depends(get_db)):
+    """Fetch complete legal policies for this vendor's store and mobile app."""
+    store = await resolve_active_store(slug, db)
+    vendor_profile = getattr(store.vendor, "profile", None)
+
+    from app.services.platform.policies import get_store_policies
+    policies = get_store_policies(store, vendor_profile)
+
+    return PublicStorePoliciesResponse(
+        store_name=store.store_name,
+        store_slug=store.store_slug,
+        terms_and_conditions=policies["terms_and_conditions"],
+        privacy_policy=policies["privacy_policy"],
+        shipping_policy=policies["shipping_policy"],
+        refund_policy=policies["refund_policy"],
     )
 
 
