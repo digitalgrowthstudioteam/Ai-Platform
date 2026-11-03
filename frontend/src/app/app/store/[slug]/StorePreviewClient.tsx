@@ -28,6 +28,7 @@ export default function StorePreviewClient() {
   const [categories, setCategories] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [slowServerNotice, setSlowServerNotice] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Selected Category filter
@@ -40,8 +41,34 @@ export default function StorePreviewClient() {
     const resolvedSlug = getStoreRouteParams(params as any).slug;
     setSlug(resolvedSlug);
 
+    // 1. Instant Cache: Check if we have cached storefront data to render immediately (0ms)
+    let hasCache = false;
+    if (typeof window !== "undefined") {
+      const cached = sessionStorage.getItem(`dgs_store_cache_${resolvedSlug}`);
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          if (parsed?.cfg) {
+            setConfig(parsed.cfg);
+            setBanners(parsed.bans || []);
+            setCategories(parsed.cats || []);
+            setProducts(parsed.prods || []);
+            setLoading(false);
+            hasCache = true;
+          }
+        } catch (e) {}
+      }
+    }
+
+    // 2. Slow server timeout: Show helpful note if backend is waking up from sleep
+    const timer = setTimeout(() => {
+      setSlowServerNotice(true);
+    }, 2800);
+
     async function loadStore() {
-      setLoading(true);
+      if (!hasCache) {
+        setLoading(true);
+      }
       setError(null);
       try {
         const [cfg, bans, cats, prods] = await Promise.all([
@@ -54,15 +81,29 @@ export default function StorePreviewClient() {
         setBanners(bans);
         setCategories(cats);
         setProducts(prods);
+
+        // Save fresh data to session cache
+        if (typeof window !== "undefined") {
+          sessionStorage.setItem(
+            `dgs_store_cache_${resolvedSlug}`,
+            JSON.stringify({ cfg, bans, cats, prods })
+          );
+        }
       } catch (err: any) {
-        setError(err.message || "Failed to load store.");
+        if (!hasCache) {
+          setError(err.message || "Failed to load store.");
+        }
       } finally {
+        clearTimeout(timer);
         setLoading(false);
+        setSlowServerNotice(false);
       }
     }
     if (resolvedSlug) {
       loadStore();
     }
+
+    return () => clearTimeout(timer);
   }, [params]);
 
   const handleAddToCart = (e: React.MouseEvent, p: any) => {
@@ -106,8 +147,14 @@ export default function StorePreviewClient() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
+        <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin mb-3" />
+        {slowServerNotice && (
+          <div className="text-center space-y-1 animate-pulse">
+            <p className="text-xs font-semibold text-slate-700">Connecting to secure store server...</p>
+            <p className="text-[11px] text-slate-400">Loading catalog and theme settings</p>
+          </div>
+        )}
       </div>
     );
   }

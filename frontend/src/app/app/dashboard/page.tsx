@@ -23,29 +23,68 @@ export default function VendorDashboardOverviewPage() {
   const [overview, setOverview] = useState<VendorOverview | null>(null);
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [slowServerNotice, setSlowServerNotice] = useState(false);
 
   useEffect(() => {
+    let hasCache = false;
+    if (typeof window !== "undefined") {
+      const cached = sessionStorage.getItem("dgs_vendor_overview_cache");
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          if (parsed?.stats) {
+            setOverview(parsed.stats);
+            setRecentOrders(parsed.orders || []);
+            setLoading(false);
+            hasCache = true;
+          }
+        } catch (e) {}
+      }
+    }
+
+    const timer = setTimeout(() => {
+      setSlowServerNotice(true);
+    }, 2800);
+
     async function loadData() {
+      if (!hasCache) {
+        setLoading(true);
+      }
       try {
         const [stats, orders] = await Promise.all([
           platformApi.getVendorOverview(),
           platformApi.getOrders(),
         ]);
         setOverview(stats);
-        setRecentOrders(orders.slice(0, 5));
+        const top5 = orders.slice(0, 5);
+        setRecentOrders(top5);
+
+        if (typeof window !== "undefined") {
+          sessionStorage.setItem("dgs_vendor_overview_cache", JSON.stringify({ stats, orders: top5 }));
+        }
       } catch (e) {
         console.error("Failed to load overview data:", e);
       } finally {
+        clearTimeout(timer);
         setLoading(false);
+        setSlowServerNotice(false);
       }
     }
     loadData();
+
+    return () => clearTimeout(timer);
   }, []);
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[50vh]">
-        <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
+      <div className="flex flex-col items-center justify-center min-h-[50vh] p-4">
+        <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin mb-3" />
+        {slowServerNotice && (
+          <div className="text-center space-y-1 animate-pulse">
+            <p className="text-xs font-semibold text-slate-700">Connecting to secure store portal...</p>
+            <p className="text-[11px] text-slate-400">Loading catalog and recent orders</p>
+          </div>
+        )}
       </div>
     );
   }

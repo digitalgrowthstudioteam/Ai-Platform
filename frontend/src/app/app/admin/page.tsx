@@ -24,29 +24,69 @@ export default function SuperAdminOverviewPage() {
   const [overview, setOverview] = useState<SuperAdminOverview | null>(null);
   const [recentVendors, setRecentVendors] = useState<VendorListItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [slowServerNotice, setSlowServerNotice] = useState(false);
 
   useEffect(() => {
+    // 1. Instant Cache: Load previously loaded overview immediately
+    let hasCache = false;
+    if (typeof window !== "undefined") {
+      const cached = sessionStorage.getItem("dgs_admin_overview_cache");
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          if (parsed?.stats) {
+            setOverview(parsed.stats);
+            setRecentVendors(parsed.vendors || []);
+            setLoading(false);
+            hasCache = true;
+          }
+        } catch (e) {}
+      }
+    }
+
+    const timer = setTimeout(() => {
+      setSlowServerNotice(true);
+    }, 2800);
+
     async function load() {
+      if (!hasCache) {
+        setLoading(true);
+      }
       try {
         const [stats, vendors] = await Promise.all([
           platformApi.getSuperAdminOverview(),
           platformApi.getAdminVendors(),
         ]);
         setOverview(stats);
-        setRecentVendors(vendors.slice(0, 5));
+        const top5 = vendors.slice(0, 5);
+        setRecentVendors(top5);
+
+        if (typeof window !== "undefined") {
+          sessionStorage.setItem("dgs_admin_overview_cache", JSON.stringify({ stats, vendors: top5 }));
+        }
       } catch (e) {
         console.error("Failed to load admin overview:", e);
       } finally {
+        clearTimeout(timer);
         setLoading(false);
+        setSlowServerNotice(false);
       }
     }
     load();
+
+    return () => clearTimeout(timer);
   }, []);
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[50vh]">
-        <div className="w-8 h-8 border-3 border-purple-600 border-t-transparent rounded-full animate-spin" />
+      <div className="flex flex-col items-center justify-center min-h-[50vh] p-4">
+        <div className="w-8 h-8 border-3 border-purple-600 border-t-transparent rounded-full animate-spin mb-3" />
+        {slowServerNotice && (
+          <div className="text-center space-y-1 animate-pulse">
+            <p className="text-xs font-semibold text-slate-700">Connecting to secure management server...</p>
+            <p className="text-[11px] text-slate-400">Loading platform metrics and vendors</p>
+          </div>
+        )}
       </div>
     );
   }
