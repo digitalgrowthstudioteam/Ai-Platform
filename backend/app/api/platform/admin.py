@@ -1389,7 +1389,7 @@ async def update_vendor_app_build_status(
         action="UPDATE_APP_CONFIG",
         resource_type="APP_CONFIG",
         resource_id=str(app_cfg.id) if hasattr(app_cfg, "id") and app_cfg.id else app_cfg.package_id,
-        changes=f"Updated app configuration for {v.vendor_code}",
+        details_json=f"Updated app configuration for {v.vendor_code}",
     )
     db.add(audit)
 

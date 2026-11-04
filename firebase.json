@@ -122,6 +122,30 @@
         "destination": "/app/store/placeholder/account.html"
       },
       {
+        "source": "/app/store/*/categories/**",
+        "destination": "/app/store/placeholder/categories.html"
+      },
+      {
+        "source": "/categories/**",
+        "destination": "/app/store/placeholder/categories.html"
+      },
+      {
+        "source": "/app/store/*/categories",
+        "destination": "/app/store/placeholder/categories.html"
+      },
+      {
+        "source": "/categories",
+        "destination": "/app/store/placeholder/categories.html"
+      },
+      {
+        "source": "/app/store/*/policies/**",
+        "destination": "/app/store/placeholder/policies/terms.html"
+      },
+      {
+        "source": "/policies/**",
+        "destination": "/app/store/placeholder/policies/terms.html"
+      },
+      {
         "source": "/app/store/**",
         "destination": "/app/store/placeholder.html"
       }

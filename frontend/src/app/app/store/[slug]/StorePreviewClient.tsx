@@ -9,6 +9,7 @@ import { useVendorWishlist } from "@/lib/app-platform/wishlist-store";
 import StoreHeader from "@/components/app-platform/store/StoreHeader";
 import StoreFooter from "@/components/app-platform/store/StoreFooter";
 import KcAariWorkTheme from "@/components/app-platform/store/themes/KcAariWorkTheme";
+import FmcgStoreTheme from "@/components/app-platform/store/themes/FmcgStoreTheme";
 import PixelInjector from "@/components/app-platform/store/PixelInjector";
 import { pixelTracker } from "@/lib/app-platform/pixel-tracker";
 import { getStoreRouteParams, getStoreHref } from "@/lib/app-platform/store-route-helper";
@@ -239,6 +240,26 @@ export default function StorePreviewClient() {
       <>
         <PixelInjector config={config} pageTitle={config?.store_name} />
         <KcAariWorkTheme
+          slug={slug}
+          config={config}
+          categories={categories}
+          products={products}
+          banners={banners}
+        />
+      </>
+    );
+  }
+
+  // FMCG / Wholesale Grocery Theme for My Shop Partner
+  if (
+    slug === "myshoppartner" ||
+    config?.store_slug === "myshoppartner" ||
+    config?.subdomain?.includes("myshoppartner")
+  ) {
+    return (
+      <>
+        <PixelInjector config={config} pageTitle={config?.store_name} />
+        <FmcgStoreTheme
           slug={slug}
           config={config}
           categories={categories}

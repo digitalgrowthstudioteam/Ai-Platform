@@ -380,6 +380,8 @@ class StoreEmailService:
 
         # Build items table rows
         rows_html = ""
+        subtotal_val = sum((getattr(it, "unit_price", 0.0) * getattr(it, "quantity", 1)) for it in items) if items else getattr(order, "total_amount", 0.0)
+        shipping_val = getattr(order, "shipping_charge", 0.0) if hasattr(order, "shipping_charge") else (getattr(order, "total_amount", 0.0) - subtotal_val if getattr(order, "total_amount", 0.0) > subtotal_val else 0.0)
         for it in items:
             name = getattr(it, "product_name", "Item")
             qty = getattr(it, "quantity", 1)
@@ -442,11 +444,11 @@ class StoreEmailService:
               <div style="background: #f8fafc; border-radius: 12px; padding: 16px; margin-bottom: 24px;">
                 <div style="display: flex; justify-content: space-between; font-size: 13px; color: #475569; margin-bottom: 6px;">
                   <span>Subtotal:</span>
-                  <span style="font-family: monospace;">₹{order.subtotal:,.2f}</span>
+                  <span style="font-family: monospace;">₹{subtotal_val:,.2f}</span>
                 </div>
                 <div style="display: flex; justify-content: space-between; font-size: 13px; color: #475569; margin-bottom: 6px;">
                   <span>Shipping:</span>
-                  <span style="font-family: monospace;">{"FREE" if order.shipping_charge == 0 else f"₹{order.shipping_charge:,.2f}"}</span>
+                  <span style="font-family: monospace;">{"FREE" if shipping_val == 0 else f"₹{shipping_val:,.2f}"}</span>
                 </div>
                 <div style="display: flex; justify-content: space-between; font-size: 16px; font-weight: 800; color: #0f172a; border-top: 1px solid #e2e8f0; padding-top: 8px; margin-top: 6px;">
                   <span>Grand Total:</span>
