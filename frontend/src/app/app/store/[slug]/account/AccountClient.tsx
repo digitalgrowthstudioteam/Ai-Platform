@@ -162,27 +162,10 @@ export default function AccountClient() {
         }
       }
 
-      // Check legacy credentials if any
+      // Pre-fill phone if saved from previous action, but strictly require password sign-in
       const savedPhone = localStorage.getItem("dgs_customer_phone");
-      const savedName = localStorage.getItem("dgs_customer_name");
-      const savedEmail = localStorage.getItem("dgs_customer_email");
       if (savedPhone && savedPhone.trim().length >= 8) {
-        const autoSess = {
-          isLoggedIn: true,
-          name: savedName || "Valued Customer",
-          phone: savedPhone.trim(),
-          email: savedEmail || "",
-          loginAt: new Date().toISOString(),
-        };
-        localStorage.setItem(`dgs_customer_session_${resolvedSlug}`, JSON.stringify(autoSess));
-        setIsLoggedIn(true);
-        setCustomerName(autoSess.name);
-        setCustomerPhone(autoSess.phone);
-        setCustomerEmail(autoSess.email);
-        setAuthPhone(autoSess.phone);
-        fetchOrders(autoSess.phone, resolvedSlug);
-        setCheckingAuth(false);
-        return;
+        setAuthPhone(savedPhone.trim());
       }
 
       setIsLoggedIn(false);

@@ -24,6 +24,7 @@ import {
 export default function AdminVendorsPage() {
   const [vendors, setVendors] = useState<VendorListItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
 
@@ -78,11 +79,14 @@ export default function AdminVendorsPage() {
   };
 
   const loadVendors = async () => {
+    setLoading(true);
+    setFetchError(null);
     try {
       const data = await platformApi.getAdminVendors(search || undefined, statusFilter || undefined);
       setVendors(data);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      setFetchError(e.message || "Failed to load vendors from platform server.");
     } finally {
       setLoading(false);
     }
@@ -110,7 +114,7 @@ export default function AdminVendorsPage() {
     e.preventDefault();
     setCreating(true);
     try {
-      const token = localStorage.getItem("platform_token");
+      const token = localStorage.getItem("dgs_platform_token") || localStorage.getItem("platform_token");
       const res = await fetch("https://digital-growth-studio-api.onrender.com/api/v1/platform/admin/vendors/provision", {
         method: "POST",
         headers: {
@@ -178,7 +182,20 @@ export default function AdminVendorsPage() {
 
       {/* Vendors Table */}
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
-        {loading ? (
+        {fetchError ? (
+          <div className="p-8 text-center bg-rose-50 border border-rose-200 rounded-2xl m-6 space-y-2">
+            <AlertTriangle className="w-8 h-8 text-rose-500 mx-auto" />
+            <p className="text-sm font-semibold text-rose-800">{fetchError}</p>
+            <p className="text-xs text-rose-600">Please check your internet or retry.</p>
+            <button
+              type="button"
+              onClick={() => loadVendors()}
+              className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 bg-rose-600 text-white rounded-xl text-xs font-semibold hover:bg-rose-700 cursor-pointer shadow-xs"
+            >
+              Retry
+            </button>
+          </div>
+        ) : loading ? (
           <div className="py-16 text-center">
             <div className="w-8 h-8 border-3 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto" />
           </div>

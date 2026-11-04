@@ -34,8 +34,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={cn(inter.variable, "font-sans", geist.variable, "w-full max-w-full overflow-x-hidden")}>
-      <body className="w-full max-w-full overflow-x-hidden">
+    <html lang="en" className={cn(inter.variable, "font-sans", geist.variable, "w-full max-w-full overflow-x-clip")}>
+      <body className="w-full max-w-full overflow-x-clip min-h-screen bg-background text-foreground antialiased selection:bg-blue-600/10">
         <GoogleAnalytics />
         <MetaPixel />
         <AppWrapper>{children}</AppWrapper>

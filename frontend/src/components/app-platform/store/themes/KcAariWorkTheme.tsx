@@ -203,21 +203,21 @@ export default function KcAariWorkTheme({
   };
 
   return (
-    <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-[#FDFBF7] text-slate-900 font-sans selection:bg-[#D4AF37]/30">
+    <div className="min-h-screen w-full max-w-full overflow-x-clip bg-[#FDFBF7] text-slate-900 font-sans selection:bg-[#D4AF37]/30">
       {/* ──────────────────────────────────────────────
           1. TOP ANNOUNCEMENT BAR
       ────────────────────────────────────────────── */}
-      <div className="bg-[#041D10] border-b border-[#D4AF37]/25 text-amber-100 text-[11px] sm:text-xs py-2 px-3 sm:px-4 w-full max-w-full overflow-hidden">
-        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-1.5 text-center sm:text-left">
-          <div className="flex items-center justify-center sm:justify-start gap-1.5 max-w-full">
+      <div className="bg-[#041D10] border-b border-[#D4AF37]/25 text-amber-100 text-[10px] sm:text-xs py-1.5 sm:py-2 px-2.5 sm:px-4 w-full max-w-full overflow-hidden">
+        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-1 sm:gap-1.5 text-center sm:text-left">
+          <div className="flex items-center justify-center sm:justify-start gap-1.5 max-w-full overflow-hidden">
             <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-            <span className="font-medium text-amber-200 text-[10px] sm:text-xs line-clamp-1 sm:line-clamp-none">
+            <span className="font-medium text-amber-200 text-[10px] sm:text-xs truncate">
               ✨ Flat 10% Off on Pre-Bridal Orders | Free Pan-India Delivery on Orders above ₹2,999
             </span>
           </div>
-          <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 text-[10px] sm:text-[11px] text-amber-200/80">
-            <span className="hidden xs:inline">Est. Dispatch: 3-5 Days</span>
-            <span className="hidden xs:inline">•</span>
+          <div className="flex items-center justify-center gap-2 sm:gap-3 text-[10px] sm:text-[11px] text-amber-200/80">
+            <span>Est. Dispatch: 3-5 Days</span>
+            <span>•</span>
             <a
               href={`tel:${whatsappPhone}`}
               className="hover:text-amber-300 font-semibold transition-colors flex items-center gap-1"
@@ -233,19 +233,19 @@ export default function KcAariWorkTheme({
           2. LUXURY STOREFRONT HEADER
       ────────────────────────────────────────────── */}
       <header className="sticky top-0 z-40 bg-[#062817]/95 backdrop-blur-md border-b border-[#D4AF37]/30 shadow-md w-full max-w-full overflow-hidden">
-        <div className="max-w-6xl mx-auto px-3 sm:px-4 py-2.5 sm:py-3 flex items-center justify-between gap-2 sm:gap-4">
+        <div className="max-w-6xl mx-auto px-2.5 sm:px-4 py-2 sm:py-3 flex items-center justify-between gap-1.5 sm:gap-4 w-full max-w-full">
           {/* Brand Logo & Title */}
           <Link href={getStoreHref(slug)} className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1 group">
-            <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-gradient-to-br from-[#D4AF37] via-amber-200 to-[#C5A059] p-0.5 shadow-md group-hover:scale-105 transition-transform shrink-0">
-              <div className="w-full h-full bg-[#062817] rounded-[10px] sm:rounded-[14px] flex items-center justify-center text-[#D4AF37] font-serif font-black text-base sm:text-xl tracking-tighter">
+            <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-lg sm:rounded-2xl bg-gradient-to-br from-[#D4AF37] via-amber-200 to-[#C5A059] p-0.5 shadow-md group-hover:scale-105 transition-transform shrink-0">
+              <div className="w-full h-full bg-[#062817] rounded-[6px] sm:rounded-[14px] flex items-center justify-center text-[#D4AF37] font-serif font-black text-xs sm:text-xl tracking-tighter">
                 KC
               </div>
             </div>
-            <div className="min-w-0 flex-1">
-              <span className="font-serif font-black text-sm sm:text-lg text-white tracking-wider uppercase block leading-tight truncate group-hover:text-amber-300 transition-colors">
+            <div className="min-w-0 flex-1 overflow-hidden">
+              <span className="font-serif font-black text-xs sm:text-lg text-white tracking-wider uppercase block leading-tight truncate group-hover:text-amber-300 transition-colors">
                 KC AARI WORK
               </span>
-              <span className="text-[9px] sm:text-[10px] text-amber-200/90 tracking-wide sm:tracking-widest uppercase font-medium block truncate">
+              <span className="text-[9px] sm:text-[10px] text-amber-200/90 tracking-wide sm:tracking-widest uppercase font-medium hidden sm:block truncate">
                 Royal Bridal & Handcrafted Blouses
               </span>
             </div>
@@ -277,30 +277,29 @@ export default function KcAariWorkTheme({
           </div>
 
           {/* Actions: WhatsApp Chat, Wishlist, Cart */}
-          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
             {/* WhatsApp Direct Order Button */}
             <a
               href={getGeneralWhatsAppUrl()}
               target="_blank"
               rel="noopener noreferrer"
               onClick={() => handleWhatsAppClick(undefined, "header_chat")}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md transition-all cursor-pointer hover:shadow-emerald-600/30"
+              className="inline-flex items-center gap-1 px-2 py-1.5 sm:px-3.5 sm:py-2 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] sm:text-xs shadow-md transition-all cursor-pointer hover:shadow-emerald-600/30"
               title="Chat with Master Designer on WhatsApp"
             >
               <MessageCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-white shrink-0" />
-              <span className="hidden md:inline">Chat on WhatsApp</span>
-              <span className="inline md:hidden text-[11px]">Chat</span>
+              <span className="hidden sm:inline">Chat</span>
             </a>
 
             {/* Wishlist Link */}
             <Link
-              href={getStoreHref(slug, "/account")}
-              className="relative p-1.5 sm:p-2 rounded-full bg-white/10 hover:bg-white/20 text-white border border-[#D4AF37]/30 transition-colors"
+              href={getStoreHref(slug, "/account?tab=wishlist")}
+              className="relative p-1.5 sm:p-2 rounded-full bg-white/10 hover:bg-white/20 text-white border border-[#D4AF37]/30 transition-colors shrink-0"
               title="Saved Wishlist"
             >
               <Heart className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-200" />
               {wishlistCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#D4AF37] text-slate-900 font-extrabold text-[9px] flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full bg-[#D4AF37] text-slate-900 font-extrabold text-[8px] sm:text-[9px] flex items-center justify-center">
                   {wishlistCount}
                 </span>
               )}
@@ -309,12 +308,12 @@ export default function KcAariWorkTheme({
             {/* Cart Link */}
             <Link
               href={getStoreHref(slug, "/cart")}
-              className="relative p-1.5 sm:p-2 rounded-full bg-gradient-to-r from-[#D4AF37] via-amber-300 to-[#C5A059] text-slate-900 font-bold shadow-md hover:scale-105 transition-transform"
+              className="relative p-1.5 sm:p-2 rounded-full bg-gradient-to-r from-[#D4AF37] via-amber-300 to-[#C5A059] text-slate-900 font-bold shadow-md hover:scale-105 transition-transform shrink-0"
               title="Shopping Cart"
             >
               <ShoppingCart className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               {cartCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-600 text-white font-extrabold text-[9px] flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full bg-rose-600 text-white font-extrabold text-[8px] sm:text-[9px] flex items-center justify-center">
                   {cartCount}
                 </span>
               )}
@@ -518,12 +517,12 @@ export default function KcAariWorkTheme({
           </p>
         </div>
 
-        {/* Category Filter Pills */}
-        <div className="flex items-center justify-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+        {/* Category Filter Pills (Full horizontal scroll safety) */}
+        <div className="w-full max-w-full flex items-center justify-start sm:justify-center gap-2 overflow-x-auto pb-2 px-1 scrollbar-none">
           <button
             type="button"
             onClick={() => setSelectedCat("")}
-            className={`px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer ${
+            className={`px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer shrink-0 ${
               selectedCat === ""
                 ? "bg-[#062817] text-amber-200 shadow-md border border-[#D4AF37]/50"
                 : "bg-white text-slate-700 border border-slate-200 hover:border-amber-300"
@@ -536,7 +535,7 @@ export default function KcAariWorkTheme({
               key={c.id}
               type="button"
               onClick={() => setSelectedCat(c.id)}
-              className={`px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+              className={`px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                 selectedCat === c.id
                   ? "bg-[#062817] text-amber-200 shadow-md border border-[#D4AF37]/50"
                   : "bg-white text-slate-700 border border-slate-200 hover:border-amber-300"
@@ -817,8 +816,8 @@ export default function KcAariWorkTheme({
       {/* ──────────────────────────────────────────────
           8. LUXURY BOUTIQUE FOOTER (Deep Green & Gold)
       ────────────────────────────────────────────── */}
-      <footer className="bg-[#041D10] text-amber-100/90 pt-12 pb-8 border-t border-[#D4AF37]/30 text-xs">
-        <div className="max-w-6xl mx-auto px-4 grid grid-cols-1 md:grid-cols-4 gap-8 pb-10 border-b border-white/10">
+      <footer className="bg-[#041D10] text-amber-100/90 pt-12 pb-8 border-t border-[#D4AF37]/30 text-xs w-full max-w-full overflow-hidden">
+        <div className="max-w-6xl mx-auto px-4 grid grid-cols-1 md:grid-cols-4 gap-8 pb-10 border-b border-white/10 w-full">
           <div className="md:col-span-2 space-y-3">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#D4AF37] to-[#C5A059] p-0.5">
