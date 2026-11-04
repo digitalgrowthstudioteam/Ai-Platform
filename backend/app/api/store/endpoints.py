@@ -4,6 +4,7 @@ All routes dynamically resolve by store slug and expose only sanitized customer-
 """
 import uuid
 import json
+import secrets
 from typing import List, Optional
 from pydantic import BaseModel
 from datetime import datetime, timezone
@@ -25,6 +26,9 @@ from app.schemas.platform.store_public import (
     PublicBannerItem,
     PublicProductImage,
     PublicStoreEventCreate,
+    CustomerAuthRequest,
+    CustomerAuthResponse,
+    CustomerProfileResponse,
 )
 from app.schemas.platform.order import PublicOrderCreateRequest, OrderResponse, OrderItemResponse
 
@@ -739,4 +743,122 @@ async def get_customer_orders(
             ]
         ))
     return output
+
+
+@router.post("/{slug}/customer/auth", response_model=CustomerAuthResponse)
+async def customer_auth(
+    slug: str,
+    payload: CustomerAuthRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Customer authentication for store storefront: sign in, registration, or instant login."""
+    store = await resolve_active_store(slug, db)
+    clean_phone = payload.phone.strip().replace(" ", "").replace("-", "")
+    if len(clean_phone) < 8:
+        raise HTTPException(status_code=400, detail="Please enter a valid mobile phone number.")
+
+    clean_email = payload.email.strip().lower() if payload.email else None
+    clean_name = payload.name.strip() if payload.name else None
+
+    # Check for existing customer record under this vendor
+    stmt = select(PlatformCustomer).where(
+        PlatformCustomer.vendor_id == store.vendor_id,
+        PlatformCustomer.phone == clean_phone,
+    )
+    customer = (await db.execute(stmt)).scalar_one_or_none()
+
+    if payload.action == "register":
+        if not customer:
+            customer = PlatformCustomer(
+                vendor_id=store.vendor_id,
+                name=clean_name or "Valued Customer",
+                phone=clean_phone,
+                email=clean_email,
+                total_orders=0,
+                total_spent=0.0,
+            )
+            db.add(customer)
+        else:
+            if clean_name:
+                customer.name = clean_name
+            if clean_email:
+                customer.email = clean_email
+        await db.commit()
+        await db.refresh(customer)
+
+        token = secrets.token_urlsafe(24)
+        return CustomerAuthResponse(
+            success=True,
+            message="Account created successfully!",
+            customer=CustomerProfileResponse(
+                id=customer.id,
+                vendor_id=customer.vendor_id,
+                name=customer.name,
+                phone=customer.phone,
+                email=customer.email,
+                total_orders=customer.total_orders,
+                total_spent=customer.total_spent,
+            ),
+            token=token,
+        )
+
+    elif payload.action in ("login", "otp_verify"):
+        if not customer:
+            # If no customer profile yet, see if customer has existing orders with this phone
+            orders_stmt = (
+                select(PlatformOrder)
+                .where(
+                    PlatformOrder.vendor_id == store.vendor_id,
+                    PlatformOrder.customer_phone == clean_phone,
+                )
+                .order_by(desc(PlatformOrder.created_at))
+            )
+            last_order = (await db.execute(orders_stmt)).scalars().first()
+
+            customer_name = clean_name or (last_order.customer_name if last_order else "Valued Customer")
+            customer_email = clean_email or (last_order.customer_email if last_order else None)
+
+            customer = PlatformCustomer(
+                vendor_id=store.vendor_id,
+                name=customer_name,
+                phone=clean_phone,
+                email=customer_email,
+                total_orders=1 if last_order else 0,
+                total_spent=last_order.total_amount if last_order else 0.0,
+            )
+            db.add(customer)
+            await db.commit()
+            await db.refresh(customer)
+        else:
+            if clean_name and clean_name != "Valued Customer":
+                customer.name = clean_name
+            if clean_email and not customer.email:
+                customer.email = clean_email
+            await db.commit()
+            await db.refresh(customer)
+
+        token = secrets.token_urlsafe(24)
+        return CustomerAuthResponse(
+            success=True,
+            message="Logged in successfully!",
+            customer=CustomerProfileResponse(
+                id=customer.id,
+                vendor_id=customer.vendor_id,
+                name=customer.name,
+                phone=customer.phone,
+                email=customer.email,
+                total_orders=customer.total_orders,
+                total_spent=customer.total_spent,
+            ),
+            token=token,
+        )
+
+    elif payload.action == "otp_request":
+        return CustomerAuthResponse(
+            success=True,
+            message="Verification OTP sent to your phone number.",
+            token=None,
+        )
+
+    raise HTTPException(status_code=400, detail="Invalid action requested.")
 

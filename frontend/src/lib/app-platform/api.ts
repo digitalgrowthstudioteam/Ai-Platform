@@ -756,6 +756,34 @@ class PlatformApiClient {
     return this.request(`/api/store/${slug}/customer-orders?phone=${encodeURIComponent(phone)}`);
   }
 
+  async customerAuth(slug: string, payload: {
+    action: 'login' | 'register' | 'otp_request' | 'otp_verify';
+    phone: string;
+    name?: string;
+    email?: string;
+    password?: string;
+    otp?: string;
+  }): Promise<any> {
+    if (this.isDemoMode() || slug === 'demo' || slug === 'demo-store') {
+      return {
+        success: true,
+        message: 'Logged in successfully',
+        customer: {
+          id: 'demo-customer-1',
+          name: payload.name || 'Valued Customer',
+          phone: payload.phone,
+          email: payload.email || 'customer@example.com',
+          total_orders: 1,
+        },
+        token: 'demo-token',
+      };
+    }
+    return this.request(`/api/store/${slug}/customer/auth`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
   // ──────────────────────────────────────────────
   // Platform Payments & Razorpay
   // ──────────────────────────────────────────────

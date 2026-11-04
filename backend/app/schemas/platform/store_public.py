@@ -98,7 +98,32 @@ class PublicCategoryItem(BaseModel):
     name: str
     slug: str
     image_url: Optional[str] = None
-    sort_order: int
+
+
+class CustomerAuthRequest(BaseModel):
+    action: str = "login"  # "login", "register", "otp_request", "otp_verify"
+    phone: str
+    name: Optional[str] = None
+    email: Optional[str] = None
+    password: Optional[str] = None
+    otp: Optional[str] = None
+
+
+class CustomerProfileResponse(BaseModel):
+    id: uuid.UUID
+    vendor_id: uuid.UUID
+    name: str
+    phone: str
+    email: Optional[str] = None
+    total_orders: int = 0
+    total_spent: float = 0.0
+
+
+class CustomerAuthResponse(BaseModel):
+    success: bool
+    message: str
+    customer: Optional[CustomerProfileResponse] = None
+    token: Optional[str] = None
 
 
 class PublicBannerItem(BaseModel):

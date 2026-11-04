@@ -76,13 +76,23 @@ export default function CheckoutClient() {
       loadConfig();
     }
 
-    // Auto-fill previous details if present in localStorage
+    // Auto-fill customer details from session or localStorage
     try {
-      const savedName = localStorage.getItem("dgs_customer_name");
-      const savedPhone = localStorage.getItem("dgs_customer_phone");
+      const savedSession = localStorage.getItem(`dgs_customer_session_${resolvedSlug}`);
+      if (savedSession) {
+        const parsed = JSON.parse(savedSession);
+        if (parsed?.name) setCustomerName(parsed.name);
+        if (parsed?.phone) setCustomerPhone(parsed.phone);
+        if (parsed?.email) setCustomerEmail(parsed.email);
+      } else {
+        const savedName = localStorage.getItem("dgs_customer_name");
+        const savedPhone = localStorage.getItem("dgs_customer_phone");
+        const savedEmail = localStorage.getItem("dgs_customer_email");
+        if (savedName) setCustomerName(savedName);
+        if (savedPhone) setCustomerPhone(savedPhone);
+        if (savedEmail) setCustomerEmail(savedEmail);
+      }
       const savedAddress = localStorage.getItem("dgs_customer_address");
-      if (savedName) setCustomerName(savedName);
-      if (savedPhone) setCustomerPhone(savedPhone);
       if (savedAddress) setStreetAddress(savedAddress);
     } catch (e) {}
   }, [slug]);

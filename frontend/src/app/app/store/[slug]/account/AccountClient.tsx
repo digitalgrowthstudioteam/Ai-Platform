@@ -17,6 +17,7 @@ import {
   Phone,
   Clock,
   ArrowRight,
+  ArrowLeft,
   ExternalLink,
   ShoppingBag,
   ShieldCheck,
@@ -39,6 +40,10 @@ import {
   ChevronRight,
   Home,
   Briefcase,
+  LogOut,
+  Lock,
+  RefreshCw,
+  Sparkles,
 } from "lucide-react";
 
 type AccountTab = "orders" | "wishlist" | "addresses" | "profile" | "help";
@@ -53,6 +58,17 @@ export default function AccountClient() {
   const [config, setConfig] = useState<any>(null);
   const [loadingConfig, setLoadingConfig] = useState(true);
 
+  // Authentication State
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
+  const [authMode, setAuthMode] = useState<"login" | "register">("login");
+  const [authPhone, setAuthPhone] = useState("");
+  const [authName, setAuthName] = useState("");
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [submittingAuth, setSubmittingAuth] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+
   // Customer Profile State
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
@@ -60,12 +76,14 @@ export default function AccountClient() {
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileSuccess, setProfileSuccess] = useState(false);
 
-  // Orders Lookup State
+  // Orders State
   const [orders, setOrders] = useState<any[]>([]);
   const [searchingOrders, setSearchingOrders] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [orderSearchQuery, setOrderSearchQuery] = useState("");
   const [orderStatusFilter, setOrderStatusFilter] = useState("ALL");
+  const [showAltPhoneInput, setShowAltPhoneInput] = useState(false);
+  const [altPhone, setAltPhone] = useState("");
 
   // Stores & Hooks
   const { addItem } = useVendorCart(slug);
@@ -93,8 +111,6 @@ export default function AccountClient() {
     is_default: false,
   });
 
-  // Track order modal / quick view
-  const [trackingOrder, setTrackingOrder] = useState<any | null>(null);
   const [addedMap, setAddedMap] = useState<Record<string, boolean>>({});
 
   // Sync tab with URL search parameter if it exists
@@ -126,18 +142,52 @@ export default function AccountClient() {
       loadConfig();
     }
 
-    // Load customer profile from local storage
+    // Inspect customer session from localStorage
     try {
-      const savedName = localStorage.getItem("dgs_customer_name") || "";
-      const savedPhone = localStorage.getItem("dgs_customer_phone") || "";
-      const savedEmail = localStorage.getItem("dgs_customer_email") || "";
-      if (savedName) setCustomerName(savedName);
-      if (savedPhone) {
-        setCustomerPhone(savedPhone);
-        fetchOrders(savedPhone, resolvedSlug);
+      const sessStr = localStorage.getItem(`dgs_customer_session_${resolvedSlug}`);
+      if (sessStr) {
+        const sess = JSON.parse(sessStr);
+        if (sess?.isLoggedIn && sess?.phone) {
+          setIsLoggedIn(true);
+          setCustomerName(sess.name || "");
+          setCustomerPhone(sess.phone || "");
+          setCustomerEmail(sess.email || "");
+          setAuthPhone(sess.phone || "");
+          fetchOrders(sess.phone, resolvedSlug);
+          setCheckingAuth(false);
+          return;
+        }
       }
-      if (savedEmail) setCustomerEmail(savedEmail);
-    } catch (e) {}
+
+      // Check legacy credentials if any
+      const savedPhone = localStorage.getItem("dgs_customer_phone");
+      const savedName = localStorage.getItem("dgs_customer_name");
+      const savedEmail = localStorage.getItem("dgs_customer_email");
+      if (savedPhone && savedPhone.trim().length >= 8) {
+        const autoSess = {
+          isLoggedIn: true,
+          name: savedName || "Valued Customer",
+          phone: savedPhone.trim(),
+          email: savedEmail || "",
+          loginAt: new Date().toISOString(),
+        };
+        localStorage.setItem(`dgs_customer_session_${resolvedSlug}`, JSON.stringify(autoSess));
+        setIsLoggedIn(true);
+        setCustomerName(autoSess.name);
+        setCustomerPhone(autoSess.phone);
+        setCustomerEmail(autoSess.email);
+        setAuthPhone(autoSess.phone);
+        fetchOrders(autoSess.phone, resolvedSlug);
+        setCheckingAuth(false);
+        return;
+      }
+
+      setIsLoggedIn(false);
+    } catch (e) {
+      setIsLoggedIn(false);
+    } finally {
+      setCheckingAuth(false);
+    }
   }, [slug]);
 
   useEffect(() => {
@@ -165,11 +215,106 @@ export default function AccountClient() {
     }
   };
 
-  const handleOrderSearchSubmit = (e: React.FormEvent) => {
+  const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (customerPhone.trim()) {
-      localStorage.setItem("dgs_customer_phone", customerPhone.trim());
-      fetchOrders(customerPhone);
+    setAuthError(null);
+
+    const cleanPhone = authPhone.replace(/\D/g, "");
+    if (cleanPhone.length < 10) {
+      setAuthError("Please enter a valid 10-digit mobile phone number.");
+      return;
+    }
+
+    if (authMode === "register" && (!authName || authName.trim().length < 2)) {
+      setAuthError("Please enter your full name.");
+      return;
+    }
+
+    setSubmittingAuth(true);
+    try {
+      const res = await platformApi.customerAuth(slug, {
+        action: authMode,
+        phone: cleanPhone,
+        name: authName.trim() || undefined,
+        email: authEmail.trim() || undefined,
+        password: authPassword.trim() || undefined,
+      });
+
+      if (!res.success && res.detail) {
+        setAuthError(res.detail || "Authentication failed. Please try again.");
+        return;
+      }
+
+      const cust = res.customer || {
+        id: "cust_" + cleanPhone,
+        name: authName.trim() || "Valued Customer",
+        phone: cleanPhone,
+        email: authEmail.trim() || "",
+      };
+
+      const sessionData = {
+        isLoggedIn: true,
+        id: cust.id,
+        name: cust.name,
+        phone: cust.phone,
+        email: cust.email || "",
+        token: res.token || "token_" + Date.now(),
+        loginAt: new Date().toISOString(),
+      };
+
+      localStorage.setItem(`dgs_customer_session_${slug}`, JSON.stringify(sessionData));
+      localStorage.setItem("dgs_customer_name", cust.name);
+      localStorage.setItem("dgs_customer_phone", cust.phone);
+      if (cust.email) {
+        localStorage.setItem("dgs_customer_email", cust.email);
+      }
+
+      // Notify header and any listening tabs
+      window.dispatchEvent(new Event("storage"));
+      window.dispatchEvent(new CustomEvent("dgs_customer_auth_changed"));
+
+      setCustomerName(cust.name);
+      setCustomerPhone(cust.phone);
+      setCustomerEmail(cust.email || "");
+      setIsLoggedIn(true);
+
+      fetchOrders(cust.phone, slug);
+    } catch (err: any) {
+      console.error("Auth error:", err);
+      setAuthError(err.message || "Failed to log in. Please check your phone number and try again.");
+    } finally {
+      setSubmittingAuth(false);
+    }
+  };
+
+  const handleLogout = () => {
+    try {
+      localStorage.removeItem(`dgs_customer_session_${slug}`);
+      localStorage.removeItem("dgs_customer_name");
+      localStorage.removeItem("dgs_customer_phone");
+      localStorage.removeItem("dgs_customer_email");
+      window.dispatchEvent(new Event("storage"));
+      window.dispatchEvent(new CustomEvent("dgs_customer_auth_changed"));
+    } catch (e) {}
+
+    setIsLoggedIn(false);
+    setCustomerName("");
+    setCustomerPhone("");
+    setCustomerEmail("");
+    setAuthPhone("");
+    setAuthName("");
+    setAuthEmail("");
+    setAuthPassword("");
+    setOrders([]);
+    setHasSearched(false);
+    setActiveTab("orders");
+  };
+
+  const handleAltPhoneSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    const clean = altPhone.replace(/\D/g, "");
+    if (clean.length >= 8) {
+      fetchOrders(clean, slug);
     }
   };
 
@@ -180,6 +325,18 @@ export default function AccountClient() {
       if (customerName.trim()) localStorage.setItem("dgs_customer_name", customerName.trim());
       if (customerPhone.trim()) localStorage.setItem("dgs_customer_phone", customerPhone.trim());
       if (customerEmail.trim()) localStorage.setItem("dgs_customer_email", customerEmail.trim());
+
+      const sessStr = localStorage.getItem(`dgs_customer_session_${slug}`);
+      if (sessStr) {
+        const sess = JSON.parse(sessStr);
+        sess.name = customerName.trim();
+        sess.phone = customerPhone.trim();
+        sess.email = customerEmail.trim();
+        localStorage.setItem(`dgs_customer_session_${slug}`, JSON.stringify(sess));
+      }
+
+      window.dispatchEvent(new Event("storage"));
+      window.dispatchEvent(new CustomEvent("dgs_customer_auth_changed"));
 
       setProfileSuccess(true);
       setTimeout(() => setProfileSuccess(false), 2500);
@@ -276,7 +433,7 @@ export default function AccountClient() {
     setAddressModalOpen(false);
   };
 
-  const primaryColor = config?.primary_color || "#2563EB";
+  const primaryColor = config?.primary_color || "#062817";
 
   // Filtered Orders
   const filteredOrders = useMemo(() => {
@@ -326,6 +483,277 @@ export default function AccountClient() {
     return 1;
   };
 
+  // ─────────────────────────────────────────────────────────────
+  // LOADING VIEW (While verifying session)
+  // ─────────────────────────────────────────────────────────────
+  if (checkingAuth || loadingConfig) {
+    return (
+      <div className="min-h-screen w-full bg-slate-50 text-slate-900 flex flex-col font-sans">
+        <StoreHeader slug={slug} config={config} backHref={getStoreHref(slug)} backLabel="Back to Store" />
+        <main className="max-w-md mx-auto px-4 py-24 flex-1 flex flex-col items-center justify-center text-center">
+          <div className="w-12 h-12 rounded-2xl border-4 border-slate-200 border-t-emerald-600 animate-spin" />
+          <h2 className="text-sm font-bold text-slate-800 mt-4">Verifying Customer Account...</h2>
+          <p className="text-xs text-slate-500 mt-1">
+            Loading shopper details for {config?.store_name || "this store"}
+          </p>
+        </main>
+        <StoreFooter slug={slug} config={config} />
+      </div>
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // AUTHENTICATION GATE (When user is not signed in)
+  // ─────────────────────────────────────────────────────────────
+  if (!isLoggedIn) {
+    return (
+      <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-slate-50 text-slate-900 flex flex-col font-sans">
+        <StoreHeader slug={slug} config={config} backHref={getStoreHref(slug)} backLabel="Back to Store" />
+
+        <main className="max-w-md mx-auto px-4 py-8 sm:py-12 flex-1 w-full space-y-6">
+          {/* Back link */}
+          <div>
+            <Link
+              href={getStoreHref(slug)}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900 transition-colors"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Back to {config?.store_name || "Store"}</span>
+            </Link>
+          </div>
+
+          {/* Auth Portal Card */}
+          <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-xs space-y-6">
+            {/* Store Brand Header */}
+            <div className="text-center space-y-2">
+              {config?.logo_url ? (
+                <img
+                  src={config.logo_url}
+                  alt={config.store_name}
+                  className="w-14 h-14 mx-auto rounded-2xl object-cover border border-slate-200 shadow-xs"
+                />
+              ) : (
+                <div
+                  className="w-14 h-14 mx-auto rounded-2xl flex items-center justify-center text-white font-black text-xl shadow-xs uppercase"
+                  style={{ backgroundColor: primaryColor }}
+                >
+                  {config?.store_name ? config.store_name[0] : "S"}
+                </div>
+              )}
+              <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">
+                Customer Account
+              </h1>
+              <p className="text-xs text-slate-500 max-w-xs mx-auto">
+                {authMode === "login"
+                  ? "Sign in with your mobile number to view past orders, track shipments, and manage saved delivery addresses."
+                  : "Create your personal shopper account to track purchases and enjoy 1-click checkouts."}
+              </p>
+            </div>
+
+            {/* Mode Switcher Tabs */}
+            <div className="grid grid-cols-2 p-1 bg-slate-100 rounded-2xl text-xs font-bold text-slate-600">
+              <button
+                type="button"
+                onClick={() => {
+                  setAuthMode("login");
+                  setAuthError(null);
+                }}
+                className={`py-2 rounded-xl transition-all cursor-pointer ${
+                  authMode === "login" ? "bg-white text-slate-900 shadow-xs" : "hover:text-slate-900"
+                }`}
+              >
+                Sign In
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAuthMode("register");
+                  setAuthError(null);
+                }}
+                className={`py-2 rounded-xl transition-all cursor-pointer ${
+                  authMode === "register" ? "bg-white text-slate-900 shadow-xs" : "hover:text-slate-900"
+                }`}
+              >
+                Create Account
+              </button>
+            </div>
+
+            {/* Error Message */}
+            {authError && (
+              <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-2xl text-xs text-rose-700 flex items-start gap-2.5">
+                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                <span className="leading-tight">{authError}</span>
+              </div>
+            )}
+
+            {/* Form */}
+            <form onSubmit={handleAuthSubmit} className="space-y-4 text-xs">
+              {authMode === "register" && (
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Your Full Name *</label>
+                  <div className="relative">
+                    <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      required
+                      value={authName}
+                      onChange={(e) => setAuthName(e.target.value)}
+                      placeholder="e.g. Priya Sharma"
+                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-blue-600"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">
+                  Mobile Phone Number *
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-mono font-bold text-slate-500">
+                    +91
+                  </span>
+                  <input
+                    type="tel"
+                    required
+                    maxLength={10}
+                    value={authPhone}
+                    onChange={(e) => setAuthPhone(e.target.value.replace(/\D/g, ""))}
+                    placeholder="9876543210"
+                    className="w-full pl-12 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs focus:bg-white focus:outline-blue-600"
+                  />
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1">
+                  All past and new order invoices are linked directly to this phone number.
+                </p>
+              </div>
+
+              {authMode === "register" && (
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Email Address (Optional)</label>
+                  <div className="relative">
+                    <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="email"
+                      value={authEmail}
+                      onChange={(e) => setAuthEmail(e.target.value)}
+                      placeholder="e.g. priya@example.com"
+                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-blue-600"
+                    />
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    Receive digital PDF invoices and dispatch notifications.
+                  </p>
+                </div>
+              )}
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="font-semibold text-slate-700 block">
+                    Security PIN / Password (Optional)
+                  </label>
+                  {authMode === "login" && (
+                    <span className="text-[10px] text-emerald-600 font-semibold">1-Click Login</span>
+                  )}
+                </div>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="password"
+                    value={authPassword}
+                    onChange={(e) => setAuthPassword(e.target.value)}
+                    placeholder={authMode === "register" ? "Create optional 4-8 digit PIN" : "Enter PIN or leave blank"}
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-blue-600"
+                  />
+                </div>
+              </div>
+
+              <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 text-[11px] text-slate-600 flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>Instant Login: No complicated passwords needed. Your purchases are instantly linked.</span>
+              </div>
+
+              <button
+                type="submit"
+                disabled={submittingAuth}
+                className="w-full py-3 px-4 rounded-xl text-xs font-bold text-white shadow-xs hover:opacity-95 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+                style={{ backgroundColor: primaryColor }}
+              >
+                {submittingAuth ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Signing In...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>{authMode === "login" ? "Sign In to My Account" : "Create Account & Sign In"}</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+            </form>
+
+            <div className="pt-2 text-center text-xs text-slate-500">
+              {authMode === "login" ? (
+                <p>
+                  Don't have an account yet?{" "}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuthMode("register");
+                      setAuthError(null);
+                    }}
+                    className="font-bold text-slate-900 underline hover:text-blue-600 cursor-pointer"
+                  >
+                    Create Account
+                  </button>
+                </p>
+              ) : (
+                <p>
+                  Already have an account?{" "}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuthMode("login");
+                      setAuthError(null);
+                    }}
+                    className="font-bold text-slate-900 underline hover:text-blue-600 cursor-pointer"
+                  >
+                    Sign In
+                  </button>
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Trust Highlights */}
+          <div className="grid grid-cols-3 gap-3 text-center text-[11px] text-slate-600">
+            <div className="p-3 bg-white rounded-2xl border border-slate-200">
+              <ShieldCheck className="w-4 h-4 text-emerald-600 mx-auto mb-1" />
+              <p className="font-semibold text-slate-800">100% Secure</p>
+              <p className="text-[10px] text-slate-400">Encrypted portal</p>
+            </div>
+            <div className="p-3 bg-white rounded-2xl border border-slate-200">
+              <Truck className="w-4 h-4 text-blue-600 mx-auto mb-1" />
+              <p className="font-semibold text-slate-800">Live Tracking</p>
+              <p className="text-[10px] text-slate-400">Real-time status</p>
+            </div>
+            <div className="p-3 bg-white rounded-2xl border border-slate-200">
+              <MapPin className="w-4 h-4 text-purple-600 mx-auto mb-1" />
+              <p className="font-semibold text-slate-800">1-Click Checkout</p>
+              <p className="text-[10px] text-slate-400">Saved addresses</p>
+            </div>
+          </div>
+        </main>
+
+        <StoreFooter slug={slug} config={config} />
+      </div>
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // AUTHENTICATED CUSTOMER HUB (When user is logged in)
+  // ─────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-slate-50 text-slate-900 flex flex-col font-sans">
       <StoreHeader slug={slug} config={config} backHref={getStoreHref(slug)} backLabel="Back to Store" />
@@ -343,32 +771,34 @@ export default function AccountClient() {
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">
-                  {customerName ? customerName : "My Customer Hub"}
+                  {customerName ? `Welcome back, ${customerName}!` : "My Customer Hub"}
                 </h1>
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                  {config?.store_name || "Verified Shopper"}
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                  Verified Customer
+                </span>
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                  {config?.store_name || "Online Store"}
                 </span>
               </div>
-              <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-2 flex-wrap">
-                {customerPhone ? (
-                  <span className="font-mono text-slate-700 font-semibold flex items-center gap-1">
-                    <Phone className="w-3 h-3 text-slate-400" /> +91 {customerPhone}
-                  </span>
-                ) : (
-                  <span>Enter your phone below to track purchases</span>
-                )}
+              <p className="text-xs text-slate-500 mt-1 flex items-center gap-2 flex-wrap">
+                <span className="font-mono text-slate-700 font-semibold flex items-center gap-1">
+                  <Phone className="w-3 h-3 text-slate-400" /> +91 {customerPhone}
+                </span>
                 {customerEmail && (
-                  <span className="text-slate-400 hidden sm:inline">• {customerEmail}</span>
+                  <span className="text-slate-400 flex items-center gap-1">
+                    <Mail className="w-3 h-3 text-slate-400" /> {customerEmail}
+                  </span>
                 )}
               </p>
             </div>
           </div>
 
-          {/* Quick Metrics Bar */}
+          {/* Quick Metrics Bar + Sign Out */}
           <div className="flex items-center gap-3 sm:gap-4 w-full md:w-auto justify-between sm:justify-start border-t md:border-t-0 pt-4 md:pt-0 border-slate-100">
             <button
               onClick={() => setActiveTab("orders")}
-              className="text-center px-3 py-2 rounded-xl hover:bg-slate-50 transition-colors"
+              className="text-center px-3 py-2 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer"
             >
               <span className="block text-lg font-black text-slate-900 font-mono leading-none">
                 {orders.length}
@@ -378,7 +808,7 @@ export default function AccountClient() {
             <div className="h-8 w-px bg-slate-200" />
             <button
               onClick={() => setActiveTab("wishlist")}
-              className="text-center px-3 py-2 rounded-xl hover:bg-slate-50 transition-colors"
+              className="text-center px-3 py-2 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer"
             >
               <span className="block text-lg font-black text-rose-600 font-mono leading-none">
                 {wishlistItems.length}
@@ -388,12 +818,21 @@ export default function AccountClient() {
             <div className="h-8 w-px bg-slate-200" />
             <button
               onClick={() => setActiveTab("addresses")}
-              className="text-center px-3 py-2 rounded-xl hover:bg-slate-50 transition-colors"
+              className="text-center px-3 py-2 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer"
             >
               <span className="block text-lg font-black text-blue-600 font-mono leading-none">
                 {addresses.length}
               </span>
               <span className="text-[11px] text-slate-500 font-medium mt-1 block">Addresses</span>
+            </button>
+            <div className="h-8 w-px bg-slate-200 hidden sm:block" />
+            <button
+              onClick={handleLogout}
+              className="px-3.5 py-2 rounded-xl text-xs font-bold text-slate-600 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 transition-all flex items-center gap-1.5 cursor-pointer ml-1"
+              title="Sign out of account"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span>Sign Out</span>
             </button>
           </div>
         </div>
@@ -481,253 +920,266 @@ export default function AccountClient() {
         {/* ───────────────────────────────────────────────────────── */}
         {activeTab === "orders" && (
           <div className="space-y-6">
-            {/* Phone Lookup Box */}
-            <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                    <Phone className="w-4 h-4 text-blue-600" />
-                    Lookup Real-Time Orders by Phone Number
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Enter the mobile phone number you use for checkouts to fetch all your historical invoices and tracking details.
-                  </p>
-                </div>
-                {hasSearched && (
-                  <span className="text-[11px] text-emerald-700 font-semibold bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-xl self-start sm:self-auto">
-                    ✓ Verified for {customerPhone}
-                  </span>
-                )}
+            {/* Orders Summary Bar */}
+            <div className="bg-white rounded-3xl border border-slate-200 p-5 sm:p-6 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <h3 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
+                  <Package className="w-4 h-4 text-blue-600" />
+                  Your Orders & Live Tracking
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Showing purchases and shipments placed with <strong className="font-mono text-slate-700 font-semibold">+91 {customerPhone}</strong>
+                </p>
               </div>
 
-              <form onSubmit={handleOrderSearchSubmit} className="flex flex-col sm:flex-row gap-3 pt-1">
-                <div className="relative flex-1">
-                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-mono text-slate-400">
-                    +91
-                  </span>
-                  <input
-                    type="tel"
-                    required
-                    value={customerPhone}
-                    onChange={(e) => setCustomerPhone(e.target.value)}
-                    placeholder="e.g. 9876543210"
-                    className="w-full pl-12 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:bg-white focus:outline-blue-600 transition-colors"
-                  />
-                </div>
+              <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-between sm:justify-start">
                 <button
-                  type="submit"
+                  type="button"
+                  onClick={() => fetchOrders(customerPhone)}
                   disabled={searchingOrders}
-                  className="px-6 py-2.5 rounded-xl text-xs font-bold text-white shadow-xs hover:opacity-95 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer shrink-0"
-                  style={{ backgroundColor: primaryColor }}
+                  className="px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  title="Refresh order statuses"
                 >
-                  <Search className="w-4 h-4" />
-                  {searchingOrders ? "Searching Orders..." : "Find My Orders"}
+                  <RefreshCw className={`w-3.5 h-3.5 ${searchingOrders ? "animate-spin text-blue-600" : ""}`} />
+                  <span>{searchingOrders ? "Updating..." : "Refresh"}</span>
                 </button>
-              </form>
+
+                <button
+                  type="button"
+                  onClick={() => setShowAltPhoneInput(!showAltPhoneInput)}
+                  className="px-3 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:text-slate-800 hover:bg-slate-50 border border-slate-200 transition-colors cursor-pointer"
+                >
+                  {showAltPhoneInput ? "Hide Search" : "Search Another Phone"}
+                </button>
+              </div>
             </div>
 
-            {/* Orders List & Controls */}
-            {hasSearched && (
-              <div className="space-y-4">
-                {/* Search & Filter Pills */}
-                {orders.length > 0 && (
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200">
-                    <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-1 sm:pb-0">
-                      {["ALL", "NEW", "CONFIRMED", "PROCESSING", "SHIPPED", "DELIVERED"].map((st) => (
-                        <button
-                          key={st}
-                          onClick={() => setOrderStatusFilter(st)}
-                          className={`px-3 py-1.5 rounded-xl text-[11px] font-semibold transition-colors cursor-pointer whitespace-nowrap ${
-                            orderStatusFilter === st
-                              ? "bg-slate-900 text-white"
-                              : "text-slate-600 hover:bg-slate-100"
-                          }`}
-                        >
-                          {st === "ALL" ? "All Orders" : st}
-                        </button>
-                      ))}
-                    </div>
-
-                    <div className="relative w-full sm:w-56">
-                      <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                      <input
-                        type="text"
-                        value={orderSearchQuery}
-                        onChange={(e) => setOrderSearchQuery(e.target.value)}
-                        placeholder="Search order # or item"
-                        className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-blue-600"
-                      />
-                    </div>
+            {/* Optional Alternate Phone Lookup Form if toggled */}
+            {showAltPhoneInput && (
+              <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-2 animate-in fade-in duration-150">
+                <p className="text-xs font-semibold text-slate-700">Lookup orders placed with a different mobile phone number:</p>
+                <form onSubmit={handleAltPhoneSearch} className="flex gap-2">
+                  <div className="relative flex-1">
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-mono text-slate-400">+91</span>
+                    <input
+                      type="tel"
+                      value={altPhone}
+                      onChange={(e) => setAltPhone(e.target.value)}
+                      placeholder="Enter 10-digit phone"
+                      className="w-full pl-12 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:bg-white focus:outline-blue-600"
+                    />
                   </div>
-                )}
-
-                {/* Orders Content */}
-                {filteredOrders.length === 0 ? (
-                  <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center max-w-md mx-auto space-y-4">
-                    <div className="w-16 h-16 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto shadow-xs">
-                      <Package className="w-8 h-8" />
-                    </div>
-                    <h3 className="font-bold text-slate-900 text-base">
-                      {orders.length === 0 ? "No Orders Found" : "No Orders Matching Filter"}
-                    </h3>
-                    <p className="text-xs text-slate-500">
-                      {orders.length === 0
-                        ? `We didn't find any orders matching phone number ${customerPhone} under ${config?.store_name || "this store"}. Start exploring our products below.`
-                        : "Try selecting another status tab or clearing your search query."}
-                    </p>
-                    <div className="pt-2">
-                      <Link
-                        href={getStoreHref(slug)}
-                        className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-semibold text-white shadow-xs hover:opacity-95"
-                        style={{ backgroundColor: primaryColor }}
-                      >
-                        Start Shopping
-                        <ArrowRight className="w-4 h-4" />
-                      </Link>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {filteredOrders.map((ord) => {
-                      const stepIdx = getStepIndex(ord.order_status);
-                      const isDelivered = (ord.order_status || "").toUpperCase() === "DELIVERED";
-                      const isCancelled = (ord.order_status || "").toUpperCase() === "CANCELLED";
-
-                      return (
-                        <div
-                          key={ord.id}
-                          className="bg-white rounded-3xl border border-slate-200 p-5 sm:p-6 shadow-xs space-y-5 hover:border-blue-300 transition-colors"
-                        >
-                          {/* Order Header */}
-                          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
-                            <div>
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-black text-slate-900 text-sm font-mono tracking-tight">
-                                  {ord.order_number}
-                                </span>
-                                {getStatusBadge(ord.order_status)}
-                              </div>
-                              <p className="text-[11px] text-slate-400 mt-1 flex items-center gap-1.5">
-                                <Clock className="w-3 h-3 text-slate-400" />
-                                Placed on: {new Date(ord.created_at).toLocaleDateString("en-IN", {
-                                  day: "numeric",
-                                  month: "short",
-                                  year: "numeric",
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                })}
-                              </p>
-                            </div>
-
-                            <div className="sm:text-right">
-                              <span className="text-base sm:text-lg font-black text-slate-900 font-mono">
-                                ₹{Number(ord.total_amount || 0).toLocaleString("en-IN")}
-                              </span>
-                              <p className="text-[11px] text-slate-500 font-medium">
-                                Payment: <span className="font-semibold text-slate-700">{ord.payment_method}</span> ({ord.payment_status})
-                              </p>
-                            </div>
-                          </div>
-
-                          {/* Live Tracking Progress Bar (if not cancelled) */}
-                          {!isCancelled ? (
-                            <div className="p-4 bg-slate-50/80 rounded-2xl border border-slate-100 space-y-3">
-                              <div className="flex items-center justify-between text-xs">
-                                <span className="font-bold text-slate-800 flex items-center gap-1.5">
-                                  <Truck className="w-4 h-4 text-blue-600" />
-                                  Live Delivery Status
-                                </span>
-                                <span className="text-[11px] font-semibold text-slate-500">
-                                  {ord.courier_name
-                                    ? `Courier: ${ord.courier_name} (${ord.tracking_number || "In Transit"})`
-                                    : "Preparing Package"}
-                                </span>
-                              </div>
-
-                              <div className="grid grid-cols-4 gap-2 pt-1 text-center">
-                                {[
-                                  { label: "Order Placed", step: 0 },
-                                  { label: "Confirmed", step: 1 },
-                                  { label: "In Transit", step: 3 },
-                                  { label: "Delivered", step: 4 },
-                                ].map((s, idx) => {
-                                  const completed = stepIdx >= s.step;
-                                  return (
-                                    <div key={idx} className="space-y-1.5">
-                                      <div
-                                        className={`h-2 rounded-full transition-all ${
-                                          completed ? "bg-emerald-500" : "bg-slate-200"
-                                        }`}
-                                      />
-                                      <p
-                                        className={`text-[10px] font-semibold ${
-                                          completed ? "text-emerald-700 font-bold" : "text-slate-400"
-                                        }`}
-                                      >
-                                        {s.label}
-                                      </p>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="p-3 bg-rose-50 border border-rose-200 rounded-2xl text-xs text-rose-800 flex items-center gap-2">
-                              <AlertCircle className="w-4 h-4 shrink-0" />
-                              <span>This order was cancelled. Please contact store support if you have questions.</span>
-                            </div>
-                          )}
-
-                          {/* Items Breakdown */}
-                          <div className="space-y-2">
-                            {(ord.items || []).map((it: any) => (
-                              <div
-                                key={it.id}
-                                className="flex items-center justify-between text-xs py-1.5 border-b border-slate-50 last:border-0"
-                              >
-                                <div className="flex items-center gap-2.5">
-                                  <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center font-bold text-slate-400 text-xs shrink-0">
-                                    {it.quantity}×
-                                  </div>
-                                  <span className="font-semibold text-slate-800 line-clamp-1">
-                                    {it.product_name}
-                                    {it.variant_name && (
-                                      <span className="text-[11px] text-slate-400 font-normal ml-1">
-                                        ({it.variant_name})
-                                      </span>
-                                    )}
-                                  </span>
-                                </div>
-                                <span className="font-mono font-bold text-slate-800">
-                                  ₹{Number(it.total || it.price * it.quantity).toLocaleString("en-IN")}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-
-                          {/* Bottom Row / Actions */}
-                          <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-slate-500">
-                            <span className="line-clamp-1 text-[11px]">
-                              Deliver to: <strong className="text-slate-700">{ord.customer_name}</strong> • {ord.shipping_address}
-                            </span>
-                            <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-end">
-                              <Link
-                                href={getStoreHref(slug, `/order/${ord.id || ord.order_number}`)}
-                                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white shadow-xs hover:opacity-95 transition-opacity"
-                                style={{ backgroundColor: primaryColor }}
-                              >
-                                View Digital Receipt
-                                <ArrowRight className="w-3.5 h-3.5" />
-                              </Link>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
+                  <button
+                    type="submit"
+                    disabled={searchingOrders}
+                    className="px-4 py-2 rounded-xl text-xs font-bold text-white shadow-xs hover:opacity-95 cursor-pointer disabled:opacity-50"
+                    style={{ backgroundColor: primaryColor }}
+                  >
+                    Search
+                  </button>
+                </form>
               </div>
             )}
+
+            {/* Orders List & Controls */}
+            <div className="space-y-4">
+              {/* Search & Filter Pills */}
+              {orders.length > 0 && (
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200">
+                  <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-1 sm:pb-0">
+                    {["ALL", "NEW", "CONFIRMED", "PROCESSING", "SHIPPED", "DELIVERED"].map((st) => (
+                      <button
+                        key={st}
+                        onClick={() => setOrderStatusFilter(st)}
+                        className={`px-3 py-1.5 rounded-xl text-[11px] font-semibold transition-colors cursor-pointer whitespace-nowrap ${
+                          orderStatusFilter === st
+                            ? "bg-slate-900 text-white"
+                            : "text-slate-600 hover:bg-slate-100"
+                        }`}
+                      >
+                        {st === "ALL" ? "All Orders" : st}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="relative w-full sm:w-56">
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={orderSearchQuery}
+                      onChange={(e) => setOrderSearchQuery(e.target.value)}
+                      placeholder="Search order # or item"
+                      className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-blue-600"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Orders Content */}
+              {filteredOrders.length === 0 ? (
+                <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center max-w-md mx-auto space-y-4">
+                  <div className="w-16 h-16 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto shadow-xs">
+                    <Package className="w-8 h-8" />
+                  </div>
+                  <h3 className="font-bold text-slate-900 text-base">
+                    {orders.length === 0 ? "No Orders Placed Yet" : "No Orders Matching Filter"}
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    {orders.length === 0
+                      ? `We haven't recorded any completed orders for phone number +91 ${customerPhone} under ${config?.store_name || "this store"}. Start exploring our products below.`
+                      : "Try selecting another status tab or clearing your search query."}
+                  </p>
+                  <div className="pt-2">
+                    <Link
+                      href={getStoreHref(slug)}
+                      className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-semibold text-white shadow-xs hover:opacity-95"
+                      style={{ backgroundColor: primaryColor }}
+                    >
+                      Start Shopping
+                      <ArrowRight className="w-4 h-4" />
+                    </Link>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {filteredOrders.map((ord) => {
+                    const stepIdx = getStepIndex(ord.order_status);
+                    const isCancelled = (ord.order_status || "").toUpperCase() === "CANCELLED";
+
+                    return (
+                      <div
+                        key={ord.id}
+                        className="bg-white rounded-3xl border border-slate-200 p-5 sm:p-6 shadow-xs space-y-5 hover:border-blue-300 transition-colors"
+                      >
+                        {/* Order Header */}
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-black text-slate-900 text-sm font-mono tracking-tight">
+                                {ord.order_number}
+                              </span>
+                              {getStatusBadge(ord.order_status)}
+                            </div>
+                            <p className="text-[11px] text-slate-400 mt-1 flex items-center gap-1.5">
+                              <Clock className="w-3 h-3 text-slate-400" />
+                              Placed on: {new Date(ord.created_at).toLocaleDateString("en-IN", {
+                                day: "numeric",
+                                month: "short",
+                                year: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </p>
+                          </div>
+
+                          <div className="sm:text-right">
+                            <span className="text-base sm:text-lg font-black text-slate-900 font-mono">
+                              ₹{Number(ord.total_amount || 0).toLocaleString("en-IN")}
+                            </span>
+                            <p className="text-[11px] text-slate-500 font-medium">
+                              Payment: <span className="font-semibold text-slate-700">{ord.payment_method}</span> ({ord.payment_status})
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Live Tracking Progress Bar */}
+                        {!isCancelled ? (
+                          <div className="p-4 bg-slate-50/80 rounded-2xl border border-slate-100 space-y-3">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="font-bold text-slate-800 flex items-center gap-1.5">
+                                <Truck className="w-4 h-4 text-blue-600" />
+                                Live Delivery Status
+                              </span>
+                              <span className="text-[11px] font-semibold text-slate-500">
+                                {ord.courier_name
+                                  ? `Courier: ${ord.courier_name} (${ord.tracking_number || "In Transit"})`
+                                  : "Preparing Package"}
+                              </span>
+                            </div>
+
+                            <div className="grid grid-cols-4 gap-2 pt-1 text-center">
+                              {[
+                                { label: "Order Placed", step: 0 },
+                                { label: "Confirmed", step: 1 },
+                                { label: "In Transit", step: 3 },
+                                { label: "Delivered", step: 4 },
+                              ].map((s, idx) => {
+                                const completed = stepIdx >= s.step;
+                                return (
+                                  <div key={idx} className="space-y-1.5">
+                                    <div
+                                      className={`h-2 rounded-full transition-all ${
+                                        completed ? "bg-emerald-500" : "bg-slate-200"
+                                      }`}
+                                    />
+                                    <p
+                                      className={`text-[10px] font-semibold ${
+                                        completed ? "text-emerald-700 font-bold" : "text-slate-400"
+                                      }`}
+                                    >
+                                      {s.label}
+                                    </p>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="p-3 bg-rose-50 border border-rose-200 rounded-2xl text-xs text-rose-800 flex items-center gap-2">
+                            <AlertCircle className="w-4 h-4 shrink-0" />
+                            <span>This order was cancelled. Please contact store support if you have questions.</span>
+                          </div>
+                        )}
+
+                        {/* Items Breakdown */}
+                        <div className="space-y-2">
+                          {(ord.items || []).map((it: any) => (
+                            <div
+                              key={it.id}
+                              className="flex items-center justify-between text-xs py-1.5 border-b border-slate-50 last:border-0"
+                            >
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center font-bold text-slate-400 text-xs shrink-0">
+                                  {it.quantity}×
+                                </div>
+                                <span className="font-semibold text-slate-800 line-clamp-1">
+                                  {it.product_name}
+                                  {it.variant_name && (
+                                    <span className="text-[11px] text-slate-400 font-normal ml-1">
+                                      ({it.variant_name})
+                                    </span>
+                                  )}
+                                </span>
+                              </div>
+                              <span className="font-mono font-bold text-slate-800">
+                                ₹{Number(it.total || it.price * it.quantity).toLocaleString("en-IN")}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Bottom Row / Actions */}
+                        <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-slate-500">
+                          <span className="line-clamp-1 text-[11px]">
+                            Deliver to: <strong className="text-slate-700">{ord.customer_name}</strong> • {ord.shipping_address}
+                          </span>
+                          <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-end">
+                            <Link
+                              href={getStoreHref(slug, `/order/${ord.id || ord.order_number}`)}
+                              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white shadow-xs hover:opacity-95 transition-opacity"
+                              style={{ backgroundColor: primaryColor }}
+                            >
+                              View Digital Receipt
+                              <ArrowRight className="w-3.5 h-3.5" />
+                            </Link>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -1002,14 +1454,25 @@ export default function AccountClient() {
         {activeTab === "profile" && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
             <div className="md:col-span-2 bg-white rounded-3xl border border-slate-200 p-6 shadow-xs space-y-4">
-              <div className="pb-3 border-b border-slate-100">
-                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                  <User className="w-5 h-5 text-blue-600" />
-                  Customer Personal Details
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Update your contact details to auto-fill checkouts and receive WhatsApp order tracking alerts.
-                </p>
+              <div className="pb-3 border-b border-slate-100 flex items-center justify-between">
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                    <User className="w-5 h-5 text-blue-600" />
+                    Customer Personal Details
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Update your contact details to auto-fill checkouts and receive WhatsApp order tracking alerts.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="px-3 py-1.5 rounded-xl text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-colors flex items-center gap-1.5 cursor-pointer"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>Sign Out</span>
+                </button>
               </div>
 
               {profileSuccess && (
@@ -1092,6 +1555,17 @@ export default function AccountClient() {
                   <span>Direct WhatsApp updates on your courier dispatch</span>
                 </li>
               </ul>
+
+              <div className="pt-4 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="w-full py-2.5 rounded-xl text-xs font-semibold text-rose-300 hover:text-white hover:bg-rose-600/20 border border-rose-500/30 transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Sign Out of Account</span>
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -1185,7 +1659,7 @@ export default function AccountClient() {
                 <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100">
                   <h5 className="font-bold text-slate-900">How can I track my shipment?</h5>
                   <p className="text-[11px] text-slate-500 mt-1">
-                    Simply enter your 10-digit mobile number in the <strong>My Orders & Tracking</strong> tab above to view live courier status.
+                    Your orders and live courier statuses are automatically loaded in the <strong>My Orders & Tracking</strong> tab above.
                   </p>
                 </div>
               </div>
