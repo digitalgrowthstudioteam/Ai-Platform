@@ -31,8 +31,9 @@ import {
   Check,
   Zap,
 } from "lucide-react";
+import CustomDomainTab from "./CustomDomainTab";
 
-type AnalyticsTab = "performance" | "pixels";
+type AnalyticsTab = "performance" | "pixels" | "domain";
 type DateRange = "7d" | "30d" | "90d" | "all";
 
 export default function AnalyticsClient() {
@@ -231,6 +232,19 @@ export default function AnalyticsClient() {
           {(pixels.meta_pixel_id || pixels.ga4_id || pixels.gtm_id) && (
             <span className="w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-emerald-200" />
           )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("domain")}
+          className={`pb-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-all ${
+            activeTab === "domain"
+              ? "border-blue-600 text-blue-600"
+              : "border-transparent text-slate-500 hover:text-slate-900"
+          }`}
+        >
+          <Globe className="w-4 h-4" />
+          <span>Custom Domain & DNS Setup</span>
         </button>
       </div>
 
@@ -804,6 +818,16 @@ export default function AnalyticsClient() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ──────────────────────────────────────────────────────────── */}
+      {/* TAB 3: CUSTOM DOMAIN & DNS SETUP */}
+      {/* ──────────────────────────────────────────────────────────── */}
+      {activeTab === "domain" && (
+        <CustomDomainTab
+          onSuccessNotification={(msg) => setSuccessMsg(msg)}
+          onErrorNotification={(msg) => setErrorMsg(msg)}
+        />
       )}
     </div>
   );
