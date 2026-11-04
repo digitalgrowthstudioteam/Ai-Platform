@@ -3,10 +3,11 @@
 import React from "react";
 
 interface StatusBadgeProps {
-  status: string;
+  status?: string | null;
 }
 
 export default function StatusBadge({ status }: StatusBadgeProps) {
+  const label = status ? String(status).replace(/_/g, " ") : "N/A";
   const norm = (status || "").toUpperCase();
 
   let colorClasses = "bg-slate-100 text-slate-700 border-slate-200";
@@ -48,7 +49,7 @@ export default function StatusBadge({ status }: StatusBadgeProps) {
     <span
       className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${colorClasses}`}
     >
-      {status.replace(/_/g, " ")}
+      {label}
     </span>
   );
 }

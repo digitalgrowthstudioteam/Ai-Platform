@@ -237,12 +237,12 @@ export default function AdminAnalyticsClient() {
                 <span className="text-xs text-slate-500">
                   Last sale: <span className="font-medium text-slate-700">{topRevVendor.last_sale_date || "Recent"}</span>
                 </span>
-                <Link
+                <a
                   href={`/app/admin/vendors/${topRevVendor.vendor_id}`}
                   className="inline-flex items-center gap-1 text-xs font-bold text-amber-700 hover:text-amber-900 hover:underline"
                 >
                   Manage Vendor <ArrowUpRight className="w-3.5 h-3.5" />
-                </Link>
+                </a>
               </div>
             </div>
           ) : (
@@ -297,12 +297,12 @@ export default function AdminAnalyticsClient() {
                 <span className="text-xs text-slate-500">
                   Conv. Rate: <span className="font-semibold text-emerald-700">{topUnitsVendor.conversion_rate}%</span>
                 </span>
-                <Link
+                <a
                   href={`/app/admin/vendors/${topUnitsVendor.vendor_id}`}
                   className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-900 hover:underline"
                 >
                   Manage Vendor <ArrowUpRight className="w-3.5 h-3.5" />
-                </Link>
+                </a>
               </div>
             </div>
           ) : (
@@ -714,12 +714,12 @@ export default function AdminAnalyticsClient() {
 
                       {/* Actions */}
                       <td className="py-3 px-4 text-right">
-                        <Link
+                        <a
                           href={`/app/admin/vendors/${vendor.vendor_id}`}
                           className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors"
                         >
                           View Details
-                        </Link>
+                        </a>
                       </td>
                     </tr>
                   );

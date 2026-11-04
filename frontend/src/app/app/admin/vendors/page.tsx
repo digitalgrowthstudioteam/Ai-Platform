@@ -250,14 +250,14 @@ export default function AdminVendorsPage() {
                           <Clock className="w-3.5 h-3.5" />
                           Access
                         </button>
-                        <Link
+                        <a
                           href={`/app/admin/vendors/${v.id}`}
                           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-purple-700 bg-purple-50 border border-purple-200 hover:bg-purple-100 transition-colors cursor-pointer"
                           title="Open Dedicated Vendor Page"
                         >
                           <Eye className="w-3.5 h-3.5" />
                           Details
-                        </Link>
+                        </a>
                         <button
                           type="button"
                           onClick={() => setVendorToDelete(v)}

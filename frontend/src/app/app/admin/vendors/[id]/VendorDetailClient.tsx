@@ -40,7 +40,73 @@ import {
   X,
 } from "lucide-react";
 
+// Safe Date Formatter helper
+const formatDate = (val?: string | null, style: "long" | "medium" | "short" = "long") => {
+  if (!val) return "N/A";
+  try {
+    const d = new Date(val);
+    return isNaN(d.getTime()) ? "N/A" : d.toLocaleDateString("en-IN", { dateStyle: style });
+  } catch {
+    return "N/A";
+  }
+};
+
+// React Error Boundary for isolated crash prevention
+class VendorDetailErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error("VendorDetailClient ErrorBoundary caught:", error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="max-w-xl mx-auto my-12 p-6 bg-white rounded-3xl border border-rose-200 shadow-sm text-center space-y-4">
+          <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
+            <AlertTriangle className="w-6 h-6" />
+          </div>
+          <h2 className="text-lg font-bold text-slate-900">Something went wrong loading vendor details</h2>
+          <p className="text-xs text-slate-500">
+            {this.state.error?.message || "An unexpected error occurred while rendering vendor details."}
+          </p>
+          <div className="flex items-center justify-center gap-3 pt-2">
+            <button
+              onClick={() => this.setState({ hasError: false, error: null })}
+              className="px-4 py-2 rounded-xl bg-purple-600 text-white text-xs font-semibold hover:bg-purple-700 cursor-pointer"
+            >
+              Try Again
+            </button>
+            <a
+              href="/app/admin/vendors"
+              className="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-semibold hover:bg-slate-200"
+            >
+              Back to Vendors Directory
+            </a>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function VendorDetailClient() {
+  return (
+    <VendorDetailErrorBoundary>
+      <VendorDetailInner />
+    </VendorDetailErrorBoundary>
+  );
+}
+
+function VendorDetailInner() {
   const params = useParams();
   const router = useRouter();
 
@@ -230,12 +296,14 @@ export default function VendorDetailClient() {
         const fromPath = decodeURIComponent(parts[idx + 1]);
         if (fromPath && fromPath !== "placeholder") {
           resolved = fromPath;
-          setVendorIdentifier(fromPath);
+          if (fromPath !== vendorIdentifier) {
+            setVendorIdentifier(fromPath);
+          }
         }
       }
     }
     loadVendorData(resolved);
-  }, [vendorIdentifier]);
+  }, []);
 
   // Handle Account Status (active, suspended, inactive)
   const handleUpdateStatus = async (newStatus: string) => {
@@ -437,7 +505,7 @@ export default function VendorDetailClient() {
           </div>
           <p className="text-xs text-slate-400 flex items-center gap-1.5">
             <Calendar className="w-3.5 h-3.5" />
-            Registered on {new Date(vendor.created_at).toLocaleDateString("en-IN", { dateStyle: "long" })}
+            Registered on {formatDate(vendor.created_at, "long")}
           </p>
         </div>
 
@@ -778,15 +846,19 @@ export default function VendorDetailClient() {
                       Edit Subdomain
                     </button>
                   </div>
-                  <a
-                    href={`https://${vendor.subdomain}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-mono font-bold text-blue-600 hover:underline mt-0.5 flex items-center gap-1"
-                  >
-                    {vendor.subdomain}
-                    <ExternalLink className="w-3 h-3 text-slate-400" />
-                  </a>
+                  {vendor.subdomain ? (
+                    <a
+                      href={`https://${vendor.subdomain}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-mono font-bold text-blue-600 hover:underline mt-0.5 flex items-center gap-1"
+                    >
+                      {vendor.subdomain}
+                      <ExternalLink className="w-3 h-3 text-slate-400" />
+                    </a>
+                  ) : (
+                    <span className="font-mono text-slate-400 mt-0.5 block">None assigned</span>
+                  )}
                 </div>
               )}
 
@@ -800,7 +872,7 @@ export default function VendorDetailClient() {
               <div>
                 <span className="text-slate-400 block text-[11px] uppercase font-bold">Catalog Size</span>
                 <p className="font-bold text-slate-900 mt-0.5">
-                  {vendor.total_products} products • {vendor.total_orders} orders
+                  {vendor.total_products ?? 0} products • {vendor.total_orders ?? 0} orders
                 </p>
               </div>
 
@@ -882,25 +954,25 @@ export default function VendorDetailClient() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
               <div>
                 <span className="text-slate-400 block text-[11px] uppercase font-bold">App Display Name</span>
-                <p className="font-bold text-slate-900 mt-0.5">{vendor.app_name}</p>
+                <p className="font-bold text-slate-900 mt-0.5">{vendor.app_name || "Not Configured"}</p>
               </div>
 
               <div>
                 <span className="text-slate-400 block text-[11px] uppercase font-bold">Package Name</span>
-                <p className="font-mono text-slate-700 mt-0.5">{vendor.package_id}</p>
+                <p className="font-mono text-slate-700 mt-0.5">{vendor.package_id || "Not Configured"}</p>
               </div>
 
               <div>
                 <span className="text-slate-400 block text-[11px] uppercase font-bold">App Build Status</span>
                 <div className="mt-1">
-                  <StatusBadge status={vendor.app_build_status} />
+                  <StatusBadge status={vendor.app_build_status || "NOT_REQUESTED"} />
                 </div>
               </div>
 
               <div>
                 <span className="text-slate-400 block text-[11px] uppercase font-bold">Play Store Status</span>
                 <div className="mt-1">
-                  <StatusBadge status={vendor.publication_status} />
+                  <StatusBadge status={vendor.publication_status || "UNPUBLISHED"} />
                 </div>
               </div>
 
@@ -1026,7 +1098,7 @@ export default function VendorDetailClient() {
                 <div className="flex items-center justify-between">
                   <span className="text-slate-500">Next Renewal:</span>
                   <span className="font-mono text-slate-800">
-                    {new Date(vendor.renewal_date).toLocaleDateString("en-IN", { dateStyle: "medium" })}
+                    {formatDate(vendor.renewal_date, "medium")}
                   </span>
                 </div>
               )}
