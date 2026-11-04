@@ -19,6 +19,7 @@ import {
   Check,
   CheckCheck,
   ExternalLink,
+  Tag,
 } from "lucide-react";
 
 export default function VendorSubscriptionPage() {
@@ -29,6 +30,27 @@ export default function VendorSubscriptionPage() {
   const [purchasingAddonId, setPurchasingAddonId] = useState<string | null>(null);
   const [approvingApk, setApprovingApk] = useState(false);
   const [notification, setNotification] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
+  // Promo code states per addon
+  const [couponInputs, setCouponInputs] = useState<Record<string, string>>({});
+  const [appliedCoupons, setAppliedCoupons] = useState<Record<string, any>>({});
+  const [validatingCouponId, setValidatingCouponId] = useState<string | null>(null);
+  const [couponErrors, setCouponErrors] = useState<Record<string, string>>({});
+
+  const handleValidateCoupon = async (addonId: string) => {
+    const code = (couponInputs[addonId] || "").trim().toUpperCase();
+    if (!code) return;
+    setValidatingCouponId(addonId);
+    setCouponErrors((prev) => ({ ...prev, [addonId]: "" }));
+    try {
+      const res = await platformApi.validateAddonCoupon(addonId, code);
+      setAppliedCoupons((prev) => ({ ...prev, [addonId]: res }));
+    } catch (err: any) {
+      setCouponErrors((prev) => ({ ...prev, [addonId]: err.message || "Invalid or expired promo code" }));
+    } finally {
+      setValidatingCouponId(null);
+    }
+  };
 
   const loadData = async () => {
     try {
@@ -68,12 +90,31 @@ export default function VendorSubscriptionPage() {
     setPurchasingAddonId(addon.id);
     setNotification(null);
 
+    const appliedCoupon = appliedCoupons[addon.id];
+    const couponCode = appliedCoupon?.coupon_code;
+
     try {
-      const orderRes = await platformApi.createAddonOrder(addon.id);
+      const orderRes = await platformApi.createAddonOrder(addon.id, couponCode);
+
+      // 100% Free coupon unlock
+      if (orderRes.is_free) {
+        setNotification({
+          type: "success",
+          message: `🎉 '${addon.name}' successfully activated for FREE with promo code ${couponCode}!`,
+        });
+        setAppliedCoupons((prev) => {
+          const next = { ...prev };
+          delete next[addon.id];
+          return next;
+        });
+        await loadData();
+        return;
+      }
 
       if (orderRes.is_mock) {
         await platformApi.verifyAddonPayment({
           addon_id: addon.id,
+          coupon_code: couponCode,
           razorpay_order_id: orderRes.order_id,
           razorpay_payment_id: "pay_mock_addon_" + Math.random().toString(36).substring(2, 9),
           razorpay_signature: "sig_mock_addon",
@@ -81,6 +122,11 @@ export default function VendorSubscriptionPage() {
         setNotification({
           type: "success",
           message: `🎉 '${addon.name}' successfully activated via Razorpay!`,
+        });
+        setAppliedCoupons((prev) => {
+          const next = { ...prev };
+          delete next[addon.id];
+          return next;
         });
         await loadData();
         return;
@@ -109,6 +155,7 @@ export default function VendorSubscriptionPage() {
           try {
             await platformApi.verifyAddonPayment({
               addon_id: addon.id,
+              coupon_code: couponCode,
               razorpay_order_id: response.razorpay_order_id,
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_signature: response.razorpay_signature,
@@ -116,6 +163,11 @@ export default function VendorSubscriptionPage() {
             setNotification({
               type: "success",
               message: `🎉 '${addon.name}' successfully activated via Razorpay!`,
+            });
+            setAppliedCoupons((prev) => {
+              const next = { ...prev };
+              delete next[addon.id];
+              return next;
             });
             await loadData();
           } catch (err: any) {
@@ -473,25 +525,110 @@ export default function VendorSubscriptionPage() {
                   </p>
                 </div>
 
-                <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-end">
-                  <button
-                    type="button"
-                    disabled={isBuying}
-                    onClick={() => handleBuyAddon(a)}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-xs transition-colors disabled:opacity-50 cursor-pointer"
-                  >
-                    {isBuying ? (
-                      <>
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        <span>Opening Razorpay...</span>
-                      </>
+                <div className="mt-4 pt-3 border-t border-slate-100 space-y-3">
+                  {/* Promo code redemption */}
+                  <div>
+                    {appliedCoupons[a.id] ? (
+                      <div className="flex items-center justify-between text-xs bg-emerald-50 text-emerald-800 px-3 py-1.5 rounded-lg border border-emerald-200">
+                        <span className="font-semibold flex items-center gap-1.5">
+                          <Tag className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>{appliedCoupons[a.id].coupon_code}:</span>
+                          <span className="text-emerald-700">
+                            {appliedCoupons[a.id].is_free ? "100% OFF (Free)" : `₹${appliedCoupons[a.id].discount_amount} OFF`}
+                          </span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAppliedCoupons((prev) => {
+                              const next = { ...prev };
+                              delete next[a.id];
+                              return next;
+                            });
+                          }}
+                          className="text-[11px] text-rose-600 hover:text-rose-800 font-medium cursor-pointer ml-2"
+                        >
+                          Remove
+                        </button>
+                      </div>
                     ) : (
-                      <>
-                        <CreditCard className="w-3.5 h-3.5" />
-                        <span>Buy with Razorpay</span>
-                      </>
+                      <div className="flex items-center gap-1.5">
+                        <div className="relative flex-1">
+                          <input
+                            type="text"
+                            placeholder="Promo Code"
+                            value={couponInputs[a.id] || ""}
+                            onChange={(e) =>
+                              setCouponInputs((prev) => ({ ...prev, [a.id]: e.target.value.toUpperCase() }))
+                            }
+                            className="w-full text-xs uppercase px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-blue-500 font-mono tracking-wider"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          disabled={validatingCouponId === a.id || !(couponInputs[a.id] || "").trim()}
+                          onClick={() => handleValidateCoupon(a.id)}
+                          className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-white hover:bg-slate-900 disabled:opacity-40 cursor-pointer transition-colors"
+                        >
+                          {validatingCouponId === a.id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            "Apply"
+                          )}
+                        </button>
+                      </div>
                     )}
-                  </button>
+                    {couponErrors[a.id] && (
+                      <p className="text-[11px] text-rose-600 mt-1">{couponErrors[a.id]}</p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1">
+                    <div className="text-xs">
+                      {appliedCoupons[a.id] ? (
+                        appliedCoupons[a.id].is_free ? (
+                          <span className="font-bold text-emerald-600">Free with Code</span>
+                        ) : (
+                          <span className="font-bold text-blue-600 font-mono">
+                            Pay ₹{appliedCoupons[a.id].final_price_inr}
+                          </span>
+                        )
+                      ) : (
+                        <span className="text-slate-400">Standard Pricing</span>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      disabled={isBuying}
+                      onClick={() => handleBuyAddon(a)}
+                      className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white shadow-xs transition-colors disabled:opacity-50 cursor-pointer ${
+                        appliedCoupons[a.id]?.is_free
+                          ? "bg-emerald-600 hover:bg-emerald-700"
+                          : "bg-blue-600 hover:bg-blue-700"
+                      }`}
+                    >
+                      {isBuying ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>Processing...</span>
+                        </>
+                      ) : appliedCoupons[a.id]?.is_free ? (
+                        <>
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Unlock for FREE</span>
+                        </>
+                      ) : (
+                        <>
+                          <CreditCard className="w-3.5 h-3.5" />
+                          <span>
+                            {appliedCoupons[a.id]
+                              ? `Pay ₹${appliedCoupons[a.id].final_price_inr}`
+                              : "Buy with Razorpay"}
+                          </span>
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
               </div>
             );

@@ -58,6 +58,12 @@ class SetupFeeVerifyRequest(BaseModel):
 
 class AddonOrderCreateRequest(BaseModel):
     addon_id: uuid.UUID
+    coupon_code: Optional[str] = None
+
+
+class AddonCouponValidateRequest(BaseModel):
+    addon_id: uuid.UUID
+    coupon_code: str
 
 
 class AddonVerifyRequest(BaseModel):
@@ -65,6 +71,7 @@ class AddonVerifyRequest(BaseModel):
     razorpay_order_id: str
     razorpay_payment_id: str
     razorpay_signature: str
+    coupon_code: Optional[str] = None
 
 
 class SubscriptionOrderResponse(BaseModel):
@@ -88,10 +95,12 @@ class AdminCouponCreateRequest(BaseModel):
     code: str
     discount_type: str = "FIXED_INR"  # FIXED_INR or PERCENTAGE
     discount_value: float
-    applicable_to: str = "SETUP_FEE"
+    applicable_to: str = "SETUP_FEE"  # SETUP_FEE, ADDON, ALL
+    addon_id: Optional[uuid.UUID] = None
     vendor_id: Optional[uuid.UUID] = None
     max_uses: int = 1
     valid_days: int = 30
+    one_time_per_vendor: bool = True
 
 
 class AdminVendorSetupFeeUpdateRequest(BaseModel):

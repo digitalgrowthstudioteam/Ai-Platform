@@ -118,6 +118,8 @@ async def lifespan(app: FastAPI):
                 "ALTER TABLE platform_customers ADD COLUMN IF NOT EXISTS google_id VARCHAR(255);",
                 "ALTER TABLE platform_customers ADD COLUMN IF NOT EXISTS reset_token VARCHAR(100);",
                 "ALTER TABLE platform_customers ADD COLUMN IF NOT EXISTS reset_token_expires_at TIMESTAMPTZ;",
+                "ALTER TABLE platform_coupons ADD COLUMN IF NOT EXISTS addon_id UUID REFERENCES platform_addons(id) ON DELETE SET NULL;",
+                "ALTER TABLE platform_coupons ADD COLUMN IF NOT EXISTS one_time_per_vendor BOOLEAN NOT NULL DEFAULT TRUE;",
                 "ALTER TABLE platform_vendor_app_configs ALTER COLUMN app_logo_url TYPE TEXT;",
                 "ALTER TABLE platform_vendor_app_configs ALTER COLUMN splash_screen_url TYPE TEXT;",
             ]

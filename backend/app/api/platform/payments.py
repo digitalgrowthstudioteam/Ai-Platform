@@ -34,6 +34,7 @@ from app.schemas.platform.payments import (
     SetupFeeOrderResponse,
     SetupFeeVerifyRequest,
     AddonOrderCreateRequest,
+    AddonCouponValidateRequest,
     AddonVerifyRequest,
     SubscriptionOrderResponse,
     SubscriptionVerifyRequest,
@@ -345,20 +346,202 @@ async def verify_setup_fee_payment(
 
 
 # ──────────────────────────────────────────────
-# 5. Add-on Services Razorpay Checkout
+# 5. Add-on Services Razorpay Checkout & Promo Coupons
 # ──────────────────────────────────────────────
+@router.post("/validate-addon-coupon")
+async def validate_addon_coupon(
+    payload: AddonCouponValidateRequest,
+    current: CurrentVendor = Depends(require_vendor_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Validate promo code specifically for an Add-on (e.g. Custom Domain, Storage, etc.)."""
+    vid = current.vendor.id
+    addon = (await db.execute(select(PlatformAddon).where(PlatformAddon.id == payload.addon_id))).scalar_one_or_none()
+    if not addon:
+        raise HTTPException(status_code=404, detail="Add-on service not found.")
+
+    code_clean = payload.coupon_code.upper().strip()
+    coupon = (await db.execute(select(PlatformCoupon).where(PlatformCoupon.code == code_clean))).scalar_one_or_none()
+    if not coupon:
+        raise HTTPException(status_code=404, detail=f"Coupon code '{code_clean}' is invalid.")
+
+    if not coupon.is_active:
+        raise HTTPException(status_code=400, detail="This coupon code is currently disabled.")
+
+    now = datetime.now(timezone.utc)
+    val_until = coupon.valid_until
+    if val_until.tzinfo is None:
+        val_until = val_until.replace(tzinfo=timezone.utc)
+    if val_until < now:
+        raise HTTPException(status_code=400, detail="This coupon code has expired.")
+
+    if coupon.used_count >= coupon.max_uses:
+        raise HTTPException(status_code=400, detail="This coupon has reached its maximum total uses.")
+
+    if coupon.vendor_id and coupon.vendor_id != vid:
+        raise HTTPException(status_code=403, detail="This coupon code is not valid for your account.")
+
+    # Check applicability
+    if coupon.addon_id and coupon.addon_id != addon.id:
+        raise HTTPException(
+            status_code=400,
+            detail=f"This coupon is only valid for a specific service, not for '{addon.name}'.",
+        )
+    elif not coupon.addon_id and coupon.applicable_to not in ("ALL", "ADDON", "ADDON_ALL"):
+        if coupon.applicable_to != addon.code:
+            raise HTTPException(
+                status_code=400,
+                detail="This coupon is not valid for this add-on.",
+            )
+
+    # Check one-time use per vendor
+    if getattr(coupon, "one_time_per_vendor", True):
+        prior_usage = (await db.execute(
+            select(PlatformPayment).where(
+                PlatformPayment.vendor_id == vid,
+                PlatformPayment.reference_id == coupon.code,
+                PlatformPayment.status == "SUCCESS",
+            )
+        )).scalar_one_or_none()
+        if prior_usage:
+            raise HTTPException(
+                status_code=400,
+                detail="You have already redeemed this coupon code once.",
+            )
+
+    # Calculate discount
+    if coupon.discount_type == "PERCENTAGE":
+        discount_inr = round(addon.price_inr * (coupon.discount_value / 100.0), 2)
+    else:
+        discount_inr = min(addon.price_inr, coupon.discount_value)
+
+    final_price_inr = max(0.0, round(addon.price_inr - discount_inr, 2))
+    is_free = final_price_inr <= 0.0
+
+    return {
+        "valid": True,
+        "coupon_code": coupon.code,
+        "discount_type": coupon.discount_type,
+        "discount_value": coupon.discount_value,
+        "discount_inr": discount_inr,
+        "original_price_inr": addon.price_inr,
+        "final_price_inr": final_price_inr,
+        "is_free": is_free,
+        "message": f"Coupon '{coupon.code}' applied! You save ₹{discount_inr:.0f}."
+        if not is_free
+        else f"🎉 Coupon '{coupon.code}' applied! 100% Free activation.",
+    }
+
+
 @router.post("/create-addon-order")
 async def create_addon_order(
     payload: AddonOrderCreateRequest,
     current: CurrentVendor = Depends(require_vendor_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """Generate platform Razorpay order for purchasing growth add-ons."""
+    """Generate platform Razorpay order for purchasing growth add-ons with optional promo code."""
+    vid = current.vendor.id
     addon = (await db.execute(select(PlatformAddon).where(PlatformAddon.id == payload.addon_id))).scalar_one_or_none()
     if not addon or not addon.is_active:
         raise HTTPException(status_code=404, detail="Add-on service not found or currently inactive.")
 
-    amount_paise = int(round(addon.price_inr * 100))
+    price_to_pay = addon.price_inr
+    discount_inr = 0.0
+    applied_coupon = None
+
+    if payload.coupon_code:
+        code_clean = payload.coupon_code.upper().strip()
+        coupon = (await db.execute(select(PlatformCoupon).where(PlatformCoupon.code == code_clean))).scalar_one_or_none()
+        if not coupon or not coupon.is_active:
+            raise HTTPException(status_code=400, detail="Invalid or disabled coupon code.")
+
+        now = datetime.now(timezone.utc)
+        val_until = coupon.valid_until
+        if val_until.tzinfo is None:
+            val_until = val_until.replace(tzinfo=timezone.utc)
+        if val_until < now or coupon.used_count >= coupon.max_uses:
+            raise HTTPException(status_code=400, detail="This coupon code has expired or reached usage limit.")
+
+        if coupon.vendor_id and coupon.vendor_id != vid:
+            raise HTTPException(status_code=403, detail="Coupon code not valid for your vendor account.")
+
+        if coupon.addon_id and coupon.addon_id != addon.id:
+            raise HTTPException(status_code=400, detail=f"Coupon not valid for '{addon.name}'.")
+        elif not coupon.addon_id and coupon.applicable_to not in ("ALL", "ADDON", "ADDON_ALL"):
+            if coupon.applicable_to != addon.code:
+                raise HTTPException(status_code=400, detail="Coupon not valid for this add-on.")
+
+        if getattr(coupon, "one_time_per_vendor", True):
+            prior_usage = (await db.execute(
+                select(PlatformPayment).where(
+                    PlatformPayment.vendor_id == vid,
+                    PlatformPayment.reference_id == coupon.code,
+                    PlatformPayment.status == "SUCCESS",
+                )
+            )).scalar_one_or_none()
+            if prior_usage:
+                raise HTTPException(status_code=400, detail="You have already redeemed this coupon code once.")
+
+        if coupon.discount_type == "PERCENTAGE":
+            discount_inr = round(addon.price_inr * (coupon.discount_value / 100.0), 2)
+        else:
+            discount_inr = min(addon.price_inr, coupon.discount_value)
+
+        price_to_pay = max(0.0, round(addon.price_inr - discount_inr, 2))
+        applied_coupon = coupon
+
+    # IF 100% FREE WITH PROMO CODE:
+    if price_to_pay <= 0.0 and applied_coupon:
+        now = datetime.now(timezone.utc)
+        vendor_addon = PlatformVendorAddon(
+            vendor_id=vid,
+            addon_id=addon.id,
+            status="active",
+            price_paid=0.0,
+            activated_at=now,
+            expires_at=now + timedelta(days=30) if addon.billing_type == "MONTHLY" else None,
+        )
+        db.add(vendor_addon)
+
+        # Entitlements
+        if addon.code == "storage-5gb":
+            st = (await db.execute(select(PlatformStorageUsage).where(PlatformStorageUsage.vendor_id == vid))).scalar_one_or_none()
+            if st:
+                st.limit_bytes += 5 * 1024 * 1024 * 1024
+
+        if addon.code in ("custom-domain", "custom_domain"):
+            from app.models.platform.vendor import PlatformStore
+            st_store = (await db.execute(select(PlatformStore).where(PlatformStore.vendor_id == vid))).scalar_one_or_none()
+            if st_store:
+                st_store.custom_domain_enabled = True
+
+        applied_coupon.used_count += 1
+
+        db.add(PlatformPayment(
+            vendor_id=vid,
+            amount_inr=0.0,
+            payment_type="ADDON",
+            gateway="COUPON",
+            reference_id=applied_coupon.code,
+            status="SUCCESS",
+        ))
+
+        await db.commit()
+        return {
+            "order_id": f"order_free_coupon_{applied_coupon.code}",
+            "amount": 0,
+            "currency": "INR",
+            "addon_name": addon.name,
+            "addon_code": addon.code,
+            "key_id": settings.RAZORPAY_KEY_ID or "rzp_test_platform_mock",
+            "is_mock": False,
+            "is_free": True,
+            "discount_inr": discount_inr,
+            "message": f"'{addon.name}' unlocked for FREE with promo code {applied_coupon.code}!",
+        }
+
+    # Otherwise, charge remaining amount via Razorpay
+    amount_paise = int(round(price_to_pay * 100))
     is_mock = True
     order_id = f"order_mock_addon_{uuid.uuid4().hex[:10]}"
 
@@ -374,6 +557,7 @@ async def create_addon_order(
                     "addon_id": str(addon.id),
                     "addon_code": addon.code,
                     "payment_type": "ADDON",
+                    "coupon_code": applied_coupon.code if applied_coupon else "",
                 },
             }
             rzp_order = client.order.create(order_data)
@@ -391,6 +575,9 @@ async def create_addon_order(
         "addon_code": addon.code,
         "key_id": settings.RAZORPAY_KEY_ID or "rzp_test_platform_mock",
         "is_mock": is_mock,
+        "is_free": False,
+        "discount_inr": discount_inr,
+        "final_price_inr": price_to_pay,
     }
 
 
@@ -446,6 +633,13 @@ async def verify_addon_payment(
         st_store = (await db.execute(select(PlatformStore).where(PlatformStore.vendor_id == vid))).scalar_one_or_none()
         if st_store:
             st_store.custom_domain_enabled = True
+
+    # If coupon was applied on discounted payment, increment coupon usage
+    if payload.coupon_code:
+        code_clean = payload.coupon_code.upper().strip()
+        coupon = (await db.execute(select(PlatformCoupon).where(PlatformCoupon.code == code_clean))).scalar_one_or_none()
+        if coupon:
+            coupon.used_count += 1
 
     # Record payment transaction
     db.add(PlatformPayment(

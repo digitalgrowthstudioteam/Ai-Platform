@@ -51,6 +51,12 @@ export default function VendorStoreSettingsPage() {
   const [copiedDns, setCopiedDns] = useState(false);
   const [domainMessage, setDomainMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
+  // Add-on Promo Code State
+  const [addonPromoCode, setAddonPromoCode] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
+  const [validatingCoupon, setValidatingCoupon] = useState(false);
+  const [couponError, setCouponError] = useState<string | null>(null);
+
   // Email Notifications & SMTP State
   const [emailSettings, setEmailSettings] = useState<any>(null);
   const [showSmtpPassword, setShowSmtpPassword] = useState(false);
@@ -101,6 +107,26 @@ export default function VendorStoreSettingsPage() {
     });
   };
 
+  const handleApplyAddonCoupon = async () => {
+    if (!domainInfo?.addon_id || !addonPromoCode.trim()) return;
+    setValidatingCoupon(true);
+    setCouponError(null);
+    try {
+      const res = await platformApi.validateAddonCoupon(domainInfo.addon_id, addonPromoCode.trim());
+      if (res.valid) {
+        setAppliedCoupon(res);
+        setCouponError(null);
+      } else {
+        setCouponError(res.message || "Invalid coupon code.");
+      }
+    } catch (err: any) {
+      setCouponError(err.message || "Invalid or expired promo code.");
+      setAppliedCoupon(null);
+    } finally {
+      setValidatingCoupon(false);
+    }
+  };
+
   const handlePurchaseCustomDomainAddon = async () => {
     if (!domainInfo?.addon_id) {
       setDomainMessage({ type: "error", text: "Custom domain add-on not found in catalog." });
@@ -109,7 +135,19 @@ export default function VendorStoreSettingsPage() {
     setPurchasingAddon(true);
     setDomainMessage(null);
     try {
-      const orderRes = await platformApi.createAddonOrder(domainInfo.addon_id);
+      const orderRes = await platformApi.createAddonOrder(domainInfo.addon_id, appliedCoupon?.coupon_code);
+
+      if (orderRes.is_free) {
+        // Unlocked 100% free with promo code!
+        const refreshed = await platformApi.getVendorCustomDomainInfo();
+        setDomainInfo(refreshed);
+        setDomainMessage({
+          type: "success",
+          text: orderRes.message || "🎉 Custom Domain unlocked for FREE with promo code! Enter your domain below.",
+        });
+        setPurchasingAddon(false);
+        return;
+      }
 
       if (orderRes.is_mock) {
         // Fallback only if backend has no payment gateway credentials configured
@@ -118,6 +156,7 @@ export default function VendorStoreSettingsPage() {
           razorpay_order_id: orderRes.order_id,
           razorpay_payment_id: `pay_mock_${Date.now()}`,
           razorpay_signature: `mock_sig_${Date.now()}`,
+          coupon_code: appliedCoupon?.coupon_code,
         });
         const refreshed = await platformApi.getVendorCustomDomainInfo();
         setDomainInfo(refreshed);
@@ -156,6 +195,7 @@ export default function VendorStoreSettingsPage() {
               razorpay_order_id: response.razorpay_order_id,
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_signature: response.razorpay_signature,
+              coupon_code: appliedCoupon?.coupon_code,
             });
             const refreshed = await platformApi.getVendorCustomDomainInfo();
             setDomainInfo(refreshed);
@@ -451,6 +491,16 @@ export default function VendorStoreSettingsPage() {
                   <RefreshCw className="w-4 h-4 animate-spin" />
                   <span>Activating...</span>
                 </>
+              ) : appliedCoupon?.is_free ? (
+                <>
+                  <Sparkles className="w-3.5 h-3.5 text-slate-950" />
+                  <span>Unlock for FREE (Promo Applied)</span>
+                </>
+              ) : appliedCoupon ? (
+                <>
+                  <Lock className="w-3.5 h-3.5" />
+                  <span>Unlock for ₹{appliedCoupon.final_price_inr} (Discounted)</span>
+                </>
               ) : (
                 <>
                   <Lock className="w-3.5 h-3.5" />
@@ -458,6 +508,61 @@ export default function VendorStoreSettingsPage() {
                 </>
               )}
             </button>
+          </div>
+
+          {/* Promo Code Box */}
+          <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 space-y-2.5">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2 flex-1 max-w-sm">
+                <div className="relative flex-1">
+                  <Tag className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder="Enter Promo Code (e.g. SPECIAL999)"
+                    value={addonPromoCode}
+                    onChange={(e) => {
+                      setAddonPromoCode(e.target.value.toUpperCase());
+                      setCouponError(null);
+                    }}
+                    className="w-full pl-9 pr-3 py-2 bg-white/10 border border-white/20 rounded-xl text-xs font-mono uppercase text-white placeholder-slate-400 focus:outline-none focus:border-amber-400"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleApplyAddonCoupon}
+                  disabled={validatingCoupon || !addonPromoCode.trim()}
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-amber-400 hover:bg-amber-300 text-slate-950 transition-colors cursor-pointer disabled:opacity-50 shrink-0"
+                >
+                  {validatingCoupon ? "Checking..." : "Apply Code"}
+                </button>
+              </div>
+
+              {appliedCoupon ? (
+                <div className="text-xs font-semibold text-emerald-400 flex items-center gap-1.5 flex-wrap">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>{appliedCoupon.message}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAppliedCoupon(null);
+                      setAddonPromoCode("");
+                    }}
+                    className="text-[10px] underline text-slate-300 hover:text-white ml-2 cursor-pointer"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ) : couponError ? (
+                <div className="text-xs font-medium text-rose-400 flex items-center gap-1">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span>{couponError}</span>
+                </div>
+              ) : (
+                <span className="text-[11px] text-slate-400">
+                  Have a Super Admin discount or free coupon code? Apply above.
+                </span>
+              )}
+            </div>
           </div>
 
           {/* Perks Grid */}

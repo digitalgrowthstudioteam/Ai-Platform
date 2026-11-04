@@ -44,14 +44,17 @@ export default function AdminSubscriptionsPage() {
   const [couponsLoading, setCouponsLoading] = useState(true);
   const [isCouponModalOpen, setIsCouponModalOpen] = useState(false);
   const [deletingCouponId, setDeletingCouponId] = useState<string | null>(null);
+  const [availableAddons, setAvailableAddons] = useState<any[]>([]);
   const [couponForm, setCouponForm] = useState({
     code: "",
     discount_type: "FIXED_INR" as "FIXED_INR" | "PERCENTAGE",
     discount_value: "500",
     valid_days: "30",
-    applicable_to: "SETUP_FEE",
+    applicable_to: "SETUP_FEE" as "SETUP_FEE" | "ADDON_ALL" | "SPECIFIC_ADDON",
+    addon_id: "",
     vendor_id: "",
     max_uses: "100",
+    one_time_per_vendor: true,
   });
   const [submittingCoupon, setSubmittingCoupon] = useState(false);
 
@@ -69,8 +72,15 @@ export default function AdminSubscriptionsPage() {
   const loadCoupons = async () => {
     try {
       setCouponsLoading(true);
-      const data = await platformApi.getAdminCoupons();
-      setCoupons(data);
+      const [couponsData, addonsData] = await Promise.all([
+        platformApi.getAdminCoupons(),
+        platformApi.getAdminAddons().catch(() => []),
+      ]);
+      setCoupons(couponsData);
+      setAvailableAddons(addonsData);
+      if (addonsData.length > 0 && !couponForm.addon_id) {
+        setCouponForm((prev) => ({ ...prev, addon_id: addonsData[0].id }));
+      }
     } catch (e) {
       console.error("Failed to load coupons", e);
     } finally {
@@ -166,10 +176,12 @@ export default function AdminSubscriptionsPage() {
         discount_type: couponForm.discount_type,
         discount_value: parseFloat(couponForm.discount_value),
         valid_days: parseInt(couponForm.valid_days, 10),
-        applicable_to: couponForm.applicable_to,
+        applicable_to: couponForm.applicable_to === "SPECIFIC_ADDON" ? "ADDON" : couponForm.applicable_to,
+        addon_id: couponForm.applicable_to === "SPECIFIC_ADDON" && couponForm.addon_id ? couponForm.addon_id : undefined,
         vendor_id: couponForm.vendor_id.trim() || undefined,
         max_uses: parseInt(couponForm.max_uses, 10),
-      });
+        one_time_per_vendor: couponForm.one_time_per_vendor,
+      } as any);
       setIsCouponModalOpen(false);
       setCouponForm({
         code: "",
@@ -177,8 +189,10 @@ export default function AdminSubscriptionsPage() {
         discount_value: "500",
         valid_days: "30",
         applicable_to: "SETUP_FEE",
+        addon_id: availableAddons.length > 0 ? availableAddons[0].id : "",
         vendor_id: "",
         max_uses: "100",
+        one_time_per_vendor: true,
       });
       loadCoupons();
     } catch (err: any) {
@@ -369,15 +383,40 @@ export default function AdminSubscriptionsPage() {
                         <td className="py-3 px-4 font-semibold text-slate-900">
                           {discountDisplay}
                         </td>
-                        <td className="py-3 px-4 text-slate-600">
-                          {c.vendor_id ? (
-                            <span className="inline-flex items-center gap-1 font-mono text-[11px] bg-slate-100 px-2 py-0.5 rounded text-slate-700">
-                              <User className="w-3 h-3 text-slate-400" />
-                              Vendor: {c.vendor_id.slice(0, 8)}...
-                            </span>
-                          ) : (
-                            <span className="text-slate-500">Universal (All Vendors)</span>
-                          )}
+                        <td className="py-3 px-4 text-slate-600 space-y-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {(c as any).addon_name ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full">
+                                <Sparkles className="w-3 h-3 text-indigo-500" />
+                                {(c as any).addon_name}
+                              </span>
+                            ) : c.applicable_to === "ADDON_ALL" || c.applicable_to === "ADDON" ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200 px-2 py-0.5 rounded-full">
+                                All Add-ons
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200 px-2 py-0.5 rounded-full">
+                                Setup Fee
+                              </span>
+                            )}
+
+                            {(c as any).one_time_per_vendor && (
+                              <span className="inline-flex items-center text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 px-1.5 py-0.5 rounded">
+                                1x / Vendor
+                              </span>
+                            )}
+                          </div>
+
+                          <div>
+                            {c.vendor_id ? (
+                              <span className="inline-flex items-center gap-1 font-mono text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-700">
+                                <User className="w-3 h-3 text-slate-400" />
+                                Vendor: {c.vendor_id.slice(0, 8)}...
+                              </span>
+                            ) : (
+                              <span className="text-[11px] text-slate-400">All Vendors</span>
+                            )}
+                          </div>
                         </td>
                         <td className="py-3 px-4 text-slate-700">
                           <span className="font-semibold">{c.used_count}</span>
@@ -605,6 +644,70 @@ export default function AdminSubscriptionsPage() {
                     className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl"
                   />
                 </div>
+              </div>
+
+              {/* Target / Applicable Service */}
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">
+                  Applicable Service / Target *
+                </label>
+                <select
+                  value={couponForm.applicable_to}
+                  onChange={(e) => {
+                    const val = e.target.value as any;
+                    setCouponForm({
+                      ...couponForm,
+                      applicable_to: val,
+                      addon_id: val === "SPECIFIC_ADDON" && availableAddons.length > 0 ? (couponForm.addon_id || availableAddons[0].id) : "",
+                    });
+                  }}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800"
+                >
+                  <option value="SETUP_FEE">App Setup Fee (₹499 - ₹2000)</option>
+                  <option value="ADDON_ALL">All Growth Add-ons</option>
+                  <option value="SPECIFIC_ADDON">Specific Add-on Service (e.g. Custom Domain)</option>
+                </select>
+              </div>
+
+              {/* If Specific Add-on is chosen */}
+              {couponForm.applicable_to === "SPECIFIC_ADDON" && (
+                <div className="p-3 bg-indigo-50/70 border border-indigo-200 rounded-xl space-y-1.5">
+                  <label className="font-semibold text-indigo-950 block text-[11px] uppercase tracking-wider">
+                    Select Target Add-on *
+                  </label>
+                  <select
+                    value={couponForm.addon_id}
+                    onChange={(e) => setCouponForm({ ...couponForm, addon_id: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-indigo-300 rounded-xl font-semibold text-indigo-900 text-xs"
+                  >
+                    {availableAddons.map((add) => (
+                      <option key={add.id} value={add.id}>
+                        {add.name} (₹{add.price_inr} - {add.billing_type === "MONTHLY" ? "Monthly" : "One-Time"})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-indigo-700">
+                    This promo code can ONLY be redeemed when purchasing this specific add-on.
+                  </p>
+                </div>
+              )}
+
+              {/* One-Time Use Per Vendor Checkbox */}
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-3">
+                <div>
+                  <span className="font-semibold text-slate-800 block text-xs">
+                    One-Time Use Per Vendor
+                  </span>
+                  <span className="text-[10px] text-slate-500">
+                    Ensures each registered vendor can only redeem this promo code once.
+                  </span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={couponForm.one_time_per_vendor}
+                  onChange={(e) => setCouponForm({ ...couponForm, one_time_per_vendor: e.target.checked })}
+                  className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer"
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-3">

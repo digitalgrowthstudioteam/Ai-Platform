@@ -966,19 +966,51 @@ class PlatformApiClient {
     });
   }
 
-  async createAddonOrder(addonId: string): Promise<any> {
+  async validateAddonCoupon(addonId: string, couponCode: string): Promise<any> {
     if (this.isDemoMode()) {
+      return {
+        valid: true,
+        coupon_code: couponCode,
+        discount_type: "FIXED_INR",
+        discount_value: 999,
+        discount_inr: 999,
+        original_price_inr: 999,
+        final_price_inr: 0,
+        is_free: true,
+        message: `🎉 Coupon '${couponCode}' applied! 100% Free activation.`,
+      };
+    }
+    return this.request('/api/v1/platform/payments/validate-addon-coupon', {
+      method: 'POST',
+      body: JSON.stringify({ addon_id: addonId, coupon_code: couponCode }),
+    });
+  }
+
+  async createAddonOrder(addonId: string, couponCode?: string): Promise<any> {
+    if (this.isDemoMode()) {
+      if (couponCode) {
+        return {
+          order_id: `free_coupon_${couponCode}`,
+          amount: 0,
+          currency: 'INR',
+          key_id: 'rzp_test_platform_mock',
+          is_mock: false,
+          is_free: true,
+          message: "Unlocked with promo code!",
+        };
+      }
       return {
         order_id: `order_mock_addon_${addonId.slice(0, 6)}`,
         amount: 49900,
         currency: 'INR',
         key_id: 'rzp_test_platform_mock',
         is_mock: true,
+        is_free: false,
       };
     }
     return this.request('/api/v1/platform/payments/create-addon-order', {
       method: 'POST',
-      body: JSON.stringify({ addon_id: addonId }),
+      body: JSON.stringify({ addon_id: addonId, coupon_code: couponCode }),
     });
   }
 
@@ -987,6 +1019,7 @@ class PlatformApiClient {
     razorpay_order_id: string;
     razorpay_payment_id: string;
     razorpay_signature: string;
+    coupon_code?: string;
   }): Promise<any> {
     if (this.isDemoMode()) {
       return { success: true, message: "Add-on activated successfully in demo sandbox!" };

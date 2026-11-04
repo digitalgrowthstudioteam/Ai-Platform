@@ -56,11 +56,15 @@ class PlatformCoupon(BaseModel):
     discount_type: Mapped[str] = mapped_column(String(20), nullable=False, default="FIXED_INR")  # FIXED_INR or PERCENTAGE
     discount_value: Mapped[float] = mapped_column(Float, nullable=False)
     applicable_to: Mapped[str] = mapped_column(String(50), nullable=False, default="SETUP_FEE")  # SETUP_FEE, SUBSCRIPTION, ADDON, ALL
+    addon_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("platform_addons.id", ondelete="SET NULL"), nullable=True)
     vendor_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("platform_vendors.id", ondelete="CASCADE"), nullable=True)
     max_uses: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     used_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    one_time_per_vendor: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     valid_until: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+    addon: Mapped[Optional["PlatformAddon"]] = relationship("PlatformAddon", lazy="joined")
 
 
 class PlatformPayment(BaseModel):
