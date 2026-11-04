@@ -203,3 +203,16 @@ async def root():
         "status": "running",
         "docs": "/docs" if settings.APP_ENV == "development" else None,
     }
+
+
+@app.get("/health", tags=["Health"])
+@app.get("/api/v1/ping", tags=["Health"])
+async def health_ping():
+    """Lightweight 24/7 keep-alive and health check endpoint."""
+    from datetime import datetime, timezone
+    return {
+        "status": "ok",
+        "service": "digital-growth-studio-api",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "warm": True,
+    }

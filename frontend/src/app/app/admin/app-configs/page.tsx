@@ -11,6 +11,8 @@ export default function AdminAppConfigsPage() {
   const [loading, setLoading] = useState(true);
   const [selectedVendor, setSelectedVendor] = useState<any>(null);
   const [formData, setFormData] = useState({
+    app_name: "",
+    package_id: "",
     app_build_status: "BUILT",
     publication_status: "PUBLISHED",
     playstore_url: "",
@@ -40,6 +42,8 @@ export default function AdminAppConfigsPage() {
       const detail = await platformApi.getAdminVendorDetail(v.id);
       setSelectedVendor(detail);
       setFormData({
+        app_name: detail.app_name || detail.business_name || "",
+        package_id: detail.package_id || `in.digitalgrowthstudio.${(detail.store_slug || "store").replace(/-/g, "_")}`,
         app_build_status: detail.app_build_status || "NOT_REQUESTED",
         publication_status: detail.publication_status || "UNPUBLISHED",
         playstore_url: detail.playstore_url || "",
@@ -145,8 +149,32 @@ export default function AdminAppConfigsPage() {
             </div>
 
             <form onSubmit={handleSave} className="mt-4 space-y-4 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">App Display Name *</label>
+                  <input
+                    type="text"
+                    value={formData.app_name}
+                    onChange={(e) => setFormData({ ...formData, app_name: e.target.value })}
+                    placeholder="e.g. My Shop Partner"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Android Package ID *</label>
+                  <input
+                    type="text"
+                    value={formData.package_id}
+                    onChange={(e) => setFormData({ ...formData, package_id: e.target.value.toLowerCase().replace(/[^a-z0-9_.]/g, "") })}
+                    placeholder="in.digitalgrowthstudio.store"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs"
+                    required
+                  />
+                </div>
+              </div>
+
               <div className="p-3 bg-slate-50 rounded-xl space-y-1.5 font-mono text-[11px]">
-                <div><span className="text-slate-400">Package ID:</span> {selectedVendor.package_id}</div>
                 <div><span className="text-slate-400">API Endpoint:</span> /api/store/{selectedVendor.store_slug}/config</div>
                 <div><span className="text-slate-400">Primary Color:</span> {selectedVendor.app_primary_color}</div>
               </div>

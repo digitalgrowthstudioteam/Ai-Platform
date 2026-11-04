@@ -37,11 +37,37 @@ const getPlatformBaseUrl = (): string => {
   return envUrl.replace(/\/api\/v1\/?$/, '');
 };
 
+// Automatic 24/7 client-side keepalive & warmup to prevent Render free-tier spin-down
+let keepAliveInitialized = false;
+export const initPlatformKeepAlive = () => {
+  if (typeof window === 'undefined' || keepAliveInitialized) return;
+  keepAliveInitialized = true;
+  const baseUrl = getPlatformBaseUrl();
+  const ping = () => {
+    fetch(`${baseUrl}/api/v1/ping`, { method: 'GET', keepalive: true }).catch(() => {});
+  };
+  // Fire immediate warmup
+  ping();
+  // Keep warm every 4 minutes (Render spins down after 15 minutes of inactivity)
+  setInterval(ping, 4 * 60 * 1000);
+};
+
+if (typeof window !== 'undefined') {
+  initPlatformKeepAlive();
+}
+
 class PlatformApiClient {
   private getAuthHeader(): Record<string, string> {
     if (typeof window === 'undefined') return {};
     const token = localStorage.getItem('dgs_platform_token');
     return token ? { Authorization: `Bearer ${token}` } : {};
+  }
+
+  async warmup(): Promise<void> {
+    const baseUrl = getPlatformBaseUrl();
+    try {
+      await fetch(`${baseUrl}/api/v1/ping`, { method: 'GET', keepalive: true });
+    } catch {}
   }
 
   private async request<T>(endpoint: string, options: RequestInit & { timeout?: number; retries?: number } = {}): Promise<T> {
@@ -53,10 +79,11 @@ class PlatformApiClient {
       ...(options.headers || {}),
     };
 
-    const maxRetries = options.retries ?? 2;
-    const timeoutMs = options.timeout ?? 45000;
+    const maxRetries = options.retries ?? 3;
+    const timeoutMs = options.timeout ?? 50000;
 
     let lastError: any = null;
+    const retryDelays = [1500, 3000, 5000, 7000];
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       const controller = new AbortController();
@@ -81,6 +108,14 @@ class PlatformApiClient {
         }
 
         if (!res.ok) {
+          // If server is returning 502/503/504 (e.g. Render container cold start or restarting deployment),
+          // treat it as transient and retry with backoff instead of failing instantly!
+          if ((res.status === 502 || res.status === 503 || res.status === 504) && attempt < maxRetries) {
+            const delay = retryDelays[attempt] || 3000;
+            await new Promise((r) => setTimeout(r, delay));
+            continue;
+          }
+
           let errorMsg = `Server error (${res.status})`;
           if (responseData) {
             if (typeof responseData.detail === 'string') {
@@ -109,14 +144,15 @@ class PlatformApiClient {
         clearTimeout(timeoutId);
         lastError = err;
 
-        // If it was a real HTTP response from the server, do not retry 4xx errors
+        // If it was a real HTTP response from the server, do not retry client-side 4xx errors
         if (typeof err?.status === 'number' && err.status >= 400 && err.status < 500) {
           throw err;
         }
 
-        // On transient network failure or timeout, wait before retrying (exponential backoff)
+        // On transient network failure, cold boot or timeout, wait before retrying (exponential backoff)
         if (attempt < maxRetries) {
-          await new Promise((r) => setTimeout(r, (attempt + 1) * 1500));
+          const delay = retryDelays[attempt] || 3000;
+          await new Promise((r) => setTimeout(r, delay));
           continue;
         }
       }
@@ -127,13 +163,13 @@ class PlatformApiClient {
     }
 
     if (lastError?.name === 'AbortError') {
-      const err = new Error('Connection timed out. Please check your internet connection or retry in a moment.');
+      const err = new Error('Connection timed out. Server is taking longer than expected to respond. Please retry.');
       (err as any).status = 408;
       throw err;
     }
 
     if (lastError?.message === 'Failed to fetch') {
-      const err = new Error('Unable to connect to platform server. Please check your internet or retry.');
+      const err = new Error('Unable to connect to platform server. The server is restarting or your internet is unstable. Please retry in a few seconds.');
       (err as any).status = 503;
       throw err;
     }

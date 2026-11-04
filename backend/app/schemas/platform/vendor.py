@@ -264,6 +264,8 @@ class VendorDetailFullResponse(BaseModel):
     custom_domain: Optional[str] = None
     custom_domain_enabled: Optional[bool] = None
     custom_domain_status: Optional[str] = None
+    custom_domain_ssl_status: Optional[str] = None
+    custom_domain_dns_target: Optional[str] = None
 
     # Transactional Email Notification System (Platform Brevo vs Custom SMTP)
     email_notifications_enabled: Optional[bool] = None
@@ -274,6 +276,42 @@ class VendorDetailFullResponse(BaseModel):
     smtp_password: Optional[str] = None
     smtp_from_email: Optional[str] = None
     smtp_from_name: Optional[str] = None
+
+    # Tracking & Pixels
+    meta_pixel_id: Optional[str] = None
+    gtm_id: Optional[str] = None
+    ga4_id: Optional[str] = None
+    tracking_enabled: Optional[bool] = True
+
+    # Mobile App Configuration
+    app_name: Optional[str] = None
+    app_logo_url: Optional[str] = None
+    splash_screen_url: Optional[str] = None
+    app_primary_color: Optional[str] = "#2563EB"
+    app_secondary_color: Optional[str] = "#1E293B"
+    package_id: Optional[str] = "in.digitalgrowthstudio.store"
+    app_build_status: Optional[str] = "NOT_REQUESTED"
+    app_version: Optional[str] = "1.0.0"
+    playstore_url: Optional[str] = None
+    publication_status: Optional[str] = "UNPUBLISHED"
+    apk_user_approved: Optional[bool] = False
+    apk_download_url: Optional[str] = None
+    subscription_auto_debit_active: Optional[bool] = False
+    is_locked: Optional[bool] = False
+
+    # Catalog & Storage Stats
+    total_products: Optional[int] = 0
+    total_orders: Optional[int] = 0
+    storage_used_mb: Optional[float] = 0.0
+    storage_limit_mb: Optional[float] = 1024.0
+
+    # Subscription & Setup Fee
+    plan_name: Optional[str] = "Starter Store"
+    subscription_status: Optional[str] = "active"
+    renewal_date: Optional[datetime] = None
+    setup_fee_paid: Optional[bool] = False
+    setup_fee_waived: Optional[bool] = False
+    setup_fee_custom_price_inr: Optional[float] = None
 
 
 class StoreEmailSettingsUpdateRequest(BaseModel):
@@ -302,40 +340,6 @@ class StoreEmailSettingsResponse(BaseModel):
 
 class StoreEmailTestRequest(BaseModel):
     test_email: Optional[str] = None
-
-    # Tracking & Pixels
-    meta_pixel_id: Optional[str] = None
-    gtm_id: Optional[str] = None
-    ga4_id: Optional[str] = None
-    tracking_enabled: Optional[bool] = True
-
-    # Mobile App Configuration
-    app_name: Optional[str] = None
-    app_logo_url: Optional[str] = None
-    splash_screen_url: Optional[str] = None
-    app_primary_color: Optional[str] = "#2563EB"
-    app_secondary_color: Optional[str] = "#1E293B"
-    package_id: Optional[str] = "in.digitalgrowthstudio.store"
-    app_build_status: Optional[str] = "NOT_REQUESTED"
-    app_version: Optional[str] = "1.0.0"
-    playstore_url: Optional[str] = None
-    publication_status: Optional[str] = "UNPUBLISHED"
-    apk_user_approved: Optional[bool] = False
-    apk_download_url: Optional[str] = None
-
-    # Catalog & Storage Stats
-    total_products: Optional[int] = 0
-    total_orders: Optional[int] = 0
-    storage_used_mb: Optional[float] = 0.0
-    storage_limit_mb: Optional[float] = 1024.0
-
-    # Subscription & Setup Fee
-    plan_name: Optional[str] = "Starter Store"
-    subscription_status: Optional[str] = "active"
-    renewal_date: Optional[datetime] = None
-    setup_fee_paid: Optional[bool] = False
-    setup_fee_waived: Optional[bool] = False
-    setup_fee_custom_price_inr: Optional[float] = None
 
 
 class VendorPixelConfigResponse(BaseModel):
@@ -467,6 +471,8 @@ class AdminVendorFullUpdateRequest(BaseModel):
     custom_domain: Optional[str] = None
     custom_domain_enabled: Optional[bool] = None
     custom_domain_status: Optional[str] = None
+    custom_domain_ssl_status: Optional[str] = None
+    custom_domain_dns_target: Optional[str] = None
 
     # Transactional Email Notification System (Platform Brevo vs Custom SMTP)
     email_notifications_enabled: Optional[bool] = None
@@ -477,6 +483,42 @@ class AdminVendorFullUpdateRequest(BaseModel):
     smtp_password: Optional[str] = None
     smtp_from_email: Optional[str] = None
     smtp_from_name: Optional[str] = None
+
+    # Tracking & Pixels
+    meta_pixel_id: Optional[str] = None
+    gtm_id: Optional[str] = None
+    ga4_id: Optional[str] = None
+    tracking_enabled: Optional[bool] = True
+
+    # Mobile App Configuration
+    app_name: Optional[str] = None
+    app_logo_url: Optional[str] = None
+    splash_screen_url: Optional[str] = None
+    app_primary_color: Optional[str] = "#2563EB"
+    app_secondary_color: Optional[str] = "#1E293B"
+    package_id: Optional[str] = "in.digitalgrowthstudio.store"
+    app_build_status: Optional[str] = "NOT_REQUESTED"
+    app_version: Optional[str] = "1.0.0"
+    playstore_url: Optional[str] = None
+    publication_status: Optional[str] = "UNPUBLISHED"
+    apk_user_approved: Optional[bool] = False
+    apk_download_url: Optional[str] = None
+    subscription_auto_debit_active: Optional[bool] = False
+    is_locked: Optional[bool] = False
+
+    # Catalog & Storage Stats
+    total_products: Optional[int] = 0
+    total_orders: Optional[int] = 0
+    storage_used_mb: Optional[float] = 0.0
+    storage_limit_mb: Optional[float] = 1024.0
+
+    # Subscription & Setup Fee
+    plan_name: Optional[str] = "Starter Store"
+    subscription_status: Optional[str] = "active"
+    renewal_date: Optional[datetime] = None
+    setup_fee_paid: Optional[bool] = False
+    setup_fee_waived: Optional[bool] = False
+    setup_fee_custom_price_inr: Optional[float] = None
 
 
 class StoreEmailSettingsUpdateRequest(BaseModel):
@@ -505,40 +547,6 @@ class StoreEmailSettingsResponse(BaseModel):
 
 class StoreEmailTestRequest(BaseModel):
     test_email: Optional[str] = None
-
-    # Tracking & Pixels
-    meta_pixel_id: Optional[str] = None
-    gtm_id: Optional[str] = None
-    ga4_id: Optional[str] = None
-    tracking_enabled: Optional[bool] = True
-
-    # Mobile App Configuration
-    app_name: Optional[str] = None
-    app_logo_url: Optional[str] = None
-    splash_screen_url: Optional[str] = None
-    app_primary_color: Optional[str] = "#2563EB"
-    app_secondary_color: Optional[str] = "#1E293B"
-    package_id: Optional[str] = "in.digitalgrowthstudio.store"
-    app_build_status: Optional[str] = "NOT_REQUESTED"
-    app_version: Optional[str] = "1.0.0"
-    playstore_url: Optional[str] = None
-    publication_status: Optional[str] = "UNPUBLISHED"
-    apk_user_approved: Optional[bool] = False
-    apk_download_url: Optional[str] = None
-
-    # Catalog & Storage Stats
-    total_products: Optional[int] = 0
-    total_orders: Optional[int] = 0
-    storage_used_mb: Optional[float] = 0.0
-    storage_limit_mb: Optional[float] = 1024.0
-
-    # Subscription & Setup Fee
-    plan_name: Optional[str] = "Starter Store"
-    subscription_status: Optional[str] = "active"
-    renewal_date: Optional[datetime] = None
-    setup_fee_paid: Optional[bool] = False
-    setup_fee_waived: Optional[bool] = False
-    setup_fee_custom_price_inr: Optional[float] = None
 
 
 class VendorPixelConfigResponse(BaseModel):

@@ -38,6 +38,8 @@ import {
   Truck,
   MessageCircle,
   X,
+  Download,
+  Palette,
 } from "lucide-react";
 
 // Safe Date Formatter helper
@@ -147,8 +149,10 @@ function VendorDetailInner() {
   const [editOwnerModalOpen, setEditOwnerModalOpen] = useState(false);
   const [editBusinessModalOpen, setEditBusinessModalOpen] = useState(false);
   const [editStoreModalOpen, setEditStoreModalOpen] = useState(false);
+  const [editAppModalOpen, setEditAppModalOpen] = useState(false);
   const [activePolicyTab, setActivePolicyTab] = useState<"terms" | "privacy" | "shipping" | "refund">("terms");
   const [savingDetails, setSavingDetails] = useState(false);
+  const [savingAppConfig, setSavingAppConfig] = useState(false);
 
   // Forms
   const [ownerForm, setOwnerForm] = useState({
@@ -185,6 +189,76 @@ function VendorDetailInner() {
     shipping_policy: "",
     refund_policy: "",
   });
+
+  const [appForm, setAppForm] = useState({
+    app_name: "",
+    package_id: "",
+    app_version: "1.0.0",
+    app_build_status: "NOT_REQUESTED",
+    publication_status: "UNPUBLISHED",
+    playstore_url: "",
+    apk_download_url: "",
+    primary_color: "#2563EB",
+    secondary_color: "#1E293B",
+    app_logo_url: "",
+    splash_screen_url: "",
+    apk_user_approved: false,
+    subscription_auto_debit_active: false,
+    is_locked: false,
+  });
+
+  const openEditApp = () => {
+    if (!vendor) return;
+    setAppForm({
+      app_name: vendor.app_name || vendor.business_name || "",
+      package_id: vendor.package_id || `in.digitalgrowthstudio.${(vendor.store_slug || "app").replace(/-/g, "_")}`,
+      app_version: vendor.app_version || "1.0.0",
+      app_build_status: vendor.app_build_status || "NOT_REQUESTED",
+      publication_status: vendor.publication_status || "UNPUBLISHED",
+      playstore_url: vendor.playstore_url || "",
+      apk_download_url: vendor.apk_download_url || "",
+      primary_color: vendor.app_primary_color || vendor.primary_color || "#2563EB",
+      secondary_color: vendor.app_secondary_color || vendor.secondary_color || "#1E293B",
+      app_logo_url: vendor.app_logo_url || vendor.logo_url || "",
+      splash_screen_url: vendor.splash_screen_url || "",
+      apk_user_approved: Boolean(vendor.apk_user_approved),
+      subscription_auto_debit_active: Boolean(vendor.subscription_auto_debit_active),
+      is_locked: Boolean(vendor.is_locked),
+    });
+    setEditAppModalOpen(true);
+  };
+
+  const handleSaveAppConfig = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!vendor) return;
+    setSavingAppConfig(true);
+    setMessage(null);
+    try {
+      const res = await platformApi.updateVendorAppConfigByAdmin(vendor.id, appForm);
+      setVendor((prev: any) =>
+        prev
+          ? {
+              ...prev,
+              ...appForm,
+              app_primary_color: appForm.primary_color,
+              app_secondary_color: appForm.secondary_color,
+            }
+          : null
+      );
+      setMessage({
+        type: "success",
+        text: res.message || "Android Mobile App configuration successfully updated!",
+      });
+      setEditAppModalOpen(false);
+    } catch (err: any) {
+      setMessage({
+        type: "error",
+        text: err.message || "Failed to update Android app configuration",
+      });
+    } finally {
+      setSavingAppConfig(false);
+    }
+  };
 
   const openEditOwner = () => {
     if (!vendor) return;
@@ -856,37 +930,19 @@ function VendorDetailInner() {
                       Super Admin Override
                     </span>
                   </div>
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                    <div className="flex items-center bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 focus-within:ring-2 focus-within:ring-blue-500 flex-1">
-                      <span className="text-xs text-slate-400 font-mono">https://</span>
+                  <div className="space-y-2">
+                    <div className="flex items-center bg-white border border-blue-300 rounded-xl px-3 py-2 focus-within:ring-2 focus-within:ring-blue-500 shadow-2xs">
+                      <span className="text-xs text-slate-400 font-mono shrink-0 select-none">https://</span>
                       <input
                         type="text"
                         value={subdomainInput}
                         onChange={(e) => setSubdomainInput(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
                         placeholder="e.g. dgs"
-                        className="text-xs font-mono font-bold text-slate-900 outline-none flex-1 px-1 bg-transparent"
+                        className="text-xs font-mono font-bold text-slate-900 outline-none flex-1 px-1.5 bg-transparent min-w-[70px]"
                       />
-                      <span className="text-xs text-slate-500 font-mono">.digitalgrowthstudio.in</span>
+                      <span className="text-xs text-slate-500 font-mono shrink-0 select-none">.digitalgrowthstudio.in</span>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={handleSaveSubdomain}
-                        disabled={updatingSubdomain}
-                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-all disabled:opacity-50 cursor-pointer flex items-center gap-1.5 shadow-xs"
-                      >
-                        {updatingSubdomain ? (
-                          <>
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            <span>Saving...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Check className="w-3.5 h-3.5" />
-                            <span>Save Subdomain</span>
-                          </>
-                        )}
-                      </button>
+                    <div className="flex items-center justify-end gap-2 pt-0.5">
                       <button
                         type="button"
                         onClick={() => {
@@ -895,9 +951,27 @@ function VendorDetailInner() {
                           setEditingSubdomain(false);
                         }}
                         disabled={updatingSubdomain}
-                        className="px-2.5 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-xs font-semibold transition-all cursor-pointer"
+                        className="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-xs font-semibold transition-all cursor-pointer shadow-2xs"
                       >
                         Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSaveSubdomain}
+                        disabled={updatingSubdomain}
+                        className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-all disabled:opacity-50 cursor-pointer flex items-center gap-1.5 shadow-xs shrink-0"
+                      >
+                        {updatingSubdomain ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            <span>Saving Subdomain...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Check className="w-3.5 h-3.5" />
+                            <span>Save Subdomain</span>
+                          </>
+                        )}
                       </button>
                     </div>
                   </div>
@@ -1147,20 +1221,57 @@ function VendorDetailInner() {
         <div className="space-y-6">
           {/* 4. Android Mobile App Configuration */}
           <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
-            <h3 className="font-bold text-slate-800 uppercase tracking-wider text-xs flex items-center gap-2 pb-2 border-b border-slate-100">
-              <Smartphone className="w-4 h-4 text-emerald-600" />
-              4. Android Mobile App Configuration
-            </h3>
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <h3 className="font-bold text-slate-800 uppercase tracking-wider text-xs flex items-center gap-2">
+                <Smartphone className="w-4 h-4 text-emerald-600" />
+                4. Android Mobile App Configuration
+              </h3>
+              <button
+                type="button"
+                onClick={openEditApp}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors cursor-pointer shadow-2xs"
+              >
+                <Edit3 className="w-3 h-3" />
+                <span>Edit Mobile App Configuration</span>
+              </button>
+            </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
               <div>
                 <span className="text-slate-400 block text-[11px] uppercase font-bold">App Display Name</span>
-                <p className="font-bold text-slate-900 mt-0.5">{vendor.app_name || "Not Configured"}</p>
+                <p className="font-bold text-slate-900 mt-0.5">{vendor.app_name || vendor.business_name || "Not Configured"}</p>
               </div>
 
               <div>
                 <span className="text-slate-400 block text-[11px] uppercase font-bold">Package Name</span>
-                <p className="font-mono text-slate-700 mt-0.5">{vendor.package_id || "Not Configured"}</p>
+                <p className="font-mono text-slate-700 mt-0.5 break-all">
+                  {vendor.package_id || (vendor.store_slug ? `in.digitalgrowthstudio.${vendor.store_slug.replace(/-/g, '_')}` : "Not Configured")}
+                </p>
+              </div>
+
+              <div>
+                <span className="text-slate-400 block text-[11px] uppercase font-bold">App Version</span>
+                <p className="font-mono text-slate-800 mt-0.5">v{vendor.app_version || "1.0.0"}</p>
+              </div>
+
+              <div>
+                <span className="text-slate-400 block text-[11px] uppercase font-bold">App Theme Colors</span>
+                <div className="flex items-center gap-2 mt-1">
+                  <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-md px-2 py-0.5">
+                    <span
+                      className="w-3 h-3 rounded-full border border-slate-300"
+                      style={{ backgroundColor: vendor.app_primary_color || vendor.primary_color || "#2563EB" }}
+                    />
+                    <span className="font-mono text-[10px] text-slate-600">{vendor.app_primary_color || vendor.primary_color || "#2563EB"}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-md px-2 py-0.5">
+                    <span
+                      className="w-3 h-3 rounded-full border border-slate-300"
+                      style={{ backgroundColor: vendor.app_secondary_color || vendor.secondary_color || "#1E293B" }}
+                    />
+                    <span className="font-mono text-[10px] text-slate-600">{vendor.app_secondary_color || vendor.secondary_color || "#1E293B"}</span>
+                  </div>
+                </div>
               </div>
 
               <div>
@@ -1177,6 +1288,21 @@ function VendorDetailInner() {
                 </div>
               </div>
 
+              {vendor.playstore_url && (
+                <div className="sm:col-span-2">
+                  <span className="text-slate-400 block text-[11px] uppercase font-bold">Google Play Store URL</span>
+                  <a
+                    href={vendor.playstore_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 font-mono text-[11px] hover:underline break-all mt-0.5 inline-flex items-center gap-1"
+                  >
+                    <span>{vendor.playstore_url}</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+              )}
+
               {vendor.apk_download_url && (
                 <div className="sm:col-span-2">
                   <span className="text-slate-400 block text-[11px] uppercase font-bold">APK Download URL</span>
@@ -1184,12 +1310,36 @@ function VendorDetailInner() {
                     href={vendor.apk_download_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-blue-600 font-mono text-[11px] hover:underline break-all mt-0.5 block"
+                    className="text-blue-600 font-mono text-[11px] hover:underline break-all mt-0.5 inline-flex items-center gap-1"
                   >
-                    {vendor.apk_download_url}
+                    <Download className="w-3 h-3" />
+                    <span>{vendor.apk_download_url}</span>
                   </a>
                 </div>
               )}
+
+              <div className="sm:col-span-2 pt-2 border-t border-slate-100 flex flex-wrap items-center gap-2">
+                <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold ${
+                  vendor.apk_user_approved
+                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                    : "bg-amber-50 text-amber-700 border border-amber-200"
+                }`}>
+                  <Check className="w-3 h-3" />
+                  {vendor.apk_user_approved ? "APK Tested & Approved" : "Awaiting Vendor WhatsApp Confirmation"}
+                </span>
+                {vendor.subscription_auto_debit_active && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                    <Zap className="w-3 h-3" />
+                    Auto-Debit Active (₹499/mo)
+                  </span>
+                )}
+                {vendor.is_locked && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                    <Lock className="w-3 h-3" />
+                    Locked from Vendor Editing
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
@@ -1961,6 +2111,298 @@ function VendorDetailInner() {
                 )}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 4. EDIT ANDROID MOBILE APP CONFIGURATION MODAL */}
+      {editAppModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 space-y-5 max-h-[92vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-700">
+                  <Smartphone className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Edit Android Mobile App Configuration</h3>
+                  <p className="text-xs text-slate-500">Package identifiers, Play Store URLs, APK delivery & build status</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditAppModalOpen(false)}
+                className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveAppConfig} className="space-y-5 text-xs">
+              {/* Section A: App Identity & Package */}
+              <div className="space-y-3">
+                <h4 className="font-bold text-slate-800 uppercase tracking-wider text-[11px] pb-1 border-b border-slate-100 flex items-center gap-1.5">
+                  <Smartphone className="w-3.5 h-3.5 text-emerald-600" />
+                  App Identity & Play Store Package
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-700 font-bold mb-1">App Display Title *</label>
+                    <input
+                      type="text"
+                      value={appForm.app_name}
+                      onChange={(e) => setAppForm({ ...appForm, app_name: e.target.value })}
+                      placeholder="e.g. My Shop Partner"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500"
+                      required
+                    />
+                    <span className="text-[10px] text-slate-400">Name shown under icon on Android home screen</span>
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-700 font-bold mb-1">Package Identifier *</label>
+                    <input
+                      type="text"
+                      value={appForm.package_id}
+                      onChange={(e) => setAppForm({ ...appForm, package_id: e.target.value.toLowerCase().replace(/[^a-z0-9_.]/g, "") })}
+                      placeholder="e.g. in.digitalgrowthstudio.myshoppartner"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs font-semibold text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500"
+                      required
+                    />
+                    <span className="text-[10px] text-slate-400">Unique Android Play Store package name</span>
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-700 font-bold mb-1">App Version</label>
+                    <input
+                      type="text"
+                      value={appForm.app_version}
+                      onChange={(e) => setAppForm({ ...appForm, app_version: e.target.value })}
+                      placeholder="e.g. 1.0.0"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-700 font-bold mb-1">Store API Feed Endpoint</label>
+                    <div className="px-3 py-2 bg-slate-100 border border-slate-200 rounded-xl font-mono text-[11px] text-slate-600 truncate">
+                      /api/store/{vendor.store_slug || "store"}/config
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section B: Lifecycle & Deployment Status */}
+              <div className="space-y-3 pt-2 border-t border-slate-100">
+                <h4 className="font-bold text-slate-800 uppercase tracking-wider text-[11px] pb-1 border-b border-slate-100 flex items-center gap-1.5">
+                  <Layers className="w-3.5 h-3.5 text-blue-600" />
+                  Build & Google Play Lifecycle
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-700 font-bold mb-1">Android Application Build Status</label>
+                    <select
+                      value={appForm.app_build_status}
+                      onChange={(e) => setAppForm({ ...appForm, app_build_status: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none"
+                    >
+                      <option value="NOT_REQUESTED">NOT_REQUESTED</option>
+                      <option value="QUEUED">QUEUED (In developer queue)</option>
+                      <option value="IN_DEVELOPMENT">IN_DEVELOPMENT (Compiling Flutter APK/AAB)</option>
+                      <option value="BUILT">BUILT (APK & AAB signed ready)</option>
+                      <option value="FAILED">FAILED (Build error / compilation issue)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-700 font-bold mb-1">Google Play Publication Status</label>
+                    <select
+                      value={appForm.publication_status}
+                      onChange={(e) => setAppForm({ ...appForm, publication_status: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none"
+                    >
+                      <option value="UNPUBLISHED">UNPUBLISHED</option>
+                      <option value="PENDING_REVIEW">PENDING_REVIEW (Under Google Review)</option>
+                      <option value="PUBLISHED">PUBLISHED (Live on Google Play Store)</option>
+                      <option value="REJECTED">REJECTED (Action required on Google Play)</option>
+                    </select>
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-slate-700 font-bold mb-1">Google Play Store Live URL</label>
+                    <input
+                      type="url"
+                      value={appForm.playstore_url}
+                      onChange={(e) => setAppForm({ ...appForm, playstore_url: e.target.value })}
+                      placeholder="https://play.google.com/store/apps/details?id=in.digitalgrowthstudio..."
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-slate-700 font-bold mb-1">Final APK Download URL</label>
+                    <input
+                      type="url"
+                      value={appForm.apk_download_url}
+                      onChange={(e) => setAppForm({ ...appForm, apk_download_url: e.target.value })}
+                      placeholder="https://storage... or Google Drive direct download link (or leave blank if sent via WhatsApp)"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500"
+                    />
+                    <span className="text-[10px] text-slate-400">Allows vendor to download and install their testing APK directly from dashboard</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section C: App Theme Branding */}
+              <div className="space-y-3 pt-2 border-t border-slate-100">
+                <h4 className="font-bold text-slate-800 uppercase tracking-wider text-[11px] pb-1 border-b border-slate-100 flex items-center gap-1.5">
+                  <Palette className="w-3.5 h-3.5 text-purple-600" />
+                  App Branding Colors & Assets
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-700 font-bold mb-1">App Primary Color</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={appForm.primary_color || "#2563EB"}
+                        onChange={(e) => setAppForm({ ...appForm, primary_color: e.target.value })}
+                        className="w-8 h-8 rounded-lg cursor-pointer border border-slate-200 p-0.5"
+                      />
+                      <input
+                        type="text"
+                        value={appForm.primary_color}
+                        onChange={(e) => setAppForm({ ...appForm, primary_color: e.target.value })}
+                        className="flex-1 px-2.5 py-1.5 font-mono text-xs bg-slate-50 border border-slate-200 rounded-lg outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-700 font-bold mb-1">App Secondary Color</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={appForm.secondary_color || "#1E293B"}
+                        onChange={(e) => setAppForm({ ...appForm, secondary_color: e.target.value })}
+                        className="w-8 h-8 rounded-lg cursor-pointer border border-slate-200 p-0.5"
+                      />
+                      <input
+                        type="text"
+                        value={appForm.secondary_color}
+                        onChange={(e) => setAppForm({ ...appForm, secondary_color: e.target.value })}
+                        className="flex-1 px-2.5 py-1.5 font-mono text-xs bg-slate-50 border border-slate-200 rounded-lg outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-700 font-bold mb-1">App Logo / Icon URL</label>
+                    <input
+                      type="url"
+                      value={appForm.app_logo_url}
+                      onChange={(e) => setAppForm({ ...appForm, app_logo_url: e.target.value })}
+                      placeholder="https://... 512x512 PNG"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-700 font-bold mb-1">Splash Screen Banner URL</label>
+                    <input
+                      type="url"
+                      value={appForm.splash_screen_url}
+                      onChange={(e) => setAppForm({ ...appForm, splash_screen_url: e.target.value })}
+                      placeholder="https://... portrait splash image"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Section D: Toggles & Permissions */}
+              <div className="space-y-3 pt-2 border-t border-slate-100">
+                <h4 className="font-bold text-slate-800 uppercase tracking-wider text-[11px] pb-1 border-b border-slate-100 flex items-center gap-1.5">
+                  <Shield className="w-3.5 h-3.5 text-indigo-600" />
+                  App Approval & Permissions
+                </h4>
+
+                <div className="space-y-2.5">
+                  <label className="flex items-start gap-2.5 p-3 rounded-xl border border-emerald-200 bg-emerald-50/60 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={appForm.apk_user_approved}
+                      onChange={(e) => setAppForm({ ...appForm, apk_user_approved: e.target.checked })}
+                      className="w-4 h-4 text-emerald-600 rounded border-slate-300 mt-0.5"
+                    />
+                    <div>
+                      <span className="font-bold text-emerald-950 block">Vendor Tested & Approved APK (Confirmed via WhatsApp)</span>
+                      <span className="text-[11px] text-emerald-800">
+                        Check this when the vendor verifies the APK on their phone. This automatically transitions their account to active and unlocks Google Play release.
+                      </span>
+                    </div>
+                  </label>
+
+                  <label className="flex items-start gap-2.5 p-3 rounded-xl border border-blue-200 bg-blue-50/60 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={appForm.subscription_auto_debit_active}
+                      onChange={(e) => setAppForm({ ...appForm, subscription_auto_debit_active: e.target.checked })}
+                      className="w-4 h-4 text-blue-600 rounded border-slate-300 mt-0.5"
+                    />
+                    <div>
+                      <span className="font-bold text-blue-950 block">Recurring ₹499/month Membership Active</span>
+                      <span className="text-[11px] text-blue-800">
+                        Enables monthly auto-debit sync and keeps Android store APIs synchronized.
+                      </span>
+                    </div>
+                  </label>
+
+                  <label className="flex items-start gap-2.5 p-3 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={appForm.is_locked}
+                      onChange={(e) => setAppForm({ ...appForm, is_locked: e.target.checked })}
+                      className="w-4 h-4 text-slate-600 rounded border-slate-300 mt-0.5"
+                    />
+                    <div>
+                      <span className="font-bold text-slate-900 block">Lock Mobile Configuration from Vendor Edits</span>
+                      <span className="text-[11px] text-slate-500">
+                        Prevents the vendor from modifying app branding once compilation has begun.
+                      </span>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  disabled={savingAppConfig}
+                  onClick={() => setEditAppModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingAppConfig}
+                  className="px-5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition-colors disabled:opacity-50 inline-flex items-center gap-1.5 cursor-pointer"
+                >
+                  {savingAppConfig ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Saving Configuration...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Save Mobile App Configuration</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

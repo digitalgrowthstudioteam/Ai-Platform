@@ -113,13 +113,20 @@ class AddonResponse(BaseModel):
 
 
 class VendorAppStatusUpdateRequest(BaseModel):
+    app_name: Optional[str] = None
+    package_id: Optional[str] = None
     app_build_status: Optional[str] = None  # NOT_REQUESTED, QUEUED, IN_DEVELOPMENT, BUILT, FAILED
-    publication_status: Optional[str] = None  # UNPUBLISHED, PENDING_REVIEW, PUBLISHED
+    publication_status: Optional[str] = None  # UNPUBLISHED, PENDING_REVIEW, PUBLISHED, REJECTED
     playstore_url: Optional[str] = None
     app_version: Optional[str] = None
     is_locked: Optional[bool] = None
     apk_download_url: Optional[str] = None
     apk_user_approved: Optional[bool] = None
+    primary_color: Optional[str] = None
+    secondary_color: Optional[str] = None
+    app_logo_url: Optional[str] = None
+    splash_screen_url: Optional[str] = None
+    subscription_auto_debit_active: Optional[bool] = None
 
 
 class VendorStorageLimitUpdateRequest(BaseModel):

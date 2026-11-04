@@ -1,0 +1,25 @@
+name: Render 24/7 Keep-Alive Automation
+
+on:
+  schedule:
+    # Runs every 10 minutes (Render spins down after 15m of inactivity)
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+jobs:
+  keepalive:
+    name: Ping Render API Server
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping Health Endpoint
+        run: |
+          echo "Pinging Digital Growth Studio platform backend to prevent idle spin-down..."
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "https://digital-growth-studio-api.onrender.com/api/v1/ping" || echo "failed")
+          echo "Render API response code: $STATUS"
+          if [ "$STATUS" -eq 200 ]; then
+            echo "Server is warm and healthy (200 OK)."
+          else
+            echo "Server responded with status $STATUS (or wake-up in progress)."
+          fi
+

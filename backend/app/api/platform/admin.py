@@ -801,6 +801,8 @@ async def get_vendor_full_detail(
         setup_fee_custom_price_inr=sub.setup_fee_custom_price_inr if sub else None,
         apk_user_approved=app.apk_user_approved if app else False,
         apk_download_url=app.apk_download_url if app else None,
+        subscription_auto_debit_active=app.subscription_auto_debit_active if app else False,
+        is_locked=app.is_locked if app else False,
     )
 
 
@@ -1330,7 +1332,16 @@ async def update_vendor_app_build_status(
 
     app_cfg = (await db.execute(select(PlatformVendorAppConfig).where(PlatformVendorAppConfig.vendor_id == v.id))).scalar_one_or_none()
     if not app_cfg:
-        raise HTTPException(status_code=404, detail="Vendor app config not found")
+        default_pkg = f"in.digitalgrowthstudio.{v.store.store_slug.replace('-', '_')}" if v.store and v.store.store_slug else f"in.digitalgrowthstudio.{v.vendor_code.lower()}"
+        app_cfg = PlatformVendorAppConfig(
+            vendor_id=v.id,
+            app_name=v.profile.business_name if v.profile else "App",
+            package_id=default_pkg,
+            app_build_status="NOT_REQUESTED",
+            publication_status="UNPUBLISHED",
+            app_version="1.0.0",
+        )
+        db.add(app_cfg)
 
     for field, val in payload.model_dump(exclude_unset=True).items():
         setattr(app_cfg, field, val)
@@ -1371,8 +1382,38 @@ async def update_vendor_app_build_status(
     elif payload.is_locked is not None:
         app_cfg.is_locked = payload.is_locked
 
+    audit = PlatformAuditLog(
+        actor_id=admin.id,
+        actor_role="SUPER_ADMIN",
+        vendor_id=v.id,
+        action="UPDATE_APP_CONFIG",
+        resource_type="APP_CONFIG",
+        resource_id=str(app_cfg.id) if hasattr(app_cfg, "id") and app_cfg.id else app_cfg.package_id,
+        changes=f"Updated app configuration for {v.vendor_code}",
+    )
+    db.add(audit)
+
     await db.commit()
-    return {"message": "App build and publication configuration updated"}
+    await db.refresh(app_cfg)
+    return {
+        "message": "Android Mobile App configuration successfully updated",
+        "app_config": {
+            "app_name": app_cfg.app_name,
+            "package_id": app_cfg.package_id,
+            "app_build_status": app_cfg.app_build_status,
+            "publication_status": app_cfg.publication_status,
+            "playstore_url": app_cfg.playstore_url,
+            "app_version": app_cfg.app_version,
+            "apk_download_url": app_cfg.apk_download_url,
+            "apk_user_approved": app_cfg.apk_user_approved,
+            "primary_color": app_cfg.primary_color,
+            "secondary_color": app_cfg.secondary_color,
+            "app_logo_url": app_cfg.app_logo_url,
+            "splash_screen_url": app_cfg.splash_screen_url,
+            "subscription_auto_debit_active": app_cfg.subscription_auto_debit_active,
+            "is_locked": app_cfg.is_locked,
+        },
+    }
 
 
 @router.patch("/vendors/{vendor_id}/setup-fee")
