@@ -39,6 +39,11 @@ class VendorListItem(BaseModel):
     app_build_status: str
     publication_status: str = "UNPUBLISHED"
     apk_user_approved: bool = False
+    razorpay_enabled: bool = False
+    sms_gateway_enabled: bool = False
+    custom_domain_enabled: bool = False
+    shiprocket_enabled: bool = False
+    whatsapp_alerts_enabled: bool = False
     created_at: datetime
 
 

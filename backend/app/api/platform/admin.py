@@ -77,6 +77,7 @@ from app.schemas.platform.admin import (
 from app.schemas.platform.vendor import (
     VendorDetailFullResponse,
     AdminVendorFullUpdateRequest,
+    AdminAppToggleRequest,
 )
 
 router = APIRouter(prefix="/platform/admin", tags=["Super Admin Panel"])
@@ -575,6 +576,11 @@ async def list_all_vendors(
             app_build_status=app.app_build_status if app else "NOT_REQUESTED",
             publication_status=app.publication_status if app else "UNPUBLISHED",
             apk_user_approved=app.apk_user_approved if app else False,
+            razorpay_enabled=s.razorpay_enabled if s else False,
+            sms_gateway_enabled=s.sms_gateway_enabled if s else False,
+            custom_domain_enabled=s.custom_domain_enabled if s else False,
+            shiprocket_enabled=s.shiprocket_enabled if s else False,
+            whatsapp_alerts_enabled=s.whatsapp_alerts_enabled if s else False,
             created_at=v.created_at,
         ))
     return items
@@ -793,6 +799,18 @@ async def get_vendor_full_detail(
         custom_domain_status=s.custom_domain_status if s else "UNCONFIGURED",
         custom_domain_ssl_status=s.custom_domain_ssl_status if s else "PENDING",
         custom_domain_dns_target=s.custom_domain_dns_target if s else "cname.digitalgrowthstudio.in",
+        # SMS Gateway & Modular Apps
+        sms_gateway_enabled=s.sms_gateway_enabled if s else False,
+        sms_provider=s.sms_provider if s else "FAST2SMS",
+        sms_api_key=s.sms_api_key if s else None,
+        sms_sender_id=s.sms_sender_id if s else None,
+        sms_custom_url=s.sms_custom_url if s else None,
+        sms_order_placed_active=s.sms_order_placed_active if s else True,
+        sms_order_dispatched_active=s.sms_order_dispatched_active if s else True,
+        sms_welcome_active=s.sms_welcome_active if s else True,
+        sms_otp_active=s.sms_otp_active if s else True,
+        whatsapp_alerts_enabled=s.whatsapp_alerts_enabled if s else False,
+        shiprocket_enabled=s.shiprocket_enabled if s else False,
         plan_name=sub.plan.name if sub and sub.plan else None,
         subscription_status=sub.status if sub else None,
         renewal_date=sub.next_renewal_date if sub else None,
@@ -948,6 +966,28 @@ async def update_vendor_full_details_by_admin(
                 s.custom_domain_status = "UNCONFIGURED"
         if "custom_domain_status" in dump and dump["custom_domain_status"]:
             s.custom_domain_status = dump["custom_domain_status"].strip().upper()
+        if "sms_gateway_enabled" in dump and dump["sms_gateway_enabled"] is not None:
+            s.sms_gateway_enabled = bool(dump["sms_gateway_enabled"])
+        if "sms_provider" in dump and dump["sms_provider"]:
+            s.sms_provider = dump["sms_provider"].strip().upper()
+        if "sms_api_key" in dump:
+            s.sms_api_key = dump["sms_api_key"].strip() if dump["sms_api_key"] else None
+        if "sms_sender_id" in dump:
+            s.sms_sender_id = dump["sms_sender_id"].strip() if dump["sms_sender_id"] else None
+        if "sms_custom_url" in dump:
+            s.sms_custom_url = dump["sms_custom_url"].strip() if dump["sms_custom_url"] else None
+        if "sms_order_placed_active" in dump and dump["sms_order_placed_active"] is not None:
+            s.sms_order_placed_active = bool(dump["sms_order_placed_active"])
+        if "sms_order_dispatched_active" in dump and dump["sms_order_dispatched_active"] is not None:
+            s.sms_order_dispatched_active = bool(dump["sms_order_dispatched_active"])
+        if "sms_welcome_active" in dump and dump["sms_welcome_active"] is not None:
+            s.sms_welcome_active = bool(dump["sms_welcome_active"])
+        if "sms_otp_active" in dump and dump["sms_otp_active"] is not None:
+            s.sms_otp_active = bool(dump["sms_otp_active"])
+        if "whatsapp_alerts_enabled" in dump and dump["whatsapp_alerts_enabled"] is not None:
+            s.whatsapp_alerts_enabled = bool(dump["whatsapp_alerts_enabled"])
+        if "shiprocket_enabled" in dump and dump["shiprocket_enabled"] is not None:
+            s.shiprocket_enabled = bool(dump["shiprocket_enabled"])
 
     # Also sync app config app_name if brand/store name was changed
     if v.app_config and ("brand_name" in dump or "store_name" in dump or "business_name" in dump):
@@ -1543,6 +1583,98 @@ async def update_vendor_custom_domain_access(
         "custom_domain_enabled": store.custom_domain_enabled,
         "custom_domain": store.custom_domain,
         "custom_domain_status": store.custom_domain_status,
+    }
+
+
+@router.post("/vendors/{vendor_id}/toggle-app")
+async def toggle_vendor_app(
+    vendor_id: str,
+    payload: AdminAppToggleRequest,
+    admin: PlatformUser = Depends(require_super_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Super Admin toggles modular platform apps and integration entitlements for any vendor.
+    Supported app_code: 'razorpay', 'sms_gateway', 'custom_domain', 'shiprocket', 'whatsapp'
+    """
+    target_uuid = None
+    try:
+        target_uuid = uuid.UUID(vendor_id)
+    except (ValueError, AttributeError):
+        pass
+
+    v_stmt = select(PlatformVendor).where(
+        or_(PlatformVendor.id == target_uuid, PlatformVendor.vendor_code == vendor_id)
+        if target_uuid
+        else PlatformVendor.vendor_code == vendor_id
+    )
+    v = (await db.execute(v_stmt)).scalar_one_or_none()
+    if not v:
+        raise HTTPException(status_code=404, detail="Vendor not found")
+
+    st_stmt = select(PlatformStore).where(PlatformStore.vendor_id == v.id)
+    store = (await db.execute(st_stmt)).scalar_one_or_none()
+    if not store:
+        raise HTTPException(status_code=404, detail="Store record not found for vendor")
+
+    code = payload.app_code.lower().strip()
+    status_text = "activated" if payload.enabled else "deactivated"
+    app_display_name = ""
+
+    if code == "razorpay":
+        store.razorpay_enabled = payload.enabled
+        app_display_name = "Razorpay Payments"
+    elif code == "sms_gateway":
+        store.sms_gateway_enabled = payload.enabled
+        app_display_name = "SMS Gateway Engine"
+    elif code == "custom_domain":
+        store.custom_domain_enabled = payload.enabled
+        app_display_name = "Custom Domain Connection"
+        if not payload.enabled:
+            store.custom_domain_status = "DISABLED"
+        elif store.custom_domain_status == "DISABLED":
+            store.custom_domain_status = "ACTIVE" if store.custom_domain else "UNCONFIGURED"
+    elif code == "shiprocket":
+        store.shiprocket_enabled = payload.enabled
+        app_display_name = "Shiprocket Logistics"
+    elif code == "whatsapp":
+        store.whatsapp_alerts_enabled = payload.enabled
+        app_display_name = "WhatsApp Alerts"
+    else:
+        raise HTTPException(status_code=400, detail=f"Unsupported app code: '{payload.app_code}'")
+
+    log_entry = PlatformAuditLog(
+        id=uuid.uuid4(),
+        actor_id=admin.id,
+        actor_role=admin.role,
+        vendor_id=v.id,
+        action="TOGGLE_APP_ENTITLEMENT",
+        resource_type="store",
+        resource_id=str(store.id),
+        details_json=json.dumps({
+            "vendor_code": v.vendor_code,
+            "app_code": code,
+            "app_name": app_display_name,
+            "enabled": payload.enabled,
+        }),
+    )
+    db.add(log_entry)
+
+    await db.commit()
+    await db.refresh(store)
+
+    return {
+        "success": True,
+        "message": f"{app_display_name} {status_text} for vendor {v.vendor_code}.",
+        "app_code": code,
+        "enabled": payload.enabled,
+        "store": {
+            "razorpay_enabled": store.razorpay_enabled,
+            "sms_gateway_enabled": store.sms_gateway_enabled,
+            "custom_domain_enabled": store.custom_domain_enabled,
+            "shiprocket_enabled": store.shiprocket_enabled,
+            "whatsapp_alerts_enabled": store.whatsapp_alerts_enabled,
+        },
     }
 
 

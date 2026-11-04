@@ -131,6 +131,20 @@ class PlatformStore(BaseModel):
     smtp_from_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     smtp_from_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
+    # SMS Gateway Integration (Fast2SMS, MSG91, Custom HTTP URL e.g. Way2SMS)
+    sms_gateway_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    sms_provider: Mapped[str] = mapped_column(String(50), nullable=False, default="FAST2SMS")  # FAST2SMS, MSG91, CUSTOM_HTTP
+    sms_api_key: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    sms_sender_id: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    sms_custom_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    sms_order_placed_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    sms_order_dispatched_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    sms_welcome_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    sms_otp_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+    # WhatsApp Business Integration
+    whatsapp_alerts_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
     vendor: Mapped["PlatformVendor"] = relationship("PlatformVendor", back_populates="store")
 
 

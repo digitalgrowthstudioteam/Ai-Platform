@@ -368,6 +368,56 @@ class PlatformApiClient {
     });
   }
 
+  // Admin App Center & Vendor Modular Entitlements
+  async toggleVendorApp(vendorId: string, app_code: string, enabled: boolean): Promise<any> {
+    if (this.isDemoMode()) {
+      return { success: true, message: `App entitlement updated in demo mode`, app_code, enabled };
+    }
+    return this.request<any>(`/api/v1/platform/admin/vendors/${vendorId}/toggle-app`, {
+      method: 'POST',
+      body: JSON.stringify({ app_code, enabled }),
+    });
+  }
+
+  // Vendor SMS Gateway Settings
+  async getVendorSmsSettings(): Promise<any> {
+    if (this.isDemoMode()) {
+      return {
+        sms_gateway_enabled: true,
+        sms_provider: 'FAST2SMS',
+        sms_api_key: 'demo_key',
+        sms_sender_id: 'DGSAPP',
+        sms_custom_url: '',
+        sms_order_placed_active: true,
+        sms_order_dispatched_active: true,
+        sms_welcome_active: true,
+        sms_otp_active: true,
+        has_api_key: true,
+      };
+    }
+    return this.request<any>('/api/v1/platform/vendor/sms-settings');
+  }
+
+  async updateVendorSmsSettings(payload: any): Promise<any> {
+    if (this.isDemoMode()) {
+      return { success: true, ...payload };
+    }
+    return this.request<any>('/api/v1/platform/vendor/sms-settings', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async sendVendorTestSms(test_phone: string): Promise<any> {
+    if (this.isDemoMode()) {
+      return { success: true, message: `Test SMS dispatched successfully to ${test_phone} (Demo Mode)` };
+    }
+    return this.request<any>('/api/v1/platform/vendor/sms-settings/test', {
+      method: 'POST',
+      body: JSON.stringify({ test_phone }),
+    });
+  }
+
   async getVendorPolicies(): Promise<VendorPolicies> {
     if (this.isDemoMode()) {
       const s = demoSandbox.getStore();

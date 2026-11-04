@@ -40,6 +40,8 @@ import {
   X,
   Download,
   Palette,
+  MessageSquare,
+  Sparkles,
 } from "lucide-react";
 
 // Safe Date Formatter helper
@@ -144,6 +146,7 @@ function VendorDetailInner() {
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deletingStore, setDeletingStore] = useState(false);
+  const [togglingAppCode, setTogglingAppCode] = useState<string | null>(null);
 
   // Modals for Super Admin editing
   const [editOwnerModalOpen, setEditOwnerModalOpen] = useState(false);
@@ -534,6 +537,36 @@ function VendorDetailInner() {
     }
   };
 
+  // Modular App Center Entitlements Toggle
+  const handleToggleApp = async (appCode: string, targetEnabled: boolean) => {
+    if (!vendor) return;
+    setTogglingAppCode(appCode);
+    setMessage(null);
+    try {
+      const res = await platformApi.toggleVendorApp(vendor.id, appCode, targetEnabled);
+      setVendor((prev: any) => {
+        if (!prev) return null;
+        if (appCode === "razorpay") return { ...prev, razorpay_enabled: targetEnabled };
+        if (appCode === "sms_gateway") return { ...prev, sms_gateway_enabled: targetEnabled };
+        if (appCode === "custom_domain") return { ...prev, custom_domain_enabled: targetEnabled, custom_domain_status: targetEnabled ? (prev.custom_domain ? "ACTIVE" : "UNCONFIGURED") : "DISABLED" };
+        if (appCode === "shiprocket") return { ...prev, shiprocket_enabled: targetEnabled };
+        if (appCode === "whatsapp") return { ...prev, whatsapp_alerts_enabled: targetEnabled };
+        return prev;
+      });
+      setMessage({
+        type: "success",
+        text: res.message || `App entitlement updated successfully!`,
+      });
+    } catch (err: any) {
+      setMessage({
+        type: "error",
+        text: err.message || `Failed to update app entitlement`,
+      });
+    } finally {
+      setTogglingAppCode(null);
+    }
+  };
+
   // Handle Setup Fee Waiver
   const handleWaiveSetupFee = async () => {
     if (!vendor) return;
@@ -754,6 +787,309 @@ function VendorDetailInner() {
             <Trash2 className="w-3.5 h-3.5" />
             Delete Store
           </button>
+        </div>
+      </div>
+
+      {/* ────────────────────────────────────────────────────────── */}
+      {/* APP CENTER & INTEGRATION ENTITLEMENTS (SUPER ADMIN VENDOR CONTROL) */}
+      {/* ────────────────────────────────────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+        <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gradient-to-r from-slate-50 via-indigo-50/20 to-purple-50/20">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs shrink-0">
+              <Layers className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-bold text-slate-900 text-sm">
+                  App Center & Integration Entitlements
+                </h3>
+                <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">
+                  Vendor Control
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Manage active integrations for <strong className="text-slate-800">{vendor.business_name}</strong> ({vendor.vendor_code}). Inactive apps are completely hidden in the vendor dashboard.
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/app/admin/app-center"
+            className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 self-start sm:self-auto hover:underline cursor-pointer"
+          >
+            <span>Open Global App Center</span>
+            <ExternalLink className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+
+        {/* Modular Apps Table */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead>
+              <tr className="bg-slate-50/75 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[11px]">
+                <th className="py-3 px-5">App / Integration</th>
+                <th className="py-3 px-4">Capability & Scope</th>
+                <th className="py-3 px-4">Status</th>
+                <th className="py-3 px-5 text-right">Admin Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 text-slate-700">
+              {/* 1. Razorpay Payments */}
+              <tr className="hover:bg-slate-50/60 transition-colors">
+                <td className="py-4 px-5 font-bold text-slate-900">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                      <CreditCard className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-slate-900 text-xs">Razorpay Payments</p>
+                      <p className="text-[11px] text-slate-400 font-normal">Online Payment Gateway</p>
+                    </div>
+                  </div>
+                </td>
+                <td className="py-4 px-4 text-slate-600 max-w-xs">
+                  Allows vendor to accept UPI, Cards, Netbanking & Wallets with custom credentials.
+                </td>
+                <td className="py-4 px-4">
+                  {vendor.razorpay_enabled ? (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                      <Check className="w-3 h-3 text-emerald-600" />
+                      ACTIVE
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                      <Lock className="w-3 h-3 text-slate-400" />
+                      INACTIVE
+                    </span>
+                  )}
+                </td>
+                <td className="py-4 px-5 text-right">
+                  <button
+                    type="button"
+                    onClick={() => handleToggleApp("razorpay", !vendor.razorpay_enabled)}
+                    disabled={togglingAppCode === "razorpay"}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer inline-flex items-center gap-1.5 shadow-2xs ${
+                      vendor.razorpay_enabled
+                        ? "bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100"
+                        : "bg-indigo-600 text-white hover:bg-indigo-700 shadow-xs"
+                    }`}
+                  >
+                    {togglingAppCode === "razorpay" ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : vendor.razorpay_enabled ? (
+                      <span>Deactivate</span>
+                    ) : (
+                      <span>Activate for Vendor</span>
+                    )}
+                  </button>
+                </td>
+              </tr>
+
+              {/* 2. SMS Gateway Engine */}
+              <tr className="hover:bg-slate-50/60 transition-colors">
+                <td className="py-4 px-5 font-bold text-slate-900">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                      <MessageSquare className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-slate-900 text-xs">SMS Gateway Engine</p>
+                      <p className="text-[11px] text-slate-400 font-normal">Way2SMS / Fast2SMS / MSG91</p>
+                    </div>
+                  </div>
+                </td>
+                <td className="py-4 px-4 text-slate-600 max-w-xs">
+                  Automated SMS on order placed, dispatch tracking, customer registration & OTPs.
+                </td>
+                <td className="py-4 px-4">
+                  {vendor.sms_gateway_enabled ? (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                      <Check className="w-3 h-3 text-emerald-600" />
+                      ACTIVE
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                      <Lock className="w-3 h-3 text-slate-400" />
+                      INACTIVE
+                    </span>
+                  )}
+                </td>
+                <td className="py-4 px-5 text-right">
+                  <button
+                    type="button"
+                    onClick={() => handleToggleApp("sms_gateway", !vendor.sms_gateway_enabled)}
+                    disabled={togglingAppCode === "sms_gateway"}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer inline-flex items-center gap-1.5 shadow-2xs ${
+                      vendor.sms_gateway_enabled
+                        ? "bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100"
+                        : "bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs"
+                    }`}
+                  >
+                    {togglingAppCode === "sms_gateway" ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : vendor.sms_gateway_enabled ? (
+                      <span>Deactivate</span>
+                    ) : (
+                      <span>Activate for Vendor</span>
+                    )}
+                  </button>
+                </td>
+              </tr>
+
+              {/* 3. Custom Domain */}
+              <tr className="hover:bg-slate-50/60 transition-colors">
+                <td className="py-4 px-5 font-bold text-slate-900">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+                      <Globe className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-slate-900 text-xs">Custom Domain</p>
+                      <p className="text-[11px] text-slate-400 font-normal">Cloudflare SaaS & Free SSL</p>
+                    </div>
+                  </div>
+                </td>
+                <td className="py-4 px-4 text-slate-600 max-w-xs">
+                  Connect personal domain (e.g. kcaariwork.com) replacing the subdomain.
+                </td>
+                <td className="py-4 px-4">
+                  {vendor.custom_domain_enabled ? (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                      <Check className="w-3 h-3 text-emerald-600" />
+                      ACTIVE
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                      <Lock className="w-3 h-3 text-slate-400" />
+                      INACTIVE
+                    </span>
+                  )}
+                </td>
+                <td className="py-4 px-5 text-right">
+                  <button
+                    type="button"
+                    onClick={() => handleToggleApp("custom_domain", !vendor.custom_domain_enabled)}
+                    disabled={togglingAppCode === "custom_domain"}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer inline-flex items-center gap-1.5 shadow-2xs ${
+                      vendor.custom_domain_enabled
+                        ? "bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100"
+                        : "bg-purple-600 text-white hover:bg-purple-700 shadow-xs"
+                    }`}
+                  >
+                    {togglingAppCode === "custom_domain" ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : vendor.custom_domain_enabled ? (
+                      <span>Revoke Domain Access</span>
+                    ) : (
+                      <span>Grant Free Access</span>
+                    )}
+                  </button>
+                </td>
+              </tr>
+
+              {/* 4. Shiprocket Logistics */}
+              <tr className="hover:bg-slate-50/60 transition-colors">
+                <td className="py-4 px-5 font-bold text-slate-900">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                      <Truck className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-slate-900 text-xs">Shiprocket Logistics</p>
+                      <p className="text-[11px] text-slate-400 font-normal">Courier & Label Automation</p>
+                    </div>
+                  </div>
+                </td>
+                <td className="py-4 px-4 text-slate-600 max-w-xs">
+                  Automate Delhivery, Bluedart courier pickup, tracking & AWB generation.
+                </td>
+                <td className="py-4 px-4">
+                  {vendor.shiprocket_enabled ? (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                      <Check className="w-3 h-3 text-emerald-600" />
+                      ACTIVE
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                      <Lock className="w-3 h-3 text-slate-400" />
+                      INACTIVE
+                    </span>
+                  )}
+                </td>
+                <td className="py-4 px-5 text-right">
+                  <button
+                    type="button"
+                    onClick={() => handleToggleApp("shiprocket", !vendor.shiprocket_enabled)}
+                    disabled={togglingAppCode === "shiprocket"}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer inline-flex items-center gap-1.5 shadow-2xs ${
+                      vendor.shiprocket_enabled
+                        ? "bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100"
+                        : "bg-amber-600 text-white hover:bg-amber-700 shadow-xs"
+                    }`}
+                  >
+                    {togglingAppCode === "shiprocket" ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : vendor.shiprocket_enabled ? (
+                      <span>Deactivate</span>
+                    ) : (
+                      <span>Activate for Vendor</span>
+                    )}
+                  </button>
+                </td>
+              </tr>
+
+              {/* 5. WhatsApp Business Alerts */}
+              <tr className="hover:bg-slate-50/60 transition-colors">
+                <td className="py-4 px-5 font-bold text-slate-900">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-teal-50 text-teal-600 flex items-center justify-center shrink-0">
+                      <MessageCircle className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-slate-900 text-xs">WhatsApp Business Alerts</p>
+                      <p className="text-[11px] text-slate-400 font-normal">Order & Cart Recovery</p>
+                    </div>
+                  </div>
+                </td>
+                <td className="py-4 px-4 text-slate-600 max-w-xs">
+                  Instant WhatsApp notification alerts to customers for dispatch & live updates.
+                </td>
+                <td className="py-4 px-4">
+                  {vendor.whatsapp_alerts_enabled ? (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                      <Check className="w-3 h-3 text-emerald-600" />
+                      ACTIVE
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                      <Lock className="w-3 h-3 text-slate-400" />
+                      INACTIVE
+                    </span>
+                  )}
+                </td>
+                <td className="py-4 px-5 text-right">
+                  <button
+                    type="button"
+                    onClick={() => handleToggleApp("whatsapp", !vendor.whatsapp_alerts_enabled)}
+                    disabled={togglingAppCode === "whatsapp"}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer inline-flex items-center gap-1.5 shadow-2xs ${
+                      vendor.whatsapp_alerts_enabled
+                        ? "bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100"
+                        : "bg-teal-600 text-white hover:bg-teal-700 shadow-xs"
+                    }`}
+                  >
+                    {togglingAppCode === "whatsapp" ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : vendor.whatsapp_alerts_enabled ? (
+                      <span>Deactivate</span>
+                    ) : (
+                      <span>Activate for Vendor</span>
+                    )}
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
 

@@ -22,6 +22,7 @@ from app.models.platform.catalog import PlatformCategory, PlatformProduct, Platf
 from app.models.platform.order import PlatformCustomer, PlatformOrder, PlatformOrderItem
 from app.models.platform.system import PlatformSupplierInquiry, PlatformNotification
 from app.services.store_email_service import StoreEmailService
+from app.services.sms_service import SmsService
 from app.schemas.platform.catalog import ProductVariantResponse
 from app.schemas.platform.store_public import (
     PublicStoreConfigResponse,
@@ -588,6 +589,10 @@ async def create_store_order(
         asyncio.create_task(
             StoreEmailService.send_order_placed_emails(store, order, saved_items, store_url)
         )
+        if order.customer_phone:
+            asyncio.create_task(
+                SmsService.send_order_placed_sms(store, order.order_number, order.total_amount, order.customer_phone)
+            )
     except Exception:
         pass
 
@@ -855,6 +860,8 @@ async def customer_auth(
             asyncio.create_task(StoreEmailService.send_customer_welcome_email(store, customer, store_url))
             if customer.password_hash:
                 asyncio.create_task(StoreEmailService.send_password_changed_email(store, customer))
+            if customer.phone:
+                asyncio.create_task(SmsService.send_customer_welcome_sms(store, customer.name, customer.phone))
         except Exception:
             pass
 
@@ -969,9 +976,11 @@ async def customer_forgot_password(
     customer.reset_token_expires_at = datetime.now(timezone.utc) + timedelta(minutes=15)
     await db.commit()
 
-    # Dispatch Automated Email 3
+    # Dispatch Automated Email 3 & Automated OTP SMS
     try:
         asyncio.create_task(StoreEmailService.send_password_reset_otp_email(store, customer, otp))
+        if customer.phone:
+            asyncio.create_task(SmsService.send_otp_sms(store, otp, customer.phone))
     except Exception:
         pass
 
@@ -1136,6 +1145,8 @@ async def customer_google_auth(
         )
         try:
             asyncio.create_task(StoreEmailService.send_customer_welcome_email(store, customer, store_url))
+            if customer.phone:
+                asyncio.create_task(SmsService.send_customer_welcome_sms(store, customer.name, customer.phone))
         except Exception:
             pass
 

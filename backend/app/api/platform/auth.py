@@ -428,6 +428,11 @@ async def get_my_platform_session(
     is_subscription_expired = False
     monthly_price_inr = 499.0
     apk_user_approved = False
+    sms_gateway_enabled = False
+    razorpay_enabled = False
+    custom_domain_enabled = False
+    shiprocket_enabled = False
+    whatsapp_alerts_enabled = False
 
     if user.role == "VENDOR_ADMIN":
         now = datetime.now(timezone.utc)
@@ -447,6 +452,11 @@ async def get_my_platform_session(
             if vendor.store:
                 store_slug = vendor.store.store_slug
                 store_name = vendor.store.store_name
+                sms_gateway_enabled = getattr(vendor.store, "sms_gateway_enabled", False)
+                razorpay_enabled = getattr(vendor.store, "razorpay_enabled", False)
+                custom_domain_enabled = getattr(vendor.store, "custom_domain_enabled", False)
+                shiprocket_enabled = getattr(vendor.store, "shiprocket_enabled", False)
+                whatsapp_alerts_enabled = getattr(vendor.store, "whatsapp_alerts_enabled", False)
             if vendor.app_config:
                 apk_user_approved = getattr(vendor.app_config, "apk_user_approved", False)
 
@@ -498,4 +508,9 @@ async def get_my_platform_session(
         is_subscription_expired=is_subscription_expired,
         monthly_price_inr=monthly_price_inr,
         apk_user_approved=apk_user_approved,
+        sms_gateway_enabled=sms_gateway_enabled,
+        razorpay_enabled=razorpay_enabled,
+        custom_domain_enabled=custom_domain_enabled,
+        shiprocket_enabled=shiprocket_enabled,
+        whatsapp_alerts_enabled=whatsapp_alerts_enabled,
     )

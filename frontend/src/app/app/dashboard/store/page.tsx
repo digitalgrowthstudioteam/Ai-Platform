@@ -149,25 +149,6 @@ export default function VendorStoreSettingsPage() {
         return;
       }
 
-      if (orderRes.is_mock) {
-        // Fallback only if backend has no payment gateway credentials configured
-        await platformApi.verifyAddonPayment({
-          addon_id: domainInfo.addon_id,
-          razorpay_order_id: orderRes.order_id,
-          razorpay_payment_id: `pay_mock_${Date.now()}`,
-          razorpay_signature: `mock_sig_${Date.now()}`,
-          coupon_code: appliedCoupon?.coupon_code,
-        });
-        const refreshed = await platformApi.getVendorCustomDomainInfo();
-        setDomainInfo(refreshed);
-        setDomainMessage({
-          type: "success",
-          text: "🎉 Custom Domain add-on successfully activated! You can now enter your personal domain below.",
-        });
-        setPurchasingAddon(false);
-        return;
-      }
-
       const scriptLoaded = await loadRazorpayScript();
       if (!scriptLoaded) {
         setDomainMessage({

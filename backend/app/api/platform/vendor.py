@@ -74,8 +74,12 @@ from app.schemas.platform.vendor import (
     StoreEmailSettingsUpdateRequest,
     StoreEmailSettingsResponse,
     StoreEmailTestRequest,
+    VendorSmsSettingsResponse,
+    VendorSmsSettingsUpdateRequest,
+    VendorTestSmsRequest,
 )
 from app.services.store_email_service import StoreEmailService
+from app.services.sms_service import SmsService
 
 router = APIRouter(prefix="/platform/vendor", tags=["Vendor Dashboard"])
 
@@ -1650,18 +1654,31 @@ async def update_vendor_order_status(
     await db.commit()
     await db.refresh(order)
 
-    # Trigger Automated Email 5: Order Dispatched / Shipped
-    if payload.order_status == "SHIPPED" and order.customer_email:
+    # Trigger Automated Email 5 & SMS 3: Order Dispatched / Shipped
+    if payload.order_status == "SHIPPED":
         store = current.vendor.store
         store_url = (
             f"https://{store.custom_domain}"
             if (store and store.custom_domain_enabled and store.custom_domain)
             else f"https://{store.subdomain if store else ''}"
         )
-        try:
-            asyncio.create_task(StoreEmailService.send_order_shipped_email(store, order, store_url))
-        except Exception as email_err:
-            pass
+        if order.customer_email:
+            try:
+                asyncio.create_task(StoreEmailService.send_order_shipped_email(store, order, store_url))
+            except Exception:
+                pass
+        if order.customer_phone and store:
+            try:
+                asyncio.create_task(SmsService.send_order_dispatched_sms(
+                    store,
+                    order.order_number,
+                    order.courier_name,
+                    order.tracking_number,
+                    order.tracking_url,
+                    order.customer_phone,
+                ))
+            except Exception:
+                pass
     return {
         "message": "Order status and tracking updated",
         "order_status": order.order_status,
@@ -1772,4 +1789,107 @@ async def get_vendor_subscription_info(
         "active_addons": my_addons,
         "storage": current.vendor.storage_usage,
     }
+
+
+# ──────────────────────────────────────────────
+# 11. SMS Gateway Settings & Testing
+# ──────────────────────────────────────────────
+@router.get("/sms-settings", response_model=VendorSmsSettingsResponse)
+async def get_vendor_sms_settings(
+    current: CurrentVendor = Depends(require_vendor_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Fetch vendor's SMS Gateway configuration.
+    Strictly enforces App Center entitlement: returns 403 if admin has not activated SMS Gateway.
+    """
+    store = current.vendor.store
+    if not store or not store.sms_gateway_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="SMS Gateway is not activated for your store. Please contact your platform administrator in the App Center to unlock this integration.",
+        )
+
+    return VendorSmsSettingsResponse(
+        sms_gateway_enabled=store.sms_gateway_enabled,
+        sms_provider=store.sms_provider or "FAST2SMS",
+        sms_api_key=store.sms_api_key,
+        sms_sender_id=store.sms_sender_id,
+        sms_custom_url=store.sms_custom_url,
+        sms_order_placed_active=store.sms_order_placed_active,
+        sms_order_dispatched_active=store.sms_order_dispatched_active,
+        sms_welcome_active=store.sms_welcome_active,
+        sms_otp_active=store.sms_otp_active,
+        has_api_key=bool(store.sms_api_key or store.sms_custom_url),
+    )
+
+
+@router.put("/sms-settings", response_model=VendorSmsSettingsResponse)
+async def update_vendor_sms_settings(
+    payload: VendorSmsSettingsUpdateRequest,
+    current: CurrentVendor = Depends(require_vendor_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update vendor SMS provider, credentials, and automated event triggers."""
+    store = current.vendor.store
+    if not store or not store.sms_gateway_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="SMS Gateway is not activated for your store.",
+        )
+
+    if payload.sms_provider is not None:
+        store.sms_provider = payload.sms_provider.upper()
+    if payload.sms_api_key is not None:
+        store.sms_api_key = payload.sms_api_key.strip() if payload.sms_api_key else None
+    if payload.sms_sender_id is not None:
+        store.sms_sender_id = payload.sms_sender_id.strip() if payload.sms_sender_id else None
+    if payload.sms_custom_url is not None:
+        store.sms_custom_url = payload.sms_custom_url.strip() if payload.sms_custom_url else None
+    if payload.sms_order_placed_active is not None:
+        store.sms_order_placed_active = payload.sms_order_placed_active
+    if payload.sms_order_dispatched_active is not None:
+        store.sms_order_dispatched_active = payload.sms_order_dispatched_active
+    if payload.sms_welcome_active is not None:
+        store.sms_welcome_active = payload.sms_welcome_active
+    if payload.sms_otp_active is not None:
+        store.sms_otp_active = payload.sms_otp_active
+
+    await db.commit()
+    await db.refresh(store)
+
+    return VendorSmsSettingsResponse(
+        sms_gateway_enabled=store.sms_gateway_enabled,
+        sms_provider=store.sms_provider,
+        sms_api_key=store.sms_api_key,
+        sms_sender_id=store.sms_sender_id,
+        sms_custom_url=store.sms_custom_url,
+        sms_order_placed_active=store.sms_order_placed_active,
+        sms_order_dispatched_active=store.sms_order_dispatched_active,
+        sms_welcome_active=store.sms_welcome_active,
+        sms_otp_active=store.sms_otp_active,
+        has_api_key=bool(store.sms_api_key or store.sms_custom_url),
+    )
+
+
+@router.post("/sms-settings/test")
+async def send_vendor_test_sms(
+    payload: VendorTestSmsRequest,
+    current: CurrentVendor = Depends(require_vendor_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Sends a sample test SMS to verify vendor's configured gateway."""
+    store = current.vendor.store
+    if not store or not store.sms_gateway_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="SMS Gateway is not activated for your store.",
+        )
+
+    success, msg = await SmsService.send_test_sms(store, payload.test_phone)
+    if not success:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg)
+
+    return {"success": True, "message": msg}
+
 

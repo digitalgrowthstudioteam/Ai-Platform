@@ -69,4 +69,9 @@ class PlatformUserMeResponse(BaseModel):
     is_subscription_expired: bool = False
     monthly_price_inr: float = 499.0
     apk_user_approved: bool = False
+    sms_gateway_enabled: bool = False
+    razorpay_enabled: bool = False
+    custom_domain_enabled: bool = False
+    shiprocket_enabled: bool = False
+    whatsapp_alerts_enabled: bool = False
 

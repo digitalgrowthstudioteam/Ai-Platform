@@ -20,6 +20,7 @@ import {
   Smartphone,
   ExternalLink,
   FileText,
+  MessageSquare,
   X,
 } from "lucide-react";
 
@@ -39,6 +40,7 @@ export default function VendorSidebar() {
     { label: "Analytics & Pixels", href: "/app/dashboard/analytics", icon: BarChart3 },
     ...(!isDemo ? [{ label: "Payment Settings", href: "/app/dashboard/payments", icon: CreditCard }] : []),
     { label: "Shipping Settings", href: "/app/dashboard/shipping", icon: Truck },
+    ...(user?.sms_gateway_enabled ? [{ label: "SMS Notifications", href: "/app/dashboard/sms", icon: MessageSquare }] : []),
     { label: "Legal & Policies", href: "/app/dashboard/policies", icon: FileText },
     { label: "Subscription & Add-ons", href: "/app/dashboard/subscription", icon: Sparkles },
     { label: "Android App Config", href: "/app/dashboard/app-config", icon: Smartphone },

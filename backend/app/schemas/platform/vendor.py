@@ -283,6 +283,21 @@ class VendorDetailFullResponse(BaseModel):
     ga4_id: Optional[str] = None
     tracking_enabled: Optional[bool] = True
 
+    # SMS Gateway Integration (Fast2SMS, MSG91, Way2SMS / Custom HTTP)
+    sms_gateway_enabled: Optional[bool] = False
+    sms_provider: Optional[str] = "FAST2SMS"
+    sms_api_key: Optional[str] = None
+    sms_sender_id: Optional[str] = None
+    sms_custom_url: Optional[str] = None
+    sms_order_placed_active: Optional[bool] = True
+    sms_order_dispatched_active: Optional[bool] = True
+    sms_welcome_active: Optional[bool] = True
+    sms_otp_active: Optional[bool] = True
+
+    # WhatsApp Business & Shiprocket
+    whatsapp_alerts_enabled: Optional[bool] = False
+    shiprocket_enabled: Optional[bool] = False
+
     # Mobile App Configuration
     app_name: Optional[str] = None
     app_logo_url: Optional[str] = None
@@ -395,6 +410,40 @@ class VendorCustomDomainUpdateRequest(BaseModel):
     device_breakdown: List[dict] = []
     customer_locations: List[dict] = []
     pixel_status: dict = {}
+
+
+class VendorSmsSettingsResponse(BaseModel):
+    sms_gateway_enabled: bool = False
+    sms_provider: str = "FAST2SMS"
+    sms_api_key: Optional[str] = None
+    sms_sender_id: Optional[str] = None
+    sms_custom_url: Optional[str] = None
+    sms_order_placed_active: bool = True
+    sms_order_dispatched_active: bool = True
+    sms_welcome_active: bool = True
+    sms_otp_active: bool = True
+    has_api_key: bool = False
+
+
+class VendorSmsSettingsUpdateRequest(BaseModel):
+    sms_provider: Optional[str] = "FAST2SMS"
+    sms_api_key: Optional[str] = None
+    sms_sender_id: Optional[str] = None
+    sms_custom_url: Optional[str] = None
+    sms_order_placed_active: Optional[bool] = True
+    sms_order_dispatched_active: Optional[bool] = True
+    sms_welcome_active: Optional[bool] = True
+    sms_otp_active: Optional[bool] = True
+
+
+class VendorTestSmsRequest(BaseModel):
+    test_phone: str
+
+
+class AdminAppToggleRequest(BaseModel):
+    app_code: str  # "razorpay", "sms_gateway", "custom_domain", "shiprocket", "whatsapp"
+    enabled: bool
+
 
     # App info
     app_name: str
@@ -490,6 +539,21 @@ class AdminVendorFullUpdateRequest(BaseModel):
     ga4_id: Optional[str] = None
     tracking_enabled: Optional[bool] = True
 
+    # SMS Gateway Integration (Fast2SMS, MSG91, Way2SMS / Custom HTTP)
+    sms_gateway_enabled: Optional[bool] = False
+    sms_provider: Optional[str] = "FAST2SMS"
+    sms_api_key: Optional[str] = None
+    sms_sender_id: Optional[str] = None
+    sms_custom_url: Optional[str] = None
+    sms_order_placed_active: Optional[bool] = True
+    sms_order_dispatched_active: Optional[bool] = True
+    sms_welcome_active: Optional[bool] = True
+    sms_otp_active: Optional[bool] = True
+
+    # WhatsApp Business & Shiprocket
+    whatsapp_alerts_enabled: Optional[bool] = False
+    shiprocket_enabled: Optional[bool] = False
+
     # Mobile App Configuration
     app_name: Optional[str] = None
     app_logo_url: Optional[str] = None
@@ -602,4 +666,38 @@ class VendorCustomDomainUpdateRequest(BaseModel):
     device_breakdown: List[dict] = []
     customer_locations: List[dict] = []
     pixel_status: dict = {}
+
+
+class VendorSmsSettingsResponse(BaseModel):
+    sms_gateway_enabled: bool = False
+    sms_provider: str = "FAST2SMS"
+    sms_api_key: Optional[str] = None
+    sms_sender_id: Optional[str] = None
+    sms_custom_url: Optional[str] = None
+    sms_order_placed_active: bool = True
+    sms_order_dispatched_active: bool = True
+    sms_welcome_active: bool = True
+    sms_otp_active: bool = True
+    has_api_key: bool = False
+
+
+class VendorSmsSettingsUpdateRequest(BaseModel):
+    sms_provider: Optional[str] = "FAST2SMS"
+    sms_api_key: Optional[str] = None
+    sms_sender_id: Optional[str] = None
+    sms_custom_url: Optional[str] = None
+    sms_order_placed_active: Optional[bool] = True
+    sms_order_dispatched_active: Optional[bool] = True
+    sms_welcome_active: Optional[bool] = True
+    sms_otp_active: Optional[bool] = True
+
+
+class VendorTestSmsRequest(BaseModel):
+    test_phone: str
+
+
+class AdminAppToggleRequest(BaseModel):
+    app_code: str  # "razorpay", "sms_gateway", "custom_domain", "shiprocket", "whatsapp"
+    enabled: bool
+
 

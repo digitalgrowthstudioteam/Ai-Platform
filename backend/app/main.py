@@ -122,6 +122,16 @@ async def lifespan(app: FastAPI):
                 "ALTER TABLE platform_coupons ADD COLUMN IF NOT EXISTS one_time_per_vendor BOOLEAN NOT NULL DEFAULT TRUE;",
                 "ALTER TABLE platform_vendor_app_configs ALTER COLUMN app_logo_url TYPE TEXT;",
                 "ALTER TABLE platform_vendor_app_configs ALTER COLUMN splash_screen_url TYPE TEXT;",
+                "ALTER TABLE platform_stores ADD COLUMN IF NOT EXISTS sms_gateway_enabled BOOLEAN NOT NULL DEFAULT FALSE;",
+                "ALTER TABLE platform_stores ADD COLUMN IF NOT EXISTS sms_provider VARCHAR(50) NOT NULL DEFAULT 'FAST2SMS';",
+                "ALTER TABLE platform_stores ADD COLUMN IF NOT EXISTS sms_api_key VARCHAR(255);",
+                "ALTER TABLE platform_stores ADD COLUMN IF NOT EXISTS sms_sender_id VARCHAR(50);",
+                "ALTER TABLE platform_stores ADD COLUMN IF NOT EXISTS sms_custom_url VARCHAR(500);",
+                "ALTER TABLE platform_stores ADD COLUMN IF NOT EXISTS sms_order_placed_active BOOLEAN NOT NULL DEFAULT TRUE;",
+                "ALTER TABLE platform_stores ADD COLUMN IF NOT EXISTS sms_order_dispatched_active BOOLEAN NOT NULL DEFAULT TRUE;",
+                "ALTER TABLE platform_stores ADD COLUMN IF NOT EXISTS sms_welcome_active BOOLEAN NOT NULL DEFAULT TRUE;",
+                "ALTER TABLE platform_stores ADD COLUMN IF NOT EXISTS sms_otp_active BOOLEAN NOT NULL DEFAULT TRUE;",
+                "ALTER TABLE platform_stores ADD COLUMN IF NOT EXISTS whatsapp_alerts_enabled BOOLEAN NOT NULL DEFAULT FALSE;",
             ]
             for stmt in migration_statements:
                 try:

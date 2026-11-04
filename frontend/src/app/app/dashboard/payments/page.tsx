@@ -30,7 +30,7 @@ import {
 
 export default function VendorPaymentSettingsPage() {
   const router = useRouter();
-  const { isDemo } = usePlatformAuth();
+  const { user, isDemo } = usePlatformAuth();
   const [store, setStore] = useState<StoreSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -229,7 +229,8 @@ export default function VendorPaymentSettingsPage() {
       )}
 
       <form onSubmit={handleSave} className="space-y-6">
-        {/* 1. Razorpay Payment Gateway Card */}
+        {/* 1. Razorpay Payment Gateway Card (Strictly Hidden unless Activated by Super Admin) */}
+        {Boolean(user?.razorpay_enabled || store?.razorpay_enabled) && (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
           <div className="p-6 border-b border-slate-100 bg-linear-to-r from-blue-50/50 to-indigo-50/30">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -519,6 +520,7 @@ export default function VendorPaymentSettingsPage() {
             </div>
           </div>
         </div>
+        )}
 
         {/* 2. Cash on Delivery (COD) Options */}
         <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
@@ -593,7 +595,7 @@ export default function VendorPaymentSettingsPage() {
               </div>
             )}
 
-            {store?.razorpay_enabled ? (
+            {Boolean(user?.razorpay_enabled || store?.razorpay_enabled) && store?.razorpay_enabled && (
               <div className="p-3 rounded-lg border border-blue-500 bg-blue-50/40 flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
                   <div className="w-4 h-4 rounded-full border-4 border-blue-600 bg-white" />
@@ -610,10 +612,6 @@ export default function VendorPaymentSettingsPage() {
                   </div>
                 </div>
                 <span className="text-[11px] font-bold text-blue-600">FREE</span>
-              </div>
-            ) : (
-              <div className="p-3 rounded-lg border border-dashed border-slate-200 text-center text-xs text-slate-400">
-                Online payment is currently disabled. Customers can only pay via Cash on Delivery.
               </div>
             )}
           </div>

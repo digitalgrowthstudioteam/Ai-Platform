@@ -20,6 +20,11 @@ export interface PlatformUser {
   is_subscription_expired?: boolean;
   monthly_price_inr?: number;
   apk_user_approved?: boolean;
+  sms_gateway_enabled?: boolean;
+  razorpay_enabled?: boolean;
+  custom_domain_enabled?: boolean;
+  shiprocket_enabled?: boolean;
+  whatsapp_alerts_enabled?: boolean;
 }
 
 export interface PlatformTokenResponse {
@@ -337,6 +342,11 @@ export interface VendorListItem {
   app_build_status: string;
   publication_status: string;
   apk_user_approved?: boolean;
+  razorpay_enabled?: boolean;
+  sms_gateway_enabled?: boolean;
+  custom_domain_enabled?: boolean;
+  shiprocket_enabled?: boolean;
+  whatsapp_alerts_enabled?: boolean;
   created_at: string;
 }
 
@@ -407,6 +417,30 @@ export interface VendorDetailFull {
   custom_domain_status?: string;
   custom_domain_ssl_status?: string;
   custom_domain_dns_target?: string;
+  sms_gateway_enabled?: boolean;
+  sms_provider?: string;
+  sms_api_key?: string | null;
+  sms_sender_id?: string | null;
+  sms_custom_url?: string | null;
+  sms_order_placed_active?: boolean;
+  sms_order_dispatched_active?: boolean;
+  sms_welcome_active?: boolean;
+  sms_otp_active?: boolean;
+  whatsapp_alerts_enabled?: boolean;
+  shiprocket_enabled?: boolean;
+}
+
+export interface VendorSmsSettings {
+  sms_gateway_enabled: boolean;
+  sms_provider: string; // 'FAST2SMS' | 'MSG91' | 'CUSTOM_HTTP'
+  sms_api_key?: string | null;
+  sms_sender_id?: string | null;
+  sms_custom_url?: string | null;
+  sms_order_placed_active: boolean;
+  sms_order_dispatched_active: boolean;
+  sms_welcome_active: boolean;
+  sms_otp_active: boolean;
+  has_api_key: boolean;
 }
 
 export interface Addon {
