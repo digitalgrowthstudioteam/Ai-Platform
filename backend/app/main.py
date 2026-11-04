@@ -101,6 +101,12 @@ async def lifespan(app: FastAPI):
                 "ALTER TABLE platform_stores ADD COLUMN IF NOT EXISTS gtm_id VARCHAR(100);",
                 "ALTER TABLE platform_stores ADD COLUMN IF NOT EXISTS ga4_id VARCHAR(100);",
                 "ALTER TABLE platform_stores ADD COLUMN IF NOT EXISTS tracking_enabled BOOLEAN NOT NULL DEFAULT TRUE;",
+                "ALTER TABLE platform_stores ADD COLUMN IF NOT EXISTS custom_domain VARCHAR(255);",
+                "ALTER TABLE platform_stores ADD COLUMN IF NOT EXISTS custom_domain_enabled BOOLEAN NOT NULL DEFAULT FALSE;",
+                "ALTER TABLE platform_stores ADD COLUMN IF NOT EXISTS custom_domain_status VARCHAR(50) NOT NULL DEFAULT 'UNCONFIGURED';",
+                "ALTER TABLE platform_stores ADD COLUMN IF NOT EXISTS custom_domain_ssl_status VARCHAR(50) NOT NULL DEFAULT 'PENDING';",
+                "ALTER TABLE platform_stores ADD COLUMN IF NOT EXISTS custom_domain_dns_target VARCHAR(255) NOT NULL DEFAULT 'cname.digitalgrowthstudio.in';",
+                "ALTER TABLE platform_customers ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255);",
                 "ALTER TABLE platform_vendor_app_configs ALTER COLUMN app_logo_url TYPE TEXT;",
                 "ALTER TABLE platform_vendor_app_configs ALTER COLUMN splash_screen_url TYPE TEXT;",
             ]
@@ -160,7 +166,7 @@ from fastapi.middleware.cors import CORSMiddleware
 # Official ASGI CORSMiddleware ensuring all preflight, normal, and error responses include full CORS headers
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|.*\.digitalgrowthstudio\.in|digitalgrowthstudio\.in|.*\.web\.app|.*\.firebaseapp\.com|.*\.onrender\.com)(:\d+)?$",
+    allow_origin_regex=r"^https?://.*$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
