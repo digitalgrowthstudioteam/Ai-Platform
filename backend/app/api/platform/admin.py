@@ -1463,6 +1463,27 @@ async def update_vendor_custom_domain_access(
         raise HTTPException(status_code=404, detail="Store record not found for vendor")
 
     store.custom_domain_enabled = payload.custom_domain_enabled
+
+    from app.models.platform.subscription import PlatformAddon, PlatformVendorAddon
+    addon = (await db.execute(select(PlatformAddon).where(PlatformAddon.code == "custom-domain"))).scalar_one_or_none()
+
+    if not payload.custom_domain_enabled:
+        # Super Admin revoked custom domain: deactivate any active vendor addon records
+        if addon:
+            await db.execute(
+                update(PlatformVendorAddon)
+                .where(
+                    PlatformVendorAddon.vendor_id == v.id,
+                    PlatformVendorAddon.addon_id == addon.id,
+                )
+                .values(status="cancelled")
+            )
+        store.custom_domain_status = "DISABLED"
+    else:
+        # Super Admin granted custom domain
+        if store.custom_domain_status == "DISABLED":
+            store.custom_domain_status = "ACTIVE" if store.custom_domain else "UNCONFIGURED"
+
     if payload.custom_domain is not None:
         clean = payload.custom_domain.strip().lower().replace("https://", "").replace("http://", "").split("/")[0] if payload.custom_domain else None
         store.custom_domain = clean

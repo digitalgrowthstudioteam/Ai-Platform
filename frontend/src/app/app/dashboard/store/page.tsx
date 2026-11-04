@@ -72,6 +72,18 @@ export default function VendorStoreSettingsPage() {
     load();
   }, []);
 
+  const loadRazorpayScript = () => {
+    return new Promise<boolean>((resolve) => {
+      if (typeof window === "undefined") return resolve(false);
+      if ((window as any).Razorpay) return resolve(true);
+      const script = document.createElement("script");
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  };
+
   const handlePurchaseCustomDomainAddon = async () => {
     if (!domainInfo?.addon_id) {
       setDomainMessage({ type: "error", text: "Custom domain add-on not found in catalog." });
@@ -80,22 +92,87 @@ export default function VendorStoreSettingsPage() {
     setPurchasingAddon(true);
     setDomainMessage(null);
     try {
-      const order = await platformApi.createAddonOrder(domainInfo.addon_id);
-      await platformApi.verifyAddonPayment({
-        addon_id: domainInfo.addon_id,
-        razorpay_order_id: order.order_id || `order_${Date.now()}`,
-        razorpay_payment_id: `pay_dom_${Date.now()}`,
-        razorpay_signature: `mock_sig_${Date.now()}`,
+      const orderRes = await platformApi.createAddonOrder(domainInfo.addon_id);
+
+      if (orderRes.is_mock) {
+        // Fallback only if backend has no payment gateway credentials configured
+        await platformApi.verifyAddonPayment({
+          addon_id: domainInfo.addon_id,
+          razorpay_order_id: orderRes.order_id,
+          razorpay_payment_id: `pay_mock_${Date.now()}`,
+          razorpay_signature: `mock_sig_${Date.now()}`,
+        });
+        const refreshed = await platformApi.getVendorCustomDomainInfo();
+        setDomainInfo(refreshed);
+        setDomainMessage({
+          type: "success",
+          text: "🎉 Custom Domain add-on successfully activated! You can now enter your personal domain below.",
+        });
+        setPurchasingAddon(false);
+        return;
+      }
+
+      const scriptLoaded = await loadRazorpayScript();
+      if (!scriptLoaded) {
+        setDomainMessage({
+          type: "error",
+          text: "Failed to load Razorpay Checkout SDK. Please check your internet connection.",
+        });
+        setPurchasingAddon(false);
+        return;
+      }
+
+      const options = {
+        key: orderRes.key_id,
+        amount: orderRes.amount,
+        currency: orderRes.currency || "INR",
+        name: "Digital Growth Studio",
+        description: `Add-on: ${orderRes.addon_name || "Custom Domain Connection"}`,
+        order_id: orderRes.order_id,
+        theme: {
+          color: "#4F46E5",
+        },
+        handler: async (response: any) => {
+          try {
+            await platformApi.verifyAddonPayment({
+              addon_id: domainInfo.addon_id,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+            });
+            const refreshed = await platformApi.getVendorCustomDomainInfo();
+            setDomainInfo(refreshed);
+            setDomainMessage({
+              type: "success",
+              text: "🎉 Custom Domain add-on successfully activated via Razorpay! You can now enter your personal domain below.",
+            });
+          } catch (err: any) {
+            setDomainMessage({
+              type: "error",
+              text: err.message || "Payment verification failed. Please contact support.",
+            });
+          } finally {
+            setPurchasingAddon(false);
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            setPurchasingAddon(false);
+          },
+        },
+      };
+
+      const rzp = new (window as any).Razorpay(options);
+      rzp.on("payment.failed", (resp: any) => {
+        setDomainMessage({
+          type: "error",
+          text: resp?.error?.description || "Payment failed or was cancelled.",
+        });
+        setPurchasingAddon(false);
       });
-      const refreshed = await platformApi.getVendorCustomDomainInfo();
-      setDomainInfo(refreshed);
-      setDomainMessage({
-        type: "success",
-        text: "Custom Domain add-on successfully activated! You can now enter your personal domain below.",
-      });
+      rzp.open();
     } catch (err: any) {
-      setDomainMessage({ type: "error", text: err.message || "Failed to purchase add-on" });
-    } finally {
+      setDomainMessage({ type: "error", text: err.message || "Failed to initiate Razorpay checkout." });
       setPurchasingAddon(false);
     }
   };

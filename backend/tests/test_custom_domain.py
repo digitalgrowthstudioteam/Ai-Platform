@@ -63,12 +63,30 @@ async def test_custom_domain_lifecycle():
         }, headers=v_headers)
         assert try_set.status_code == 403, "Should reject custom domain when add-on not purchased"
 
-        # 3. Vendor purchases the 999/- Custom Domain Add-on
-        verify_pay = await client.post("/api/v1/platform/payments/verify-addon-payment", json={
+        # 3. Security Check: Mock/unverified signature must be REJECTED when Razorpay credentials exist
+        bad_pay = await client.post("/api/v1/platform/payments/verify-addon-payment", json={
             "addon_id": addon_id,
             "razorpay_order_id": "order_mock_test_domain",
             "razorpay_payment_id": "pay_mock_test_domain_999",
             "razorpay_signature": "mock_sig_ok",
+        }, headers=v_headers)
+        assert bad_pay.status_code == 400, "Should reject unverified/mock signature when gateway keys exist"
+
+        # Now test with valid Razorpay HMAC-SHA256 signature
+        import hmac
+        import hashlib
+        from app.config import get_settings
+        test_settings = get_settings()
+        rzp_secret = test_settings.RAZORPAY_KEY_SECRET or "test_secret"
+        valid_order_id = "order_rzp_test_domain_123"
+        valid_pay_id = "pay_rzp_test_domain_456"
+        valid_sig = hmac.new(rzp_secret.encode(), f"{valid_order_id}|{valid_pay_id}".encode(), hashlib.sha256).hexdigest()
+
+        verify_pay = await client.post("/api/v1/platform/payments/verify-addon-payment", json={
+            "addon_id": addon_id,
+            "razorpay_order_id": valid_order_id,
+            "razorpay_payment_id": valid_pay_id,
+            "razorpay_signature": valid_sig,
         }, headers=v_headers)
         assert verify_pay.status_code == 200
         assert verify_pay.json()["success"] is True
@@ -118,3 +136,23 @@ async def test_custom_domain_lifecycle():
         store_pub_admin = await client.get("/api/store/admin-approved-abc.com/config")
         assert store_pub_admin.status_code == 200
         assert store_pub_admin.json()["store_slug"] == "abc"
+
+        # 8. Super Admin revokes custom domain access
+        admin_revoke = await client.patch(
+            f"/api/v1/platform/admin/vendors/{vendor_id}/custom-domain-access",
+            json={
+                "custom_domain_enabled": False,
+            },
+            headers=a_headers,
+        )
+        assert admin_revoke.status_code == 200
+        assert admin_revoke.json()["custom_domain_enabled"] is False
+
+        # 9. Vendor custom domain info must now return custom_domain_enabled == False
+        vendor_info = await client.get("/api/v1/platform/vendor/custom-domain", headers=v_headers)
+        assert vendor_info.status_code == 200
+        assert vendor_info.json()["custom_domain_enabled"] is False
+
+        # 10. Public storefront lookup by custom domain must return 404 because access was revoked
+        store_pub_revoked = await client.get("/api/store/admin-approved-abc.com/config")
+        assert store_pub_revoked.status_code == 404

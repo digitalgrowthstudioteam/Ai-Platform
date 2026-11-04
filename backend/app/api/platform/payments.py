@@ -406,14 +406,12 @@ async def verify_addon_payment(
     if not addon:
         raise HTTPException(status_code=404, detail="Add-on service not found.")
 
-    is_mock = (
-        payload.razorpay_order_id.startswith("order_mock_")
-        or payload.razorpay_payment_id.startswith("pay_mock_")
-        or payload.razorpay_signature.startswith("mock_")
-        or not bool(settings.RAZORPAY_KEY_ID)
-    )
+    # Only allow mock mode when Razorpay credentials are completely absent in environment
+    is_mock = not bool(settings.RAZORPAY_KEY_ID and settings.RAZORPAY_KEY_SECRET)
 
-    if not is_mock and settings.RAZORPAY_KEY_ID and settings.RAZORPAY_KEY_SECRET and razorpay:
+    if not is_mock:
+        if not razorpay:
+            raise HTTPException(status_code=500, detail="Razorpay SDK not available.")
         try:
             client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
             client.utility.verify_payment_signature({

@@ -236,9 +236,14 @@ async def get_vendor_custom_domain_info(
         if va:
             has_paid = True
 
+    # store.custom_domain_enabled is the single source of truth across platform.
+    # If Super Admin revokes access, it is strictly False.
+    # When unlocked via ₹999 Razorpay payment or admin grant, store.custom_domain_enabled is True.
+    is_enabled = bool(store.custom_domain_enabled)
+
     return {
         "custom_domain": store.custom_domain,
-        "custom_domain_enabled": store.custom_domain_enabled or has_paid,
+        "custom_domain_enabled": is_enabled,
         "custom_domain_status": store.custom_domain_status or "UNCONFIGURED",
         "custom_domain_ssl_status": store.custom_domain_ssl_status or "PENDING",
         "custom_domain_dns_target": store.custom_domain_dns_target or "cname.digitalgrowthstudio.in",

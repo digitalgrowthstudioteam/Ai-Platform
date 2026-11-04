@@ -9,7 +9,7 @@ from typing import List, Optional
 from pydantic import BaseModel
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select, desc, or_
+from sqlalchemy import select, desc, or_, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -46,8 +46,8 @@ async def resolve_active_store(slug: str, db: AsyncSession) -> PlatformStore:
         .where(
             or_(
                 PlatformStore.store_slug == clean_identifier,
-                PlatformStore.custom_domain == clean_identifier,
-                PlatformStore.custom_domain == clean_no_www,
+                and_(PlatformStore.custom_domain == clean_identifier, PlatformStore.custom_domain_enabled == True),
+                and_(PlatformStore.custom_domain == clean_no_www, PlatformStore.custom_domain_enabled == True),
                 PlatformStore.subdomain == clean_identifier,
             )
         )
