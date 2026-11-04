@@ -7,6 +7,7 @@ import json
 import uuid
 from typing import List, Optional
 from datetime import datetime, timedelta, timezone
+from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select, func, desc, update, delete, or_, case
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -786,6 +787,12 @@ async def get_vendor_full_detail(
         total_orders=order_count,
         storage_used_mb=round((st.total_bytes_used if st else 0) / (1024 * 1024), 2),
         storage_limit_mb=round((st.limit_bytes if st else 1073741824) / (1024 * 1024), 2),
+        # Custom Domain info
+        custom_domain=s.custom_domain if s else None,
+        custom_domain_enabled=s.custom_domain_enabled if s else False,
+        custom_domain_status=s.custom_domain_status if s else "UNCONFIGURED",
+        custom_domain_ssl_status=s.custom_domain_ssl_status if s else "PENDING",
+        custom_domain_dns_target=s.custom_domain_dns_target if s else "cname.digitalgrowthstudio.in",
         plan_name=sub.plan.name if sub and sub.plan else None,
         subscription_status=sub.status if sub else None,
         renewal_date=sub.next_renewal_date if sub else None,
@@ -927,6 +934,18 @@ async def update_vendor_full_details_by_admin(
             s.ga4_id = dump["ga4_id"].strip() if dump["ga4_id"] else None
         if "tracking_enabled" in dump and dump["tracking_enabled"] is not None:
             s.tracking_enabled = bool(dump["tracking_enabled"])
+        if "custom_domain_enabled" in dump and dump["custom_domain_enabled"] is not None:
+            s.custom_domain_enabled = bool(dump["custom_domain_enabled"])
+        if "custom_domain" in dump:
+            c_domain = dump["custom_domain"].strip().lower().replace("https://", "").replace("http://", "").split("/")[0] if dump["custom_domain"] else None
+            s.custom_domain = c_domain
+            if c_domain and s.custom_domain_status == "UNCONFIGURED":
+                s.custom_domain_status = "ACTIVE"
+                s.custom_domain_ssl_status = "ACTIVE"
+            elif not c_domain:
+                s.custom_domain_status = "UNCONFIGURED"
+        if "custom_domain_status" in dump and dump["custom_domain_status"]:
+            s.custom_domain_status = dump["custom_domain_status"].strip().upper()
 
     # Also sync app config app_name if brand/store name was changed
     if v.app_config and ("brand_name" in dump or "store_name" in dump or "business_name" in dump):
@@ -1404,6 +1423,64 @@ async def update_vendor_setup_fee(
         "setup_fee_waived": sub.setup_fee_waived,
         "setup_fee_paid": sub.setup_fee_paid,
         "custom_price_inr": sub.setup_fee_custom_price_inr,
+    }
+
+
+class AdminCustomDomainAccessRequest(BaseModel):
+    custom_domain_enabled: bool
+    custom_domain: Optional[str] = None
+    custom_domain_status: Optional[str] = "ACTIVE"
+
+
+@router.patch("/vendors/{vendor_id}/custom-domain-access")
+async def update_vendor_custom_domain_access(
+    vendor_id: str,
+    payload: AdminCustomDomainAccessRequest,
+    admin: PlatformUser = Depends(require_super_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Super Admin grants, revokes, or configures custom domain access for any vendor.
+    """
+    target_uuid = None
+    try:
+        target_uuid = uuid.UUID(vendor_id)
+    except (ValueError, AttributeError):
+        pass
+
+    v_stmt = select(PlatformVendor).where(
+        or_(PlatformVendor.id == target_uuid, PlatformVendor.vendor_code == vendor_id)
+        if target_uuid
+        else PlatformVendor.vendor_code == vendor_id
+    )
+    v = (await db.execute(v_stmt)).scalar_one_or_none()
+    if not v:
+        raise HTTPException(status_code=404, detail="Vendor not found")
+
+    st_stmt = select(PlatformStore).where(PlatformStore.vendor_id == v.id)
+    store = (await db.execute(st_stmt)).scalar_one_or_none()
+    if not store:
+        raise HTTPException(status_code=404, detail="Store record not found for vendor")
+
+    store.custom_domain_enabled = payload.custom_domain_enabled
+    if payload.custom_domain is not None:
+        clean = payload.custom_domain.strip().lower().replace("https://", "").replace("http://", "").split("/")[0] if payload.custom_domain else None
+        store.custom_domain = clean
+        if clean:
+            store.custom_domain_status = payload.custom_domain_status or "ACTIVE"
+            store.custom_domain_ssl_status = "ACTIVE"
+        else:
+            store.custom_domain_status = "UNCONFIGURED"
+            store.custom_domain_ssl_status = "PENDING"
+
+    await db.commit()
+    await db.refresh(store)
+    return {
+        "success": True,
+        "message": f"Custom domain access {'granted' if store.custom_domain_enabled else 'revoked'} successfully for vendor {v.vendor_code}.",
+        "custom_domain_enabled": store.custom_domain_enabled,
+        "custom_domain": store.custom_domain,
+        "custom_domain_status": store.custom_domain_status,
     }
 
 

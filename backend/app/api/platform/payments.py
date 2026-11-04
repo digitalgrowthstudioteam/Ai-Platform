@@ -442,6 +442,13 @@ async def verify_addon_payment(
         if st:
             st.limit_bytes += 5 * 1024 * 1024 * 1024
 
+    # Entitlement: If custom domain add-on (custom-domain), instantly unlock custom domain mapping
+    if addon.code in ("custom-domain", "custom_domain"):
+        from app.models.platform.vendor import PlatformStore
+        st_store = (await db.execute(select(PlatformStore).where(PlatformStore.vendor_id == vid))).scalar_one_or_none()
+        if st_store:
+            st_store.custom_domain_enabled = True
+
     # Record payment transaction
     db.add(PlatformPayment(
         vendor_id=vid,

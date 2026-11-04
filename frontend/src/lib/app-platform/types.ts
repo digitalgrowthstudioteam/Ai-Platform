@@ -224,6 +224,13 @@ export interface StoreSettings {
   privacy_policy?: string;
   shipping_policy?: string;
   refund_policy?: string;
+  custom_domain?: string | null;
+  custom_domain_enabled?: boolean;
+  custom_domain_status?: string;
+  custom_domain_ssl_status?: string;
+  custom_domain_dns_target?: string;
+  custom_domain_addon_id?: string | null;
+  custom_domain_price_inr?: number;
 }
 
 export interface VendorPolicies {
@@ -395,6 +402,11 @@ export interface VendorDetailFull {
   setup_fee_custom_price_inr?: number;
   apk_user_approved: boolean;
   apk_download_url?: string;
+  custom_domain?: string | null;
+  custom_domain_enabled?: boolean;
+  custom_domain_status?: string;
+  custom_domain_ssl_status?: string;
+  custom_domain_dns_target?: string;
 }
 
 export interface Addon {

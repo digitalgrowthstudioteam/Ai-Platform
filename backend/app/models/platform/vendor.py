@@ -114,6 +114,13 @@ class PlatformStore(BaseModel):
     ga4_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     tracking_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
+    # Custom Domain Mapping (Cloudflare for SaaS)
+    custom_domain: Mapped[Optional[str]] = mapped_column(String(255), unique=True, nullable=True, index=True)
+    custom_domain_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    custom_domain_status: Mapped[str] = mapped_column(String(50), nullable=False, default="UNCONFIGURED")  # UNCONFIGURED, PENDING_DNS, ACTIVE, FAILED
+    custom_domain_ssl_status: Mapped[str] = mapped_column(String(50), nullable=False, default="PENDING")   # PENDING, ACTIVE, ERROR
+    custom_domain_dns_target: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, default="cname.digitalgrowthstudio.in")
+
     vendor: Mapped["PlatformVendor"] = relationship("PlatformVendor", back_populates="store")
 
 

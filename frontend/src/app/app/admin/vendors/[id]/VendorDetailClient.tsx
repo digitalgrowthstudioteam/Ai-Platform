@@ -132,6 +132,9 @@ function VendorDetailInner() {
   const [editingSubdomain, setEditingSubdomain] = useState(false);
   const [subdomainInput, setSubdomainInput] = useState("");
   const [updatingSubdomain, setUpdatingSubdomain] = useState(false);
+  const [editingCustomDomain, setEditingCustomDomain] = useState(false);
+  const [customDomainInput, setCustomDomainInput] = useState("");
+  const [updatingCustomDomain, setUpdatingCustomDomain] = useState(false);
   const [updatingSetupFee, setUpdatingSetupFee] = useState(false);
   const [customPriceInput, setCustomPriceInput] = useState<string>("");
   const [grantMonthsInput, setGrantMonthsInput] = useState<string>("1");
@@ -274,6 +277,9 @@ function VendorDetailInner() {
         } else if (data.subdomain) {
           setSubdomainInput(data.subdomain.split(".")[0]);
         }
+        if (data.custom_domain) {
+          setCustomDomainInput(data.custom_domain);
+        }
         if (data.setup_fee_custom_price_inr !== undefined && data.setup_fee_custom_price_inr !== null) {
           setCustomPriceInput(String(data.setup_fee_custom_price_inr));
         }
@@ -382,6 +388,75 @@ function VendorDetailInner() {
       setMessage({ type: "error", text: err.message || "Failed to update vendor subdomain" });
     } finally {
       setUpdatingSubdomain(false);
+    }
+  };
+
+  // Handle Custom Domain Access Toggle (Admin Override)
+  const handleToggleCustomDomain = async (enabled: boolean) => {
+    if (!vendor) return;
+    setUpdatingCustomDomain(true);
+    setMessage(null);
+    try {
+      const res = await platformApi.adminUpdateVendorCustomDomainAccess(vendor.id, {
+        custom_domain_enabled: enabled,
+      });
+      setVendor((prev: any) =>
+        prev
+          ? {
+              ...prev,
+              custom_domain_enabled: res.custom_domain_enabled,
+              custom_domain: res.custom_domain,
+              custom_domain_status: res.custom_domain_status,
+            }
+          : null
+      );
+      setMessage({
+        type: "success",
+        text: res.message || (enabled ? "Custom domain access granted!" : "Custom domain access revoked."),
+      });
+    } catch (err: any) {
+      setMessage({ type: "error", text: err.message || "Failed to update custom domain access" });
+    } finally {
+      setUpdatingCustomDomain(false);
+    }
+  };
+
+  // Handle Custom Domain Direct Assignment by Admin
+  const handleSaveCustomDomainByAdmin = async () => {
+    if (!vendor) return;
+    const cleanDomain = customDomainInput.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/+$/, "");
+    if (!cleanDomain || !cleanDomain.includes(".")) {
+      setMessage({ type: "error", text: "Please enter a valid domain format (e.g., kcaariwork.com)" });
+      return;
+    }
+    setUpdatingCustomDomain(true);
+    setMessage(null);
+    try {
+      const res = await platformApi.adminUpdateVendorCustomDomainAccess(vendor.id, {
+        custom_domain_enabled: true,
+        custom_domain: cleanDomain,
+        custom_domain_status: "ACTIVE",
+      });
+      setVendor((prev: any) =>
+        prev
+          ? {
+              ...prev,
+              custom_domain_enabled: res.custom_domain_enabled,
+              custom_domain: res.custom_domain,
+              custom_domain_status: res.custom_domain_status,
+              custom_domain_ssl_status: res.custom_domain_ssl_status,
+            }
+          : null
+      );
+      setEditingCustomDomain(false);
+      setMessage({
+        type: "success",
+        text: res.message || `Custom domain "${cleanDomain}" successfully assigned and activated!`,
+      });
+    } catch (err: any) {
+      setMessage({ type: "error", text: err.message || "Failed to update custom domain" });
+    } finally {
+      setUpdatingCustomDomain(false);
     }
   };
 
@@ -858,6 +933,132 @@ function VendorDetailInner() {
                     </a>
                   ) : (
                     <span className="font-mono text-slate-400 mt-0.5 block">None assigned</span>
+                  )}
+                </div>
+              )}
+
+              {/* Custom Domain (Cloudflare for SaaS) Block */}
+              {editingCustomDomain ? (
+                <div className="bg-purple-50/70 border border-purple-200 rounded-xl p-3 space-y-2">
+                  <label className="text-[11px] font-bold text-purple-900 uppercase tracking-wider block">
+                    Set Custom Domain (Admin Override)
+                  </label>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-1.5 bg-white border border-purple-300 rounded-lg px-2.5 py-1.5 focus-within:ring-2 focus-within:ring-purple-500">
+                      <Globe className="w-4 h-4 text-purple-600 shrink-0" />
+                      <input
+                        type="text"
+                        value={customDomainInput}
+                        onChange={(e) => setCustomDomainInput(e.target.value)}
+                        placeholder="e.g. kcaariwork.com"
+                        className="w-full text-xs font-mono font-semibold text-slate-800 outline-none bg-transparent"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleSaveCustomDomainByAdmin}
+                        disabled={updatingCustomDomain}
+                        className="px-2.5 py-1.5 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
+                      >
+                        {updatingCustomDomain ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            <span>Saving...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Check className="w-3.5 h-3.5" />
+                            <span>Assign & Activate</span>
+                          </>
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCustomDomainInput(vendor.custom_domain || "");
+                          setEditingCustomDomain(false);
+                        }}
+                        disabled={updatingCustomDomain}
+                        className="px-2.5 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-xs font-semibold transition-all cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-purple-700">
+                    Vendor points their DNS CNAME to <code className="font-mono font-bold">cname.digitalgrowthstudio.in</code>.
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400 block text-[11px] uppercase font-bold flex items-center gap-1">
+                      <Globe className="w-3 h-3 text-purple-500" /> Custom Domain
+                    </span>
+                    {vendor.custom_domain_enabled ? (
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCustomDomainInput(vendor.custom_domain || "");
+                            setEditingCustomDomain(true);
+                          }}
+                          className="text-[11px] font-semibold text-purple-600 hover:text-purple-700 hover:underline cursor-pointer"
+                        >
+                          {vendor.custom_domain ? "Edit Domain" : "Assign Domain"}
+                        </button>
+                        <span className="text-slate-300">|</span>
+                        <button
+                          type="button"
+                          onClick={() => handleToggleCustomDomain(false)}
+                          disabled={updatingCustomDomain}
+                          className="text-[11px] font-semibold text-rose-600 hover:text-rose-700 hover:underline cursor-pointer"
+                        >
+                          Revoke Access
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleToggleCustomDomain(true)}
+                        disabled={updatingCustomDomain}
+                        className="text-[11px] font-bold text-purple-600 hover:text-purple-700 hover:underline flex items-center gap-1 cursor-pointer"
+                      >
+                        {updatingCustomDomain ? <Loader2 className="w-3 h-3 animate-spin" /> : <Zap className="w-3 h-3" />}
+                        Grant Free Access
+                      </button>
+                    )}
+                  </div>
+                  {vendor.custom_domain_enabled ? (
+                    vendor.custom_domain ? (
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <a
+                          href={`https://${vendor.custom_domain}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-mono font-bold text-purple-700 hover:underline flex items-center gap-1 text-sm"
+                        >
+                          {vendor.custom_domain}
+                          <ExternalLink className="w-3 h-3 text-slate-400" />
+                        </a>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold uppercase ${
+                          vendor.custom_domain_status === "ACTIVE" 
+                            ? "bg-emerald-100 text-emerald-700" 
+                            : "bg-amber-100 text-amber-700"
+                        }`}>
+                          {vendor.custom_domain_status || "ACTIVE"}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-emerald-600 font-semibold mt-0.5 block flex items-center gap-1">
+                        <CheckCircle className="w-3.5 h-3.5" /> Access Enabled (Awaiting Domain Input)
+                      </span>
+                    )
+                  ) : (
+                    <span className="font-mono text-slate-400 mt-0.5 block text-xs">
+                      🔒 Add-on Locked (₹999 not paid)
+                    </span>
                   )}
                 </div>
               )}

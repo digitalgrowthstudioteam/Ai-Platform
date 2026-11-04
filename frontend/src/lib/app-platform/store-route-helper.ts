@@ -47,14 +47,22 @@ export function getStoreRouteParams(params?: {
         slug = pSlug;
       }
     } else {
-      // Look for subdomain e.g. dgs.digitalgrowthstudio.in
-      const hostname = window.location.hostname;
+      // Look for subdomain e.g. dgs.digitalgrowthstudio.in or custom domain e.g. kcaariwork.com
+      const hostname = window.location.hostname.toLowerCase();
       const hostParts = hostname.split(".");
-      if (hostParts.length >= 3) {
-        const sub = hostParts[0].toLowerCase();
+      if (hostParts.length >= 3 && hostname.includes("digitalgrowthstudio.in")) {
+        const sub = hostParts[0];
         if (!["www", "app", "api", "admin", "platform", "localhost", "127"].includes(sub)) {
           slug = sub;
         }
+      } else if (
+        !hostname.includes("digitalgrowthstudio.in") &&
+        !hostname.includes("web.app") &&
+        !hostname.includes("localhost") &&
+        !hostname.includes("127.0.0.1")
+      ) {
+        // Direct Custom Domain e.g. kcaariwork.com or shop.mybrand.in
+        slug = hostname.replace(/^www\./, "");
       }
     }
 

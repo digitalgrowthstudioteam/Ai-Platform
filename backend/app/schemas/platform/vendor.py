@@ -45,12 +45,22 @@ class StoreUpdateRequest(BaseModel):
     shipping_policy: Optional[str] = None
     refund_policy: Optional[str] = None
 
+    # Custom Domain Mapping (Cloudflare for SaaS)
+    custom_domain: Optional[str] = None
+    custom_domain_enabled: Optional[bool] = None
+    custom_domain_status: Optional[str] = None
+
 
 class VendorPoliciesUpdateRequest(BaseModel):
     terms_and_conditions: Optional[str] = None
     privacy_policy: Optional[str] = None
     shipping_policy: Optional[str] = None
     refund_policy: Optional[str] = None
+
+    # Custom Domain Mapping (Cloudflare for SaaS)
+    custom_domain: Optional[str] = None
+    custom_domain_enabled: Optional[bool] = None
+    custom_domain_status: Optional[str] = None
 
 
 class VendorPoliciesResponse(BaseModel):
@@ -174,6 +184,11 @@ class VendorDetailFullResponse(BaseModel):
     shipping_policy: Optional[str] = None
     refund_policy: Optional[str] = None
 
+    # Custom Domain Mapping (Cloudflare for SaaS)
+    custom_domain: Optional[str] = None
+    custom_domain_enabled: Optional[bool] = None
+    custom_domain_status: Optional[str] = None
+
     # Tracking & Pixels
     meta_pixel_id: Optional[str] = None
     gtm_id: Optional[str] = None
@@ -230,6 +245,22 @@ class VendorAnalyticsSummaryResponse(BaseModel):
     total_orders: int = 0
     total_units_sold: int = 0
     average_order_value: float = 0.0
+
+
+class VendorCustomDomainInfoResponse(BaseModel):
+    custom_domain: Optional[str] = None
+    custom_domain_enabled: bool = False
+    custom_domain_status: str = "UNCONFIGURED"  # UNCONFIGURED, PENDING_DNS, ACTIVE, FAILED
+    custom_domain_ssl_status: str = "PENDING"
+    custom_domain_dns_target: str = "cname.digitalgrowthstudio.in"
+    addon_id: Optional[uuid.UUID] = None
+    addon_price_inr: float = 999.0
+    has_paid_addon: bool = False
+
+
+class VendorCustomDomainUpdateRequest(BaseModel):
+    custom_domain: Optional[str] = None
+
     store_visits: int = 0
     unique_visitors: int = 0
     product_views: int = 0
@@ -263,6 +294,12 @@ class VendorAnalyticsSummaryResponse(BaseModel):
     total_orders: int
     storage_used_mb: float
     storage_limit_mb: float
+    # Custom Domain info
+    custom_domain: Optional[str] = None
+    custom_domain_enabled: bool = False
+    custom_domain_status: str = "UNCONFIGURED"
+    custom_domain_ssl_status: str = "PENDING"
+    custom_domain_dns_target: Optional[str] = "cname.digitalgrowthstudio.in"
     # Subscription info
     plan_name: Optional[str] = None
     subscription_status: Optional[str] = None
@@ -312,6 +349,11 @@ class AdminVendorFullUpdateRequest(BaseModel):
     shipping_policy: Optional[str] = None
     refund_policy: Optional[str] = None
 
+    # Custom Domain Mapping (Cloudflare for SaaS)
+    custom_domain: Optional[str] = None
+    custom_domain_enabled: Optional[bool] = None
+    custom_domain_status: Optional[str] = None
+
     # Tracking & Pixels
     meta_pixel_id: Optional[str] = None
     gtm_id: Optional[str] = None
@@ -368,6 +410,22 @@ class VendorAnalyticsSummaryResponse(BaseModel):
     total_orders: int = 0
     total_units_sold: int = 0
     average_order_value: float = 0.0
+
+
+class VendorCustomDomainInfoResponse(BaseModel):
+    custom_domain: Optional[str] = None
+    custom_domain_enabled: bool = False
+    custom_domain_status: str = "UNCONFIGURED"  # UNCONFIGURED, PENDING_DNS, ACTIVE, FAILED
+    custom_domain_ssl_status: str = "PENDING"
+    custom_domain_dns_target: str = "cname.digitalgrowthstudio.in"
+    addon_id: Optional[uuid.UUID] = None
+    addon_price_inr: float = 999.0
+    has_paid_addon: bool = False
+
+
+class VendorCustomDomainUpdateRequest(BaseModel):
+    custom_domain: Optional[str] = None
+
     store_visits: int = 0
     unique_visitors: int = 0
     product_views: int = 0

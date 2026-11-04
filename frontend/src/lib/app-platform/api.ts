@@ -262,6 +262,38 @@ class PlatformApiClient {
     });
   }
 
+  async getVendorCustomDomainInfo(): Promise<any> {
+    if (this.isDemoMode()) {
+      return {
+        custom_domain: null,
+        custom_domain_enabled: false,
+        custom_domain_status: 'UNCONFIGURED',
+        custom_domain_ssl_status: 'PENDING',
+        custom_domain_dns_target: 'cname.digitalgrowthstudio.in',
+        addon_id: 'mock_addon_custom_domain',
+        addon_price_inr: 999.0,
+        has_paid_addon: false,
+      };
+    }
+    return this.request<any>('/api/v1/platform/vendor/custom-domain');
+  }
+
+  async verifyVendorCustomDomain(): Promise<any> {
+    if (this.isDemoMode()) {
+      return { success: true, message: 'Custom domain verified! SSL is active.' };
+    }
+    return this.request<any>('/api/v1/platform/vendor/custom-domain/verify', {
+      method: 'POST',
+    });
+  }
+
+  async adminUpdateVendorCustomDomainAccess(vendorId: string, payload: { custom_domain_enabled: boolean; custom_domain?: string; custom_domain_status?: string }): Promise<any> {
+    return this.request<any>(`/api/v1/platform/admin/vendors/${vendorId}/custom-domain-access`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  }
+
   async getVendorPolicies(): Promise<VendorPolicies> {
     if (this.isDemoMode()) {
       const s = demoSandbox.getStore();

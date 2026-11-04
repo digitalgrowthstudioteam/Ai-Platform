@@ -36,10 +36,20 @@ router = APIRouter(prefix="/store", tags=["Public Store & Android App"])
 
 
 async def resolve_active_store(slug: str, db: AsyncSession) -> PlatformStore:
-    """Helper to resolve active store and verify vendor is eligible/active."""
+    """Helper to resolve active store by store_slug, custom_domain, or subdomain."""
+    clean_identifier = slug.lower().strip().replace("https://", "").replace("http://", "").split("/")[0]
+    clean_no_www = clean_identifier.replace("www.", "")
+
     stmt = (
         select(PlatformStore)
-        .where(PlatformStore.store_slug == slug.lower().strip())
+        .where(
+            or_(
+                PlatformStore.store_slug == clean_identifier,
+                PlatformStore.custom_domain == clean_identifier,
+                PlatformStore.custom_domain == clean_no_www,
+                PlatformStore.subdomain == clean_identifier,
+            )
+        )
         .options(
             selectinload(PlatformStore.vendor).selectinload(PlatformVendor.app_config),
             selectinload(PlatformStore.vendor).selectinload(PlatformVendor.profile),
@@ -109,6 +119,7 @@ async def get_store_config(slug: str, db: AsyncSession = Depends(get_db)):
         gtm_id=getattr(store, "gtm_id", None),
         ga4_id=getattr(store, "ga4_id", None),
         tracking_enabled=getattr(store, "tracking_enabled", True),
+        custom_domain=getattr(store, "custom_domain", None),
     )
 
 
@@ -165,6 +176,7 @@ async def get_public_store_policies(slug: str, db: AsyncSession = Depends(get_db
         gtm_id=getattr(store, "gtm_id", None),
         ga4_id=getattr(store, "ga4_id", None),
         tracking_enabled=getattr(store, "tracking_enabled", True),
+        custom_domain=getattr(store, "custom_domain", None),
     )
 
 

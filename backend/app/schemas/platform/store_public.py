@@ -41,6 +41,7 @@ class PublicStoreConfigResponse(BaseModel):
     gtm_id: Optional[str] = None
     ga4_id: Optional[str] = None
     tracking_enabled: bool = True
+    custom_domain: Optional[str] = None
 
 
 class PublicStoreEventCreate(BaseModel):

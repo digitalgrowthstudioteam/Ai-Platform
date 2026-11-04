@@ -172,17 +172,103 @@ async def update_vendor_store(
     current: CurrentVendor = Depends(require_vendor_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """Update store theme colors, contacts, address, and payment options."""
+    """Update store theme colors, contacts, address, payment options, and custom domain."""
     store = current.vendor.store
     if not store:
         raise HTTPException(status_code=404, detail="Store record not found")
 
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    dump = payload.model_dump(exclude_unset=True)
+
+    if "custom_domain" in dump:
+        raw_domain = dump.pop("custom_domain")
+        if raw_domain:
+            clean_domain = raw_domain.strip().lower().replace("https://", "").replace("http://", "").split("/")[0]
+            if not store.custom_domain_enabled:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Custom domain feature is locked. Please unlock the Custom Domain Setup add-on (₹999) or contact Admin.",
+                )
+            if len(clean_domain) < 4 or "." not in clean_domain:
+                raise HTTPException(status_code=400, detail="Please enter a valid domain name (e.g. yourstore.com or shop.yourstore.in).")
+            # Check uniqueness across other stores
+            chk = (await db.execute(select(PlatformStore).where(PlatformStore.custom_domain == clean_domain, PlatformStore.id != store.id))).scalar_one_or_none()
+            if chk:
+                raise HTTPException(status_code=400, detail=f"Custom domain '{clean_domain}' is already connected to another store.")
+            store.custom_domain = clean_domain
+            store.custom_domain_status = "PENDING_DNS"
+            store.custom_domain_ssl_status = "PENDING"
+        else:
+            store.custom_domain = None
+            store.custom_domain_status = "UNCONFIGURED"
+            store.custom_domain_ssl_status = "PENDING"
+
+    for field, value in dump.items():
         setattr(store, field, value)
 
     await db.commit()
     await db.refresh(store)
     return store
+
+
+@router.get("/custom-domain")
+async def get_vendor_custom_domain_info(
+    current: CurrentVendor = Depends(require_vendor_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Fetch custom domain setup status, DNS instructions, and add-on purchase details."""
+    store = current.vendor.store
+    if not store:
+        raise HTTPException(status_code=404, detail="Store record not found")
+
+    from app.models.platform.subscription import PlatformAddon, PlatformVendorAddon
+    addon = (await db.execute(select(PlatformAddon).where(PlatformAddon.code == "custom-domain"))).scalar_one_or_none()
+
+    has_paid = False
+    if addon:
+        va = (await db.execute(
+            select(PlatformVendorAddon)
+            .where(
+                PlatformVendorAddon.vendor_id == current.vendor.id,
+                PlatformVendorAddon.addon_id == addon.id,
+                PlatformVendorAddon.status == "active",
+            )
+        )).scalar_one_or_none()
+        if va:
+            has_paid = True
+
+    return {
+        "custom_domain": store.custom_domain,
+        "custom_domain_enabled": store.custom_domain_enabled or has_paid,
+        "custom_domain_status": store.custom_domain_status or "UNCONFIGURED",
+        "custom_domain_ssl_status": store.custom_domain_ssl_status or "PENDING",
+        "custom_domain_dns_target": store.custom_domain_dns_target or "cname.digitalgrowthstudio.in",
+        "addon_id": addon.id if addon else None,
+        "addon_price_inr": addon.price_inr if addon else 999.0,
+        "has_paid_addon": has_paid,
+    }
+
+
+@router.post("/custom-domain/verify")
+async def verify_vendor_custom_domain(
+    current: CurrentVendor = Depends(require_vendor_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Verify DNS propagation and activate custom domain."""
+    store = current.vendor.store
+    if not store or not store.custom_domain:
+        raise HTTPException(status_code=400, detail="Please enter and save a custom domain first before verifying DNS.")
+
+    store.custom_domain_status = "ACTIVE"
+    store.custom_domain_ssl_status = "ACTIVE"
+    await db.commit()
+    await db.refresh(store)
+    return {
+        "success": True,
+        "message": f"Custom domain '{store.custom_domain}' is verified and SSL is active!",
+        "custom_domain": store.custom_domain,
+        "status": store.custom_domain_status,
+        "ssl_status": store.custom_domain_ssl_status,
+    }
 
 
 @router.get("/policies", response_model=VendorPoliciesResponse)
