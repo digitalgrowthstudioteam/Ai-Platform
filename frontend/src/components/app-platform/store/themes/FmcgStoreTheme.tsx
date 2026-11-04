@@ -767,7 +767,7 @@ export default function FmcgStoreTheme({
               </li>
               <li>
                 <Link
-                  href={getStoreHref(slug, "/")}
+                  href={getStoreHref(slug, "/sell")}
                   className="hover:text-white transition-colors"
                 >
                   Sell on {brandName}

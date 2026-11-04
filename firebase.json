@@ -146,6 +146,22 @@
         "destination": "/app/store/placeholder/policies/terms.html"
       },
       {
+        "source": "/app/store/*/sell/**",
+        "destination": "/app/store/placeholder/sell.html"
+      },
+      {
+        "source": "/sell/**",
+        "destination": "/app/store/placeholder/sell.html"
+      },
+      {
+        "source": "/app/store/*/sell",
+        "destination": "/app/store/placeholder/sell.html"
+      },
+      {
+        "source": "/sell",
+        "destination": "/app/store/placeholder/sell.html"
+      },
+      {
         "source": "/app/store/**",
         "destination": "/app/store/placeholder.html"
       }

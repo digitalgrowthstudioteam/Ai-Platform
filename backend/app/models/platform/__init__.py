@@ -32,6 +32,7 @@ from app.models.platform.system import (
     PlatformNotification,
     PlatformAuditLog,
     PlatformSetting,
+    PlatformSupplierInquiry,
 )
 
 __all__ = [
@@ -57,5 +58,6 @@ __all__ = [
     "PlatformNotification",
     "PlatformAuditLog",
     "PlatformSetting",
+    "PlatformSupplierInquiry",
 ]
 

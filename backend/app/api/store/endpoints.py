@@ -20,6 +20,7 @@ from app.core.platform_auth import hash_password, verify_password
 from app.models.platform.vendor import PlatformStore, PlatformVendor, PlatformVendorAppConfig
 from app.models.platform.catalog import PlatformCategory, PlatformProduct, PlatformProductVariant, PlatformBanner
 from app.models.platform.order import PlatformCustomer, PlatformOrder, PlatformOrderItem
+from app.models.platform.system import PlatformSupplierInquiry, PlatformNotification
 from app.services.store_email_service import StoreEmailService
 from app.schemas.platform.catalog import ProductVariantResponse
 from app.schemas.platform.store_public import (
@@ -36,6 +37,8 @@ from app.schemas.platform.store_public import (
     CustomerForgotPasswordRequest,
     CustomerResetPasswordRequest,
     CustomerGoogleAuthRequest,
+    SupplierInquiryCreate,
+    SupplierInquiryResponse,
 )
 from app.schemas.platform.order import PublicOrderCreateRequest, OrderResponse, OrderItemResponse
 
@@ -1162,4 +1165,83 @@ async def customer_google_auth(
         google_id=payload.google_id,
         token=None,
     )
+
+
+# ──────────────────────────────────────────────
+# Supplier / Partner Onboarding ("Sell on Store")
+# ──────────────────────────────────────────────
+@router.post("/{slug}/supplier-inquiry", response_model=SupplierInquiryResponse)
+async def submit_supplier_inquiry(
+    slug: str,
+    payload: SupplierInquiryCreate,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Submit a supplier / merchant application to sell on a store.
+    Validates business credentials, saves inquiry, and alerts vendor & platform admin.
+    """
+    store = await resolve_active_store(slug, db)
+
+    # Basic validations
+    if not payload.business_name or len(payload.business_name.strip()) < 2:
+        raise HTTPException(status_code=400, detail="Valid business name is required (minimum 2 characters).")
+    if not payload.contact_person or len(payload.contact_person.strip()) < 2:
+        raise HTTPException(status_code=400, detail="Contact person name is required.")
+
+    clean_phone = payload.phone.strip().replace(" ", "").replace("-", "").replace("+91", "")
+    if len(clean_phone) != 10 or not clean_phone.isdigit():
+        raise HTTPException(status_code=400, detail="Valid 10-digit mobile phone number is mandatory.")
+
+    clean_email = payload.email.strip().lower()
+    if "@" not in clean_email or "." not in clean_email.split("@")[-1]:
+        raise HTTPException(status_code=400, detail="Valid business email address is required.")
+
+    if not payload.city or not payload.state:
+        raise HTTPException(status_code=400, detail="City and State are required.")
+
+    inquiry_id = uuid.uuid4()
+    ref_suffix = inquiry_id.hex[:6].upper()
+    ref_id = f"MSP-SUP-{ref_suffix}" if "myshoppartner" in slug.lower() else f"SUP-{ref_suffix}"
+
+    inquiry = PlatformSupplierInquiry(
+        id=inquiry_id,
+        vendor_id=store.vendor_id,
+        store_slug=store.store_slug,
+        business_name=payload.business_name.strip(),
+        contact_person=payload.contact_person.strip(),
+        phone=clean_phone,
+        email=clean_email,
+        whatsapp_number=payload.whatsapp_number.strip() if payload.whatsapp_number else clean_phone,
+        business_type=payload.business_type or "Manufacturer",
+        category=payload.category or "General",
+        gstin=payload.gstin.strip().upper() if payload.gstin else None,
+        fssai_license=payload.fssai_license.strip() if payload.fssai_license else None,
+        city=payload.city.strip(),
+        state=payload.state.strip(),
+        pincode=payload.pincode.strip() if payload.pincode else None,
+        monthly_capacity=payload.monthly_capacity,
+        product_details=payload.product_details.strip() if payload.product_details else None,
+        status="PENDING",
+    )
+    db.add(inquiry)
+
+    # Add notification for store vendor admin
+    notification = PlatformNotification(
+        vendor_id=store.vendor_id,
+        recipient_role="VENDOR_ADMIN",
+        title=f"New Seller Application: {payload.business_name.strip()}",
+        message=f"{payload.contact_person.strip()} applied to sell {payload.category}. Contact: +91 {clean_phone} | {clean_email}",
+        notification_type="SYSTEM",
+        action_url=f"/app/dashboard/suppliers",
+    )
+    db.add(notification)
+
+    await db.commit()
+
+    return SupplierInquiryResponse(
+        success=True,
+        reference_id=ref_id,
+        message=f"Thank you! Your seller application has been submitted to {store.store_name} onboarding team. Our merchant manager will contact you within 24 hours.",
+    )
+
 

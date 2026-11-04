@@ -43,3 +43,27 @@ class PlatformSetting(BaseModel):
     value: Mapped[str] = mapped_column(Text, nullable=False)
     description: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
+
+class PlatformSupplierInquiry(BaseModel):
+    """Supplier / Partner application to sell on a merchant store or platform."""
+    __tablename__ = "platform_supplier_inquiries"
+
+    vendor_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("platform_vendors.id", ondelete="CASCADE"), nullable=True, index=True)
+    store_slug: Mapped[str] = mapped_column(String(100), index=True, nullable=False)
+    business_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    contact_person: Mapped[str] = mapped_column(String(255), nullable=False)
+    phone: Mapped[str] = mapped_column(String(50), nullable=False)
+    email: Mapped[str] = mapped_column(String(255), nullable=False)
+    whatsapp_number: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    business_type: Mapped[str] = mapped_column(String(100), nullable=False, default="Manufacturer")  # Manufacturer, Distributor, Importer, Brand
+    category: Mapped[str] = mapped_column(String(255), nullable=False, default="General")
+    gstin: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    fssai_license: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    city: Mapped[str] = mapped_column(String(100), nullable=False)
+    state: Mapped[str] = mapped_column(String(100), nullable=False)
+    pincode: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    monthly_capacity: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    product_details: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(50), nullable=False, default="PENDING")  # PENDING, CONTACTED, APPROVED, REJECTED
+
+

@@ -158,3 +158,26 @@ class PublicBannerItem(BaseModel):
     link_url: Optional[str] = None
     sort_order: int
 
+
+class SupplierInquiryCreate(BaseModel):
+    business_name: str
+    contact_person: str
+    phone: str
+    email: str
+    whatsapp_number: Optional[str] = None
+    business_type: str = "Manufacturer"
+    category: str = "General"
+    gstin: Optional[str] = None
+    fssai_license: Optional[str] = None
+    city: str
+    state: str
+    pincode: Optional[str] = None
+    monthly_capacity: Optional[str] = None
+    product_details: Optional[str] = None
+
+
+class SupplierInquiryResponse(BaseModel):
+    success: bool
+    reference_id: str
+    message: str
+

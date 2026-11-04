@@ -924,6 +924,20 @@ class PlatformApiClient {
     });
   }
 
+  async submitSupplierInquiry(slug: string, payload: any): Promise<any> {
+    if (this.isDemoMode()) {
+      return {
+        success: true,
+        reference_id: "DEMO-SUP-12345",
+        message: "Thank you! Your seller application has been received.",
+      };
+    }
+    return this.request<any>(`/api/store/${slug}/supplier-inquiry`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
   // ──────────────────────────────────────────────
   // Platform Payments & Razorpay
   // ──────────────────────────────────────────────
