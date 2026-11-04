@@ -150,6 +150,10 @@ export default function CheckoutClient() {
       setError("Entered delivery pincode is outside this vendor's serviceable zones.");
       return;
     }
+    if (!customerEmail.trim() || !customerEmail.includes("@") || !customerEmail.includes(".")) {
+      setError("A valid email address is mandatory for receiving order invoices & tracking.");
+      return;
+    }
 
     setSubmitting(true);
     setError(null);
@@ -371,15 +375,17 @@ export default function CheckoutClient() {
 
                   <div className="sm:col-span-2">
                     <label className="font-semibold text-slate-700 block mb-1">
-                      Email Address <span className="text-slate-400 font-normal">(Optional for order receipt)</span>
+                      Email Address <span className="text-rose-500">*</span>
                     </label>
                     <input
                       type="email"
+                      required
                       value={customerEmail}
                       onChange={(e) => setCustomerEmail(e.target.value)}
                       placeholder="e.g. rahul.sharma@example.com"
                       className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-blue-600 transition-colors"
                     />
+                    <p className="text-[11px] text-slate-400 mt-1">For digital invoice & dispatch tracking updates</p>
                   </div>
                 </div>
               </div>

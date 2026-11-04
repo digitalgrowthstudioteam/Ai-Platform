@@ -18,6 +18,7 @@ class PlatformCustomer(BaseModel):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     phone: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    password_hash: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     total_orders: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     total_spent: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     last_order_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)

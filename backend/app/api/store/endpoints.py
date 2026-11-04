@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
+from app.core.platform_auth import hash_password, verify_password
 from app.models.platform.vendor import PlatformStore, PlatformVendor, PlatformVendorAppConfig
 from app.models.platform.catalog import PlatformCategory, PlatformProduct, PlatformProductVariant, PlatformBanner
 from app.models.platform.order import PlatformCustomer, PlatformOrder, PlatformOrderItem
@@ -432,6 +433,9 @@ async def create_store_order(
         )
         db.add(customer)
         await db.flush()
+    else:
+        if payload.customer_email and not customer.email:
+            customer.email = payload.customer_email.strip()
 
     # 2. Validate products and calculate prices strictly from database
     calculated_total = 0.0
@@ -763,14 +767,15 @@ async def customer_auth(
     payload: CustomerAuthRequest,
     db: AsyncSession = Depends(get_db),
 ):
-    """Customer authentication for store storefront: sign in, registration, or instant login."""
+    """Customer authentication for store storefront: registration & sign in with mandatory email, phone, and password."""
     store = await resolve_active_store(slug, db)
     clean_phone = payload.phone.strip().replace(" ", "").replace("-", "")
-    if len(clean_phone) < 8:
-        raise HTTPException(status_code=400, detail="Please enter a valid mobile phone number.")
+    if len(clean_phone) < 10:
+        raise HTTPException(status_code=400, detail="Please enter a valid 10-digit mobile phone number.")
 
     clean_email = payload.email.strip().lower() if payload.email else None
     clean_name = payload.name.strip() if payload.name else None
+    provided_password = payload.password.strip() if payload.password else None
 
     # Check for existing customer record under this vendor
     stmt = select(PlatformCustomer).where(
@@ -780,21 +785,41 @@ async def customer_auth(
     customer = (await db.execute(stmt)).scalar_one_or_none()
 
     if payload.action == "register":
+        # Mandatory fields validation
+        if not clean_name or len(clean_name) < 2:
+            raise HTTPException(status_code=400, detail="Your full name is mandatory to create an account.")
+
+        if not clean_email or "@" not in clean_email or "." not in clean_email:
+            raise HTTPException(status_code=400, detail="A valid email address is mandatory to create an account.")
+
+        if not provided_password or len(provided_password) < 6:
+            raise HTTPException(status_code=400, detail="Password creation is mandatory (minimum 6 characters).")
+
+        hashed_pwd = hash_password(provided_password)
+
+        if customer and customer.password_hash:
+            raise HTTPException(
+                status_code=400,
+                detail="An account with this phone number already exists. Please switch to 'Sign In' and enter your password."
+            )
+
         if not customer:
             customer = PlatformCustomer(
                 vendor_id=store.vendor_id,
-                name=clean_name or "Valued Customer",
+                name=clean_name,
                 phone=clean_phone,
                 email=clean_email,
+                password_hash=hashed_pwd,
                 total_orders=0,
                 total_spent=0.0,
             )
             db.add(customer)
         else:
-            if clean_name:
-                customer.name = clean_name
-            if clean_email:
-                customer.email = clean_email
+            # Upgrade existing customer record
+            customer.name = clean_name
+            customer.email = clean_email
+            customer.password_hash = hashed_pwd
+
         await db.commit()
         await db.refresh(customer)
 
@@ -815,34 +840,25 @@ async def customer_auth(
         )
 
     elif payload.action in ("login", "otp_verify"):
+        if not provided_password:
+            raise HTTPException(status_code=400, detail="Password is mandatory to sign in.")
+
         if not customer:
-            # If no customer profile yet, see if customer has existing orders with this phone
-            orders_stmt = (
-                select(PlatformOrder)
-                .where(
-                    PlatformOrder.vendor_id == store.vendor_id,
-                    PlatformOrder.customer_phone == clean_phone,
+            raise HTTPException(
+                status_code=404,
+                detail="No account found with this phone number. Please click 'Create Account' to sign up."
+            )
+
+        if customer.password_hash:
+            if not verify_password(provided_password, customer.password_hash):
+                raise HTTPException(
+                    status_code=401,
+                    detail="Incorrect password. Please verify your password and try again."
                 )
-                .order_by(desc(PlatformOrder.created_at))
-            )
-            last_order = (await db.execute(orders_stmt)).scalars().first()
-
-            customer_name = clean_name or (last_order.customer_name if last_order else "Valued Customer")
-            customer_email = clean_email or (last_order.customer_email if last_order else None)
-
-            customer = PlatformCustomer(
-                vendor_id=store.vendor_id,
-                name=customer_name,
-                phone=clean_phone,
-                email=customer_email,
-                total_orders=1 if last_order else 0,
-                total_spent=last_order.total_amount if last_order else 0.0,
-            )
-            db.add(customer)
-            await db.commit()
-            await db.refresh(customer)
         else:
-            if clean_name and clean_name != "Valued Customer":
+            # If customer profile existed without password (e.g. from previous checkout), establish password on first login
+            customer.password_hash = hash_password(provided_password)
+            if clean_name and customer.name == "Valued Customer":
                 customer.name = clean_name
             if clean_email and not customer.email:
                 customer.email = clean_email

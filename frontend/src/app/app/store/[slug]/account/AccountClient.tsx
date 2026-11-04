@@ -42,6 +42,8 @@ import {
   Briefcase,
   LogOut,
   Lock,
+  Eye,
+  EyeOff,
   RefreshCw,
   Sparkles,
 } from "lucide-react";
@@ -66,6 +68,7 @@ export default function AccountClient() {
   const [authName, setAuthName] = useState("");
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [submittingAuth, setSubmittingAuth] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
@@ -225,9 +228,26 @@ export default function AccountClient() {
       return;
     }
 
-    if (authMode === "register" && (!authName || authName.trim().length < 2)) {
-      setAuthError("Please enter your full name.");
-      return;
+    if (authMode === "register") {
+      if (!authName || authName.trim().length < 2) {
+        setAuthError("Your full name is mandatory to create an account.");
+        return;
+      }
+
+      if (!authEmail || !authEmail.trim().includes("@") || !authEmail.trim().includes(".")) {
+        setAuthError("A valid email address is mandatory to create an account.");
+        return;
+      }
+
+      if (!authPassword || authPassword.trim().length < 6) {
+        setAuthError("Password creation is mandatory (minimum 6 characters).");
+        return;
+      }
+    } else {
+      if (!authPassword || !authPassword.trim()) {
+        setAuthError("Password is mandatory to sign in.");
+        return;
+      }
     }
 
     setSubmittingAuth(true);
@@ -235,9 +255,9 @@ export default function AccountClient() {
       const res = await platformApi.customerAuth(slug, {
         action: authMode,
         phone: cleanPhone,
-        name: authName.trim() || undefined,
-        email: authEmail.trim() || undefined,
-        password: authPassword.trim() || undefined,
+        name: authMode === "register" ? authName.trim() : undefined,
+        email: authMode === "register" ? authEmail.trim() : undefined,
+        password: authPassword.trim(),
       });
 
       if (!res.success && res.detail) {
@@ -630,11 +650,12 @@ export default function AccountClient() {
 
               {authMode === "register" && (
                 <div>
-                  <label className="font-semibold text-slate-700 block mb-1">Email Address (Optional)</label>
+                  <label className="font-semibold text-slate-700 block mb-1">Email Address *</label>
                   <div className="relative">
                     <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                     <input
                       type="email"
+                      required
                       value={authEmail}
                       onChange={(e) => setAuthEmail(e.target.value)}
                       placeholder="e.g. priya@example.com"
@@ -642,7 +663,7 @@ export default function AccountClient() {
                     />
                   </div>
                   <p className="text-[10px] text-slate-400 mt-1">
-                    Receive digital PDF invoices and dispatch notifications.
+                    Mandatory for digital order receipts and dispatch notifications.
                   </p>
                 </div>
               )}
@@ -650,27 +671,45 @@ export default function AccountClient() {
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="font-semibold text-slate-700 block">
-                    Security PIN / Password (Optional)
+                    {authMode === "register" ? "Create Password *" : "Password *"}
                   </label>
-                  {authMode === "login" && (
-                    <span className="text-[10px] text-emerald-600 font-semibold">1-Click Login</span>
+                  {authMode === "register" && (
+                    <span className="text-[10px] text-slate-400 font-semibold">Min. 6 chars</span>
                   )}
                 </div>
                 <div className="relative">
                   <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
-                    type="password"
+                    type={showPassword ? "text" : "password"}
+                    required
+                    minLength={authMode === "register" ? 6 : 1}
                     value={authPassword}
                     onChange={(e) => setAuthPassword(e.target.value)}
-                    placeholder={authMode === "register" ? "Create optional 4-8 digit PIN" : "Enter PIN or leave blank"}
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-blue-600"
+                    placeholder={
+                      authMode === "register"
+                        ? "Create secure password (min. 6 characters)"
+                        : "Enter your account password"
+                    }
+                    className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-blue-600"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                    title={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
               </div>
 
               <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 text-[11px] text-slate-600 flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>Instant Login: No complicated passwords needed. Your purchases are instantly linked.</span>
+                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>
+                  {authMode === "register"
+                    ? "Mandatory security: Your password protects your orders, invoices, and saved addresses."
+                    : "Password protected: Enter your password to view orders and manage personal details."}
+                </span>
               </div>
 
               <button
@@ -1510,9 +1549,10 @@ export default function AccountClient() {
                   </div>
 
                   <div>
-                    <label className="font-semibold text-slate-700 block mb-1">Email Address (Optional)</label>
+                    <label className="font-semibold text-slate-700 block mb-1">Email Address *</label>
                     <input
                       type="email"
+                      required
                       value={customerEmail}
                       onChange={(e) => setCustomerEmail(e.target.value)}
                       placeholder="e.g. rahul@example.com"
