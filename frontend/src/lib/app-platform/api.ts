@@ -294,6 +294,44 @@ class PlatformApiClient {
     });
   }
 
+  async getVendorEmailSettings(): Promise<any> {
+    if (this.isDemoMode()) {
+      return {
+        email_notifications_enabled: true,
+        email_provider: 'PLATFORM',
+        smtp_host: '',
+        smtp_port: 587,
+        smtp_user: '',
+        smtp_from_email: '',
+        smtp_from_name: 'Demo Store',
+        has_custom_password: false,
+        default_platform_sender: 'Demo Store <no-reply@digitalgrowthstudio.in>',
+        default_reply_to: 'support@example.com',
+      };
+    }
+    return this.request<any>('/api/v1/platform/vendor/email-settings');
+  }
+
+  async updateVendorEmailSettings(payload: any): Promise<any> {
+    if (this.isDemoMode()) {
+      return { success: true, ...payload };
+    }
+    return this.request<any>('/api/v1/platform/vendor/email-settings', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async sendVendorTestEmail(test_email?: string): Promise<any> {
+    if (this.isDemoMode()) {
+      return { success: true, message: `Test email sent successfully to ${test_email || 'your email'}!` };
+    }
+    return this.request<any>('/api/v1/platform/vendor/email-settings/test', {
+      method: 'POST',
+      body: JSON.stringify({ test_email }),
+    });
+  }
+
   async getVendorPolicies(): Promise<VendorPolicies> {
     if (this.isDemoMode()) {
       const s = demoSandbox.getStore();
@@ -811,6 +849,40 @@ class PlatformApiClient {
       };
     }
     return this.request(`/api/store/${slug}/customer/auth`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async customerForgotPassword(slug: string, identifier: string): Promise<any> {
+    if (this.isDemoMode()) {
+      return { success: true, message: "6-digit verification code sent to your registered email.", masked_email: "d***@example.com" };
+    }
+    return this.request<any>(`/api/store/${slug}/customer/forgot-password`, {
+      method: 'POST',
+      body: JSON.stringify({ identifier }),
+    });
+  }
+
+  async customerResetPassword(slug: string, payload: { identifier: string; otp: string; new_password: string }): Promise<any> {
+    if (this.isDemoMode()) {
+      return { success: true, message: "Password reset successfully!" };
+    }
+    return this.request<any>(`/api/store/${slug}/customer/reset-password`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async customerGoogleAuth(slug: string, payload: { email: string; name?: string; google_id?: string; id_token?: string; phone?: string }): Promise<any> {
+    if (this.isDemoMode()) {
+      return {
+        success: true,
+        customer: { id: "demo-cust-google", name: payload.name || "Google User", phone: payload.phone || "9876543210", email: payload.email, total_orders: 0 },
+        token: "demo-google-token",
+      };
+    }
+    return this.request<any>(`/api/store/${slug}/customer/google-auth`, {
       method: 'POST',
       body: JSON.stringify(payload),
     });

@@ -121,6 +121,16 @@ class PlatformStore(BaseModel):
     custom_domain_ssl_status: Mapped[str] = mapped_column(String(50), nullable=False, default="PENDING")   # PENDING, ACTIVE, ERROR
     custom_domain_dns_target: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, default="cname.digitalgrowthstudio.in")
 
+    # Transactional Email Notification System (Platform Brevo vs Custom SMTP)
+    email_notifications_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    email_provider: Mapped[str] = mapped_column(String(50), nullable=False, default="PLATFORM")  # PLATFORM, CUSTOM_SMTP
+    smtp_host: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    smtp_port: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, default=587)
+    smtp_user: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    smtp_password: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    smtp_from_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    smtp_from_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
     vendor: Mapped["PlatformVendor"] = relationship("PlatformVendor", back_populates="store")
 
 

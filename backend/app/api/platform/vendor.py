@@ -71,7 +71,11 @@ from app.schemas.platform.vendor import (
     VendorPixelConfigResponse,
     VendorPixelConfigUpdateRequest,
     VendorAnalyticsSummaryResponse,
+    StoreEmailSettingsUpdateRequest,
+    StoreEmailSettingsResponse,
+    StoreEmailTestRequest,
 )
+from app.services.store_email_service import StoreEmailService
 
 router = APIRouter(prefix="/platform/vendor", tags=["Vendor Dashboard"])
 
@@ -273,6 +277,117 @@ async def verify_vendor_custom_domain(
         "custom_domain": store.custom_domain,
         "status": store.custom_domain_status,
         "ssl_status": store.custom_domain_ssl_status,
+    }
+
+
+# ──────────────────────────────────────────────
+# Transactional Email & Notifications Engine
+# ──────────────────────────────────────────────
+@router.get("/email-settings", response_model=StoreEmailSettingsResponse)
+async def get_vendor_email_settings(
+    current: CurrentVendor = Depends(require_vendor_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Fetch current store transactional email configuration and provider mode."""
+    store = current.vendor.store
+    if not store:
+        raise HTTPException(status_code=404, detail="Store record not found")
+
+    from app.config import get_settings
+    settings = get_settings()
+    default_sender = f"{store.store_name} <{settings.SMTP_FROM or 'no-reply@digitalgrowthstudio.in'}>"
+
+    return StoreEmailSettingsResponse(
+        email_notifications_enabled=getattr(store, "email_notifications_enabled", True),
+        email_provider=getattr(store, "email_provider", "PLATFORM") or "PLATFORM",
+        smtp_host=getattr(store, "smtp_host", None),
+        smtp_port=getattr(store, "smtp_port", 587) or 587,
+        smtp_user=getattr(store, "smtp_user", None),
+        smtp_from_email=getattr(store, "smtp_from_email", None),
+        smtp_from_name=getattr(store, "smtp_from_name", None) or store.store_name,
+        has_custom_password=bool(getattr(store, "smtp_password", None)),
+        default_platform_sender=default_sender,
+        default_reply_to=getattr(store, "contact_email", None) or current.vendor.profile.email,
+    )
+
+
+@router.put("/email-settings", response_model=StoreEmailSettingsResponse)
+async def update_vendor_email_settings(
+    payload: StoreEmailSettingsUpdateRequest,
+    current: CurrentVendor = Depends(require_vendor_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update store email notification settings (Platform Relay vs Custom SMTP)."""
+    store = current.vendor.store
+    if not store:
+        raise HTTPException(status_code=404, detail="Store record not found")
+
+    dump = payload.model_dump(exclude_unset=True)
+
+    # If switching to Custom SMTP, validate minimum parameters
+    if dump.get("email_provider") == "CUSTOM_SMTP":
+        target_host = dump.get("smtp_host") or store.smtp_host
+        target_user = dump.get("smtp_user") or store.smtp_user
+        target_pwd = dump.get("smtp_password") or store.smtp_password
+        if not target_host or not target_user or not target_pwd:
+            raise HTTPException(
+                status_code=400,
+                detail="SMTP Host, Username, and App Password are required to enable Custom SMTP mode.",
+            )
+
+    for field, val in dump.items():
+        if field == "smtp_password" and val == "":
+            continue  # preserve existing password if left blank
+        setattr(store, field, val)
+
+    await db.commit()
+    await db.refresh(store)
+
+    from app.config import get_settings
+    settings = get_settings()
+    default_sender = f"{store.store_name} <{settings.SMTP_FROM or 'no-reply@digitalgrowthstudio.in'}>"
+
+    return StoreEmailSettingsResponse(
+        email_notifications_enabled=store.email_notifications_enabled,
+        email_provider=store.email_provider,
+        smtp_host=store.smtp_host,
+        smtp_port=store.smtp_port or 587,
+        smtp_user=store.smtp_user,
+        smtp_from_email=store.smtp_from_email,
+        smtp_from_name=store.smtp_from_name or store.store_name,
+        has_custom_password=bool(store.smtp_password),
+        default_platform_sender=default_sender,
+        default_reply_to=store.contact_email or current.vendor.profile.email,
+    )
+
+
+@router.post("/email-settings/test")
+async def send_vendor_test_email(
+    payload: StoreEmailTestRequest,
+    current: CurrentVendor = Depends(require_vendor_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Send a test email to verify delivery through the configured engine (Platform or Custom SMTP)."""
+    store = current.vendor.store
+    if not store:
+        raise HTTPException(status_code=404, detail="Store record not found")
+
+    to_addr = payload.test_email or store.contact_email or current.vendor.profile.email
+    if not to_addr or "@" not in to_addr:
+        raise HTTPException(status_code=400, detail="Please enter a valid destination email address for the test.")
+
+    success, error = await StoreEmailService.send_test_email(store, to_addr)
+    if not success:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Email delivery failed: {error or 'Unknown error'}. Please check your SMTP settings.",
+        )
+
+    return {
+        "success": True,
+        "message": f"Test email sent successfully to {to_addr}! Check your inbox.",
+        "provider": store.email_provider,
+        "recipient": to_addr,
     }
 
 
@@ -1534,6 +1649,19 @@ async def update_vendor_order_status(
 
     await db.commit()
     await db.refresh(order)
+
+    # Trigger Automated Email 5: Order Dispatched / Shipped
+    if payload.order_status == "SHIPPED" and order.customer_email:
+        store = current.vendor.store
+        store_url = (
+            f"https://{store.custom_domain}"
+            if (store and store.custom_domain_enabled and store.custom_domain)
+            else f"https://{store.subdomain if store else ''}"
+        )
+        try:
+            asyncio.create_task(StoreEmailService.send_order_shipped_email(store, order, store_url))
+        except Exception as email_err:
+            pass
     return {
         "message": "Order status and tracking updated",
         "order_status": order.order_status,

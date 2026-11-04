@@ -50,6 +50,44 @@ class StoreUpdateRequest(BaseModel):
     custom_domain_enabled: Optional[bool] = None
     custom_domain_status: Optional[str] = None
 
+    # Transactional Email Notification System (Platform Brevo vs Custom SMTP)
+    email_notifications_enabled: Optional[bool] = None
+    email_provider: Optional[str] = None  # "PLATFORM" or "CUSTOM_SMTP"
+    smtp_host: Optional[str] = None
+    smtp_port: Optional[int] = None
+    smtp_user: Optional[str] = None
+    smtp_password: Optional[str] = None
+    smtp_from_email: Optional[str] = None
+    smtp_from_name: Optional[str] = None
+
+
+class StoreEmailSettingsUpdateRequest(BaseModel):
+    email_notifications_enabled: Optional[bool] = True
+    email_provider: str = "PLATFORM"  # "PLATFORM" or "CUSTOM_SMTP"
+    smtp_host: Optional[str] = None
+    smtp_port: Optional[int] = 587
+    smtp_user: Optional[str] = None
+    smtp_password: Optional[str] = None
+    smtp_from_email: Optional[str] = None
+    smtp_from_name: Optional[str] = None
+
+
+class StoreEmailSettingsResponse(BaseModel):
+    email_notifications_enabled: bool = True
+    email_provider: str = "PLATFORM"
+    smtp_host: Optional[str] = None
+    smtp_port: Optional[int] = 587
+    smtp_user: Optional[str] = None
+    smtp_from_email: Optional[str] = None
+    smtp_from_name: Optional[str] = None
+    has_custom_password: bool = False
+    default_platform_sender: str
+    default_reply_to: Optional[str] = None
+
+
+class StoreEmailTestRequest(BaseModel):
+    test_email: Optional[str] = None
+
 
 class VendorPoliciesUpdateRequest(BaseModel):
     terms_and_conditions: Optional[str] = None
@@ -61,6 +99,44 @@ class VendorPoliciesUpdateRequest(BaseModel):
     custom_domain: Optional[str] = None
     custom_domain_enabled: Optional[bool] = None
     custom_domain_status: Optional[str] = None
+
+    # Transactional Email Notification System (Platform Brevo vs Custom SMTP)
+    email_notifications_enabled: Optional[bool] = None
+    email_provider: Optional[str] = None  # "PLATFORM" or "CUSTOM_SMTP"
+    smtp_host: Optional[str] = None
+    smtp_port: Optional[int] = None
+    smtp_user: Optional[str] = None
+    smtp_password: Optional[str] = None
+    smtp_from_email: Optional[str] = None
+    smtp_from_name: Optional[str] = None
+
+
+class StoreEmailSettingsUpdateRequest(BaseModel):
+    email_notifications_enabled: Optional[bool] = True
+    email_provider: str = "PLATFORM"  # "PLATFORM" or "CUSTOM_SMTP"
+    smtp_host: Optional[str] = None
+    smtp_port: Optional[int] = 587
+    smtp_user: Optional[str] = None
+    smtp_password: Optional[str] = None
+    smtp_from_email: Optional[str] = None
+    smtp_from_name: Optional[str] = None
+
+
+class StoreEmailSettingsResponse(BaseModel):
+    email_notifications_enabled: bool = True
+    email_provider: str = "PLATFORM"
+    smtp_host: Optional[str] = None
+    smtp_port: Optional[int] = 587
+    smtp_user: Optional[str] = None
+    smtp_from_email: Optional[str] = None
+    smtp_from_name: Optional[str] = None
+    has_custom_password: bool = False
+    default_platform_sender: str
+    default_reply_to: Optional[str] = None
+
+
+class StoreEmailTestRequest(BaseModel):
+    test_email: Optional[str] = None
 
 
 class VendorPoliciesResponse(BaseModel):
@@ -188,6 +264,44 @@ class VendorDetailFullResponse(BaseModel):
     custom_domain: Optional[str] = None
     custom_domain_enabled: Optional[bool] = None
     custom_domain_status: Optional[str] = None
+
+    # Transactional Email Notification System (Platform Brevo vs Custom SMTP)
+    email_notifications_enabled: Optional[bool] = None
+    email_provider: Optional[str] = None  # "PLATFORM" or "CUSTOM_SMTP"
+    smtp_host: Optional[str] = None
+    smtp_port: Optional[int] = None
+    smtp_user: Optional[str] = None
+    smtp_password: Optional[str] = None
+    smtp_from_email: Optional[str] = None
+    smtp_from_name: Optional[str] = None
+
+
+class StoreEmailSettingsUpdateRequest(BaseModel):
+    email_notifications_enabled: Optional[bool] = True
+    email_provider: str = "PLATFORM"  # "PLATFORM" or "CUSTOM_SMTP"
+    smtp_host: Optional[str] = None
+    smtp_port: Optional[int] = 587
+    smtp_user: Optional[str] = None
+    smtp_password: Optional[str] = None
+    smtp_from_email: Optional[str] = None
+    smtp_from_name: Optional[str] = None
+
+
+class StoreEmailSettingsResponse(BaseModel):
+    email_notifications_enabled: bool = True
+    email_provider: str = "PLATFORM"
+    smtp_host: Optional[str] = None
+    smtp_port: Optional[int] = 587
+    smtp_user: Optional[str] = None
+    smtp_from_email: Optional[str] = None
+    smtp_from_name: Optional[str] = None
+    has_custom_password: bool = False
+    default_platform_sender: str
+    default_reply_to: Optional[str] = None
+
+
+class StoreEmailTestRequest(BaseModel):
+    test_email: Optional[str] = None
 
     # Tracking & Pixels
     meta_pixel_id: Optional[str] = None
@@ -353,6 +467,44 @@ class AdminVendorFullUpdateRequest(BaseModel):
     custom_domain: Optional[str] = None
     custom_domain_enabled: Optional[bool] = None
     custom_domain_status: Optional[str] = None
+
+    # Transactional Email Notification System (Platform Brevo vs Custom SMTP)
+    email_notifications_enabled: Optional[bool] = None
+    email_provider: Optional[str] = None  # "PLATFORM" or "CUSTOM_SMTP"
+    smtp_host: Optional[str] = None
+    smtp_port: Optional[int] = None
+    smtp_user: Optional[str] = None
+    smtp_password: Optional[str] = None
+    smtp_from_email: Optional[str] = None
+    smtp_from_name: Optional[str] = None
+
+
+class StoreEmailSettingsUpdateRequest(BaseModel):
+    email_notifications_enabled: Optional[bool] = True
+    email_provider: str = "PLATFORM"  # "PLATFORM" or "CUSTOM_SMTP"
+    smtp_host: Optional[str] = None
+    smtp_port: Optional[int] = 587
+    smtp_user: Optional[str] = None
+    smtp_password: Optional[str] = None
+    smtp_from_email: Optional[str] = None
+    smtp_from_name: Optional[str] = None
+
+
+class StoreEmailSettingsResponse(BaseModel):
+    email_notifications_enabled: bool = True
+    email_provider: str = "PLATFORM"
+    smtp_host: Optional[str] = None
+    smtp_port: Optional[int] = 587
+    smtp_user: Optional[str] = None
+    smtp_from_email: Optional[str] = None
+    smtp_from_name: Optional[str] = None
+    has_custom_password: bool = False
+    default_platform_sender: str
+    default_reply_to: Optional[str] = None
+
+
+class StoreEmailTestRequest(BaseModel):
+    test_email: Optional[str] = None
 
     # Tracking & Pixels
     meta_pixel_id: Optional[str] = None

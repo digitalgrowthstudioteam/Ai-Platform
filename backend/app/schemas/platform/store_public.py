@@ -125,6 +125,28 @@ class CustomerAuthResponse(BaseModel):
     message: str
     customer: Optional[CustomerProfileResponse] = None
     token: Optional[str] = None
+    requires_phone: Optional[bool] = False
+    prefill_name: Optional[str] = None
+    prefill_email: Optional[str] = None
+    google_id: Optional[str] = None
+
+
+class CustomerForgotPasswordRequest(BaseModel):
+    identifier: str  # email or 10-digit mobile phone number
+
+
+class CustomerResetPasswordRequest(BaseModel):
+    identifier: str  # email or 10-digit mobile phone number
+    otp: str  # 6-digit verification code
+    new_password: str  # minimum 6 characters
+
+
+class CustomerGoogleAuthRequest(BaseModel):
+    email: str
+    name: Optional[str] = None
+    google_id: Optional[str] = None
+    id_token: Optional[str] = None
+    phone: Optional[str] = None  # optional initially, prompted if missing
 
 
 class PublicBannerItem(BaseModel):

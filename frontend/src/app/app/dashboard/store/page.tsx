@@ -28,6 +28,10 @@ import {
   RefreshCw,
   CheckCircle2,
   Zap,
+  Send,
+  Server,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 
 export default function VendorStoreSettingsPage() {
@@ -47,13 +51,22 @@ export default function VendorStoreSettingsPage() {
   const [copiedDns, setCopiedDns] = useState(false);
   const [domainMessage, setDomainMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
+  // Email Notifications & SMTP State
+  const [emailSettings, setEmailSettings] = useState<any>(null);
+  const [showSmtpPassword, setShowSmtpPassword] = useState(false);
+  const [savingEmailSettings, setSavingEmailSettings] = useState(false);
+  const [sendingTestEmail, setSendingTestEmail] = useState(false);
+  const [testEmailAddress, setTestEmailAddress] = useState("");
+  const [emailStatusMsg, setEmailStatusMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
   useEffect(() => {
     async function load() {
       try {
-        const [storeData, profileData, customDomainData] = await Promise.all([
+        const [storeData, profileData, customDomainData, emailData] = await Promise.all([
           platformApi.getVendorStore(),
           platformApi.getVendorProfile().catch(() => null),
           platformApi.getVendorCustomDomainInfo().catch(() => null),
+          platformApi.getVendorEmailSettings().catch(() => null),
         ]);
         setStore(storeData);
         setProfile(profileData);
@@ -62,6 +75,10 @@ export default function VendorStoreSettingsPage() {
           if (customDomainData.custom_domain) {
             setCustomDomainInput(customDomainData.custom_domain);
           }
+        }
+        if (emailData) {
+          setEmailSettings(emailData);
+          setTestEmailAddress(emailData.default_reply_to || "");
         }
       } catch (e: any) {
         setError(e.message);
@@ -221,6 +238,61 @@ export default function VendorStoreSettingsPage() {
     navigator.clipboard.writeText(text);
     setCopiedDns(true);
     setTimeout(() => setCopiedDns(false), 2000);
+  };
+
+  const handleSaveEmailSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!emailSettings) return;
+    setSavingEmailSettings(true);
+    setEmailStatusMsg(null);
+    try {
+      const updated = await platformApi.updateVendorEmailSettings({
+        email_notifications_enabled: emailSettings.email_notifications_enabled,
+        email_provider: emailSettings.email_provider,
+        smtp_host: emailSettings.smtp_host,
+        smtp_port: Number(emailSettings.smtp_port) || 587,
+        smtp_user: emailSettings.smtp_user,
+        smtp_password: emailSettings.smtp_password || undefined,
+        smtp_from_email: emailSettings.smtp_from_email,
+        smtp_from_name: emailSettings.smtp_from_name,
+      });
+      setEmailSettings(updated);
+      setEmailStatusMsg({
+        type: "success",
+        text: "Transactional email notification settings saved successfully!",
+      });
+      setTimeout(() => setEmailStatusMsg(null), 4000);
+    } catch (err: any) {
+      setEmailStatusMsg({
+        type: "error",
+        text: err.message || "Failed to update email settings.",
+      });
+    } finally {
+      setSavingEmailSettings(false);
+    }
+  };
+
+  const handleSendTestEmail = async () => {
+    if (!testEmailAddress || !testEmailAddress.includes("@")) {
+      setEmailStatusMsg({ type: "error", text: "Please enter a valid destination email address for the test." });
+      return;
+    }
+    setSendingTestEmail(true);
+    setEmailStatusMsg(null);
+    try {
+      const res = await platformApi.sendVendorTestEmail(testEmailAddress);
+      setEmailStatusMsg({
+        type: "success",
+        text: res.message || `Test email dispatched successfully to ${testEmailAddress}!`,
+      });
+    } catch (err: any) {
+      setEmailStatusMsg({
+        type: "error",
+        text: err.message || "Failed to deliver test email. Please check your SMTP configuration.",
+      });
+    } finally {
+      setSendingTestEmail(false);
+    }
   };
 
   const handleStoreChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -590,6 +662,287 @@ export default function VendorStoreSettingsPage() {
           </div>
         </div>
       ) : null}
+
+      {/* ────────────────────────────────────────────────────────── */}
+      {/* EMAIL & TRANSACTIONAL NOTIFICATIONS (BREVO / CUSTOM SMTP) */}
+      {/* ────────────────────────────────────────────────────────── */}
+      {emailSettings && (
+        <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-xs space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+            <div className="flex items-center gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                <Mail className="w-6 h-6" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-base sm:text-lg font-bold text-slate-900">
+                    Transactional Emails & Store Notifications
+                  </h3>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-1">
+                    <Zap className="w-3 h-3 text-blue-600" />
+                    Automated
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Sends Account Welcome, Forgot Password OTPs, Order Invoices, and Dispatch Tracking alerts.
+                </p>
+              </div>
+            </div>
+
+            {/* Enable/Disable Master Toggle */}
+            <label className="flex items-center gap-2 cursor-pointer self-start sm:self-auto bg-slate-50 hover:bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200 transition-colors">
+              <input
+                type="checkbox"
+                checked={emailSettings.email_notifications_enabled}
+                onChange={(e) =>
+                  setEmailSettings({ ...emailSettings, email_notifications_enabled: e.target.checked })
+                }
+                className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
+              />
+              <span className="text-xs font-semibold text-slate-700">Notifications Active</span>
+            </label>
+          </div>
+
+          {emailStatusMsg && (
+            <div
+              className={`p-3.5 rounded-2xl text-xs flex items-center gap-2.5 ${
+                emailStatusMsg.type === "success"
+                  ? "bg-emerald-50 border border-emerald-200 text-emerald-800"
+                  : "bg-rose-50 border border-rose-200 text-rose-800"
+              }`}
+            >
+              {emailStatusMsg.type === "success" ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              ) : (
+                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+              )}
+              <span>{emailStatusMsg.text}</span>
+            </div>
+          )}
+
+          {/* Provider Selection */}
+          <div className="space-y-3">
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+              Email Dispatch Engine
+            </label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {/* Option 1: Platform Relay */}
+              <div
+                onClick={() => setEmailSettings({ ...emailSettings, email_provider: "PLATFORM" })}
+                className={`p-4 rounded-2xl border cursor-pointer transition-all ${
+                  emailSettings.email_provider === "PLATFORM"
+                    ? "border-blue-500 bg-blue-50/50 ring-2 ring-blue-500/20"
+                    : "border-slate-200 bg-slate-50/50 hover:border-slate-300"
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-slate-900">Platform Managed Engine</span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                      Zero Setup
+                    </span>
+                  </div>
+                  <input
+                    type="radio"
+                    name="email_provider"
+                    checked={emailSettings.email_provider === "PLATFORM"}
+                    onChange={() => setEmailSettings({ ...emailSettings, email_provider: "PLATFORM" })}
+                    className="w-4 h-4 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  />
+                </div>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  Fast, guaranteed inbox delivery powered by platform servers. Sender shows as{" "}
+                  <strong className="text-slate-800">{store?.store_name || "Your Store"}</strong> and customer replies go directly to{" "}
+                  <strong className="text-slate-800">{emailSettings.default_reply_to || "your contact email"}</strong>.
+                </p>
+              </div>
+
+              {/* Option 2: Custom SMTP */}
+              <div
+                onClick={() => setEmailSettings({ ...emailSettings, email_provider: "CUSTOM_SMTP" })}
+                className={`p-4 rounded-2xl border cursor-pointer transition-all ${
+                  emailSettings.email_provider === "CUSTOM_SMTP"
+                    ? "border-blue-500 bg-blue-50/50 ring-2 ring-blue-500/20"
+                    : "border-slate-200 bg-slate-50/50 hover:border-slate-300"
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-slate-900">Custom Business SMTP</span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800">
+                      Your Domain
+                    </span>
+                  </div>
+                  <input
+                    type="radio"
+                    name="email_provider"
+                    checked={emailSettings.email_provider === "CUSTOM_SMTP"}
+                    onChange={() => setEmailSettings({ ...emailSettings, email_provider: "CUSTOM_SMTP" })}
+                    className="w-4 h-4 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  />
+                </div>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  Send emails directly from your Google Workspace, Zoho Mail, or custom business domain webmail server (e.g. orders@{store?.store_slug || "brand"}.com).
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Custom SMTP Configuration Fields */}
+          {emailSettings.email_provider === "CUSTOM_SMTP" && (
+            <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-4">
+              <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
+                <Server className="w-4 h-4 text-blue-600" />
+                <span>Custom SMTP Connection Credentials</span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="md:col-span-2">
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                    SMTP Host / Server *
+                  </label>
+                  <input
+                    type="text"
+                    value={emailSettings.smtp_host || ""}
+                    onChange={(e) => setEmailSettings({ ...emailSettings, smtp_host: e.target.value })}
+                    placeholder="e.g. smtp.gmail.com or smtp.zoho.in"
+                    className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                    Port *
+                  </label>
+                  <input
+                    type="number"
+                    value={emailSettings.smtp_port || 587}
+                    onChange={(e) =>
+                      setEmailSettings({ ...emailSettings, smtp_port: Number(e.target.value) || 587 })
+                    }
+                    placeholder="587"
+                    className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                    SMTP Username / Login Email *
+                  </label>
+                  <input
+                    type="text"
+                    value={emailSettings.smtp_user || ""}
+                    onChange={(e) => setEmailSettings({ ...emailSettings, smtp_user: e.target.value })}
+                    placeholder="orders@yourdomain.com"
+                    className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                    SMTP Password / App Password *
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showSmtpPassword ? "text" : "password"}
+                      value={emailSettings.smtp_password || ""}
+                      onChange={(e) => setEmailSettings({ ...emailSettings, smtp_password: e.target.value })}
+                      placeholder={emailSettings.has_custom_password ? "•••••••• (Password configured - leave blank to keep)" : "Enter SMTP Password or App Password"}
+                      className="w-full pl-3.5 pr-10 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowSmtpPassword(!showSmtpPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    >
+                      {showSmtpPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                    Sender From Email
+                  </label>
+                  <input
+                    type="email"
+                    value={emailSettings.smtp_from_email || ""}
+                    onChange={(e) => setEmailSettings({ ...emailSettings, smtp_from_email: e.target.value })}
+                    placeholder={emailSettings.smtp_user || "orders@yourdomain.com"}
+                    className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                    Sender From Name
+                  </label>
+                  <input
+                    type="text"
+                    value={emailSettings.smtp_from_name || ""}
+                    onChange={(e) => setEmailSettings({ ...emailSettings, smtp_from_name: e.target.value })}
+                    placeholder={store?.store_name || "Your Store Name"}
+                    className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Test & Save Actions */}
+          <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-t border-slate-100">
+            {/* Live Test Email */}
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <input
+                type="email"
+                value={testEmailAddress}
+                onChange={(e) => setTestEmailAddress(e.target.value)}
+                placeholder="Enter test destination email"
+                className="w-full sm:w-64 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={handleSendTestEmail}
+                disabled={sendingTestEmail}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-colors disabled:opacity-50 shrink-0 flex items-center gap-1.5 cursor-pointer"
+              >
+                {sendingTestEmail ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Sending...</span>
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-3.5 h-3.5" />
+                    <span>Send Test Email</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Save Button */}
+            <button
+              type="button"
+              onClick={handleSaveEmailSettings}
+              disabled={savingEmailSettings}
+              className="px-6 py-2 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 transition-colors shadow-xs disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer shrink-0"
+            >
+              {savingEmailSettings ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  <span>Saving...</span>
+                </>
+              ) : (
+                <>
+                  <Save className="w-3.5 h-3.5" />
+                  <span>Save Email Settings</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
 
       <form onSubmit={handleSave} className="p-6 rounded-3xl bg-white border border-slate-200 shadow-xs space-y-6">
         {/* Core Store & Business Names */}

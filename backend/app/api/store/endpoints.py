@@ -5,9 +5,11 @@ All routes dynamically resolve by store slug and expose only sanitized customer-
 import uuid
 import json
 import secrets
+import random
+import asyncio
 from typing import List, Optional
 from pydantic import BaseModel
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select, desc, or_, and_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,6 +20,7 @@ from app.core.platform_auth import hash_password, verify_password
 from app.models.platform.vendor import PlatformStore, PlatformVendor, PlatformVendorAppConfig
 from app.models.platform.catalog import PlatformCategory, PlatformProduct, PlatformProductVariant, PlatformBanner
 from app.models.platform.order import PlatformCustomer, PlatformOrder, PlatformOrderItem
+from app.services.store_email_service import StoreEmailService
 from app.schemas.platform.catalog import ProductVariantResponse
 from app.schemas.platform.store_public import (
     PublicStoreConfigResponse,
@@ -30,6 +33,9 @@ from app.schemas.platform.store_public import (
     CustomerAuthRequest,
     CustomerAuthResponse,
     CustomerProfileResponse,
+    CustomerForgotPasswordRequest,
+    CustomerResetPasswordRequest,
+    CustomerGoogleAuthRequest,
 )
 from app.schemas.platform.order import PublicOrderCreateRequest, OrderResponse, OrderItemResponse
 
@@ -569,6 +575,19 @@ async def create_store_order(
 
     await db.commit()
 
+    # Trigger Automated Email 4: Order Placed (Itemized Bill to Customer & Alert to Vendor)
+    store_url = (
+        f"https://{store.custom_domain}"
+        if (store.custom_domain_enabled and store.custom_domain)
+        else f"https://{store.subdomain}"
+    )
+    try:
+        asyncio.create_task(
+            StoreEmailService.send_order_placed_emails(store, order, saved_items, store_url)
+        )
+    except Exception:
+        pass
+
     return OrderResponse(
         id=order.id,
         vendor_id=order.vendor_id,
@@ -823,6 +842,19 @@ async def customer_auth(
         await db.commit()
         await db.refresh(customer)
 
+        # Trigger Automated Email 1: Welcome & Automated Email 2: Password Created
+        store_url = (
+            f"https://{store.custom_domain}"
+            if (store.custom_domain_enabled and store.custom_domain)
+            else f"https://{store.subdomain}"
+        )
+        try:
+            asyncio.create_task(StoreEmailService.send_customer_welcome_email(store, customer, store_url))
+            if customer.password_hash:
+                asyncio.create_task(StoreEmailService.send_password_changed_email(store, customer))
+        except Exception:
+            pass
+
         token = secrets.token_urlsafe(24)
         return CustomerAuthResponse(
             success=True,
@@ -864,6 +896,10 @@ async def customer_auth(
                 customer.email = clean_email
             await db.commit()
             await db.refresh(customer)
+            try:
+                asyncio.create_task(StoreEmailService.send_password_changed_email(store, customer))
+            except Exception:
+                pass
 
         token = secrets.token_urlsafe(24)
         return CustomerAuthResponse(
@@ -889,4 +925,241 @@ async def customer_auth(
         )
 
     raise HTTPException(status_code=400, detail="Invalid action requested.")
+
+
+# ──────────────────────────────────────────────
+# Automated Email 3: Customer Forgot & Reset Password
+# ──────────────────────────────────────────────
+@router.post("/{slug}/customer/forgot-password")
+async def customer_forgot_password(
+    slug: str,
+    payload: CustomerForgotPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Request 6-digit password reset verification code sent to customer's registered email.
+    """
+    store = await resolve_active_store(slug, db)
+    clean_id = payload.identifier.strip().lower()
+    clean_phone = clean_id.replace(" ", "").replace("-", "").replace("+91", "")
+
+    stmt = select(PlatformCustomer).where(
+        PlatformCustomer.vendor_id == store.vendor_id,
+        or_(PlatformCustomer.email == clean_id, PlatformCustomer.phone == clean_phone),
+    )
+    customer = (await db.execute(stmt)).scalar_one_or_none()
+    if not customer:
+        raise HTTPException(
+            status_code=404,
+            detail="No account found with this phone number or email address. Please verify or create an account.",
+        )
+
+    if not customer.email:
+        raise HTTPException(
+            status_code=400,
+            detail="No email address is linked to this account. Please contact store support to reset your password.",
+        )
+
+    # Generate secure 6-digit OTP
+    otp = f"{random.randint(100000, 999999)}"
+    customer.reset_token = otp
+    customer.reset_token_expires_at = datetime.now(timezone.utc) + timedelta(minutes=15)
+    await db.commit()
+
+    # Dispatch Automated Email 3
+    try:
+        asyncio.create_task(StoreEmailService.send_password_reset_otp_email(store, customer, otp))
+    except Exception:
+        pass
+
+    # Mask email for response (e.g. p***a@example.com)
+    email_parts = customer.email.split("@")
+    masked_email = f"{email_parts[0][0]}***@{email_parts[1]}" if len(email_parts) == 2 and len(email_parts[0]) > 0 else customer.email
+
+    return {
+        "success": True,
+        "message": f"6-digit verification code sent to {masked_email}. Code is valid for 15 minutes.",
+        "masked_email": masked_email,
+        "phone": customer.phone,
+    }
+
+
+@router.post("/{slug}/customer/reset-password")
+async def customer_reset_password(
+    slug: str,
+    payload: CustomerResetPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Reset customer account password using the verified 6-digit OTP code.
+    """
+    store = await resolve_active_store(slug, db)
+    clean_id = payload.identifier.strip().lower()
+    clean_phone = clean_id.replace(" ", "").replace("-", "").replace("+91", "")
+
+    if len(payload.new_password.strip()) < 6:
+        raise HTTPException(status_code=400, detail="New password must be at least 6 characters long.")
+
+    stmt = select(PlatformCustomer).where(
+        PlatformCustomer.vendor_id == store.vendor_id,
+        or_(PlatformCustomer.email == clean_id, PlatformCustomer.phone == clean_phone),
+    )
+    customer = (await db.execute(stmt)).scalar_one_or_none()
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer account not found.")
+
+    if not customer.reset_token or customer.reset_token.strip() != payload.otp.strip():
+        raise HTTPException(status_code=400, detail="Invalid verification code. Please check your email and try again.")
+
+    if customer.reset_token_expires_at:
+        now_dt = datetime.now(timezone.utc)
+        expires_at = customer.reset_token_expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        if now_dt > expires_at:
+            raise HTTPException(status_code=400, detail="Verification code has expired. Please request a new code.")
+
+    # Update password and clear reset token
+    customer.password_hash = hash_password(payload.new_password.strip())
+    customer.reset_token = None
+    customer.reset_token_expires_at = None
+    await db.commit()
+    await db.refresh(customer)
+
+    # Trigger Automated Email 2: Password Changed Security Notice
+    try:
+        asyncio.create_task(StoreEmailService.send_password_changed_email(store, customer))
+    except Exception:
+        pass
+
+    token = secrets.token_urlsafe(24)
+    return CustomerAuthResponse(
+        success=True,
+        message="Password reset successfully! You are now signed in.",
+        customer=CustomerProfileResponse(
+            id=customer.id,
+            vendor_id=customer.vendor_id,
+            name=customer.name,
+            phone=customer.phone,
+            email=customer.email,
+            total_orders=customer.total_orders,
+            total_spent=customer.total_spent,
+        ),
+        token=token,
+    )
+
+
+# ──────────────────────────────────────────────
+# Google 1-Click Login (Hybrid Flow)
+# ──────────────────────────────────────────────
+@router.post("/{slug}/customer/google-auth", response_model=CustomerAuthResponse)
+async def customer_google_auth(
+    slug: str,
+    payload: CustomerGoogleAuthRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Authenticate shopper via Google OAuth.
+    If customer does not have a 10-digit mobile number on file, returns requires_phone=True
+    to seamlessly prompt for phone number required by Indian courier partners.
+    """
+    store = await resolve_active_store(slug, db)
+    clean_email = payload.email.strip().lower()
+    clean_name = payload.name.strip() if payload.name else "Customer"
+    clean_phone = payload.phone.strip().replace(" ", "").replace("-", "").replace("+91", "") if payload.phone else None
+
+    # Find existing customer by email, google_id, or phone
+    stmt = select(PlatformCustomer).where(
+        PlatformCustomer.vendor_id == store.vendor_id,
+        or_(
+            PlatformCustomer.email == clean_email,
+            PlatformCustomer.google_id == payload.google_id if payload.google_id else False,
+            PlatformCustomer.phone == clean_phone if clean_phone else False,
+        ),
+    )
+    customer = (await db.execute(stmt)).scalar_one_or_none()
+
+    # Case A: Existing customer who already has a phone number
+    if customer and customer.phone and len(customer.phone) >= 10:
+        if payload.google_id and not customer.google_id:
+            customer.google_id = payload.google_id
+            await db.commit()
+            await db.refresh(customer)
+
+        token = secrets.token_urlsafe(24)
+        return CustomerAuthResponse(
+            success=True,
+            message="Signed in with Google successfully!",
+            customer=CustomerProfileResponse(
+                id=customer.id,
+                vendor_id=customer.vendor_id,
+                name=customer.name,
+                phone=customer.phone,
+                email=customer.email,
+                total_orders=customer.total_orders,
+                total_spent=customer.total_spent,
+            ),
+            token=token,
+        )
+
+    # Case B: Phone number is provided (either during initial Google auth or after 1-step prompt)
+    if clean_phone and len(clean_phone) >= 10:
+        if customer:
+            customer.phone = clean_phone
+            if clean_name and customer.name == "Customer":
+                customer.name = clean_name
+            if payload.google_id:
+                customer.google_id = payload.google_id
+        else:
+            customer = PlatformCustomer(
+                vendor_id=store.vendor_id,
+                name=clean_name,
+                email=clean_email,
+                phone=clean_phone,
+                google_id=payload.google_id,
+                total_orders=0,
+                total_spent=0.0,
+            )
+            db.add(customer)
+
+        await db.commit()
+        await db.refresh(customer)
+
+        # Trigger Automated Email 1: Welcome
+        store_url = (
+            f"https://{store.custom_domain}"
+            if (store.custom_domain_enabled and store.custom_domain)
+            else f"https://{store.subdomain}"
+        )
+        try:
+            asyncio.create_task(StoreEmailService.send_customer_welcome_email(store, customer, store_url))
+        except Exception:
+            pass
+
+        token = secrets.token_urlsafe(24)
+        return CustomerAuthResponse(
+            success=True,
+            message="Account linked and signed in successfully!",
+            customer=CustomerProfileResponse(
+                id=customer.id,
+                vendor_id=customer.vendor_id,
+                name=customer.name,
+                phone=customer.phone,
+                email=customer.email,
+                total_orders=customer.total_orders,
+                total_spent=customer.total_spent,
+            ),
+            token=token,
+        )
+
+    # Case C: Customer has signed in with Google, but needs 10-digit phone for Indian logistics
+    return CustomerAuthResponse(
+        success=False,
+        message="Please provide your 10-digit mobile phone number for delivery and order tracking updates.",
+        requires_phone=True,
+        prefill_name=customer.name if customer else clean_name,
+        prefill_email=customer.email if customer else clean_email,
+        google_id=payload.google_id,
+        token=None,
+    )
 

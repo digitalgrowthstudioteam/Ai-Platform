@@ -10,6 +10,8 @@ import { useSavedAddresses, CustomerSavedAddress } from "@/lib/app-platform/cust
 import StoreHeader from "@/components/app-platform/store/StoreHeader";
 import StoreFooter from "@/components/app-platform/store/StoreFooter";
 import { getStoreRouteParams, getStoreHref } from "@/lib/app-platform/store-route-helper";
+import { auth } from "@/lib/firebase";
+import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import {
   User,
   Package,
@@ -71,6 +73,31 @@ export default function AccountClient() {
   const [showPassword, setShowPassword] = useState(false);
   const [submittingAuth, setSubmittingAuth] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+
+  // Google 1-Click Login State
+  const [googleSigningIn, setGoogleSigningIn] = useState(false);
+  const [showGooglePhoneModal, setShowGooglePhoneModal] = useState(false);
+  const [googlePendingData, setGooglePendingData] = useState<{
+    email: string;
+    name: string;
+    google_id: string;
+    id_token?: string;
+  } | null>(null);
+  const [googlePhoneInput, setGooglePhoneInput] = useState("");
+  const [submittingGooglePhone, setSubmittingGooglePhone] = useState(false);
+  const [googlePhoneError, setGooglePhoneError] = useState<string | null>(null);
+
+  // Forgot Password Modal State
+  const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false);
+  const [forgotStep, setForgotStep] = useState<1 | 2>(1);
+  const [forgotIdentifier, setForgotIdentifier] = useState("");
+  const [forgotOtp, setForgotOtp] = useState("");
+  const [forgotNewPassword, setForgotNewPassword] = useState("");
+  const [forgotConfirmPassword, setForgotConfirmPassword] = useState("");
+  const [showForgotNewPassword, setShowForgotNewPassword] = useState(false);
+  const [submittingForgot, setSubmittingForgot] = useState(false);
+  const [forgotSuccessMsg, setForgotSuccessMsg] = useState<string | null>(null);
+  const [forgotError, setForgotError] = useState<string | null>(null);
 
   // Customer Profile State
   const [customerName, setCustomerName] = useState("");
@@ -201,6 +228,36 @@ export default function AccountClient() {
     }
   };
 
+  const handleAuthSuccess = (cust: any, token?: string) => {
+    const sessionData = {
+      isLoggedIn: true,
+      id: cust.id,
+      name: cust.name,
+      phone: cust.phone,
+      email: cust.email || "",
+      token: token || "token_" + Date.now(),
+      loginAt: new Date().toISOString(),
+    };
+
+    localStorage.setItem(`dgs_customer_session_${slug}`, JSON.stringify(sessionData));
+    localStorage.setItem("dgs_customer_name", cust.name);
+    localStorage.setItem("dgs_customer_phone", cust.phone);
+    if (cust.email) {
+      localStorage.setItem("dgs_customer_email", cust.email);
+    }
+
+    // Notify header and any listening tabs
+    window.dispatchEvent(new Event("storage"));
+    window.dispatchEvent(new CustomEvent("dgs_customer_auth_changed"));
+
+    setCustomerName(cust.name);
+    setCustomerPhone(cust.phone);
+    setCustomerEmail(cust.email || "");
+    setIsLoggedIn(true);
+
+    fetchOrders(cust.phone, slug);
+  };
+
   const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError(null);
@@ -255,38 +312,159 @@ export default function AccountClient() {
         email: authEmail.trim() || "",
       };
 
-      const sessionData = {
-        isLoggedIn: true,
-        id: cust.id,
-        name: cust.name,
-        phone: cust.phone,
-        email: cust.email || "",
-        token: res.token || "token_" + Date.now(),
-        loginAt: new Date().toISOString(),
-      };
-
-      localStorage.setItem(`dgs_customer_session_${slug}`, JSON.stringify(sessionData));
-      localStorage.setItem("dgs_customer_name", cust.name);
-      localStorage.setItem("dgs_customer_phone", cust.phone);
-      if (cust.email) {
-        localStorage.setItem("dgs_customer_email", cust.email);
-      }
-
-      // Notify header and any listening tabs
-      window.dispatchEvent(new Event("storage"));
-      window.dispatchEvent(new CustomEvent("dgs_customer_auth_changed"));
-
-      setCustomerName(cust.name);
-      setCustomerPhone(cust.phone);
-      setCustomerEmail(cust.email || "");
-      setIsLoggedIn(true);
-
-      fetchOrders(cust.phone, slug);
+      handleAuthSuccess(cust, res.token);
     } catch (err: any) {
       console.error("Auth error:", err);
       setAuthError(err.message || "Failed to log in. Please check your phone number and try again.");
     } finally {
       setSubmittingAuth(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setAuthError(null);
+    setGoogleSigningIn(true);
+    try {
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: "select_account" });
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+      const idToken = await user.getIdToken();
+
+      const authRes = await platformApi.customerGoogleAuth(slug, {
+        email: user.email || "",
+        name: user.displayName || "Google Shopper",
+        google_id: user.uid,
+        id_token: idToken,
+      });
+
+      if (authRes.requires_phone) {
+        setGooglePendingData({
+          email: user.email || "",
+          name: user.displayName || "Google Shopper",
+          google_id: user.uid,
+          id_token: idToken,
+        });
+        setShowGooglePhoneModal(true);
+        return;
+      }
+
+      if (authRes.success && authRes.customer) {
+        handleAuthSuccess(authRes.customer, authRes.token);
+      } else {
+        setAuthError(authRes.detail || "Google authentication failed. Please try again.");
+      }
+    } catch (err: any) {
+      console.error("Google login error:", err);
+      if (err.code !== "auth/popup-closed-by-user") {
+        setAuthError(err.message || "Failed to sign in with Google.");
+      }
+    } finally {
+      setGoogleSigningIn(false);
+    }
+  };
+
+  const handleCompleteGooglePhone = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setGooglePhoneError(null);
+    const cleanPhone = googlePhoneInput.replace(/\D/g, "");
+    if (cleanPhone.length < 10) {
+      setGooglePhoneError("Please enter a valid 10-digit mobile number.");
+      return;
+    }
+    if (!googlePendingData) return;
+
+    setSubmittingGooglePhone(true);
+    try {
+      const authRes = await platformApi.customerGoogleAuth(slug, {
+        ...googlePendingData,
+        phone: cleanPhone,
+      });
+      if (authRes.success && authRes.customer) {
+        setShowGooglePhoneModal(false);
+        setGooglePendingData(null);
+        setGooglePhoneInput("");
+        handleAuthSuccess(authRes.customer, authRes.token);
+      } else {
+        setGooglePhoneError(authRes.detail || "Failed to link phone number. Please try again.");
+      }
+    } catch (err: any) {
+      setGooglePhoneError(err.message || "Failed to link phone number. Please try again.");
+    } finally {
+      setSubmittingGooglePhone(false);
+    }
+  };
+
+  const handleRequestPasswordResetOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setForgotError(null);
+    setForgotSuccessMsg(null);
+    if (!forgotIdentifier || forgotIdentifier.trim().length < 3) {
+      setForgotError("Please enter your registered phone number or email address.");
+      return;
+    }
+    setSubmittingForgot(true);
+    try {
+      const res = await platformApi.customerForgotPassword(slug, forgotIdentifier.trim());
+      if (res.success) {
+        setForgotSuccessMsg(res.message || "6-digit OTP sent to your registered email!");
+        setForgotStep(2);
+      } else {
+        setForgotError(res.detail || "Failed to send reset code.");
+      }
+    } catch (err: any) {
+      setForgotError(err.message || "Account not found or no verified email linked to this account.");
+    } finally {
+      setSubmittingForgot(false);
+    }
+  };
+
+  const handleConfirmPasswordReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setForgotError(null);
+    setForgotSuccessMsg(null);
+
+    if (!forgotOtp || forgotOtp.trim().length !== 6) {
+      setForgotError("Please enter the 6-digit OTP sent to your email.");
+      return;
+    }
+    if (!forgotNewPassword || forgotNewPassword.trim().length < 6) {
+      setForgotError("New password must be at least 6 characters.");
+      return;
+    }
+    if (forgotNewPassword !== forgotConfirmPassword) {
+      setForgotError("Passwords do not match. Please re-enter.");
+      return;
+    }
+
+    setSubmittingForgot(true);
+    try {
+      const res = await platformApi.customerResetPassword(slug, {
+        identifier: forgotIdentifier.trim(),
+        otp: forgotOtp.trim(),
+        new_password: forgotNewPassword.trim(),
+      });
+      if (res.success) {
+        setShowForgotPasswordModal(false);
+        setForgotStep(1);
+        setForgotOtp("");
+        setForgotNewPassword("");
+        setForgotConfirmPassword("");
+        setAuthPhone(res.customer?.phone || forgotIdentifier.trim());
+        setAuthPassword(forgotNewPassword.trim());
+        if (res.customer && res.token) {
+          handleAuthSuccess(res.customer, res.token);
+        } else {
+          setAuthMode("login");
+          setAuthError(null);
+        }
+      } else {
+        setForgotError(res.detail || "Invalid or expired OTP. Please try again.");
+      }
+    } catch (err: any) {
+      setForgotError(err.message || "Failed to reset password. Please check the OTP.");
+    } finally {
+      setSubmittingForgot(false);
     }
   };
 
@@ -553,6 +731,53 @@ export default function AccountClient() {
               </p>
             </div>
 
+            {/* Google 1-Click Login Button */}
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={handleGoogleSignIn}
+                disabled={googleSigningIn}
+                className="w-full py-2.5 px-4 rounded-xl border border-slate-300 hover:border-slate-400 bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold shadow-2xs transition-all flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-60"
+              >
+                {googleSigningIn ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin text-slate-500" />
+                    <span>Signing in with Google...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                      <path
+                        fill="#4285F4"
+                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                      />
+                      <path
+                        fill="#34A853"
+                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                      />
+                      <path
+                        fill="#FBBC05"
+                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                      />
+                      <path
+                        fill="#EA4335"
+                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                      />
+                    </svg>
+                    <span>Continue with Google (1-Click)</span>
+                  </>
+                )}
+              </button>
+
+              <div className="flex items-center gap-3">
+                <div className="h-px bg-slate-200 flex-1" />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  Or Sign In with Phone
+                </span>
+                <div className="h-px bg-slate-200 flex-1" />
+              </div>
+            </div>
+
             {/* Mode Switcher Tabs */}
             <div className="grid grid-cols-2 p-1 bg-slate-100 rounded-2xl text-xs font-bold text-slate-600">
               <button
@@ -656,8 +881,22 @@ export default function AccountClient() {
                   <label className="font-semibold text-slate-700 block">
                     {authMode === "register" ? "Create Password *" : "Password *"}
                   </label>
-                  {authMode === "register" && (
+                  {authMode === "register" ? (
                     <span className="text-[10px] text-slate-400 font-semibold">Min. 6 chars</span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowForgotPasswordModal(true);
+                        setForgotStep(1);
+                        setForgotIdentifier(authPhone || "");
+                        setForgotError(null);
+                        setForgotSuccessMsg(null);
+                      }}
+                      className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 hover:underline cursor-pointer"
+                    >
+                      Forgot Password?
+                    </button>
                   )}
                 </div>
                 <div className="relative">
@@ -767,6 +1006,276 @@ export default function AccountClient() {
             </div>
           </div>
         </main>
+
+        {/* ───────────────────────────────────────────────────────────── */}
+        {/* GOOGLE SIGN-IN PHONE REQUIREMENT MODAL */}
+        {/* ───────────────────────────────────────────────────────────── */}
+        {showGooglePhoneModal && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-5 animate-in fade-in zoom-in-95">
+              <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto">
+                <Phone className="w-6 h-6" />
+              </div>
+
+              <div className="text-center space-y-1">
+                <h3 className="text-lg font-bold text-slate-900">1 Final Step for Delivery Updates</h3>
+                <p className="text-xs text-slate-500 max-w-xs mx-auto">
+                  Indian courier & logistics partners require a 10-digit mobile number for dispatch OTPs and tracking updates.
+                </p>
+              </div>
+
+              {googlePhoneError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                  <span>{googlePhoneError}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleCompleteGooglePhone} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Mobile Phone Number *
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-mono font-bold text-slate-500">
+                      +91
+                    </span>
+                    <input
+                      type="tel"
+                      required
+                      maxLength={10}
+                      autoFocus
+                      value={googlePhoneInput}
+                      onChange={(e) => setGooglePhoneInput(e.target.value.replace(/\D/g, ""))}
+                      placeholder="9876543210"
+                      className="w-full pl-12 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs focus:bg-white focus:outline-blue-600"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowGooglePhoneModal(false);
+                      setGooglePendingData(null);
+                    }}
+                    className="w-1/3 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submittingGooglePhone}
+                    className="w-2/3 py-2.5 rounded-xl text-xs font-bold text-white shadow-xs hover:opacity-95 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+                    style={{ backgroundColor: primaryColor }}
+                  >
+                    {submittingGooglePhone ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        <span>Saving...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Complete Setup</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* ───────────────────────────────────────────────────────────── */}
+        {/* FORGOT PASSWORD MODAL (2-STEP OTP & RESET) */}
+        {/* ───────────────────────────────────────────────────────────── */}
+        {showForgotPasswordModal && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-5 animate-in fade-in zoom-in-95">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                    <Lock className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900">Reset Your Password</h3>
+                    <p className="text-[11px] text-slate-500">
+                      {forgotStep === 1 ? "Step 1 of 2: Verification Code" : "Step 2 of 2: Create New Password"}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowForgotPasswordModal(false)}
+                  className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {forgotError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                  <span>{forgotError}</span>
+                </div>
+              )}
+
+              {forgotSuccessMsg && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>{forgotSuccessMsg}</span>
+                </div>
+              )}
+
+              {forgotStep === 1 ? (
+                <form onSubmit={handleRequestPasswordResetOtp} className="space-y-4 text-xs">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Registered Mobile Number or Email *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      autoFocus
+                      value={forgotIdentifier}
+                      onChange={(e) => setForgotIdentifier(e.target.value)}
+                      placeholder="e.g. 9876543210 or yourname@gmail.com"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-blue-600"
+                    />
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      We'll email a secure 6-digit verification code to the email address registered with this account.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowForgotPasswordModal(false)}
+                      className="w-1/3 py-2.5 rounded-xl border border-slate-200 font-semibold text-slate-600 hover:bg-slate-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={submittingForgot}
+                      className="w-2/3 py-2.5 rounded-xl font-bold text-white shadow-xs hover:opacity-95 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+                      style={{ backgroundColor: primaryColor }}
+                    >
+                      {submittingForgot ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                          <span>Sending OTP...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>Send 6-Digit OTP</span>
+                          <ArrowRight className="w-4 h-4" />
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <form onSubmit={handleConfirmPasswordReset} className="space-y-4 text-xs">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Enter 6-Digit Verification Code *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      maxLength={6}
+                      autoFocus
+                      value={forgotOtp}
+                      onChange={(e) => setForgotOtp(e.target.value.replace(/\D/g, ""))}
+                      placeholder="123456"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-center text-sm font-bold tracking-widest focus:bg-white focus:outline-blue-600"
+                    />
+                    <div className="flex items-center justify-between mt-1 text-[10px]">
+                      <span className="text-slate-400">Valid for 15 minutes</span>
+                      <button
+                        type="button"
+                        onClick={() => setForgotStep(1)}
+                        className="text-blue-600 hover:underline"
+                      >
+                        Change Phone/Email
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      New Password (Min. 6 chars) *
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showForgotNewPassword ? "text" : "password"}
+                        required
+                        minLength={6}
+                        value={forgotNewPassword}
+                        onChange={(e) => setForgotNewPassword(e.target.value)}
+                        placeholder="Enter new secure password"
+                        className="w-full pl-3.5 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-blue-600"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowForgotNewPassword(!showForgotNewPassword)}
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                      >
+                        {showForgotNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Confirm New Password *
+                    </label>
+                    <input
+                      type="password"
+                      required
+                      minLength={6}
+                      value={forgotConfirmPassword}
+                      onChange={(e) => setForgotConfirmPassword(e.target.value)}
+                      placeholder="Re-enter new password"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-blue-600"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setForgotStep(1)}
+                      className="w-1/3 py-2.5 rounded-xl border border-slate-200 font-semibold text-slate-600 hover:bg-slate-50"
+                    >
+                      Back
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={submittingForgot}
+                      className="w-2/3 py-2.5 rounded-xl font-bold text-white shadow-xs hover:opacity-95 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+                      style={{ backgroundColor: primaryColor }}
+                    >
+                      {submittingForgot ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                          <span>Updating...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>Reset & Sign In</span>
+                          <ArrowRight className="w-4 h-4" />
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          </div>
+        )}
 
         <StoreFooter slug={slug} config={config} />
       </div>
