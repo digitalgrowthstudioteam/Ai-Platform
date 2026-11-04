@@ -145,17 +145,21 @@ export default function VendorPaymentSettingsPage() {
     setSaving(true);
     setMessage(null);
     try {
-      const cleanKey = keyId.trim();
-      const cleanSecret = keySecret.trim();
-
-      const updated = await platformApi.updateVendorStore({
+      const payload: any = {
         cod_enabled: store.cod_enabled,
         cod_charge: codCharge || 0,
-        razorpay_enabled: store.razorpay_enabled,
-        razorpay_key_id: cleanKey || undefined,
-        razorpay_key_secret: cleanSecret || undefined,
-        razorpay_verified: verifyStatus.valid || store.razorpay_verified || false,
-      });
+      };
+
+      // Only include Razorpay credentials if activated by Admin
+      if (store.razorpay_enabled) {
+        const cleanKey = keyId.trim();
+        const cleanSecret = keySecret.trim();
+        if (cleanKey) payload.razorpay_key_id = cleanKey;
+        if (cleanSecret) payload.razorpay_key_secret = cleanSecret;
+        payload.razorpay_verified = verifyStatus.valid || store.razorpay_verified || false;
+      }
+
+      const updated = await platformApi.updateVendorStore(payload);
 
       setStore(updated);
       setMessage({
@@ -230,7 +234,7 @@ export default function VendorPaymentSettingsPage() {
 
       <form onSubmit={handleSave} className="space-y-6">
         {/* 1. Razorpay Payment Gateway Card (Strictly Hidden unless Activated by Super Admin) */}
-        {Boolean(user?.razorpay_enabled || store?.razorpay_enabled) && (
+        {Boolean(store?.razorpay_enabled) && (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
           <div className="p-6 border-b border-slate-100 bg-linear-to-r from-blue-50/50 to-indigo-50/30">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -595,7 +599,7 @@ export default function VendorPaymentSettingsPage() {
               </div>
             )}
 
-            {Boolean(user?.razorpay_enabled || store?.razorpay_enabled) && store?.razorpay_enabled && (
+            {Boolean(store?.razorpay_enabled) && (
               <div className="p-3 rounded-lg border border-blue-500 bg-blue-50/40 flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
                   <div className="w-4 h-4 rounded-full border-4 border-blue-600 bg-white" />

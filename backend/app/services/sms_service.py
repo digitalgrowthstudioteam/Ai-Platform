@@ -254,3 +254,4 @@ class SmsService:
         store_name = getattr(store, "store_name", "Digital Growth Studio") or "Digital Growth Studio"
         msg = f"Test SMS from {store_name}: Your SMS Gateway integration is working perfectly!"
         return await cls.send_sms(store, test_phone, msg, event_type="test")
+

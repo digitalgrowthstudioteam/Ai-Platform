@@ -210,6 +210,33 @@ async def update_vendor_store(
             store.custom_domain_status = "UNCONFIGURED"
             store.custom_domain_ssl_status = "PENDING"
 
+    # Security: Vendors cannot arbitrarily grant themselves Admin Entitlements
+    ADMIN_ENTITLEMENT_FLAGS = {
+        "razorpay_enabled",
+        "shiprocket_enabled",
+        "sms_gateway_enabled",
+        "custom_domain_enabled",
+        "whatsapp_alerts_enabled",
+    }
+    for flag in ADMIN_ENTITLEMENT_FLAGS:
+        dump.pop(flag, None)
+
+    # Security: Reject Shiprocket configuration if admin has not activated Shiprocket
+    shiprocket_fields = {"shiprocket_email", "shiprocket_password", "shiprocket_auto_fulfill"}
+    if any(k in dump for k in shiprocket_fields) and not store.shiprocket_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Shiprocket Logistics is not activated for your store. Please contact Admin to activate."
+        )
+
+    # Security: Reject Razorpay configuration if admin has not activated Razorpay
+    razorpay_fields = {"razorpay_key_id", "razorpay_key_secret", "razorpay_verified"}
+    if any(k in dump for k in razorpay_fields) and not store.razorpay_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Razorpay Online Payments is not activated for your store. Please contact Admin to activate."
+        )
+
     for field, value in dump.items():
         setattr(store, field, value)
 
@@ -787,6 +814,15 @@ async def verify_razorpay_credentials(
 
     mode = "live" if key_id.startswith("rzp_live_") else "test"
     key_secret = payload.key_secret.strip() if payload.key_secret else None
+
+    store = current.vendor.store
+    if not store:
+        raise HTTPException(status_code=404, detail="Store record not found")
+    if not store.razorpay_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Razorpay integration is not activated for your store. Please contact Admin to activate."
+        )
 
     # If secret is provided, test authentication against Razorpay API
     if key_secret:

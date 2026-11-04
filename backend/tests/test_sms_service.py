@@ -51,3 +51,4 @@ async def test_send_sms_custom_http_url():
         assert "mobile=9876543210" in called_url
         assert "apikey=secret_key_123" in called_url
         assert "sender=WAY2SM" in called_url
+

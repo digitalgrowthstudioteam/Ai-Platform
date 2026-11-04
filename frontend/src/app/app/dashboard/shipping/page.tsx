@@ -43,7 +43,7 @@ export default function VendorShippingSettingsPage() {
     setSaving(true);
     setMessage(null);
     try {
-      await platformApi.updateVendorStore({
+      const payload: any = {
         shipping_enabled: store.shipping_enabled,
         shipping_charge: Number(store.shipping_charge) || 0,
         free_shipping_min_order:
@@ -55,11 +55,16 @@ export default function VendorShippingSettingsPage() {
         allowed_countries: store.allowed_countries || "India",
         serviceable_pincodes_type: store.serviceable_pincodes_type || "all",
         serviceable_pincodes: store.serviceable_pincodes || "",
-        shiprocket_enabled: store.shiprocket_enabled || false,
-        shiprocket_email: store.shiprocket_email || "",
-        shiprocket_password: store.shiprocket_password || "",
-        shiprocket_auto_fulfill: store.shiprocket_auto_fulfill || false,
-      });
+      };
+
+      // Only include Shiprocket configuration if granted by Admin App Center
+      if (store.shiprocket_enabled) {
+        payload.shiprocket_email = store.shiprocket_email || "";
+        payload.shiprocket_password = store.shiprocket_password || "";
+        payload.shiprocket_auto_fulfill = store.shiprocket_auto_fulfill || false;
+      }
+
+      await platformApi.updateVendorStore(payload);
       setMessage({ type: "success", text: "Shipping rules & logistics settings saved successfully!" });
     } catch (err: any) {
       setMessage({ type: "error", text: err.message || "Failed to update shipping settings" });
@@ -78,13 +83,16 @@ export default function VendorShippingSettingsPage() {
 
   const shippingCharge = Number(store?.shipping_charge) || 0;
   const freeShippingMov = Number(store?.free_shipping_min_order) || 0;
+  const isShiprocketAllowed = Boolean(store?.shiprocket_enabled);
 
   return (
     <div className="space-y-6 max-w-4xl">
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-slate-900">Shipping & Delivery Settings</h1>
         <p className="text-sm text-slate-500">
-          Set delivery fees, free delivery order thresholds (MOV), Shiprocket automation, and serviceable regions
+          {isShiprocketAllowed
+            ? "Set delivery fees, free delivery order thresholds (MOV), Shiprocket automation, and serviceable regions"
+            : "Set delivery fees, free delivery order thresholds (MOV), and serviceable delivery regions"}
         </p>
       </div>
 
@@ -231,89 +239,91 @@ export default function VendorShippingSettingsPage() {
           </div>
         </div>
 
-        {/* 2. Shiprocket Logistics Integration */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-5">
-          <div className="flex items-start justify-between pb-4 border-b border-slate-100">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-purple-50 text-purple-600">
-                <Zap className="w-5 h-5" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-base font-bold text-slate-900">Shiprocket Courier Automation</h3>
-                  <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-100 text-purple-700 uppercase tracking-wider">
-                    Logistics Partner
-                  </span>
+        {/* 2. Shiprocket Logistics Integration (Strictly Hidden unless Activated by Super Admin) */}
+        {isShiprocketAllowed && (
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-5 animate-in fade-in duration-150">
+            <div className="flex items-start justify-between pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-purple-50 text-purple-600">
+                  <Zap className="w-5 h-5" />
                 </div>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Automate shipping labels, schedule courier pickups (Bluedart, Delhivery, DTDC), and live AWB tracking
-                </p>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold text-slate-900">Shiprocket Courier Automation</h3>
+                    <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-100 text-purple-700 uppercase tracking-wider">
+                      Logistics Partner
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Automate shipping labels, schedule courier pickups (Bluedart, Delhivery, DTDC), and live AWB tracking
+                  </p>
+                </div>
               </div>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={store?.shiprocket_enabled || false}
-                onChange={(e) => setStore((prev) => (prev ? { ...prev, shiprocket_enabled: e.target.checked } : null))}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
-            </label>
-          </div>
-
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Shiprocket Account Email
-                </label>
+              <label className="relative inline-flex items-center cursor-pointer">
                 <input
-                  type="email"
-                  value={store?.shiprocket_email || ""}
-                  onChange={(e) => setStore((prev) => (prev ? { ...prev, shiprocket_email: e.target.value } : null))}
-                  placeholder="logistics@yourstore.com"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono"
+                  type="checkbox"
+                  checked={store?.shiprocket_auto_fulfill || false}
+                  onChange={(e) => setStore((prev) => (prev ? { ...prev, shiprocket_auto_fulfill: e.target.checked } : null))}
+                  className="sr-only peer"
                 />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Shiprocket API Password / Token
-                </label>
-                <input
-                  type="password"
-                  value={store?.shiprocket_password || ""}
-                  onChange={(e) => setStore((prev) => (prev ? { ...prev, shiprocket_password: e.target.value } : null))}
-                  placeholder="••••••••••••"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 pt-1">
-              <input
-                type="checkbox"
-                id="shiprocket_auto_fulfill"
-                checked={store?.shiprocket_auto_fulfill || false}
-                onChange={(e) =>
-                  setStore((prev) => (prev ? { ...prev, shiprocket_auto_fulfill: e.target.checked } : null))
-                }
-                className="rounded text-purple-600 focus:ring-purple-500"
-              />
-              <label htmlFor="shiprocket_auto_fulfill" className="text-xs font-medium text-slate-700">
-                Automatically push confirmed orders to Shiprocket to request doorstep pickup
+                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
               </label>
             </div>
 
-            <div className="p-3 bg-purple-50/60 rounded-xl border border-purple-100 flex items-start gap-2.5 text-xs text-purple-900">
-              <ShieldCheck className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
-              <div>
-                <strong>Encrypted Credential Storage:</strong> Your Shiprocket credentials are used only for generating
-                consignment waybills and live parcel tracking numbers.
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Shiprocket Account Email
+                  </label>
+                  <input
+                    type="email"
+                    value={store?.shiprocket_email || ""}
+                    onChange={(e) => setStore((prev) => (prev ? { ...prev, shiprocket_email: e.target.value } : null))}
+                    placeholder="logistics@yourstore.com"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Shiprocket API Password / Token
+                  </label>
+                  <input
+                    type="password"
+                    value={store?.shiprocket_password || ""}
+                    onChange={(e) => setStore((prev) => (prev ? { ...prev, shiprocket_password: e.target.value } : null))}
+                    placeholder="••••••••••••"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  type="checkbox"
+                  id="shiprocket_auto_fulfill"
+                  checked={store?.shiprocket_auto_fulfill || false}
+                  onChange={(e) =>
+                    setStore((prev) => (prev ? { ...prev, shiprocket_auto_fulfill: e.target.checked } : null))
+                  }
+                  className="rounded text-purple-600 focus:ring-purple-500"
+                />
+                <label htmlFor="shiprocket_auto_fulfill" className="text-xs font-medium text-slate-700">
+                  Automatically push confirmed orders to Shiprocket to request doorstep pickup
+                </label>
+              </div>
+
+              <div className="p-3 bg-purple-50/60 rounded-xl border border-purple-100 flex items-start gap-2.5 text-xs text-purple-900">
+                <ShieldCheck className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
+                <div>
+                  <strong>Encrypted Credential Storage:</strong> Your Shiprocket credentials are used only for generating
+                  consignment waybills and live parcel tracking numbers.
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* 3. Geographic & Pincode Restrictions */}
         <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-5">

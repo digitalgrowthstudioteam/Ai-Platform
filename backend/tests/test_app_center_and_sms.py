@@ -85,3 +85,46 @@ async def test_app_center_toggle_and_sms_settings(db: AsyncSession):
         # 7. Vendor should now be strictly blocked with 403 Forbidden
         sms_blocked = await client.get("/api/v1/platform/vendor/sms-settings", headers=vendor_headers)
         assert sms_blocked.status_code == 403
+
+        # 8. Shiprocket Entitlement Guard Tests
+        # Ensure Shiprocket is deactivated for this vendor
+        await client.post(
+            f"/api/v1/platform/admin/vendors/{vendor_id}/toggle-app",
+            headers=admin_headers,
+            json={"app_code": "shiprocket", "enabled": False},
+        )
+
+        # A) Vendor tries to update Shiprocket credentials while deactivated -> 403 Forbidden
+        sr_fail = await client.put(
+            "/api/v1/platform/vendor/store",
+            headers=vendor_headers,
+            json={"shiprocket_email": "test@vendor.com", "shiprocket_password": "secretpassword"},
+        )
+        assert sr_fail.status_code == 403
+        assert "Shiprocket Logistics is not activated" in sr_fail.json()["detail"]
+
+        # B) Vendor tries to self-grant entitlement by passing shiprocket_enabled: True -> Stripped & ignored
+        sr_exploit = await client.put(
+            "/api/v1/platform/vendor/store",
+            headers=vendor_headers,
+            json={"shipping_charge": 50, "shiprocket_enabled": True},
+        )
+        assert sr_exploit.status_code == 200
+        # Check store settings from GET: shiprocket_enabled must remain False!
+        store_check = await client.get("/api/v1/platform/vendor/store", headers=vendor_headers)
+        assert store_check.status_code == 200
+        assert store_check.json()["shiprocket_enabled"] is False
+
+        # C) Razorpay Deactivation Guard: Deactivate Razorpay and verify verify-razorpay is blocked with 403
+        await client.post(
+            f"/api/v1/platform/admin/vendors/{vendor_id}/toggle-app",
+            headers=admin_headers,
+            json={"app_code": "razorpay", "enabled": False},
+        )
+        rzp_blocked = await client.post(
+            "/api/v1/platform/vendor/store/verify-razorpay",
+            headers=vendor_headers,
+            json={"key_id": "rzp_test_12345678901234", "key_secret": "testsecret123456"},
+        )
+        assert rzp_blocked.status_code == 403
+        assert "Razorpay integration is not activated" in rzp_blocked.json()["detail"]
