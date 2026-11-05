@@ -36,6 +36,21 @@ class StoreUpdateRequest(BaseModel):
     allowed_countries: Optional[str] = None
     serviceable_pincodes_type: Optional[str] = None
     serviceable_pincodes: Optional[str] = None
+
+    # Hyperlocal On-Demand Settings
+    hyperlocal_enabled: Optional[bool] = None
+    hyperlocal_mode: Optional[str] = None  # "radius", "pincode", "both"
+    store_latitude: Optional[float] = None
+    store_longitude: Optional[float] = None
+    store_location_name: Optional[str] = None
+    max_delivery_radius_km: Optional[float] = None
+    min_order_value: Optional[float] = None
+    base_delivery_fee: Optional[float] = None
+    base_distance_km: Optional[float] = None
+    per_km_fee: Optional[float] = None
+    free_delivery_above: Optional[float] = None
+    estimated_delivery_mins: Optional[int] = None
+
     shiprocket_enabled: Optional[bool] = None
     shiprocket_email: Optional[str] = None
     shiprocket_password: Optional[str] = None
@@ -87,6 +102,40 @@ class StoreEmailSettingsResponse(BaseModel):
 
 class StoreEmailTestRequest(BaseModel):
     test_email: Optional[str] = None
+
+
+class HyperlocalSettingsUpdate(BaseModel):
+    hyperlocal_enabled: bool = False
+    hyperlocal_mode: str = "radius"  # "radius", "pincode", "both"
+    store_latitude: Optional[float] = None
+    store_longitude: Optional[float] = None
+    store_location_name: Optional[str] = None
+    max_delivery_radius_km: float = 10.0
+    min_order_value: float = 0.0
+    base_delivery_fee: float = 30.0
+    base_distance_km: float = 3.0
+    per_km_fee: float = 10.0
+    free_delivery_above: Optional[float] = 499.0
+    estimated_delivery_mins: int = 45
+    serviceable_pincodes_type: str = "all"  # "all", "specific"
+    serviceable_pincodes: Optional[str] = None
+
+
+class HyperlocalSettingsResponse(BaseModel):
+    hyperlocal_enabled: bool
+    hyperlocal_mode: str
+    store_latitude: Optional[float]
+    store_longitude: Optional[float]
+    store_location_name: Optional[str]
+    max_delivery_radius_km: float
+    min_order_value: float
+    base_delivery_fee: float
+    base_distance_km: float
+    per_km_fee: float
+    free_delivery_above: Optional[float]
+    estimated_delivery_mins: int
+    serviceable_pincodes_type: str
+    serviceable_pincodes: Optional[str]
 
 
 class VendorPoliciesUpdateRequest(BaseModel):

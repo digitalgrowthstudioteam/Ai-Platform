@@ -7,6 +7,7 @@ import '../providers/wishlist_provider.dart';
 import '../models/store_models.dart';
 import '../widgets/smart_store_image.dart';
 import '../widgets/sizing_guide_sheet.dart';
+import '../widgets/location_selector_sheet.dart';
 import 'product_detail_screen.dart';
 import 'cart_screen.dart';
 import 'order_tracking_screen.dart';
@@ -195,6 +196,92 @@ class HomeScreen extends StatelessWidget {
         color: primary,
         child: CustomScrollView(
           slivers: [
+            // Hyperlocal Location & Delivery Header Pill
+            SliverToBoxAdapter(
+              child: Material(
+                color: Colors.white,
+                child: InkWell(
+                  onTap: () => LocationSelectorSheet.show(context),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                    decoration: BoxDecoration(
+                      border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.location_on, color: primary, size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Text(
+                                "Deliver to: ",
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey.shade600,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              Flexible(
+                                child: Text(
+                                  store.deliveryLocationDisplayText,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF0F172A),
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const SizedBox(width: 2),
+                              const Icon(Icons.keyboard_arrow_down, size: 16, color: Color(0xFF64748B)),
+                            ],
+                          ),
+                        ),
+                        if (store.hyperlocalEligibility != null)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: store.hyperlocalEligibility!.isDeliverable
+                                  ? const Color(0xFFDCFCE7)
+                                  : const Color(0xFFFEE2E2),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  store.hyperlocalEligibility!.isDeliverable
+                                      ? Icons.bolt
+                                      : Icons.cancel_outlined,
+                                  size: 13,
+                                  color: store.hyperlocalEligibility!.isDeliverable
+                                      ? const Color(0xFF16A34A)
+                                      : const Color(0xFFDC2626),
+                                ),
+                                const SizedBox(width: 3),
+                                Text(
+                                  store.hyperlocalEligibility!.isDeliverable
+                                      ? store.hyperlocalEligibility!.estimatedTimeText
+                                      : "Unavailable",
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: store.hyperlocalEligibility!.isDeliverable
+                                      ? const Color(0xFF15803D)
+                                      : const Color(0xFFB91C1C),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
             // 1. Top Announcement Bar (matching website)
             SliverToBoxAdapter(
               child: Container(

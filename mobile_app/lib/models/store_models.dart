@@ -20,6 +20,22 @@ class StoreConfig {
   final double freeShippingMinOrder;
   final double codCharge;
   final String estimatedDeliveryDays;
+  final String serviceablePincodesType;
+  final String? serviceablePincodes;
+
+  // Hyperlocal On-Demand Delivery
+  final bool hyperlocalEnabled;
+  final String hyperlocalMode; // "radius", "pincode", "both"
+  final double? storeLatitude;
+  final double? storeLongitude;
+  final String? storeLocationName;
+  final double maxDeliveryRadiusKm;
+  final double minOrderValue;
+  final double baseDeliveryFee;
+  final double baseDistanceKm;
+  final double perKmFee;
+  final double? freeDeliveryAbove;
+  final int estimatedDeliveryMins;
 
   StoreConfig({
     required this.storeName,
@@ -43,6 +59,20 @@ class StoreConfig {
     required this.freeShippingMinOrder,
     required this.codCharge,
     required this.estimatedDeliveryDays,
+    this.serviceablePincodesType = 'all',
+    this.serviceablePincodes,
+    this.hyperlocalEnabled = false,
+    this.hyperlocalMode = 'radius',
+    this.storeLatitude,
+    this.storeLongitude,
+    this.storeLocationName,
+    this.maxDeliveryRadiusKm = 10.0,
+    this.minOrderValue = 0.0,
+    this.baseDeliveryFee = 30.0,
+    this.baseDistanceKm = 3.0,
+    this.perKmFee = 10.0,
+    this.freeDeliveryAbove = 499.0,
+    this.estimatedDeliveryMins = 45,
   });
 
   factory StoreConfig.fromJson(Map<String, dynamic> json) {
@@ -68,8 +98,73 @@ class StoreConfig {
       freeShippingMinOrder: (json['free_shipping_min_order'] as num?)?.toDouble() ?? 999.0,
       codCharge: (json['cod_charge'] as num?)?.toDouble() ?? 0.0,
       estimatedDeliveryDays: json['estimated_delivery_days'] ?? '3-5 Business Days',
+      serviceablePincodesType: json['serviceable_pincodes_type'] ?? 'all',
+      serviceablePincodes: json['serviceable_pincodes'],
+      hyperlocalEnabled: json['hyperlocal_enabled'] ?? false,
+      hyperlocalMode: json['hyperlocal_mode'] ?? 'radius',
+      storeLatitude: (json['store_latitude'] as num?)?.toDouble(),
+      storeLongitude: (json['store_longitude'] as num?)?.toDouble(),
+      storeLocationName: json['store_location_name'],
+      maxDeliveryRadiusKm: (json['max_delivery_radius_km'] as num?)?.toDouble() ?? 10.0,
+      minOrderValue: (json['min_order_value'] as num?)?.toDouble() ?? 0.0,
+      baseDeliveryFee: (json['base_delivery_fee'] as num?)?.toDouble() ?? 30.0,
+      baseDistanceKm: (json['base_distance_km'] as num?)?.toDouble() ?? 3.0,
+      perKmFee: (json['per_km_fee'] as num?)?.toDouble() ?? 10.0,
+      freeDeliveryAbove: (json['free_delivery_above'] as num?)?.toDouble() ?? 499.0,
+      estimatedDeliveryMins: (json['estimated_delivery_mins'] as num?)?.toInt() ?? 45,
     );
   }
+}
+
+class HyperlocalEligibility {
+  final bool hyperlocalEnabled;
+  final bool isDeliverable;
+  final bool locationServiceable;
+  final double? distanceKm;
+  final double deliveryFee;
+  final String estimatedTimeText;
+  final String? storeLocationName;
+  final double minOrderValue;
+  final bool minOrderMet;
+  final double? freeDeliveryAbove;
+  final double freeDeliveryRemaining;
+  final String? reason;
+  final String mode;
+
+  HyperlocalEligibility({
+    required this.hyperlocalEnabled,
+    required this.isDeliverable,
+    this.locationServiceable = true,
+    this.distanceKm,
+    required this.deliveryFee,
+    required this.estimatedTimeText,
+    this.storeLocationName,
+    required this.minOrderValue,
+    required this.minOrderMet,
+    this.freeDeliveryAbove,
+    required this.freeDeliveryRemaining,
+    this.reason,
+    required this.mode,
+  });
+
+  factory HyperlocalEligibility.fromJson(Map<String, dynamic> json) {
+    return HyperlocalEligibility(
+      hyperlocalEnabled: json['hyperlocal_enabled'] ?? false,
+      isDeliverable: json['is_deliverable'] ?? false,
+      locationServiceable: json['location_serviceable'] ?? true,
+      distanceKm: (json['distance_km'] as num?)?.toDouble(),
+      deliveryFee: (json['delivery_fee'] as num?)?.toDouble() ?? 0.0,
+      estimatedTimeText: json['estimated_time_text'] ?? '45 mins',
+      storeLocationName: json['store_location_name'],
+      minOrderValue: (json['min_order_value'] as num?)?.toDouble() ?? 0.0,
+      minOrderMet: json['min_order_met'] ?? true,
+      freeDeliveryAbove: (json['free_delivery_above'] as num?)?.toDouble(),
+      freeDeliveryRemaining: (json['free_delivery_remaining'] as num?)?.toDouble() ?? 0.0,
+      reason: json['reason'],
+      mode: json['mode'] ?? 'radius',
+    );
+  }
+}
 }
 
 class BannerItem {

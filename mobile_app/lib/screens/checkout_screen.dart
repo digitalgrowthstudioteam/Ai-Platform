@@ -46,6 +46,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       }
 
       final store = Provider.of<StoreProvider>(context, listen: false);
+      if (store.selectedPincode != null && store.selectedPincode!.isNotEmpty) {
+        _pincodeCtrl.text = store.selectedPincode!;
+      }
+      if (store.selectedAddress != null && store.selectedAddress!.isNotEmpty) {
+        _addressCtrl.text = store.selectedAddress!;
+      }
+
       final config = store.config;
       // Default to Razorpay if active and configured, else COD
       if (config?.razorpayEnabled == true && config?.razorpayKeyId != null && config!.razorpayKeyId!.isNotEmpty) {
@@ -70,6 +77,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     final cart = Provider.of<CartProvider>(context, listen: false);
+    final store = Provider.of<StoreProvider>(context, listen: false);
 
     setState(() => _submitting = true);
 
@@ -91,6 +99,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         "customer_phone": _phoneCtrl.text.trim(),
         "customer_email": _emailCtrl.text.trim(),
         "shipping_address": fullAddress,
+        "shipping_pincode": _pincodeCtrl.text.trim(),
+        "customer_latitude": store.customerLatitude,
+        "customer_longitude": store.customerLongitude,
         "payment_method": _paymentMode,
         "items": itemsPayload,
         "notes": widget.couponDiscount > 0 ? "Coupon discount applied: ₹${widget.couponDiscount}" : null,
@@ -280,8 +291,27 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           child: TextFormField(
                             controller: _pincodeCtrl,
                             keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(labelText: "6-Digit Pincode *", border: OutlineInputBorder()),
-                            validator: (v) => (v == null || v.trim().length < 6) ? "Pincode required" : null,
+                            maxLength: 6,
+                            decoration: const InputDecoration(
+                              labelText: "6-Digit Pincode *",
+                              counterText: "",
+                              border: OutlineInputBorder(),
+                            ),
+                            validator: (v) {
+                              if (v == null || v.trim().length < 6) return "6-digit pincode required";
+                              final store = Provider.of<StoreProvider>(context, listen: false);
+                              final cfg = store.config;
+                              if (cfg != null && cfg.serviceablePincodesType == "specific" && cfg.serviceablePincodes != null && cfg.serviceablePincodes!.isNotEmpty) {
+                                final allowed = cfg.serviceablePincodes!
+                                    .split(RegExp(r'[,;\s\n\r]+'))
+                                    .where((s) => s.isNotEmpty)
+                                    .toSet();
+                                if (!allowed.contains(v.trim())) {
+                                  return "Store does not ship to pincode $v";
+                                }
+                              }
+                              return null;
+                            },
                           ),
                         ),
                       ],

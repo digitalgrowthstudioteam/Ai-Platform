@@ -33,6 +33,21 @@ class PublicStoreConfigResponse(BaseModel):
     allowed_countries: str = "India"
     serviceable_pincodes_type: str = "all"
     serviceable_pincodes: Optional[str] = None
+
+    # Hyperlocal On-Demand Delivery
+    hyperlocal_enabled: bool = False
+    hyperlocal_mode: str = "radius"
+    store_latitude: Optional[float] = None
+    store_longitude: Optional[float] = None
+    store_location_name: Optional[str] = None
+    max_delivery_radius_km: float = 10.0
+    min_order_value: float = 0.0
+    base_delivery_fee: float = 30.0
+    base_distance_km: float = 3.0
+    per_km_fee: float = 10.0
+    free_delivery_above: Optional[float] = 499.0
+    estimated_delivery_mins: int = 45
+
     terms_and_conditions: Optional[str] = None
     privacy_policy: Optional[str] = None
     shipping_policy: Optional[str] = None
@@ -42,6 +57,29 @@ class PublicStoreConfigResponse(BaseModel):
     ga4_id: Optional[str] = None
     tracking_enabled: bool = True
     custom_domain: Optional[str] = None
+
+
+class HyperlocalEligibilityRequest(BaseModel):
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    pincode: Optional[str] = None
+    cart_total: float = 0.0
+
+
+class HyperlocalEligibilityResponse(BaseModel):
+    hyperlocal_enabled: bool
+    is_deliverable: bool
+    location_serviceable: bool = True
+    distance_km: Optional[float] = None
+    delivery_fee: float
+    estimated_time_text: str
+    store_location_name: Optional[str] = None
+    min_order_value: float
+    min_order_met: bool
+    free_delivery_above: Optional[float] = None
+    free_delivery_remaining: float = 0.0
+    reason: Optional[str] = None
+    mode: str = "radius"
 
 
 class PublicStoreEventCreate(BaseModel):

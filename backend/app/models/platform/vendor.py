@@ -102,6 +102,20 @@ class PlatformStore(BaseModel):
     shiprocket_password: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     shiprocket_auto_fulfill: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
+    # Hyperlocal On-Demand Delivery & Specific Pincodes
+    hyperlocal_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    hyperlocal_mode: Mapped[str] = mapped_column(String(50), nullable=False, default="radius")  # "radius", "pincode", "both"
+    store_latitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    store_longitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    store_location_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    max_delivery_radius_km: Mapped[float] = mapped_column(Float, nullable=False, default=10.0)
+    min_order_value: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    base_delivery_fee: Mapped[float] = mapped_column(Float, nullable=False, default=30.0)
+    base_distance_km: Mapped[float] = mapped_column(Float, nullable=False, default=3.0)
+    per_km_fee: Mapped[float] = mapped_column(Float, nullable=False, default=10.0)
+    free_delivery_above: Mapped[Optional[float]] = mapped_column(Float, nullable=True, default=499.0)
+    estimated_delivery_mins: Mapped[int] = mapped_column(Integer, nullable=False, default=45)
+
     # Brand Legal Policies
     terms_and_conditions: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     privacy_policy: Mapped[Optional[str]] = mapped_column(Text, nullable=True)

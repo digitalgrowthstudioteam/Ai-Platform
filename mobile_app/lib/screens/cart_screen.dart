@@ -4,6 +4,7 @@ import '../providers/cart_provider.dart';
 import '../providers/store_provider.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/smart_store_image.dart';
+import '../widgets/location_selector_sheet.dart';
 import 'checkout_screen.dart';
 import 'login_screen.dart';
 
@@ -50,9 +51,19 @@ class _CartScreenState extends State<CartScreen> {
     final auth = Provider.of<AuthProvider>(context);
     final primary = store.primaryColor;
     final config = store.config;
+    final eligibility = store.hyperlocalEligibility;
+    final isHyperlocal = store.isHyperlocalActive;
 
-    final freeShippingThreshold = config?.freeShippingMinOrder ?? 999.0;
-    final shipping = cart.calculateShipping(config);
+    final double shipping;
+    if (isHyperlocal && eligibility != null && eligibility.locationServiceable) {
+      shipping = eligibility.deliveryFee;
+    } else {
+      shipping = cart.calculateShipping(config);
+    }
+
+    final freeShippingThreshold = isHyperlocal && eligibility?.freeDeliveryAbove != null
+        ? eligibility!.freeDeliveryAbove!
+        : (config?.freeShippingMinOrder ?? 999.0);
     final subtotal = cart.subtotal;
     final remainingForFreeShipping = freeShippingThreshold - subtotal;
 
@@ -279,6 +290,58 @@ class _CartScreenState extends State<CartScreen> {
                           ),
                         const SizedBox(height: 12),
 
+                        // Hyperlocal Delivery Zone Indicator
+                        InkWell(
+                          onTap: () => LocationSelectorSheet.show(context),
+                          child: Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.location_on, size: 16, color: primary),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    "Delivering to: ${store.deliveryLocationDisplayText}",
+                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                const Text("Change", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF2563EB))),
+                              ],
+                            ),
+                          ),
+                        ),
+                        if (isHyperlocal && eligibility != null && !eligibility.isDeliverable) ...[
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFEF2F2),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: const Color(0xFFFCA5A5)),
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Icon(Icons.error_outline, size: 16, color: Color(0xFFDC2626)),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    eligibility.reason ?? "Delivery is unavailable to your selected area.",
+                                    style: const TextStyle(fontSize: 11, color: Color(0xFF991B1B), fontWeight: FontWeight.w500),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 12),
+
                         // Subtotal
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -327,10 +390,24 @@ class _CartScreenState extends State<CartScreen> {
                         const SizedBox(height: 14),
 
                         // Proceed to Checkout (Prompt login if not signed in)
+                        final bool cannotDeliver = isHyperlocal && eligibility != null && !eligibility.isDeliverable;
+
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton(
-                            onPressed: () {
+                            onPressed: cannotDeliver
+                                ? () {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(eligibility.reason ?? "Delivery is unavailable to your selected area."),
+                                        action: SnackBarAction(
+                                          label: "Change",
+                                          onPressed: () => LocationSelectorSheet.show(context),
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                : () {
                               if (auth.isLoggedIn) {
                                 Navigator.of(context).push(
                                   MaterialPageRoute(
@@ -349,13 +426,16 @@ class _CartScreenState extends State<CartScreen> {
                               }
                             },
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFFDB2777), // Glam Pink
+                              backgroundColor: cannotDeliver ? const Color(0xFF94A3B8) : const Color(0xFFDB2777), // Glam Pink
                               foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(vertical: 14),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              elevation: 2,
+                              elevation: cannotDeliver ? 0 : 2,
                             ),
-                            child: const Text("PROCEED TO CHECKOUT →", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                            child: Text(
+                              cannotDeliver ? "DELIVERY UNAVAILABLE TO THIS AREA" : "PROCEED TO CHECKOUT →",
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                            ),
                           ),
                         ),
                       ],

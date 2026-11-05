@@ -19,6 +19,9 @@ class PublicOrderCreateRequest(BaseModel):
     customer_phone: str = Field(min_length=6)
     customer_email: Optional[str] = None
     shipping_address: str = Field(min_length=5)
+    shipping_pincode: Optional[str] = None
+    customer_latitude: Optional[float] = None
+    customer_longitude: Optional[float] = None
     payment_method: str = "COD"  # COD, ONLINE
     items: List[OrderItemCreate] = Field(min_length=1)
     notes: Optional[str] = None

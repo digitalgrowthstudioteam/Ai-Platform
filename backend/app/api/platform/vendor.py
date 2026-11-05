@@ -77,6 +77,8 @@ from app.schemas.platform.vendor import (
     VendorSmsSettingsResponse,
     VendorSmsSettingsUpdateRequest,
     VendorTestSmsRequest,
+    HyperlocalSettingsUpdate,
+    HyperlocalSettingsResponse,
 )
 from app.services.store_email_service import StoreEmailService
 from app.services.sms_service import SmsService
@@ -243,6 +245,72 @@ async def update_vendor_store(
     await db.commit()
     await db.refresh(store)
     return store
+
+
+# ──────────────────────────────────────────────
+# HYPERLOCAL ON-DEMAND & SPECIFIC PINCODES SETTINGS
+# ──────────────────────────────────────────────
+@router.get("/hyperlocal-settings", response_model=HyperlocalSettingsResponse)
+async def get_vendor_hyperlocal_settings(
+    current: CurrentVendor = Depends(require_vendor_admin),
+):
+    """Retrieve vendor's hyperlocal radius, store coordinates, fee slabs, and allowed pincodes."""
+    store = current.vendor.store
+    if not store:
+        raise HTTPException(status_code=404, detail="Store record not found")
+
+    return HyperlocalSettingsResponse(
+        hyperlocal_enabled=getattr(store, "hyperlocal_enabled", False),
+        hyperlocal_mode=getattr(store, "hyperlocal_mode", "radius"),
+        store_latitude=getattr(store, "store_latitude", None),
+        store_longitude=getattr(store, "store_longitude", None),
+        store_location_name=getattr(store, "store_location_name", None),
+        max_delivery_radius_km=getattr(store, "max_delivery_radius_km", 10.0),
+        min_order_value=getattr(store, "min_order_value", 0.0),
+        base_delivery_fee=getattr(store, "base_delivery_fee", 30.0),
+        base_distance_km=getattr(store, "base_distance_km", 3.0),
+        per_km_fee=getattr(store, "per_km_fee", 10.0),
+        free_delivery_above=getattr(store, "free_delivery_above", 499.0),
+        estimated_delivery_mins=getattr(store, "estimated_delivery_mins", 45),
+        serviceable_pincodes_type=getattr(store, "serviceable_pincodes_type", "all"),
+        serviceable_pincodes=getattr(store, "serviceable_pincodes", None),
+    )
+
+
+@router.put("/hyperlocal-settings", response_model=HyperlocalSettingsResponse)
+async def update_vendor_hyperlocal_settings(
+    payload: HyperlocalSettingsUpdate,
+    current: CurrentVendor = Depends(require_vendor_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update vendor's hyperlocal radius delivery settings, store coordinates, and serviceable pincodes."""
+    store = current.vendor.store
+    if not store:
+        raise HTTPException(status_code=404, detail="Store record not found")
+
+    dump = payload.model_dump(exclude_unset=True)
+    for field, value in dump.items():
+        setattr(store, field, value)
+
+    await db.commit()
+    await db.refresh(store)
+
+    return HyperlocalSettingsResponse(
+        hyperlocal_enabled=getattr(store, "hyperlocal_enabled", False),
+        hyperlocal_mode=getattr(store, "hyperlocal_mode", "radius"),
+        store_latitude=getattr(store, "store_latitude", None),
+        store_longitude=getattr(store, "store_longitude", None),
+        store_location_name=getattr(store, "store_location_name", None),
+        max_delivery_radius_km=getattr(store, "max_delivery_radius_km", 10.0),
+        min_order_value=getattr(store, "min_order_value", 0.0),
+        base_delivery_fee=getattr(store, "base_delivery_fee", 30.0),
+        base_distance_km=getattr(store, "base_distance_km", 3.0),
+        per_km_fee=getattr(store, "per_km_fee", 10.0),
+        free_delivery_above=getattr(store, "free_delivery_above", 499.0),
+        estimated_delivery_mins=getattr(store, "estimated_delivery_mins", 45),
+        serviceable_pincodes_type=getattr(store, "serviceable_pincodes_type", "all"),
+        serviceable_pincodes=getattr(store, "serviceable_pincodes", None),
+    )
 
 
 @router.get("/custom-domain")

@@ -243,4 +243,30 @@ class ApiService {
     } catch (_) {}
     return [];
   }
+
+  /// 14. Hyperlocal Delivery Eligibility Check
+  Future<HyperlocalEligibility?> checkHyperlocalEligibility({
+    double? latitude,
+    double? longitude,
+    String? pincode,
+    double cartTotal = 0.0,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse("$_baseUrl/hyperlocal/check-eligibility"),
+        headers: {"Content-Type": "application/json"},
+        body: json.encode({
+          "latitude": latitude,
+          "longitude": longitude,
+          "pincode": pincode,
+          "cart_total": cartTotal,
+        }),
+      );
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return HyperlocalEligibility.fromJson(data);
+      }
+    } catch (_) {}
+    return null;
+  }
 }

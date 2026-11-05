@@ -40,7 +40,10 @@ from app.schemas.platform.store_public import (
     CustomerGoogleAuthRequest,
     SupplierInquiryCreate,
     SupplierInquiryResponse,
+    HyperlocalEligibilityRequest,
+    HyperlocalEligibilityResponse,
 )
+from app.utils.geo import check_store_hyperlocal_eligibility, haversine_distance, is_pincode_serviceable
 from app.schemas.platform.order import PublicOrderCreateRequest, OrderResponse, OrderItemResponse
 
 router = APIRouter(prefix="/store", tags=["Public Store & Android App"])
@@ -122,6 +125,18 @@ async def get_store_config(slug: str, db: AsyncSession = Depends(get_db)):
         allowed_countries=getattr(store, "allowed_countries", "India"),
         serviceable_pincodes_type=getattr(store, "serviceable_pincodes_type", "all"),
         serviceable_pincodes=getattr(store, "serviceable_pincodes", None),
+        hyperlocal_enabled=getattr(store, "hyperlocal_enabled", False),
+        hyperlocal_mode=getattr(store, "hyperlocal_mode", "radius"),
+        store_latitude=getattr(store, "store_latitude", None),
+        store_longitude=getattr(store, "store_longitude", None),
+        store_location_name=getattr(store, "store_location_name", None),
+        max_delivery_radius_km=getattr(store, "max_delivery_radius_km", 10.0),
+        min_order_value=getattr(store, "min_order_value", 0.0),
+        base_delivery_fee=getattr(store, "base_delivery_fee", 30.0),
+        base_distance_km=getattr(store, "base_distance_km", 3.0),
+        per_km_fee=getattr(store, "per_km_fee", 10.0),
+        free_delivery_above=getattr(store, "free_delivery_above", 499.0),
+        estimated_delivery_mins=getattr(store, "estimated_delivery_mins", 45),
         terms_and_conditions=policies["terms_and_conditions"],
         privacy_policy=policies["privacy_policy"],
         shipping_policy=policies["shipping_policy"],
@@ -132,6 +147,40 @@ async def get_store_config(slug: str, db: AsyncSession = Depends(get_db)):
         tracking_enabled=getattr(store, "tracking_enabled", True),
         custom_domain=getattr(store, "custom_domain", None),
     )
+
+
+@router.post("/{slug}/hyperlocal/check-eligibility", response_model=HyperlocalEligibilityResponse)
+async def check_store_delivery_eligibility(
+    slug: str,
+    payload: HyperlocalEligibilityRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Check if a customer's location (GPS coordinates and/or pincode) is serviceable
+    by this store and compute real-time distance and delivery fee slab.
+    """
+    store = await resolve_active_store(slug, db)
+    result = check_store_hyperlocal_eligibility(
+        store_latitude=getattr(store, "store_latitude", None),
+        store_longitude=getattr(store, "store_longitude", None),
+        store_location_name=getattr(store, "store_location_name", None),
+        hyperlocal_enabled=getattr(store, "hyperlocal_enabled", False),
+        hyperlocal_mode=getattr(store, "hyperlocal_mode", "radius"),
+        max_delivery_radius_km=getattr(store, "max_delivery_radius_km", 10.0),
+        min_order_value=getattr(store, "min_order_value", 0.0),
+        base_delivery_fee=getattr(store, "base_delivery_fee", 30.0),
+        base_distance_km=getattr(store, "base_distance_km", 3.0),
+        per_km_fee=getattr(store, "per_km_fee", 10.0),
+        free_delivery_above=getattr(store, "free_delivery_above", 499.0),
+        estimated_delivery_mins=getattr(store, "estimated_delivery_mins", 45),
+        serviceable_pincodes_type=getattr(store, "serviceable_pincodes_type", "all"),
+        serviceable_pincodes=getattr(store, "serviceable_pincodes", None),
+        customer_latitude=payload.latitude,
+        customer_longitude=payload.longitude,
+        customer_pincode=payload.pincode,
+        cart_total=payload.cart_total,
+    )
+    return HyperlocalEligibilityResponse(**result)
 
 
 @router.post("/{slug}/events")
@@ -520,14 +569,58 @@ async def create_store_order(
             "total": line_total,
         })
 
-    # Apply vendor shipping policy and COD fees
+    # Apply vendor shipping policy, hyperlocal rules, and specific pincodes
+    import re
+    effective_pincode = (payload.shipping_pincode or "").strip()
+    if not effective_pincode and payload.shipping_address:
+        pin_match = re.search(r"\b([1-9][0-9]{5})\b", payload.shipping_address)
+        if pin_match:
+            effective_pincode = pin_match.group(1)
+
     shipping_fee = 0.0
-    if getattr(store, "shipping_enabled", True):
-        free_min = getattr(store, "free_shipping_min_order", 0.0) or 0.0
-        if free_min > 0 and calculated_total >= free_min:
-            shipping_fee = 0.0
-        else:
-            shipping_fee = getattr(store, "shipping_charge", 0.0) or 0.0
+    if getattr(store, "hyperlocal_enabled", False):
+        # Run strict hyperlocal delivery verification
+        eligibility = check_store_hyperlocal_eligibility(
+            store_latitude=getattr(store, "store_latitude", None),
+            store_longitude=getattr(store, "store_longitude", None),
+            store_location_name=getattr(store, "store_location_name", None),
+            hyperlocal_enabled=True,
+            hyperlocal_mode=getattr(store, "hyperlocal_mode", "radius"),
+            max_delivery_radius_km=getattr(store, "max_delivery_radius_km", 10.0),
+            min_order_value=getattr(store, "min_order_value", 0.0),
+            base_delivery_fee=getattr(store, "base_delivery_fee", 30.0),
+            base_distance_km=getattr(store, "base_distance_km", 3.0),
+            per_km_fee=getattr(store, "per_km_fee", 10.0),
+            free_delivery_above=getattr(store, "free_delivery_above", 499.0),
+            estimated_delivery_mins=getattr(store, "estimated_delivery_mins", 45),
+            serviceable_pincodes_type=getattr(store, "serviceable_pincodes_type", "all"),
+            serviceable_pincodes=getattr(store, "serviceable_pincodes", None),
+            customer_latitude=payload.customer_latitude,
+            customer_longitude=payload.customer_longitude,
+            customer_pincode=effective_pincode or None,
+            cart_total=calculated_total,
+        )
+        if not eligibility["is_deliverable"]:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Local delivery unavailable: {eligibility['reason'] or 'Outside serviceable area'}"
+            )
+        shipping_fee = eligibility["delivery_fee"]
+    else:
+        # Standard shipping with pincode filter
+        if getattr(store, "serviceable_pincodes_type", "all") == "specific" and effective_pincode:
+            if not is_pincode_serviceable(effective_pincode, "specific", getattr(store, "serviceable_pincodes", None)):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Pincode {effective_pincode} is not serviceable by this store."
+                )
+
+        if getattr(store, "shipping_enabled", True):
+            free_min = getattr(store, "free_shipping_min_order", 0.0) or 0.0
+            if free_min > 0 and calculated_total >= free_min:
+                shipping_fee = 0.0
+            else:
+                shipping_fee = getattr(store, "shipping_charge", 0.0) or 0.0
 
     cod_fee = 0.0
     if payload.payment_method.upper() == "COD":
