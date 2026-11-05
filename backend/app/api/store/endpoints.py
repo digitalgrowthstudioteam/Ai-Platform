@@ -741,17 +741,33 @@ async def get_customer_orders(
 ):
     """Fetch all orders placed by a specific customer phone number under this vendor."""
     store = await resolve_active_store(slug, db)
-    clean_phone = phone.strip()
+    clean_phone = phone.strip().replace(" ", "").replace("-", "")
+    phone_candidates = {clean_phone}
+    if len(clean_phone) >= 10:
+        raw_10 = clean_phone[-10:]
+        phone_candidates.add(raw_10)
+        phone_candidates.add(f"+91{raw_10}")
+        phone_candidates.add(f"+91 {raw_10}")
+
     stmt = (
         select(PlatformOrder)
         .where(
             PlatformOrder.vendor_id == store.vendor_id,
-            PlatformOrder.customer_phone == clean_phone,
+            PlatformOrder.customer_phone.in_(list(phone_candidates)),
         )
         .options(selectinload(PlatformOrder.items))
         .order_by(desc(PlatformOrder.created_at))
     )
     orders = (await db.execute(stmt)).scalars().all()
+
+    # Preload product thumbnails
+    product_ids = [it.product_id for order in orders for it in order.items if it.product_id]
+    product_thumb_map = {}
+    if product_ids:
+        p_stmt = select(PlatformProduct.id, PlatformProduct.thumbnail_url).where(PlatformProduct.id.in_(product_ids))
+        p_rows = (await db.execute(p_stmt)).all()
+        product_thumb_map = {row[0]: row[1] for row in p_rows}
+
     output = []
     for order in orders:
         output.append(OrderResponse(
@@ -777,11 +793,14 @@ async def get_customer_orders(
                 OrderItemResponse(
                     id=it.id,
                     product_id=it.product_id,
+                    variant_id=it.variant_id,
+                    variant_name=it.variant_name,
                     product_name=it.product_name,
                     product_sku=it.product_sku,
                     price=it.price,
                     quantity=it.quantity,
                     total=it.total,
+                    image_url=product_thumb_map.get(it.product_id),
                 ) for it in order.items
             ]
         ))

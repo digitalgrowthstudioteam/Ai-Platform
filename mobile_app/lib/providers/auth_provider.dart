@@ -165,6 +165,16 @@ class AuthProvider extends ChangeNotifier {
     String? phone,
     String? googleId,
   }) async {
+    final result = await googleAuthRaw(email: email, name: name, phone: phone, googleId: googleId);
+    return result['success'] == true;
+  }
+
+  Future<Map<String, dynamic>> googleAuthRaw({
+    required String email,
+    required String name,
+    String? phone,
+    String? googleId,
+  }) async {
     _loading = true;
     _errorMessage = null;
     notifyListeners();
@@ -184,7 +194,17 @@ class AuthProvider extends ChangeNotifier {
         await _saveSessionToDisk();
         _loading = false;
         notifyListeners();
-        return true;
+        return {'success': true, 'requires_phone': false};
+      } else if (res['requires_phone'] == true) {
+        _loading = false;
+        notifyListeners();
+        return {
+          'success': false,
+          'requires_phone': true,
+          'prefill_name': res['prefill_name'],
+          'prefill_email': res['prefill_email'],
+          'google_id': res['google_id'],
+        };
       } else {
         _errorMessage = res['message'] ?? "Google login failed";
       }
@@ -194,7 +214,7 @@ class AuthProvider extends ChangeNotifier {
 
     _loading = false;
     notifyListeners();
-    return false;
+    return {'success': false, 'requires_phone': false, 'error': _errorMessage};
   }
 
   Future<void> logout() async {

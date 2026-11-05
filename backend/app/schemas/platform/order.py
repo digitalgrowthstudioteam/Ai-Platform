@@ -34,6 +34,7 @@ class OrderItemResponse(BaseModel):
     price: float
     quantity: int
     total: float
+    image_url: Optional[str] = None
 
 
 class OrderResponse(BaseModel):

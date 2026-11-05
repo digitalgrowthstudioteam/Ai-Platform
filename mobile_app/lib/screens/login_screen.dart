@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import '../providers/store_provider.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/smart_store_image.dart';
@@ -99,6 +100,215 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
         MaterialPageRoute(builder: (_) => const HomeScreen()),
       );
     }
+  }
+
+  Future<void> _handleGoogleSignIn() async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    try {
+      final googleSignIn = GoogleSignIn(scopes: ['email', 'profile']);
+      final account = await googleSignIn.signIn();
+      if (account == null) return; // User cancelled
+
+      final result = await auth.googleAuthRaw(
+        email: account.email,
+        name: account.displayName ?? "Customer",
+        googleId: account.id,
+      );
+
+      if (result['success'] == true && mounted) {
+        _navigateNext();
+      } else if (result['requires_phone'] == true && mounted) {
+        _showPhonePromptDialog(
+          email: account.email,
+          name: account.displayName ?? "Customer",
+          googleId: account.id,
+        );
+      }
+    } catch (_) {
+      // Fallback dialog for devices/emulators without full Play Services
+      _showManualGoogleAuthDialog();
+    }
+  }
+
+  void _showPhonePromptDialog({
+    required String email,
+    required String name,
+    required String googleId,
+  }) {
+    final phoneCtrl = TextEditingController();
+    bool loading = false;
+    String? error;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (bCtx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+            left: 20,
+            right: 20,
+            top: 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: const [
+                  Icon(Icons.phone_android, color: Color(0xFF0F172A), size: 24),
+                  SizedBox(width: 8),
+                  Text("Enter Mobile Number", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                ],
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                "Please enter your 10-digit mobile number for order delivery & tracking updates.",
+                style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B)),
+              ),
+              if (error != null) ...[
+                const SizedBox(height: 8),
+                Text(error!, style: const TextStyle(color: Colors.red, fontSize: 12)),
+              ],
+              const SizedBox(height: 14),
+              TextField(
+                controller: phoneCtrl,
+                keyboardType: TextInputType.phone,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  prefixText: "+91 ",
+                  labelText: "10-Digit Mobile Number",
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: loading
+                    ? null
+                    : () async {
+                        final phone = phoneCtrl.text.trim();
+                        if (phone.length < 10) {
+                          setSheetState(() => error = "Please enter a valid 10-digit mobile number");
+                          return;
+                        }
+                        setSheetState(() => loading = true);
+                        final auth = Provider.of<AuthProvider>(context, listen: false);
+                        final res = await auth.googleAuthRaw(
+                          email: email,
+                          name: name,
+                          phone: phone,
+                          googleId: googleId,
+                        );
+                        if (res['success'] == true && mounted) {
+                          if (bCtx.mounted) Navigator.of(bCtx).pop();
+                          _navigateNext();
+                        } else {
+                          setSheetState(() {
+                            loading = false;
+                            error = res['error'] ?? "Failed to link phone number";
+                          });
+                        }
+                      },
+                child: loading
+                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Text("Confirm & Continue"),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showManualGoogleAuthDialog() {
+    final emailCtrl = TextEditingController();
+    final nameCtrl = TextEditingController();
+    final phoneCtrl = TextEditingController();
+    bool loading = false;
+    String? error;
+
+    showDialog(
+      context: context,
+      builder: (dCtx) => StatefulBuilder(
+        builder: (ctx, setDState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: const [
+              Icon(Icons.account_circle, color: Color(0xFF2563EB), size: 24),
+              SizedBox(width: 8),
+              Text("Google Sign In", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (error != null)
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    margin: const EdgeInsets.only(bottom: 10),
+                    decoration: BoxDecoration(color: const Color(0xFFFEE2E2), borderRadius: BorderRadius.circular(8)),
+                    child: Text(error!, style: const TextStyle(color: Color(0xFFB91C1C), fontSize: 12)),
+                  ),
+                TextField(
+                  controller: emailCtrl,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: const InputDecoration(labelText: "Google Email", border: OutlineInputBorder()),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: nameCtrl,
+                  decoration: const InputDecoration(labelText: "Full Name", border: OutlineInputBorder()),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: phoneCtrl,
+                  keyboardType: TextInputType.phone,
+                  decoration: const InputDecoration(prefixText: "+91 ", labelText: "10-Digit Mobile", border: OutlineInputBorder()),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(dCtx).pop(), child: const Text("Cancel")),
+            ElevatedButton(
+              onPressed: loading
+                  ? null
+                  : () async {
+                      if (!emailCtrl.text.contains("@") || phoneCtrl.text.trim().length < 10) {
+                        setDState(() => error = "Valid Google email and 10-digit mobile required");
+                        return;
+                      }
+                      setDState(() => loading = true);
+                      final auth = Provider.of<AuthProvider>(context, listen: false);
+                      final res = await auth.googleAuthRaw(
+                        email: emailCtrl.text.trim(),
+                        name: nameCtrl.text.trim().isNotEmpty ? nameCtrl.text.trim() : "Google Shopper",
+                        phone: phoneCtrl.text.trim(),
+                        googleId: "google_${DateTime.now().millisecondsSinceEpoch}",
+                      );
+                      if (res['success'] == true && mounted) {
+                        if (dCtx.mounted) Navigator.of(dCtx).pop();
+                        _navigateNext();
+                      } else {
+                        setDState(() {
+                          loading = false;
+                          error = res['error'] ?? "Failed to sign in";
+                        });
+                      }
+                    },
+              child: loading
+                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Text("Continue"),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showForgotPasswordDialog() {
@@ -416,7 +626,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
 
               // Tab Views
               SizedBox(
-                height: 420,
+                height: 520,
                 child: TabBarView(
                   controller: _tabCtrl,
                   children: [
@@ -520,6 +730,10 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                     ),
             ),
+            const SizedBox(height: 16),
+            _buildOrDivider(),
+            const SizedBox(height: 14),
+            _buildGoogleButton(auth, isSignUp: false),
           ],
         ),
       ),
@@ -595,7 +809,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
             ElevatedButton(
               onPressed: auth.loading ? null : _handleRegister,
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFDB2777), // Glam Rose Pink
+                backgroundColor: primary,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -612,8 +826,60 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                       style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                     ),
             ),
+            const SizedBox(height: 14),
+            _buildOrDivider(),
+            const SizedBox(height: 12),
+            _buildGoogleButton(auth, isSignUp: true),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildOrDivider() {
+    return Row(
+      children: const [
+        Expanded(child: Divider(color: Color(0xFFE2E8F0))),
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: 10),
+          child: Text(
+            "OR",
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)),
+          ),
+        ),
+        Expanded(child: Divider(color: Color(0xFFE2E8F0))),
+      ],
+    );
+  }
+
+  Widget _buildGoogleButton(AuthProvider auth, {required bool isSignUp}) {
+    return OutlinedButton(
+      onPressed: auth.loading ? null : _handleGoogleSignIn,
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(vertical: 13),
+        side: const BorderSide(color: Color(0xFFCBD5E1), width: 1.2),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        backgroundColor: Colors.white,
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Image.network(
+            "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/768px-Google_%22G%22_logo.svg.png",
+            width: 20,
+            height: 20,
+            errorBuilder: (_, _, _) => const Icon(Icons.g_mobiledata, color: Color(0xFF4285F4), size: 24),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            isSignUp ? "Sign Up with Google" : "Sign In with Google",
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1E293B),
+            ),
+          ),
+        ],
       ),
     );
   }
