@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/store_models.dart';
 import '../services/api_service.dart';
-import '../providers/store_provider.dart';
 import '../providers/cart_provider.dart';
+import '../providers/auth_provider.dart';
 import '../widgets/smart_store_image.dart';
 import '../widgets/sizing_guide_sheet.dart';
 import 'cart_screen.dart';
 import 'checkout_screen.dart';
+import 'login_screen.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final ProductItem? product;
@@ -59,9 +60,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final store = Provider.of<StoreProvider>(context);
     final cart = Provider.of<CartProvider>(context);
-    final primary = store.primaryColor;
+    final auth = Provider.of<AuthProvider>(context);
 
     if (_loading) {
       return Scaffold(
@@ -172,7 +172,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             width: _activeImageIdx == idx ? 16 : 6,
                             height: 6,
                             decoration: BoxDecoration(
-                              color: _activeImageIdx == idx ? const Color(0xFFDB2777) : Colors.white.withOpacity(0.7),
+                              color: _activeImageIdx == idx ? const Color(0xFFDB2777) : Colors.white.withAlpha(180),
                               borderRadius: BorderRadius.circular(3),
                             ),
                           );
@@ -239,7 +239,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         "₹${effectivePrice.toStringAsFixed(0)}",
                         style: const TextStyle(
                           fontSize: 24,
-                          fontWeight: FontWeight.black,
+                          fontWeight: FontWeight.w900,
                           color: Color(0xFF0B192C),
                         ),
                       ),
@@ -261,7 +261,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
-                            "${discountPercent}% OFF",
+                            "$discountPercent% OFF",
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 10,
@@ -274,7 +274,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Free Kit Banner Callout (matching website guarantee)
+                  // Free Kit Banner Callout
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
@@ -418,7 +418,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.08),
+              color: Colors.black.withAlpha(20),
               blurRadius: 10,
               offset: const Offset(0, -3),
             ),
@@ -455,15 +455,26 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               ),
               const SizedBox(width: 12),
 
-              // Buy Now Button
+              // Buy Now Button (Requires login before completing order)
               Expanded(
                 child: ElevatedButton(
                   onPressed: inStock
                       ? () {
                           cart.addToCart(p, variant: _selectedVariant, quantity: _quantity);
-                          Navigator.of(context).push(
-                            MaterialPageRoute(builder: (_) => const CheckoutScreen()),
-                          );
+                          if (auth.isLoggedIn) {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(builder: (_) => const CheckoutScreen()),
+                            );
+                          } else {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const LoginScreen(
+                                  promptMessage: "Please sign in to complete your order and track delivery.",
+                                  redirectTo: CheckoutScreen(),
+                                ),
+                              ),
+                            );
+                          }
                         }
                       : null,
                   style: ElevatedButton.styleFrom(

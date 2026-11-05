@@ -28,7 +28,7 @@ if sys.platform == "win32":
 # Paths on D: Drive
 ROOT_DIR = Path("D:/App/Digital Growth Studio")
 MOBILE_APP_DIR = ROOT_DIR / "mobile_app"
-RELEASES_BASE_DIR = Path("D:/App/Releases/Vendors")
+RELEASES_BASE_DIR = ROOT_DIR / "vendors"
 API_BASE_URL = "https://digital-growth-studio-api.onrender.com"
 
 def sanitize_filename(name: str) -> str:

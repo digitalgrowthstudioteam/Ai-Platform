@@ -5,7 +5,6 @@ import '../providers/auth_provider.dart';
 import '../widgets/smart_store_image.dart';
 import '../config/app_config.dart';
 import 'home_screen.dart';
-import 'login_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -58,24 +57,14 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
     if (!mounted) return;
 
-    // Direct routing: if logged in -> HomeScreen, otherwise -> LoginScreen
-    if (auth.isLoggedIn) {
-      Navigator.of(context).pushReplacement(
-        PageRouteBuilder(
-          pageBuilder: (_, __, ___) => const HomeScreen(),
-          transitionsBuilder: (_, a, __, c) => FadeTransition(opacity: a, child: c),
-          transitionDuration: const Duration(milliseconds: 400),
-        ),
-      );
-    } else {
-      Navigator.of(context).pushReplacement(
-        PageRouteBuilder(
-          pageBuilder: (_, __, ___) => const LoginScreen(),
-          transitionsBuilder: (_, a, __, c) => FadeTransition(opacity: a, child: c),
-          transitionDuration: const Duration(milliseconds: 400),
-        ),
-      );
-    }
+    // Keep the app open for seamless shopping: navigate directly to HomeScreen
+    Navigator.of(context).pushReplacement(
+      PageRouteBuilder(
+        pageBuilder: (ctx, anim, secAnim) => const HomeScreen(),
+        transitionsBuilder: (ctx, anim, secAnim, child) => FadeTransition(opacity: anim, child: child),
+        transitionDuration: const Duration(milliseconds: 400),
+      ),
+    );
   }
 
   @override
@@ -101,13 +90,13 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFFD97706).withOpacity(0.35),
+                        color: const Color(0xFFD97706).withAlpha(89),
                         blurRadius: 28,
                         spreadRadius: 4,
                       ),
                     ],
                     border: Border.all(
-                      color: const Color(0xFFD97706).withOpacity(0.8),
+                      color: const Color(0xFFD97706).withAlpha(204),
                       width: 2.5,
                     ),
                   ),

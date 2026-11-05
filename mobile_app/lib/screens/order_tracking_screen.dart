@@ -64,8 +64,8 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
           setState(() => _errorMsg = "No orders found for mobile: $q");
         }
       }
-    } catch (e: any) {
-      setState(() => _errorMsg = e.toString());
+    } catch (e) {
+      setState(() => _errorMsg = e.toString().replaceAll("Exception: ", ""));
     } finally {
       setState(() => _loading = false);
     }
@@ -194,7 +194,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: primary.withOpacity(0.1),
+                  color: const Color(0xFFEFF6FF),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(

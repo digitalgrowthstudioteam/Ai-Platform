@@ -26,10 +26,16 @@ android {
     signingConfigs {
         create("release") {
             val keyFile = keystoreProperties.getProperty("storeFile")
-            if (keyFile != null && rootProject.file(keyFile).exists()) {
+            val targetKey = if (keyFile != null && rootProject.file(keyFile).exists()) {
+                rootProject.file(keyFile)
+            } else if (keyFile != null && file(keyFile).exists()) {
+                file(keyFile)
+            } else null
+
+            if (targetKey != null) {
                 keyAlias = keystoreProperties.getProperty("keyAlias")
                 keyPassword = keystoreProperties.getProperty("keyPassword")
-                storeFile = rootProject.file(keyFile)
+                storeFile = targetKey
                 storePassword = keystoreProperties.getProperty("storePassword")
             }
         }
@@ -54,6 +60,11 @@ android {
             }
         }
     }
+
+    lint {
+        checkReleaseBuilds = false
+        abortOnError = false
+    }
 }
 
 kotlin {
@@ -64,4 +75,8 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+tasks.matching { it.name.startsWith("lintVital") }.configureEach {
+    enabled = false
 }

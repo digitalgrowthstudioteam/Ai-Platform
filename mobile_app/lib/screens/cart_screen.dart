@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/cart_provider.dart';
 import '../providers/store_provider.dart';
+import '../providers/auth_provider.dart';
 import '../widgets/smart_store_image.dart';
 import 'checkout_screen.dart';
+import 'login_screen.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
@@ -45,6 +47,7 @@ class _CartScreenState extends State<CartScreen> {
   Widget build(BuildContext context) {
     final cart = Provider.of<CartProvider>(context);
     final store = Provider.of<StoreProvider>(context);
+    final auth = Provider.of<AuthProvider>(context);
     final primary = store.primaryColor;
     final config = store.config;
 
@@ -139,7 +142,7 @@ class _CartScreenState extends State<CartScreen> {
                   child: ListView.separated(
                     padding: const EdgeInsets.all(14),
                     itemCount: cart.items.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 10),
+                    separatorBuilder: (_, idx) => const SizedBox(height: 10),
                     itemBuilder: (context, idx) {
                       final key = cart.items.keys.elementAt(idx);
                       final item = cart.items[key]!;
@@ -189,7 +192,7 @@ class _CartScreenState extends State<CartScreen> {
                                   const SizedBox(height: 4),
                                   Text(
                                     "₹${item.unitPrice.toStringAsFixed(0)}",
-                                    style: const TextStyle(fontWeight: FontWeight.black, fontSize: 14, color: Color(0xFF0B192C)),
+                                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: Color(0xFF0B192C)),
                                   ),
                                 ],
                               ),
@@ -225,7 +228,7 @@ class _CartScreenState extends State<CartScreen> {
                     color: Colors.white,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.06),
+                        color: Colors.black.withAlpha(15),
                         offset: const Offset(0, -3),
                         blurRadius: 10,
                       ),
@@ -317,22 +320,33 @@ class _CartScreenState extends State<CartScreen> {
                             const Text("Total Payable", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF0B192C))),
                             Text(
                               "₹${totalPayable.toStringAsFixed(0)}",
-                              style: const TextStyle(fontWeight: FontWeight.black, fontSize: 20, color: Color(0xFF0B192C)),
+                              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 20, color: Color(0xFF0B192C)),
                             ),
                           ],
                         ),
                         const SizedBox(height: 14),
 
-                        // Proceed to Checkout
+                        // Proceed to Checkout (Prompt login if not signed in)
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton(
                             onPressed: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => CheckoutScreen(couponDiscount: effectiveDiscount),
-                                ),
-                              );
+                              if (auth.isLoggedIn) {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => CheckoutScreen(couponDiscount: effectiveDiscount),
+                                  ),
+                                );
+                              } else {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => LoginScreen(
+                                      promptMessage: "Please sign in to complete your order and track delivery.",
+                                      redirectTo: CheckoutScreen(couponDiscount: effectiveDiscount),
+                                    ),
+                                  ),
+                                );
+                              }
                             },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFFDB2777), // Glam Pink

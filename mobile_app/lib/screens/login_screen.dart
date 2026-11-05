@@ -8,7 +8,14 @@ import '../services/api_service.dart';
 import 'home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  final Widget? redirectTo;
+  final String? promptMessage;
+
+  const LoginScreen({
+    super.key,
+    this.redirectTo,
+    this.promptMessage,
+  });
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -60,7 +67,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     );
 
     if (success && mounted) {
-      _navigateToHome();
+      _navigateNext();
     }
   }
 
@@ -76,14 +83,22 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     );
 
     if (success && mounted) {
-      _navigateToHome();
+      _navigateNext();
     }
   }
 
-  void _navigateToHome() {
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const HomeScreen()),
-    );
+  void _navigateNext() {
+    if (widget.redirectTo != null) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => widget.redirectTo!),
+      );
+    } else if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop(true);
+    } else {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
+      );
+    }
   }
 
   void _showForgotPasswordDialog() {
@@ -196,13 +211,17 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                 otp: otpCtrl.text.trim(),
                                 newPassword: newPwdCtrl.text.trim(),
                               );
-                              Navigator.of(ctx).pop();
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text("Password reset successful! Please log in."),
-                                  backgroundColor: Color(0xFF16A34A),
-                                ),
-                              );
+                              if (dialogContext.mounted) {
+                                Navigator.of(ctx).pop();
+                              }
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text("Password reset successful! Please log in."),
+                                    backgroundColor: Color(0xFF16A34A),
+                                  ),
+                                );
+                              }
                             }
                           } catch (err) {
                             setDialogState(() {
@@ -237,6 +256,16 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
 
     return Scaffold(
       backgroundColor: const Color(0xFFFDFCFB),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF0B192C),
+        elevation: 0,
+        leading: Navigator.of(context).canPop()
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back, color: Colors.white),
+                onPressed: () => Navigator.of(context).pop(),
+              )
+            : null,
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           child: Column(
@@ -244,7 +273,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
               // Top Luxury Navy Header with Glam Stree Logo
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
                 decoration: const BoxDecoration(
                   color: Color(0xFF0B192C),
                   borderRadius: BorderRadius.only(
@@ -262,7 +291,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                         border: Border.all(color: const Color(0xFFD97706), width: 2),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFFD97706).withOpacity(0.3),
+                            color: const Color(0xFFD97706).withAlpha(76),
                             blurRadius: 16,
                           ),
                         ],
@@ -270,20 +299,20 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                       child: ClipOval(
                         child: SmartStoreImage(
                           imageUrl: logoUrl,
-                          width: 80,
-                          height: 80,
+                          width: 74,
+                          height: 74,
                           fit: BoxFit.cover,
                           fallbackText: "GS",
                         ),
                       ),
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 12),
 
                     // Brand Name
                     Text(
                       storeName.toUpperCase(),
                       style: const TextStyle(
-                        fontSize: 20,
+                        fontSize: 19,
                         fontWeight: FontWeight.w900,
                         letterSpacing: 2.0,
                         color: Colors.white,
@@ -305,9 +334,37 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                 ),
               ),
 
+              // Mandatory Action Prompt Banner (if redirected from checkout / my account)
+              if (widget.promptMessage != null)
+                Container(
+                  margin: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF3C7),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFFDE68A)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info_outline, color: Color(0xFFD97706), size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          widget.promptMessage!,
+                          style: const TextStyle(
+                            color: Color(0xFF92400E),
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
               // Tab Bar (Sign In / Create Account)
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
                 child: Container(
                   height: 44,
                   decoration: BoxDecoration(
@@ -368,29 +425,6 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                     // TAB 2: CREATE ACCOUNT
                     _buildRegisterTab(auth, primary),
                   ],
-                ),
-              ),
-
-              // Guest Skip Option
-              Padding(
-                padding: const EdgeInsets.only(bottom: 24),
-                child: TextButton(
-                  onPressed: _navigateToHome,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: const [
-                      Text(
-                        "Skip & Browse Catalog",
-                        style: TextStyle(
-                          color: Color(0xFF64748B),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                        ),
-                      ),
-                      SizedBox(width: 4),
-                      Icon(Icons.arrow_forward_ios, size: 12, color: Color(0xFF64748B)),
-                    ],
-                  ),
                 ),
               ),
             ],

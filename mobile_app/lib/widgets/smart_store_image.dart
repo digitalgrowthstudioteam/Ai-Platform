@@ -36,7 +36,7 @@ class SmartStoreImage extends StatelessWidget {
         fallbackText,
         style: const TextStyle(
           color: Color(0xFF0B192C),
-          fontWeight: FontWeight.black,
+          fontWeight: FontWeight.w900,
           fontSize: 16,
         ),
       ),
@@ -64,7 +64,7 @@ class SmartStoreImage extends StatelessWidget {
               width: width,
               height: height,
               fit: fit,
-              errorBuilder: (_, __, ___) => _buildFallback(context),
+              errorBuilder: (_, error, stack) => _buildFallback(context),
             ),
           );
         }

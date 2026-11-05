@@ -121,7 +121,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.08),
+                      color: Colors.black.withAlpha(20),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
@@ -296,7 +296,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   itemCount: _orders.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  separatorBuilder: (_, idx) => const SizedBox(height: 10),
                   itemBuilder: (context, idx) {
                     final ord = _orders[idx];
                     final orderNum = ord['order_number'] ?? ord['id'];

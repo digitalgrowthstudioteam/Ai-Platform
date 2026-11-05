@@ -30,7 +30,6 @@ class HomeScreen extends StatelessWidget {
     final cart = Provider.of<CartProvider>(context);
     final auth = Provider.of<AuthProvider>(context);
     final primary = store.primaryColor;
-    final secondary = store.secondaryColor;
     final supportPhone = store.config?.contactPhone ?? "7499904962";
 
     return Scaffold(
@@ -97,7 +96,12 @@ class HomeScreen extends StatelessWidget {
                 );
               } else {
                 Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                  MaterialPageRoute(
+                    builder: (_) => const LoginScreen(
+                      promptMessage: "Sign in to view your orders, saved addresses, and profile.",
+                      redirectTo: ProfileScreen(),
+                    ),
+                  ),
                 );
               }
             },
@@ -168,7 +172,7 @@ class HomeScreen extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFDB2777).withOpacity(0.3),
+                        color: const Color(0xFFDB2777).withAlpha(80),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: const Text(
@@ -232,7 +236,7 @@ class HomeScreen extends StatelessWidget {
                           borderRadius: BorderRadius.circular(16),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.08),
+                              color: Colors.black.withAlpha(20),
                               blurRadius: 10,
                               offset: const Offset(0, 4),
                             ),
@@ -256,7 +260,7 @@ class HomeScreen extends StatelessWidget {
                                     end: Alignment.bottomCenter,
                                     colors: [
                                       Colors.transparent,
-                                      Colors.black.withOpacity(0.7),
+                                      Colors.black.withAlpha(180),
                                     ],
                                   ),
                                 ),
@@ -470,7 +474,7 @@ class HomeScreen extends StatelessWidget {
                   delegate: SliverChildBuilderDelegate(
                     (context, idx) {
                       final product = store.products[idx];
-                      return _buildProductCard(context, product, cart, primary);
+                      return _buildProductCard(context, product, cart);
                     },
                     childCount: store.products.length,
                   ),
@@ -491,7 +495,7 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildProductCard(BuildContext context, ProductItem p, CartProvider cart, Color primary) {
+  Widget _buildProductCard(BuildContext context, ProductItem p, CartProvider cart) {
     return InkWell(
       onTap: () {
         Navigator.of(context).push(
@@ -506,7 +510,7 @@ class HomeScreen extends StatelessWidget {
           border: Border.all(color: const Color(0xFFE2E8F0)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withAlpha(10),
               blurRadius: 6,
               offset: const Offset(0, 2),
             ),
@@ -556,7 +560,7 @@ class HomeScreen extends StatelessWidget {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                       decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.7),
+                        color: Colors.black.withAlpha(180),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: const Text(
@@ -610,7 +614,7 @@ class HomeScreen extends StatelessWidget {
                             "₹${p.effectivePrice.toStringAsFixed(0)}",
                             style: const TextStyle(
                               fontSize: 14,
-                              fontWeight: FontWeight.black,
+                              fontWeight: FontWeight.w900,
                               color: Color(0xFF0B192C),
                             ),
                           ),

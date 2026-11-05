@@ -221,3 +221,4 @@ class AuthProvider extends ChangeNotifier {
     } catch (_) {}
   }
 }
+

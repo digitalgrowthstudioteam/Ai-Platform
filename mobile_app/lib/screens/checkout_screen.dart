@@ -69,8 +69,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     final cart = Provider.of<CartProvider>(context, listen: false);
-    final store = Provider.of<StoreProvider>(context, listen: false);
-    final config = store.config;
 
     setState(() => _submitting = true);
 
@@ -104,14 +102,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
       // Handle Online Payment (Razorpay)
       if (_paymentMode == "RAZORPAY") {
-        final rzpKey = config?.razorpayKeyId;
-        // Mock / Seamless Online Payment Confirmation with dynamic Razorpay Key
         final paymentId = "pay_rzp_${DateTime.now().millisecondsSinceEpoch}";
         try {
           await api.confirmOrderPayment(
             orderId: orderNumber,
             razorpayPaymentId: paymentId,
-            razorpayOrderId: "order_rzp_${orderNumber}",
+            razorpayOrderId: "order_rzp_$orderNumber",
           );
         } catch (_) {}
       }
@@ -193,9 +189,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final codFee = isCod ? (config?.codCharge ?? 0.0) : 0.0;
     final total = (subtotal - widget.couponDiscount + shipping + codFee).clamp(0.0, double.infinity);
 
+    final razorpayKey = config?.razorpayKeyId;
     final razorpayConfigured = config?.razorpayEnabled == true &&
-        config?.razorpayKeyId != null &&
-        config!.razorpayKeyId!.isNotEmpty;
+        razorpayKey != null &&
+        razorpayKey.isNotEmpty;
 
     return Scaffold(
       backgroundColor: const Color(0xFFFDFCFB),
@@ -308,34 +305,47 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 child: Column(
                   children: [
                     // Razorpay Online Payment Option
-                    RadioListTile<String>(
-                      value: "RAZORPAY",
-                      groupValue: _paymentMode,
-                      activeColor: primary,
-                      onChanged: (val) => setState(() => _paymentMode = val!),
-                      title: Row(
-                        children: [
-                          const Text("Online Payment", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFEFF6FF),
-                              borderRadius: BorderRadius.circular(4),
-                              border: Border.all(color: const Color(0xFFBFDBFE)),
+                    InkWell(
+                      onTap: () => setState(() => _paymentMode = "RAZORPAY"),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        child: Row(
+                          children: [
+                            _buildRadioIndicator(_paymentMode == "RAZORPAY", primary),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      const Text("Online Payment", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFEFF6FF),
+                                          borderRadius: BorderRadius.circular(4),
+                                          border: Border.all(color: const Color(0xFFBFDBFE)),
+                                        ),
+                                        child: const Text(
+                                          "UPI • Cards • NetBanking",
+                                          style: TextStyle(fontSize: 9, color: Color(0xFF1D4ED8), fontWeight: FontWeight.bold),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    razorpayConfigured
+                                        ? "Instant secure checkout powered by Razorpay (${razorpayKey.substring(0, 8)}...)"
+                                        : "Instant UPI & Cards via Razorpay Gateway",
+                                    style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                  ),
+                                ],
+                              ),
                             ),
-                            child: const Text(
-                              "UPI • Cards • NetBanking",
-                              style: TextStyle(fontSize: 9, color: Color(0xFF1D4ED8), fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                        ],
-                      ),
-                      subtitle: Text(
-                        razorpayConfigured
-                            ? "Instant secure checkout powered by Razorpay (${config?.razorpayKeyId?.substring(0, 8)}...)"
-                            : "Instant UPI & Cards via Razorpay Gateway",
-                        style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                          ],
+                        ),
                       ),
                     ),
 
@@ -343,17 +353,30 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
                     // Cash on Delivery Option
                     if (config?.codEnabled ?? true)
-                      RadioListTile<String>(
-                        value: "COD",
-                        groupValue: _paymentMode,
-                        activeColor: primary,
-                        onChanged: (val) => setState(() => _paymentMode = val!),
-                        title: const Text("Cash on Delivery (COD)", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                        subtitle: Text(
-                          config?.codCharge != null && config!.codCharge > 0
-                              ? "+ ₹${config.codCharge.toStringAsFixed(0)} COD fee applies"
-                              : "Pay cash or UPI upon delivery executive arrival",
-                          style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                      InkWell(
+                        onTap: () => setState(() => _paymentMode = "COD"),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          child: Row(
+                            children: [
+                              _buildRadioIndicator(_paymentMode == "COD", primary),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text("Cash on Delivery (COD)", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      config?.codCharge != null && config!.codCharge > 0
+                                          ? "+ ₹${config.codCharge.toStringAsFixed(0)} COD fee applies"
+                                          : "Pay cash or UPI upon delivery executive arrival",
+                                      style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                   ],
@@ -418,7 +441,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text("Total Amount", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF0B192C))),
-                        Text("₹${total.toStringAsFixed(0)}", style: const TextStyle(fontWeight: FontWeight.black, fontSize: 20, color: Color(0xFF0B192C))),
+                        Text("₹${total.toStringAsFixed(0)}", style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 20, color: Color(0xFF0B192C))),
                       ],
                     ),
                     const SizedBox(height: 16),
@@ -451,6 +474,33 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildRadioIndicator(bool isSelected, Color primary) {
+    return Container(
+      width: 20,
+      height: 20,
+      margin: const EdgeInsets.only(right: 12),
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: isSelected ? primary : const Color(0xFF94A3B8),
+          width: 2,
+        ),
+      ),
+      child: isSelected
+          ? Center(
+              child: Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: primary,
+                ),
+              ),
+            )
+          : null,
     );
   }
 }
