@@ -219,6 +219,7 @@ async def update_vendor_store(
         "sms_gateway_enabled",
         "custom_domain_enabled",
         "whatsapp_alerts_enabled",
+        "hyperlocal_enabled",
     }
     for flag in ADMIN_ENTITLEMENT_FLAGS:
         dump.pop(flag, None)

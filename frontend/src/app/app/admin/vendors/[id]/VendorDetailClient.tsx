@@ -546,6 +546,7 @@ function VendorDetailInner() {
       const res = await platformApi.toggleVendorApp(vendor.id, appCode, targetEnabled);
       setVendor((prev: any) => {
         if (!prev) return null;
+        if (appCode === "hyperlocal") return { ...prev, hyperlocal_enabled: targetEnabled };
         if (appCode === "razorpay") return { ...prev, razorpay_enabled: targetEnabled };
         if (appCode === "sms_gateway") return { ...prev, sms_gateway_enabled: targetEnabled };
         if (appCode === "custom_domain") return { ...prev, custom_domain_enabled: targetEnabled, custom_domain_status: targetEnabled ? (prev.custom_domain ? "ACTIVE" : "UNCONFIGURED") : "DISABLED" };
@@ -834,6 +835,57 @@ function VendorDetailInner() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
+              {/* 0. Hyperlocal Quick-Commerce */}
+              <tr className="hover:bg-slate-50/60 transition-colors">
+                <td className="py-4 px-5 font-bold text-slate-900">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+                      <MapPin className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-slate-900 text-xs">Hyperlocal Quick-Commerce</p>
+                      <p className="text-[11px] text-slate-400 font-normal">Local Radius & Pincode Delivery</p>
+                    </div>
+                  </div>
+                </td>
+                <td className="py-4 px-4 text-slate-600 max-w-xs">
+                  Allows vendor to define delivery radius (km), GPS geofencing, distance-slab fees, and serviceable pincodes.
+                </td>
+                <td className="py-4 px-4">
+                  {vendor.hyperlocal_enabled ? (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                      <Check className="w-3 h-3 text-emerald-600" />
+                      ACTIVE
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                      <Lock className="w-3 h-3 text-slate-400" />
+                      INACTIVE
+                    </span>
+                  )}
+                </td>
+                <td className="py-4 px-5 text-right">
+                  <button
+                    type="button"
+                    onClick={() => handleToggleApp("hyperlocal", !vendor.hyperlocal_enabled)}
+                    disabled={togglingAppCode === "hyperlocal"}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer inline-flex items-center gap-1.5 shadow-2xs ${
+                      vendor.hyperlocal_enabled
+                        ? "bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100"
+                        : "bg-rose-600 text-white hover:bg-rose-700 shadow-xs"
+                    }`}
+                  >
+                    {togglingAppCode === "hyperlocal" ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : vendor.hyperlocal_enabled ? (
+                      <span>Deactivate</span>
+                    ) : (
+                      <span>Activate for Vendor</span>
+                    )}
+                  </button>
+                </td>
+              </tr>
+
               {/* 1. Razorpay Payments */}
               <tr className="hover:bg-slate-50/60 transition-colors">
                 <td className="py-4 px-5 font-bold text-slate-900">

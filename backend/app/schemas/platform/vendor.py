@@ -346,6 +346,7 @@ class VendorDetailFullResponse(BaseModel):
     # WhatsApp Business & Shiprocket
     whatsapp_alerts_enabled: Optional[bool] = False
     shiprocket_enabled: Optional[bool] = False
+    hyperlocal_enabled: Optional[bool] = False
 
     # Mobile App Configuration
     app_name: Optional[str] = None
@@ -602,6 +603,7 @@ class AdminVendorFullUpdateRequest(BaseModel):
     # WhatsApp Business & Shiprocket
     whatsapp_alerts_enabled: Optional[bool] = False
     shiprocket_enabled: Optional[bool] = False
+    hyperlocal_enabled: Optional[bool] = False
 
     # Mobile App Configuration
     app_name: Optional[str] = None

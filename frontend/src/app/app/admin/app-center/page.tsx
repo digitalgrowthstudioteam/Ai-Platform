@@ -11,6 +11,7 @@ import {
   Globe,
   Truck,
   MessageCircle,
+  MapPin,
   Search,
   Check,
   Lock,
@@ -35,6 +36,15 @@ interface AppDefinition {
 }
 
 const APPS: AppDefinition[] = [
+  {
+    code: "hyperlocal",
+    name: "Hyperlocal Quick-Commerce",
+    category: "Quick Commerce & Delivery",
+    icon: MapPin,
+    color: "from-rose-500 to-amber-600",
+    description: "On-demand local radius delivery, GPS geofencing, distance fee slabs, and serviceable pincode restrictions.",
+    features: ["Radius Geofencing (1-50 km)", "Live Mobile GPS Check", "Distance-Based Slabs (₹/km)", "Custom Pincode Whitelist"],
+  },
   {
     code: "razorpay",
     name: "Razorpay Payments",
@@ -124,6 +134,7 @@ export default function AdminAppCenterPage() {
         prev.map((v) => {
           if (v.id === vendorId) {
             const copy: any = { ...v };
+            if (appCode === "hyperlocal") copy.hyperlocal_enabled = target;
             if (appCode === "razorpay") copy.razorpay_enabled = target;
             if (appCode === "sms_gateway") copy.sms_gateway_enabled = target;
             if (appCode === "custom_domain") copy.custom_domain_enabled = target;
@@ -150,6 +161,7 @@ export default function AdminAppCenterPage() {
 
   // Metrics
   const totalVendors = vendors.length;
+  const hyperlocalCount = vendors.filter((v) => v.hyperlocal_enabled).length;
   const razorpayCount = vendors.filter((v) => v.razorpay_enabled).length;
   const smsCount = vendors.filter((v) => v.sms_gateway_enabled).length;
   const customDomainCount = vendors.filter((v) => v.custom_domain_enabled).length;
@@ -166,6 +178,7 @@ export default function AdminAppCenterPage() {
 
     if (!matchesSearch) return false;
 
+    if (selectedAppFilter === "hyperlocal") return v.hyperlocal_enabled;
     if (selectedAppFilter === "razorpay") return v.razorpay_enabled;
     if (selectedAppFilter === "sms_gateway") return v.sms_gateway_enabled;
     if (selectedAppFilter === "custom_domain") return v.custom_domain_enabled;
@@ -223,7 +236,11 @@ export default function AdminAppCenterPage() {
       )}
 
       {/* Metrics Row */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Hyperlocal Active</span>
+          <p className="text-xl font-black text-rose-600 mt-1">{hyperlocalCount} <span className="text-xs font-semibold text-slate-400">/ {totalVendors}</span></p>
+        </div>
         <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Razorpay Active</span>
           <p className="text-xl font-black text-blue-600 mt-1">{razorpayCount} <span className="text-xs font-semibold text-slate-400">/ {totalVendors}</span></p>
@@ -251,7 +268,9 @@ export default function AdminAppCenterPage() {
         {APPS.map((app) => {
           const Icon = app.icon;
           const count =
-            app.code === "razorpay"
+            app.code === "hyperlocal"
+              ? hyperlocalCount
+              : app.code === "razorpay"
               ? razorpayCount
               : app.code === "sms_gateway"
               ? smsCount
@@ -354,6 +373,7 @@ export default function AdminAppCenterPage() {
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[11px]">
                 <th className="py-3 px-5">Vendor Account</th>
+                <th className="py-3 px-3 text-center">Hyperlocal</th>
                 <th className="py-3 px-3 text-center">Razorpay</th>
                 <th className="py-3 px-3 text-center">SMS Gateway</th>
                 <th className="py-3 px-3 text-center">Custom Domain</th>
@@ -365,7 +385,7 @@ export default function AdminAppCenterPage() {
             <tbody className="divide-y divide-slate-100 text-slate-700">
               {filteredVendors.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-10 text-xs text-slate-400">
+                  <td colSpan={8} className="text-center py-10 text-xs text-slate-400">
                     No vendors matched the selected criteria.
                   </td>
                 </tr>
@@ -388,6 +408,34 @@ export default function AdminAppCenterPage() {
                             {v.store_slug}.digitalgrowthstudio.in
                           </span>
                         </div>
+                      </td>
+
+                      {/* Hyperlocal Toggle */}
+                      <td className="py-4 px-3 text-center">
+                        <button
+                          type="button"
+                          onClick={() => handleToggle(v.id, "hyperlocal", !!v.hyperlocal_enabled)}
+                          disabled={togglingMap[`${v.id}_hyperlocal`]}
+                          className={`px-2.5 py-1 rounded-full text-[10px] font-bold transition-all cursor-pointer inline-flex items-center gap-1 ${
+                            v.hyperlocal_enabled
+                              ? "bg-rose-100 text-rose-800 hover:bg-rose-200"
+                              : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                          }`}
+                        >
+                          {togglingMap[`${v.id}_hyperlocal`] ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : v.hyperlocal_enabled ? (
+                            <>
+                              <Check className="w-3 h-3 text-rose-600" />
+                              Active
+                            </>
+                          ) : (
+                            <>
+                              <Lock className="w-3 h-3 text-slate-400" />
+                              Locked
+                            </>
+                          )}
+                        </button>
                       </td>
 
                       {/* Razorpay Toggle */}

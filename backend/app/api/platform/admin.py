@@ -576,6 +576,7 @@ async def list_all_vendors(
             app_build_status=app.app_build_status if app else "NOT_REQUESTED",
             publication_status=app.publication_status if app else "UNPUBLISHED",
             apk_user_approved=app.apk_user_approved if app else False,
+            hyperlocal_enabled=s.hyperlocal_enabled if s else False,
             razorpay_enabled=s.razorpay_enabled if s else False,
             sms_gateway_enabled=s.sms_gateway_enabled if s else False,
             custom_domain_enabled=s.custom_domain_enabled if s else False,
@@ -811,6 +812,7 @@ async def get_vendor_full_detail(
         sms_otp_active=s.sms_otp_active if s else True,
         whatsapp_alerts_enabled=s.whatsapp_alerts_enabled if s else False,
         shiprocket_enabled=s.shiprocket_enabled if s else False,
+        hyperlocal_enabled=s.hyperlocal_enabled if s else False,
         plan_name=sub.plan.name if sub and sub.plan else None,
         subscription_status=sub.status if sub else None,
         renewal_date=sub.next_renewal_date if sub else None,
@@ -988,6 +990,8 @@ async def update_vendor_full_details_by_admin(
             s.whatsapp_alerts_enabled = bool(dump["whatsapp_alerts_enabled"])
         if "shiprocket_enabled" in dump and dump["shiprocket_enabled"] is not None:
             s.shiprocket_enabled = bool(dump["shiprocket_enabled"])
+        if "hyperlocal_enabled" in dump and dump["hyperlocal_enabled"] is not None:
+            s.hyperlocal_enabled = bool(dump["hyperlocal_enabled"])
 
     # Also sync app config app_name if brand/store name was changed
     if v.app_config and ("brand_name" in dump or "store_name" in dump or "business_name" in dump):
@@ -1640,6 +1644,9 @@ async def toggle_vendor_app(
     elif code == "whatsapp":
         store.whatsapp_alerts_enabled = payload.enabled
         app_display_name = "WhatsApp Alerts"
+    elif code == "hyperlocal":
+        store.hyperlocal_enabled = payload.enabled
+        app_display_name = "Hyperlocal Quick-Commerce"
     else:
         raise HTTPException(status_code=400, detail=f"Unsupported app code: '{payload.app_code}'")
 
@@ -1674,6 +1681,7 @@ async def toggle_vendor_app(
             "custom_domain_enabled": store.custom_domain_enabled,
             "shiprocket_enabled": store.shiprocket_enabled,
             "whatsapp_alerts_enabled": store.whatsapp_alerts_enabled,
+            "hyperlocal_enabled": store.hyperlocal_enabled,
         },
     }
 

@@ -25,6 +25,7 @@ export interface PlatformUser {
   custom_domain_enabled?: boolean;
   shiprocket_enabled?: boolean;
   whatsapp_alerts_enabled?: boolean;
+  hyperlocal_enabled?: boolean;
 }
 
 export interface PlatformTokenResponse {
@@ -236,6 +237,16 @@ export interface StoreSettings {
   custom_domain_dns_target?: string;
   custom_domain_addon_id?: string | null;
   custom_domain_price_inr?: number;
+  hyperlocal_enabled?: boolean;
+  hyperlocal_mode?: string;
+  hyperlocal_radius_km?: number;
+  hyperlocal_store_lat?: number | null;
+  hyperlocal_store_lng?: number | null;
+  hyperlocal_pincodes?: string | null;
+  hyperlocal_base_fee?: number;
+  hyperlocal_base_distance_km?: number;
+  hyperlocal_extra_fee_per_km?: number;
+  hyperlocal_free_delivery_above?: number | null;
 }
 
 export interface VendorPolicies {
@@ -347,6 +358,7 @@ export interface VendorListItem {
   custom_domain_enabled?: boolean;
   shiprocket_enabled?: boolean;
   whatsapp_alerts_enabled?: boolean;
+  hyperlocal_enabled?: boolean;
   created_at: string;
 }
 

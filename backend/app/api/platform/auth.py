@@ -433,6 +433,7 @@ async def get_my_platform_session(
     custom_domain_enabled = False
     shiprocket_enabled = False
     whatsapp_alerts_enabled = False
+    hyperlocal_enabled = False
 
     if user.role == "VENDOR_ADMIN":
         now = datetime.now(timezone.utc)
@@ -457,6 +458,7 @@ async def get_my_platform_session(
                 custom_domain_enabled = getattr(vendor.store, "custom_domain_enabled", False)
                 shiprocket_enabled = getattr(vendor.store, "shiprocket_enabled", False)
                 whatsapp_alerts_enabled = getattr(vendor.store, "whatsapp_alerts_enabled", False)
+                hyperlocal_enabled = getattr(vendor.store, "hyperlocal_enabled", False)
             if vendor.app_config:
                 apk_user_approved = getattr(vendor.app_config, "apk_user_approved", False)
 
@@ -513,4 +515,5 @@ async def get_my_platform_session(
         custom_domain_enabled=custom_domain_enabled,
         shiprocket_enabled=shiprocket_enabled,
         whatsapp_alerts_enabled=whatsapp_alerts_enabled,
+        hyperlocal_enabled=hyperlocal_enabled,
     )

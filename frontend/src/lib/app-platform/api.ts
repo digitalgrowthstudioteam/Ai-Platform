@@ -418,6 +418,39 @@ class PlatformApiClient {
     });
   }
 
+  // Hyperlocal Delivery Settings
+  async getHyperlocalSettings(): Promise<any> {
+    if (this.isDemoMode()) {
+      return {
+        hyperlocal_enabled: true,
+        hyperlocal_mode: 'radius',
+        store_latitude: 18.5204,
+        store_longitude: 73.8567,
+        store_location_name: 'Main Store, Pune',
+        max_delivery_radius_km: 10.0,
+        min_order_value: 0.0,
+        base_delivery_fee: 30.0,
+        base_distance_km: 3.0,
+        per_km_fee: 10.0,
+        free_delivery_above: 499.0,
+        estimated_delivery_mins: 45,
+        serviceable_pincodes_type: 'all',
+        serviceable_pincodes: '',
+      };
+    }
+    return this.request<any>('/api/v1/platform/vendor/hyperlocal-settings');
+  }
+
+  async updateHyperlocalSettings(payload: any): Promise<any> {
+    if (this.isDemoMode()) {
+      return { success: true, ...payload };
+    }
+    return this.request<any>('/api/v1/platform/vendor/hyperlocal-settings', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  }
+
   async getVendorPolicies(): Promise<VendorPolicies> {
     if (this.isDemoMode()) {
       const s = demoSandbox.getStore();
