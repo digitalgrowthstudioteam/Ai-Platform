@@ -64,6 +64,14 @@ Thumbs.db
 ehthumbs.db
 Desktop.ini
 
+# ── Mobile & Android ─────────────────────────
+.gradle/
+.kotlin/
+.dart_tool/
+**/android/.gradle/
+**/android/.kotlin/
+**/build/
+
 # ── Misc ─────────────────────────────────────
 *.bak
 *.tmp
