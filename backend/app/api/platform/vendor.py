@@ -40,6 +40,7 @@ from app.models.platform.subscription import (
     PlatformAddon,
     PlatformVendorAddon,
 )
+from app.models.platform.system import PlatformNotification
 from app.schemas.platform.catalog import (
     CategoryCreatePayload,
     CategoryUpdatePayload,
@@ -1996,5 +1997,57 @@ async def send_vendor_test_sms(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg)
 
     return {"success": True, "message": msg}
+
+
+@router.get("/notifications")
+async def get_vendor_notifications(
+    limit: int = 30,
+    current: CurrentVendor = Depends(require_vendor_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Retrieve in-app notifications and alerts for the current vendor."""
+    stmt = (
+        select(PlatformNotification)
+        .where(
+            or_(
+                PlatformNotification.vendor_id == current.vendor.id,
+                PlatformNotification.vendor_id.is_(None),
+            )
+        )
+        .order_by(desc(PlatformNotification.created_at))
+        .limit(limit)
+    )
+    rows = (await db.execute(stmt)).scalars().all()
+    return [
+        {
+            "id": str(r.id),
+            "title": r.title,
+            "message": r.message,
+            "notification_type": r.notification_type,
+            "is_read": r.is_read,
+            "action_url": r.action_url,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        }
+        for r in rows
+    ]
+
+
+@router.patch("/notifications/{notification_id}/read")
+async def mark_vendor_notification_read(
+    notification_id: uuid.UUID,
+    current: CurrentVendor = Depends(require_vendor_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Mark a vendor notification as read."""
+    stmt = select(PlatformNotification).where(
+        PlatformNotification.id == notification_id,
+        PlatformNotification.vendor_id == current.vendor.id,
+    )
+    notif = (await db.execute(stmt)).scalar_one_or_none()
+    if notif:
+        notif.is_read = True
+        await db.commit()
+    return {"success": True}
+
 
 

@@ -38,9 +38,17 @@ Thumbs.db
 
 # ── Build Output ─────────────────────────────
 .next/
+**/.next/
+**/.next/**
 out/
+**/out/
+**/out/**
 build/
+**/build/
+**/build/**
 dist/
+**/dist/
+**/dist/**
 *.egg-info/
 *.egg
 *.apk
@@ -66,11 +74,22 @@ Desktop.ini
 
 # ── Mobile & Android ─────────────────────────
 .gradle/
+**/.gradle/
+**/.gradle/**
 .kotlin/
+**/.kotlin/
+**/.kotlin/**
 .dart_tool/
+**/.dart_tool/
+**/.dart_tool/**
 **/android/.gradle/
+**/android/.gradle/**
 **/android/.kotlin/
+**/android/.kotlin/**
+**/android/app/build/
+**/android/app/build/**
 **/build/
+**/build/**
 
 # ── Misc ─────────────────────────────────────
 *.bak

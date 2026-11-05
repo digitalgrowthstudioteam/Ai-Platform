@@ -689,6 +689,20 @@ async def create_store_order(
     except Exception:
         pass
 
+    try:
+        from app.models.platform.system import PlatformNotification
+        db.add(PlatformNotification(
+            vendor_id=store.vendor_id,
+            recipient_role="VENDOR_ADMIN",
+            title=f"New Order #{order.order_number}",
+            message=f"Received order from {order.customer_name} for Rs. {order.total_amount:.2f}",
+            notification_type="ORDER",
+            action_url=f"/orders/{order.id}",
+        ))
+        await db.commit()
+    except Exception:
+        pass
+
     return OrderResponse(
         id=order.id,
         vendor_id=order.vendor_id,
