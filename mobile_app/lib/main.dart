@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'providers/store_provider.dart';
 import 'providers/cart_provider.dart';
 import 'providers/auth_provider.dart';
+import 'providers/wishlist_provider.dart';
 import 'screens/splash_screen.dart';
 import 'config/app_config.dart';
 
@@ -21,6 +22,7 @@ class DgsStoreApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => StoreProvider()),
         ChangeNotifierProvider(create: (_) => CartProvider()),
+        ChangeNotifierProvider(create: (_) => WishlistProvider()),
       ],
       child: Consumer<StoreProvider>(
         builder: (context, store, _) {

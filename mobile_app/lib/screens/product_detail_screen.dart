@@ -4,11 +4,13 @@ import '../models/store_models.dart';
 import '../services/api_service.dart';
 import '../providers/cart_provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/wishlist_provider.dart';
 import '../widgets/smart_store_image.dart';
 import '../widgets/sizing_guide_sheet.dart';
 import 'cart_screen.dart';
 import 'checkout_screen.dart';
 import 'login_screen.dart';
+import 'wishlist_screen.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final ProductItem? product;
@@ -30,6 +32,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   int _quantity = 1;
   int _activeImageIdx = 0;
   bool _loading = false;
+  final PageController _pageController = PageController();
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -62,11 +71,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   Widget build(BuildContext context) {
     final cart = Provider.of<CartProvider>(context);
     final auth = Provider.of<AuthProvider>(context);
+    final wishlist = Provider.of<WishlistProvider>(context);
 
     if (_loading) {
       return Scaffold(
         appBar: AppBar(elevation: 0, backgroundColor: Colors.white),
-        body: const Center(child: CircularProgressIndicator(color: Color(0xFF0B192C))),
+        body: const Center(child: CircularProgressIndicator(color: Color(0xFF0F172A))),
       );
     }
 
@@ -101,27 +111,58 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0.5,
-        leading: const BackButton(color: Color(0xFF0B192C)),
+        leading: const BackButton(color: Color(0xFF0F172A)),
         title: Text(
           p.title,
-          style: const TextStyle(color: Color(0xFF0B192C), fontSize: 15, fontWeight: FontWeight.bold),
+          style: const TextStyle(color: Color(0xFF0F172A), fontSize: 15, fontWeight: FontWeight.bold),
           overflow: TextOverflow.ellipsis,
         ),
         actions: [
+          // Wishlist Button
+          IconButton(
+            icon: Icon(
+              wishlist.isWishlisted(p.id) ? Icons.favorite : Icons.favorite_border,
+              color: wishlist.isWishlisted(p.id) ? const Color(0xFFE11D48) : const Color(0xFF0F172A),
+            ),
+            tooltip: "Wishlist",
+            onPressed: () async {
+              final added = await wishlist.toggleWishlist(p);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(added ? "${p.title} added to Wishlist!" : "${p.title} removed from Wishlist"),
+                    duration: const Duration(milliseconds: 1400),
+                    backgroundColor: const Color(0xFF0F172A),
+                    action: SnackBarAction(
+                      label: "VIEW",
+                      textColor: const Color(0xFFD4AF37),
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => const WishlistScreen()),
+                        );
+                      },
+                    ),
+                  ),
+                );
+              }
+            },
+          ),
+
+          // Shopping Bag Button
           IconButton(
             icon: Stack(
               children: [
-                const Icon(Icons.shopping_bag_outlined, color: Color(0xFF0B192C)),
+                const Icon(Icons.shopping_bag_outlined, color: Color(0xFF0F172A)),
                 if (cart.itemCount > 0)
                   Positioned(
                     right: 0,
                     top: 0,
                     child: Container(
                       padding: const EdgeInsets.all(3),
-                      decoration: const BoxDecoration(color: Color(0xFFDB2777), shape: BoxShape.circle),
+                      decoration: const BoxDecoration(color: Color(0xFFD4AF37), shape: BoxShape.circle),
                       child: Text(
                         '${cart.itemCount}',
-                        style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                        style: const TextStyle(color: Color(0xFF0F172A), fontSize: 9, fontWeight: FontWeight.bold),
                       ),
                     ),
                   ),
@@ -139,23 +180,29 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 1. High-Res Image Gallery Carousel
-            if (images.isNotEmpty)
+            // 1. High-Res Full Product Image Viewer (Full Page Width & Unrestricted Aspect Ratio)
+            if (images.isNotEmpty) ...[
               Stack(
                 alignment: Alignment.bottomCenter,
                 children: [
-                  SizedBox(
-                    height: 340,
+                  AspectRatio(
+                    aspectRatio: 1.0,
                     child: PageView.builder(
+                      controller: _pageController,
                       itemCount: images.length,
                       onPageChanged: (idx) => setState(() => _activeImageIdx = idx),
                       itemBuilder: (context, idx) {
-                        return SmartStoreImage(
-                          imageUrl: images[idx],
-                          width: double.infinity,
-                          height: 340,
-                          fit: BoxFit.cover,
-                          fallbackText: "GLAM STREE",
+                        return GestureDetector(
+                          onTap: () => _showFullScreenImage(context, images, idx),
+                          child: Container(
+                            color: const Color(0xFFF8FAFC),
+                            child: SmartStoreImage(
+                              imageUrl: images[idx],
+                              width: double.infinity,
+                              fit: BoxFit.contain,
+                              fallbackText: "AC",
+                            ),
+                          ),
                         );
                       },
                     ),
@@ -169,10 +216,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         children: List.generate(images.length, (idx) {
                           return Container(
                             margin: const EdgeInsets.symmetric(horizontal: 3),
-                            width: _activeImageIdx == idx ? 16 : 6,
+                            width: _activeImageIdx == idx ? 18 : 6,
                             height: 6,
                             decoration: BoxDecoration(
-                              color: _activeImageIdx == idx ? const Color(0xFFDB2777) : Colors.white.withAlpha(180),
+                              color: _activeImageIdx == idx ? const Color(0xFF0F172A) : Colors.black.withAlpha(50),
                               borderRadius: BorderRadius.circular(3),
                             ),
                           );
@@ -181,6 +228,66 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     ),
                 ],
               ),
+
+              // Horizontal Thumbnail Carousel (for multiple images / variants)
+              if (images.length > 1)
+                Container(
+                  height: 74,
+                  margin: const EdgeInsets.only(top: 10, bottom: 4),
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: images.length,
+                    itemBuilder: (context, idx) {
+                      final isSelected = _activeImageIdx == idx;
+                      return GestureDetector(
+                        onTap: () {
+                          setState(() => _activeImageIdx = idx);
+                          if (_pageController.hasClients) {
+                            _pageController.animateToPage(
+                              idx,
+                              duration: const Duration(milliseconds: 250),
+                              curve: Curves.easeInOut,
+                            );
+                          }
+                        },
+                        child: Container(
+                          width: 64,
+                          height: 64,
+                          margin: const EdgeInsets.only(right: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: isSelected ? const Color(0xFFD4AF37) : const Color(0xFFE2E8F0),
+                              width: isSelected ? 2.5 : 1.0,
+                            ),
+                            boxShadow: isSelected
+                                ? [
+                                    BoxShadow(
+                                      color: const Color(0xFFD4AF37).withAlpha(60),
+                                      blurRadius: 6,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ]
+                                : null,
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: SmartStoreImage(
+                              imageUrl: images[idx],
+                              width: 64,
+                              height: 64,
+                              fit: BoxFit.cover,
+                              fallbackText: "AC",
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+            ],
 
             // 2. Product Information
             Padding(
@@ -199,9 +306,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
-                          p.category ?? "Press On Nails",
+                          p.category ?? "Men's Apparel",
                           style: const TextStyle(
-                            color: Color(0xFF0B192C),
+                            color: Color(0xFF0F172A),
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
                           ),
@@ -224,7 +331,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     style: const TextStyle(
                       fontSize: 19,
                       fontWeight: FontWeight.w900,
-                      color: Color(0xFF0B192C),
+                      color: Color(0xFF0F172A),
                       height: 1.3,
                     ),
                   ),
@@ -240,7 +347,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         style: const TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.w900,
-                          color: Color(0xFF0B192C),
+                          color: Color(0xFF0F172A),
                         ),
                       ),
                       const SizedBox(width: 10),
@@ -257,7 +364,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFDB2777),
+                            color: const Color(0xFFDC2626),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
@@ -274,22 +381,22 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Free Kit Banner Callout
+                  // Brand Guarantee Banner
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFDF2F8),
+                      color: const Color(0xFFF8FAFC),
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFFFBCFE8)),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
                     ),
                     child: Row(
                       children: const [
-                        Icon(Icons.card_giftcard, color: Color(0xFFDB2777), size: 22),
+                        Icon(Icons.verified, color: Color(0xFFD4AF37), size: 20),
                         SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            "Includes Free ₹299 Application Kit: Ultra-bond glue, buffer, wooden cuticle stick, alcohol prep pads & adhesive tabs.",
-                            style: TextStyle(fontSize: 11.5, color: Color(0xFF831843), fontWeight: FontWeight.w600),
+                            "Ashtekar Tailored Guarantee: 100% fine fabrics, handcrafted tailoring & complimentary size exchange.",
+                            style: TextStyle(fontSize: 11.5, color: Color(0xFF334155), fontWeight: FontWeight.w600),
                           ),
                         ),
                       ],
@@ -297,22 +404,22 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   ),
                   const SizedBox(height: 20),
 
-                  // 3. Variant / Size Selector
+                  // 3. Variant / Size Selector (With images if present)
                   if (p.variants.isNotEmpty) ...[
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text(
-                          "SELECT SIZE (SET OF 10 NAILS)",
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0B192C), letterSpacing: 0.5),
+                          "SELECT SIZE / VARIANT",
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A), letterSpacing: 0.5),
                         ),
                         InkWell(
                           onTap: () => SizingGuideSheet.show(context),
                           child: Row(
                             children: const [
-                              Icon(Icons.straighten, size: 14, color: Color(0xFFD97706)),
+                              Icon(Icons.straighten, size: 14, color: Color(0xFFD4AF37)),
                               SizedBox(width: 4),
-                              Text("Sizing Guide", style: TextStyle(color: Color(0xFFD97706), fontSize: 11, fontWeight: FontWeight.bold)),
+                              Text("Sizing Guide", style: TextStyle(color: Color(0xFFD4AF37), fontSize: 11, fontWeight: FontWeight.bold)),
                             ],
                           ),
                         ),
@@ -325,15 +432,35 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       children: p.variants.map((v) {
                         final isSelected = _selectedVariant?.id == v.id;
                         return ChoiceChip(
+                          avatar: v.images.isNotEmpty
+                              ? ClipRRect(
+                                  borderRadius: BorderRadius.circular(4),
+                                  child: SmartStoreImage(
+                                    imageUrl: v.images.first,
+                                    width: 20,
+                                    height: 20,
+                                    fit: BoxFit.cover,
+                                    fallbackText: "AC",
+                                  ),
+                                )
+                              : null,
                           label: Text(v.title),
                           selected: isSelected,
-                          onSelected: (_) => setState(() => _selectedVariant = v),
-                          selectedColor: const Color(0xFF0B192C),
+                          onSelected: (_) {
+                            setState(() {
+                              _selectedVariant = v;
+                              _activeImageIdx = 0;
+                            });
+                            if (_pageController.hasClients) {
+                              _pageController.jumpToPage(0);
+                            }
+                          },
+                          selectedColor: const Color(0xFF0F172A),
                           backgroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
                             side: BorderSide(
-                              color: isSelected ? const Color(0xFF0B192C) : const Color(0xFFCBD5E1),
+                              color: isSelected ? const Color(0xFF0F172A) : const Color(0xFFCBD5E1),
                             ),
                           ),
                           labelStyle: TextStyle(
@@ -398,9 +525,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: const [
-                      _TrustIcon(icon: Icons.repeat, label: "Reusable 5+ Times"),
-                      _TrustIcon(icon: Icons.local_shipping_outlined, label: "Fast Courier Delivery"),
-                      _TrustIcon(icon: Icons.verified_user_outlined, label: "100% Handcrafted"),
+                      _TrustIcon(icon: Icons.check_circle_outline, label: "100% Pure Fabric"),
+                      _TrustIcon(icon: Icons.local_shipping_outlined, label: "Express Shipping"),
+                      _TrustIcon(icon: Icons.straighten, label: "Tailored Perfect Fit"),
                     ],
                   ),
                   const SizedBox(height: 100),
@@ -437,19 +564,19 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             SnackBar(
                               content: Text("${p.title} added to bag!"),
                               duration: const Duration(milliseconds: 1400),
-                              backgroundColor: const Color(0xFF0B192C),
+                              backgroundColor: const Color(0xFF0F172A),
                             ),
                           );
                         }
                       : null,
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 14),
-                    side: const BorderSide(color: Color(0xFF0B192C), width: 1.5),
+                    side: const BorderSide(color: Color(0xFF0F172A), width: 1.5),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
                   child: const Text(
                     "ADD TO BAG",
-                    style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0B192C)),
+                    style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
                   ),
                 ),
               ),
@@ -478,8 +605,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         }
                       : null,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFDB2777), // Glam Pink
-                    foregroundColor: Colors.white,
+                    backgroundColor: const Color(0xFF0F172A), // Brand Navy
+                    foregroundColor: const Color(0xFFD4AF37), // Brand Gold
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     elevation: 2,
@@ -491,6 +618,35 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showFullScreenImage(BuildContext context, List<String> images, int initialIdx) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => Scaffold(
+          backgroundColor: Colors.black,
+          appBar: AppBar(
+            backgroundColor: Colors.black,
+            iconTheme: const IconThemeData(color: Colors.white),
+            elevation: 0,
+          ),
+          body: PageView.builder(
+            controller: PageController(initialPage: initialIdx),
+            itemCount: images.length,
+            itemBuilder: (ctx, idx) => Center(
+              child: InteractiveViewer(
+                maxScale: 4.0,
+                child: SmartStoreImage(
+                  imageUrl: images[idx],
+                  fit: BoxFit.contain,
+                  fallbackText: "AC",
+                ),
+              ),
+            ),
           ),
         ),
       ),

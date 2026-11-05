@@ -3,9 +3,11 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../providers/auth_provider.dart';
 import '../providers/store_provider.dart';
+import '../providers/wishlist_provider.dart';
 import '../services/api_service.dart';
 import '../widgets/sizing_guide_sheet.dart';
 import 'order_tracking_screen.dart';
+import 'wishlist_screen.dart';
 import 'login_screen.dart';
 import '../config/app_config.dart';
 
@@ -249,7 +251,53 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ],
               ),
 
-              const SizedBox(height: 24),
+              const SizedBox(height: 14),
+
+              // Wishlist Shortcut Card
+              Consumer<WishlistProvider>(
+                builder: (context, wishlist, _) {
+                  return InkWell(
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const WishlistScreen()),
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.favorite, color: Color(0xFFE11D48), size: 22),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  "My Wishlist",
+                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF0F172A)),
+                                ),
+                                Text(
+                                  "${wishlist.itemCount} items saved",
+                                  style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Icon(Icons.chevron_right, color: Color(0xFF94A3B8), size: 20),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+
+              const SizedBox(height: 20),
 
               // Order History
               Row(

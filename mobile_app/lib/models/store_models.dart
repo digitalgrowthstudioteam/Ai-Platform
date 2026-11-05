@@ -172,6 +172,19 @@ class ProductVariant {
       attributes: (json['attributes'] as Map<String, dynamic>?) ?? {},
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'sku': sku,
+      'price': price,
+      'sale_price': salePrice,
+      'stock_quantity': stockQuantity,
+      'images': images,
+      'attributes': attributes,
+    };
+  }
 }
 
 class ProductItem {
@@ -240,7 +253,7 @@ class ProductItem {
     final pImage = json['thumbnail_url'] ??
         (json['primary_image'] ?? (gallery.isNotEmpty ? gallery.first : null));
 
-    final title = json['name'] ?? (json['title'] ?? 'Luxury Press-On Nails');
+    final title = json['name'] ?? (json['title'] ?? 'Apparel Item');
     final catName = json['category_name'] ?? json['category'];
 
     return ProductItem(
@@ -259,6 +272,25 @@ class ProductItem {
       isFeatured: json['is_featured'] ?? false,
       inStock: json['in_stock'] ?? (json['stock_quantity'] == null || json['stock_quantity'] > 0),
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'slug': slug,
+      'description': description,
+      'regular_price': regularPrice,
+      'sale_price': salePrice,
+      'effective_price': effectivePrice,
+      'stock_quantity': stockQuantity,
+      'category': category,
+      'primary_image': primaryImage,
+      'images': galleryImages,
+      'variants': variants.map((v) => v.toJson()).toList(),
+      'is_featured': isFeatured,
+      'in_stock': inStock,
+    };
   }
 }
 

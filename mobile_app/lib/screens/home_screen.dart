@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../providers/store_provider.dart';
 import '../providers/cart_provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/wishlist_provider.dart';
 import '../models/store_models.dart';
 import '../widgets/smart_store_image.dart';
 import '../widgets/sizing_guide_sheet.dart';
 import 'product_detail_screen.dart';
 import 'cart_screen.dart';
 import 'order_tracking_screen.dart';
+import 'wishlist_screen.dart';
 import 'profile_screen.dart';
 import 'login_screen.dart';
 import '../config/app_config.dart';
@@ -17,21 +18,13 @@ import '../config/app_config.dart';
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
-  Future<void> _launchWhatsApp(String phone) async {
-    final clean = phone.replaceAll(RegExp(r'[^0-9]'), '');
-    final uri = Uri.parse("https://wa.me/91$clean?text=Hi%20Glam%20Stree!%20I%20am%20browsing%20your%20app%20and%20need%20help%20with%20sizing.");
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final store = Provider.of<StoreProvider>(context);
     final cart = Provider.of<CartProvider>(context);
     final auth = Provider.of<AuthProvider>(context);
+    final wishlist = Provider.of<WishlistProvider>(context);
     final primary = store.primaryColor;
-    final supportPhone = store.config?.contactPhone ?? "7499904962";
 
     return Scaffold(
       backgroundColor: const Color(0xFFFDFCFB),
@@ -107,6 +100,44 @@ class HomeScreen extends StatelessWidget {
                 );
               }
             },
+          ),
+
+          // Wishlist with dynamic badge
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.favorite_border, color: Color(0xFF475569)),
+                tooltip: "Wishlist",
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const WishlistScreen()),
+                  );
+                },
+              ),
+              if (wishlist.itemCount > 0)
+                Positioned(
+                  right: 6,
+                  top: 6,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFE11D48),
+                      shape: BoxShape.circle,
+                    ),
+                    constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                    child: Text(
+                      '${wishlist.itemCount}',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
 
           // Order Tracking
@@ -202,7 +233,7 @@ class HomeScreen extends StatelessWidget {
                 child: TextField(
                   onChanged: (val) => store.searchProducts(val),
                   decoration: InputDecoration(
-                    hintText: "Search press-on nails, shapes, colors...",
+                    hintText: "Search festive kurtas, shirts, suits, jackets...",
                     hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
                     prefixIcon: const Icon(Icons.search, size: 20, color: Color(0xFF94A3B8)),
                     filled: true,
@@ -378,7 +409,7 @@ class HomeScreen extends StatelessWidget {
                           return Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 4),
                             child: ChoiceChip(
-                              label: const Text("All Nails"),
+                              label: const Text("All Apparel"),
                               selected: isAll,
                               onSelected: (_) => store.selectCategory(null),
                               selectedColor: primary,
@@ -422,11 +453,11 @@ class HomeScreen extends StatelessWidget {
                     Text(
                       store.selectedCategory != null
                           ? "Category Collection"
-                          : "Handcrafted Luxury Nails",
+                          : "Men's Collection",
                       style: const TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF0B192C),
+                        color: Color(0xFF0F172A),
                       ),
                     ),
                     Text(
@@ -442,7 +473,7 @@ class HomeScreen extends StatelessWidget {
             if (store.loading)
               const SliverFillRemaining(
                 child: Center(
-                  child: CircularProgressIndicator(color: Color(0xFF0B192C)),
+                  child: CircularProgressIndicator(color: Color(0xFF0F172A)),
                 ),
               )
             else if (store.products.isEmpty)
@@ -454,12 +485,12 @@ class HomeScreen extends StatelessWidget {
                       const Icon(Icons.category_outlined, size: 54, color: Color(0xFF94A3B8)),
                       const SizedBox(height: 12),
                       const Text(
-                        "No nails found in this collection",
+                        "No apparel found in this collection",
                         style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF475569)),
                       ),
                       TextButton(
                         onPressed: () => store.selectCategory(null),
-                        child: const Text("View All Nails"),
+                        child: const Text("View All Apparel"),
                       ),
                     ],
                   ),
@@ -471,35 +502,33 @@ class HomeScreen extends StatelessWidget {
                 sliver: SliverGrid(
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
-                    childAspectRatio: 0.62,
+                    childAspectRatio: 0.52,
                     crossAxisSpacing: 10,
                     mainAxisSpacing: 12,
                   ),
                   delegate: SliverChildBuilderDelegate(
                     (context, idx) {
                       final product = store.products[idx];
-                      return _buildProductCard(context, product, cart);
+                      return _buildProductCard(context, product, cart, wishlist);
                     },
                     childCount: store.products.length,
                   ),
                 ),
               ),
 
-            const SliverToBoxAdapter(child: SizedBox(height: 80)),
+            const SliverToBoxAdapter(child: SizedBox(height: 40)),
           ],
         ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _launchWhatsApp(supportPhone),
-        backgroundColor: const Color(0xFF16A34A), // WhatsApp Green
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.chat, size: 20),
-        label: const Text("WhatsApp Sizing", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
       ),
     );
   }
 
-  Widget _buildProductCard(BuildContext context, ProductItem p, CartProvider cart) {
+  Widget _buildProductCard(
+    BuildContext context,
+    ProductItem p,
+    CartProvider cart,
+    WishlistProvider wishlist,
+  ) {
     return InkWell(
       onTap: () {
         Navigator.of(context).push(
@@ -523,7 +552,7 @@ class HomeScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Image with Discount Badge
+            // Image with Discount Badge & Wishlist Button
             Expanded(
               child: Stack(
                 fit: StackFit.expand,
@@ -533,7 +562,7 @@ class HomeScreen extends StatelessWidget {
                     child: SmartStoreImage(
                       imageUrl: p.primaryImage,
                       fit: BoxFit.cover,
-                      fallbackText: "GLAM",
+                      fallbackText: "AC",
                     ),
                   ),
                   // Discount Badge
@@ -544,7 +573,7 @@ class HomeScreen extends StatelessWidget {
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFDB2777),
+                          color: const Color(0xFFDC2626),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
@@ -557,19 +586,51 @@ class HomeScreen extends StatelessWidget {
                         ),
                       ),
                     ),
-                  // Free Kit Pill
+                  // Wishlist Button
                   Positioned(
-                    bottom: 6,
-                    left: 6,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withAlpha(180),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: const Text(
-                        "Free Kit Included",
-                        style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
+                    top: 8,
+                    right: 8,
+                    child: InkWell(
+                      onTap: () async {
+                        final added = await wishlist.toggleWishlist(p);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(added ? "${p.title} added to Wishlist!" : "${p.title} removed from Wishlist"),
+                              duration: const Duration(milliseconds: 1400),
+                              backgroundColor: const Color(0xFF0F172A),
+                              action: SnackBarAction(
+                                label: "VIEW",
+                                textColor: const Color(0xFFD4AF37),
+                                onPressed: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(builder: (_) => const WishlistScreen()),
+                                  );
+                                },
+                              ),
+                            ),
+                          );
+                        }
+                      },
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withAlpha(235),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withAlpha(25),
+                              blurRadius: 4,
+                              offset: const Offset(0, 1),
+                            ),
+                          ],
+                        ),
+                        child: Icon(
+                          wishlist.isWishlisted(p.id) ? Icons.favorite : Icons.favorite_border,
+                          size: 16,
+                          color: wishlist.isWishlisted(p.id) ? const Color(0xFFE11D48) : const Color(0xFF64748B),
+                        ),
                       ),
                     ),
                   ),
@@ -599,79 +660,81 @@ class HomeScreen extends StatelessWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      fontSize: 12.5,
+                      fontSize: 12,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF0B192C),
+                      color: Color(0xFF0F172A),
                       height: 1.25,
                     ),
                   ),
                   const SizedBox(height: 6),
 
-                  // Pricing & Add Button
+                  // Pricing
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            "₹${p.effectivePrice.toStringAsFixed(0)}",
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w900,
-                              color: Color(0xFF0B192C),
-                            ),
-                          ),
-                          if (p.regularPrice > p.effectivePrice)
-                            Text(
-                              "₹${p.regularPrice.toStringAsFixed(0)}",
-                              style: const TextStyle(
-                                fontSize: 10,
-                                decoration: TextDecoration.lineThrough,
-                                color: Color(0xFF94A3B8),
-                              ),
-                            ),
-                        ],
-                      ),
-                      // Quick Add Button
-                      InkWell(
-                        onTap: () {
-                          cart.addToCart(p);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text("${p.title} added to bag!"),
-                              duration: const Duration(milliseconds: 1400),
-                              backgroundColor: const Color(0xFF0B192C),
-                              action: SnackBarAction(
-                                label: "VIEW BAG",
-                                textColor: const Color(0xFFF472B6),
-                                onPressed: () {
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute(builder: (_) => const CartScreen()),
-                                  );
-                                },
-                              ),
-                            ),
-                          );
-                        },
-                        borderRadius: BorderRadius.circular(8),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF0B192C),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Text(
-                            "ADD",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                      Text(
+                        "₹${p.effectivePrice.toStringAsFixed(0)}",
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF0F172A),
                         ),
                       ),
+                      if (p.regularPrice > p.effectivePrice) ...[
+                        const SizedBox(width: 6),
+                        Text(
+                          "₹${p.regularPrice.toStringAsFixed(0)}",
+                          style: const TextStyle(
+                            fontSize: 10.5,
+                            decoration: TextDecoration.lineThrough,
+                            color: Color(0xFF94A3B8),
+                          ),
+                        ),
+                      ],
                     ],
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Full-Width Add to Cart Button
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        cart.addToCart(p);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text("${p.title} added to bag!"),
+                            duration: const Duration(milliseconds: 1400),
+                            backgroundColor: const Color(0xFF0F172A),
+                            action: SnackBarAction(
+                              label: "VIEW BAG",
+                              textColor: const Color(0xFFD4AF37),
+                              onPressed: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(builder: (_) => const CartScreen()),
+                                );
+                              },
+                            ),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.shopping_bag_outlined, size: 13),
+                      label: const Text(
+                        "Add to Cart",
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0F172A),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 7),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        elevation: 0,
+                      ),
+                    ),
                   ),
                 ],
               ),
