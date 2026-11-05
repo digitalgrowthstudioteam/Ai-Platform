@@ -2,7 +2,7 @@ import React from "react";
 import StorePolicyClient from "./StorePolicyClient";
 
 export function generateStaticParams() {
-  const slugs = ["placeholder", "abc", "xyz", "kcaariwork"];
+  const slugs = ["placeholder", "abc", "xyz", "kcaariwork", "myshoppartner", "glam-stree-nails", "glamstree"];
   const types = ["terms", "privacy", "shipping", "refund"];
   const params: { slug: string; type: string }[] = [];
 

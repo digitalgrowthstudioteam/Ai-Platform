@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ShieldCheck, Truck, RefreshCcw, Headphones, FileText, RotateCcw } from "lucide-react";
 import PolicyModal, { PolicyType } from "./PolicyModal";
 import { getStoreHref } from "@/lib/app-platform/store-route-helper";
+import { isGlamStreeStore } from "@/lib/app-platform/glam-stree-data";
 
 interface StoreFooterProps {
   slug: string;
@@ -28,6 +29,72 @@ export default function StoreFooter({ slug, config }: StoreFooterProps) {
         return "";
     }
   };
+
+  const isGlam = isGlamStreeStore(slug, config);
+
+  if (isGlam) {
+    return (
+      <>
+        <footer className="bg-[#07111e] text-slate-400 mt-16 py-12 px-4 text-xs border-t border-slate-800">
+          <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+            <div className="space-y-3">
+              <h4 className="font-serif font-black text-white text-base uppercase tracking-tight">
+                {config?.store_name || "Glam stree nails"}
+              </h4>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Handcrafted luxury press-on nails. Salon finish at home in 10 minutes with zero natural nail damage.
+              </p>
+              <div className="text-[11px] space-y-1 text-slate-400 pt-1">
+                <p>Phone: +91 {config?.contact_phone || "7499904962"}</p>
+                <p>Email: {config?.contact_email || "apekshajondhale1111@gmail.com"}</p>
+                <p>Location: {config?.business_address || "Pune, Maharashtra, India"}</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <h5 className="font-bold text-white text-xs uppercase tracking-wider">Quick Links</h5>
+              <ul className="space-y-1.5">
+                <li><Link href={getStoreHref(slug, "/")} className="hover:text-white">Home Storefront</Link></li>
+                <li><Link href={getStoreHref(slug, "/categories")} className="hover:text-white">Press On Nails</Link></li>
+                <li><Link href={getStoreHref(slug, "/cart")} className="hover:text-white">Shopping Cart</Link></li>
+                <li><Link href={getStoreHref(slug, "/account")} className="hover:text-white">Customer Account</Link></li>
+              </ul>
+            </div>
+            <div className="space-y-2">
+              <h5 className="font-bold text-white text-xs uppercase tracking-wider">Sizing Standards</h5>
+              <div className="text-[11px] space-y-1 text-slate-400">
+                <p>XS: 14, 11, 12, 11, 8 mm</p>
+                <p>S: 15, 12, 13, 12, 9 mm</p>
+                <p>M: 16, 13, 14, 13, 10 mm</p>
+                <p>L: 17, 14, 15, 14, 11 mm</p>
+                <p className="text-yellow-400 font-semibold pt-1">Custom Sizes Accepted</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <h5 className="font-bold text-white text-xs uppercase tracking-wider">Legal Policies</h5>
+              <ul className="space-y-1.5">
+                <li><button onClick={() => setActivePolicy("terms")} className="hover:text-white text-left">Terms & Conditions</button></li>
+                <li><button onClick={() => setActivePolicy("privacy")} className="hover:text-white text-left">Privacy Policy</button></li>
+                <li><button onClick={() => setActivePolicy("shipping")} className="hover:text-white text-left">Shipping Policy</button></li>
+                <li><button onClick={() => setActivePolicy("refund")} className="hover:text-white text-left">Cancellation & Refund</button></li>
+              </ul>
+            </div>
+          </div>
+          <div className="max-w-6xl mx-auto pt-6 border-t border-slate-800 text-center text-[11px] text-slate-500">
+            © {new Date().getFullYear()} {config?.store_name || "Glam stree nails"}. All Rights Reserved.
+          </div>
+        </footer>
+        {activePolicy && (
+          <PolicyModal
+            isOpen={Boolean(activePolicy)}
+            onClose={() => setActivePolicy(null)}
+            type={activePolicy}
+            storeName={config?.store_name || "Glam stree nails"}
+            content={getPolicyContent(activePolicy)}
+          />
+        )}
+      </>
+    );
+  }
 
   return (
     <>

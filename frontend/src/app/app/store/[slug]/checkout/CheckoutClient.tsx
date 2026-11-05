@@ -11,6 +11,7 @@ import StoreFooter from "@/components/app-platform/store/StoreFooter";
 import PixelInjector from "@/components/app-platform/store/PixelInjector";
 import { pixelTracker } from "@/lib/app-platform/pixel-tracker";
 import { getStoreRouteParams, getStoreHref } from "@/lib/app-platform/store-route-helper";
+import { isGlamStreeStore } from "@/lib/app-platform/glam-stree-data";
 import {
   CreditCard,
   Banknote,
@@ -22,6 +23,7 @@ import {
   ShoppingBag,
   CheckCircle2,
   MapPin,
+  Sparkles,
 } from "lucide-react";
 
 export default function CheckoutClient() {
@@ -115,7 +117,8 @@ export default function CheckoutClient() {
     );
   }
 
-  const primaryColor = config?.primary_color || "#2563EB";
+  const isGlam = isGlamStreeStore(slug, config);
+  const primaryColor = isGlam ? "#0b192c" : (config?.primary_color || "#2563EB");
   const freeMin = Number(config?.free_shipping_min_order) || 0;
   const isFreeDelivery = freeMin > 0 && subtotal >= freeMin;
   const shippingFee =
@@ -645,6 +648,15 @@ export default function CheckoutClient() {
 
               {/* Price Breakdown */}
               <div className="pt-4 border-t border-slate-100 space-y-2.5 text-xs">
+                {isGlam && (
+                  <div className="flex items-center justify-between text-xs text-pink-800 bg-pink-50 p-2 rounded-xl font-medium border border-pink-100">
+                    <span className="flex items-center gap-1.5 font-bold">
+                      <Sparkles className="w-3.5 h-3.5 text-pink-600" /> Free Salon Care Kit (₹299 Value):
+                    </span>
+                    <span className="font-black text-emerald-700">FREE</span>
+                  </div>
+                )}
+
                 <div className="flex items-center justify-between text-slate-600">
                   <span>Items Subtotal:</span>
                   <span className="font-semibold text-slate-900 font-mono">₹{subtotal.toLocaleString("en-IN")}</span>

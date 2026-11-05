@@ -10,6 +10,8 @@ import StoreHeader from "@/components/app-platform/store/StoreHeader";
 import StoreFooter from "@/components/app-platform/store/StoreFooter";
 import KcAariWorkTheme from "@/components/app-platform/store/themes/KcAariWorkTheme";
 import FmcgStoreTheme from "@/components/app-platform/store/themes/FmcgStoreTheme";
+import GlamStreeTheme from "@/components/app-platform/store/themes/GlamStreeTheme";
+import { isGlamStreeStore } from "@/lib/app-platform/glam-stree-data";
 import PixelInjector from "@/components/app-platform/store/PixelInjector";
 import { pixelTracker } from "@/lib/app-platform/pixel-tracker";
 import { getStoreRouteParams, getStoreHref } from "@/lib/app-platform/store-route-helper";
@@ -260,6 +262,22 @@ export default function StorePreviewClient() {
       <>
         <PixelInjector config={config} pageTitle={config?.store_name} />
         <FmcgStoreTheme
+          slug={slug}
+          config={config}
+          categories={categories}
+          products={products}
+          banners={banners}
+        />
+      </>
+    );
+  }
+
+  // Glam Stree Nails Theme
+  if (isGlamStreeStore(slug, config)) {
+    return (
+      <>
+        <PixelInjector config={config} pageTitle={config?.store_name} />
+        <GlamStreeTheme
           slug={slug}
           config={config}
           categories={categories}

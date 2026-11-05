@@ -9,6 +9,8 @@ import { useVendorWishlist } from "@/lib/app-platform/wishlist-store";
 import { getStoreRouteParams, getStoreHref } from "@/lib/app-platform/store-route-helper";
 import PixelInjector from "@/components/app-platform/store/PixelInjector";
 import { pixelTracker } from "@/lib/app-platform/pixel-tracker";
+import GlamStreeCategoryTheme from "@/components/app-platform/store/themes/GlamStreeCategoryTheme";
+import { isGlamStreeStore } from "@/lib/app-platform/glam-stree-data";
 import {
   ShoppingCart,
   Search,
@@ -261,6 +263,22 @@ export default function CategoryBrowseClient() {
 
   const activeCategoryObj = categories.find((c) => c.id === selectedCat);
   const activeCategoryTitle = activeCategoryObj ? activeCategoryObj.name : "All Products";
+
+  if (isGlamStreeStore(slug, config)) {
+    return (
+      <>
+        <PixelInjector config={config} pageTitle={`Press On Nails - ${brandName}`} />
+        <GlamStreeCategoryTheme
+          slug={slug}
+          config={config}
+          categories={categories}
+          products={products}
+          selectedCatId={selectedCat}
+          searchQueryParam={searchQuery}
+        />
+      </>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-white text-slate-900 flex flex-col font-sans pb-16 sm:pb-0">

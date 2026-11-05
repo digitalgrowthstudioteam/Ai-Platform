@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useVendorCart } from "@/lib/app-platform/cart-store";
 import { useVendorWishlist } from "@/lib/app-platform/wishlist-store";
 import { getStoreHref } from "@/lib/app-platform/store-route-helper";
+import { isGlamStreeStore } from "@/lib/app-platform/glam-stree-data";
 import {
   ShoppingCart,
   User,
@@ -31,7 +32,8 @@ export default function StoreHeader({
 }: StoreHeaderProps) {
   const { itemCount } = useVendorCart(slug);
   const { itemCount: wishlistCount } = useVendorWishlist(slug);
-  const primaryColor = config?.primary_color || "#2563EB";
+  const isGlam = isGlamStreeStore(slug, config);
+  const primaryColor = isGlam ? "#0b192c" : (config?.primary_color || "#2563EB");
 
   const [customerName, setCustomerName] = useState<string | null>(null);
 
@@ -65,31 +67,49 @@ export default function StoreHeader({
   return (
     <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
       {/* Top Value Proposition Bar */}
-      <div className="bg-slate-900 text-slate-200 text-[11px] py-1.5 px-4 hidden sm:block">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            {config?.free_shipping_min_order && config.free_shipping_min_order > 0 ? (
-              <span className="flex items-center gap-1.5 text-blue-300 font-medium">
-                <Truck className="w-3 h-3 text-blue-400" />
-                Free Delivery on orders above ₹{config.free_shipping_min_order}
+      {isGlam ? (
+        <div className="bg-[#0b192c] text-white text-[11px] py-1.5 px-3 sm:px-4 tracking-wide">
+          <div className="max-w-6xl mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-2 overflow-hidden truncate">
+              <span className="bg-pink-500/20 text-pink-300 font-bold px-1.5 py-0.5 rounded text-[10px] uppercase">
+                SALE
               </span>
-            ) : null}
-            <span className="flex items-center gap-1 text-emerald-400 font-medium">
-              <CheckCircle2 className="w-3 h-3" />
-              Cash on Delivery Available
-            </span>
-          </div>
-          <div className="flex items-center gap-3 text-slate-400">
-            <span className="flex items-center gap-1">
-              <Clock className="w-3 h-3 text-slate-400" />
-              Est. Delivery: {config?.estimated_delivery_days || "3-5 Business Days"}
-            </span>
-            {config?.contact_phone && (
-              <span>Help: {config.contact_phone}</span>
-            )}
+              <span className="font-medium truncate">
+                Flat 10% off with coupon <strong className="text-yellow-300 font-bold">FIRST10</strong> | Free Shipping above ₹999 | Free Salon Kit Included
+              </span>
+            </div>
+            <div className="hidden sm:flex items-center gap-3 text-slate-300 text-[11px] shrink-0">
+              <span>Helpline: +91 {config?.contact_phone || "7499904962"}</span>
+            </div>
           </div>
         </div>
-      </div>
+      ) : (
+        <div className="bg-slate-900 text-slate-200 text-[11px] py-1.5 px-4 hidden sm:block">
+          <div className="max-w-6xl mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              {config?.free_shipping_min_order && config.free_shipping_min_order > 0 ? (
+                <span className="flex items-center gap-1.5 text-blue-300 font-medium">
+                  <Truck className="w-3 h-3 text-blue-400" />
+                  Free Delivery on orders above ₹{config.free_shipping_min_order}
+                </span>
+              ) : null}
+              <span className="flex items-center gap-1 text-emerald-400 font-medium">
+                <CheckCircle2 className="w-3 h-3" />
+                Cash on Delivery Available
+              </span>
+            </div>
+            <div className="flex items-center gap-3 text-slate-400">
+              <span className="flex items-center gap-1">
+                <Clock className="w-3 h-3 text-slate-400" />
+                Est. Delivery: {config?.estimated_delivery_days || "3-5 Business Days"}
+              </span>
+              {config?.contact_phone && (
+                <span>Help: {config.contact_phone}</span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main Storefront Navigation */}
       <div className="max-w-6xl mx-auto px-3 sm:px-4 py-2.5 sm:py-3.5 flex items-center justify-between gap-2 sm:gap-4 w-full max-w-full overflow-hidden">

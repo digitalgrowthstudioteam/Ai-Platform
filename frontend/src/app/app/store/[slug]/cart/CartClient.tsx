@@ -10,6 +10,7 @@ import StoreHeader from "@/components/app-platform/store/StoreHeader";
 import StoreFooter from "@/components/app-platform/store/StoreFooter";
 import PixelInjector from "@/components/app-platform/store/PixelInjector";
 import { getStoreRouteParams, getStoreHref } from "@/lib/app-platform/store-route-helper";
+import { isGlamStreeStore } from "@/lib/app-platform/glam-stree-data";
 import {
   ShoppingCart,
   Trash2,
@@ -21,6 +22,7 @@ import {
   ShieldCheck,
   CheckCircle2,
   Heart,
+  Sparkles,
 } from "lucide-react";
 
 export default function CartClient() {
@@ -71,7 +73,8 @@ export default function CartClient() {
     );
   }
 
-  const primaryColor = config?.primary_color || "#2563EB";
+  const isGlam = isGlamStreeStore(slug, config);
+  const primaryColor = isGlam ? "#0b192c" : (config?.primary_color || "#2563EB");
   const freeMin = Number(config?.free_shipping_min_order) || 0;
   const isFreeDelivery = freeMin > 0 && subtotal >= freeMin;
   const shippingCharge =
@@ -286,6 +289,17 @@ export default function CartClient() {
               <h3 className="text-base font-bold text-slate-900 pb-3 border-b border-slate-100">
                 Order Summary
               </h3>
+
+              {isGlam && (
+                <div className="bg-pink-50/80 border border-pink-200/90 rounded-xl p-3 text-xs text-pink-950 space-y-1">
+                  <div className="font-bold flex items-center gap-1.5 text-pink-900">
+                    <Sparkles className="w-3.5 h-3.5 text-pink-600" /> Free Salon Care Kit Included (₹299)
+                  </div>
+                  <p className="text-[11px] text-pink-800 leading-snug">
+                    Includes nail glue, adhesive tabs, buffer, file, cuticle pusher & cleansing prep wipes.
+                  </p>
+                </div>
+              )}
 
               <div className="space-y-3 text-xs">
                 <div className="flex items-center justify-between text-slate-600">

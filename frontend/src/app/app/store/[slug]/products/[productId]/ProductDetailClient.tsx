@@ -11,6 +11,8 @@ import StoreFooter from "@/components/app-platform/store/StoreFooter";
 import PixelInjector from "@/components/app-platform/store/PixelInjector";
 import { pixelTracker } from "@/lib/app-platform/pixel-tracker";
 import { getStoreRouteParams, getStoreHref } from "@/lib/app-platform/store-route-helper";
+import GlamStreeProductTheme from "@/components/app-platform/store/themes/GlamStreeProductTheme";
+import { isGlamStreeStore } from "@/lib/app-platform/glam-stree-data";
 import {
   ShoppingCart,
   Zap,
@@ -130,6 +132,21 @@ export default function ProductDetailClient() {
 
   const isKcAariWork = slug === "kcaariwork" || config?.store_slug === "kcaariwork" || config?.primary_color === "#062817";
   const primaryColor = config?.primary_color || (isKcAariWork ? "#062817" : "#2563EB");
+
+  // Custom theme for Glam Stree Nails
+  if (isGlamStreeStore(slug, config)) {
+    return (
+      <>
+        <PixelInjector config={config} pageTitle={product?.name || "Press On Nails"} />
+        <GlamStreeProductTheme
+          slug={slug}
+          config={config}
+          product={product}
+          relatedProducts={relatedProducts}
+        />
+      </>
+    );
+  }
 
   if (!product) {
     return (

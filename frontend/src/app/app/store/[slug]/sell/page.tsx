@@ -8,6 +8,8 @@ export function generateStaticParams() {
     { slug: "xyz" },
     { slug: "myshoppartner" },
     { slug: "kcaariwork" },
+    { slug: "glam-stree-nails" },
+    { slug: "glamstree" },
   ];
 }
 

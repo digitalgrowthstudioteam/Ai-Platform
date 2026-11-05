@@ -6,6 +6,10 @@ export function generateStaticParams() {
     { slug: "placeholder" },
     { slug: "abc" },
     { slug: "xyz" },
+    { slug: "myshoppartner" },
+    { slug: "kcaariwork" },
+    { slug: "glam-stree-nails" },
+    { slug: "glamstree" },
   ];
 }
 
