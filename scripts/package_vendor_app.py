@@ -19,6 +19,7 @@ import re
 import urllib.request
 import argparse
 from pathlib import Path
+from scripts.vendor_file_manager import get_vendor_workspace
 
 # Fix Windows console UTF-8 output
 if sys.platform == "win32":
@@ -89,7 +90,13 @@ def package_vendor(identifier: str, build_apk: bool = False, build_aab: bool = F
     print(f"📁 Destination Folder Created:")
     print(f"   {vendor_release_dir}")
 
-    # 2. Download / Save Branding Assets
+    # 2. Setup Vendor Workspace & Generate Launcher Icons
+    ws = get_vendor_workspace(slug)
+    ws.setup_android_activity()
+    if logo_url:
+        ws.install_brand_icons(logo_url)
+
+    # 3. Download / Save Branding Assets
     colors_info = {
         "brand_name": store_name,
         "store_slug": slug,
@@ -109,7 +116,7 @@ def package_vendor(identifier: str, build_apk: bool = False, build_aab: bool = F
         except Exception as e:
             print(f"   ⚠ Could not download logo: {e}")
 
-    # 3. Create iOS Configuration
+    # 4. Create iOS Configuration
     ios_summary = f"""====================================================
 Digital Growth Studio — iOS Configuration for {store_name}
 ====================================================

@@ -3,12 +3,23 @@
   "vendor_slug": "glam-stree-nails",
   "package_id": "in.digitalgrowthstudio.glam_stree_nails",
   "apk_filename": "GlamStreeNails-release.apk",
-  "apk_size_bytes": 53566110,
-  "apk_size_mb": "51.1 MB",
+  "apk_size_bytes": 54555128,
+  "apk_size_mb": "52.0 MB",
   "keystore_alias": "dgs-master-key",
   "keystore_sha1": "5F:53:67:62:97:02:79:9D:63:F9:AA:1B:DE:E1:42:DA:87:B0:C1:8E",
   "google_oauth_client_id": "455814773569-dl1cglemkebqm3vdf5sb33t0lf7vqmc.apps.googleusercontent.com",
-  "built_at": "2026-11-05T13:40:00+05:30",
+  "built_at": "2026-11-05T14:17:40+05:30",
+  "branding_assets": {
+    "launcher_icon": "Glam Stree Gold & Navy Logo",
+    "adaptive_round_icon": true,
+    "master_icon_path": "vendors/glam-stree-nails/branding/app_icon_512.png",
+    "bundled_asset": "mobile_app/assets/images/logo.png"
+  },
+  "activity_resolution": {
+    "package": "in.digitalgrowthstudio.glam_stree_nails",
+    "main_activity": "in.digitalgrowthstudio.glam_stree_nails.MainActivity",
+    "status": "verified_compiled"
+  },
   "features": {
     "open_browsing_flow": true,
     "contextual_login": "checkout_and_profile_only",

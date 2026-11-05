@@ -27,17 +27,23 @@ class SmartStoreImage extends StatelessWidget {
 
   Widget _buildFallback(BuildContext context) {
     if (errorWidget != null) return errorWidget!;
-    return Container(
+    return Image.asset(
+      "assets/images/logo.png",
       width: width,
       height: height,
-      color: const Color(0xFFF1F5F9),
-      alignment: Alignment.center,
-      child: Text(
-        fallbackText,
-        style: const TextStyle(
-          color: Color(0xFF0B192C),
-          fontWeight: FontWeight.w900,
-          fontSize: 16,
+      fit: fit,
+      errorBuilder: (_, _, _) => Container(
+        width: width,
+        height: height,
+        color: const Color(0xFFF1F5F9),
+        alignment: Alignment.center,
+        child: Text(
+          fallbackText,
+          style: const TextStyle(
+            color: Color(0xFF0B192C),
+            fontWeight: FontWeight.w900,
+            fontSize: 16,
+          ),
         ),
       ),
     );
