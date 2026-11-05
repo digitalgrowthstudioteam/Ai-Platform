@@ -18,13 +18,11 @@ class ApiService {
         final data = json.decode(response.body);
         return StoreConfig.fromJson(data);
       }
-    } catch (e) {
-      // Offline fallback
-    }
+    } catch (_) {}
     return null;
   }
 
-  /// 2. Banners
+  /// 2. Banners - Synced dynamically with vendor dashboard
   Future<List<BannerItem>> getBanners() async {
     try {
       final response = await http.get(Uri.parse("$_baseUrl/banners"));
@@ -36,7 +34,7 @@ class ApiService {
     return [];
   }
 
-  /// 3. Categories
+  /// 3. Categories - Synced dynamically with vendor dashboard
   Future<List<CategoryItem>> getCategories() async {
     try {
       final response = await http.get(Uri.parse("$_baseUrl/categories"));
@@ -48,7 +46,7 @@ class ApiService {
     return [];
   }
 
-  /// 4. Products with search & category filter
+  /// 4. Products with search & category filter - Synced with vendor catalog
   Future<List<ProductItem>> getProducts({String? category, String? search}) async {
     try {
       final queryParams = <String, String>{};
@@ -63,8 +61,8 @@ class ApiService {
       final response = await http.get(uri);
 
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final List<dynamic> items = data['items'] ?? [];
+        final dynamic decoded = json.decode(response.body);
+        final List<dynamic> items = (decoded is List) ? decoded : (decoded['items'] ?? []);
         return items.map((item) => ProductItem.fromJson(item)).toList();
       }
     } catch (_) {}
@@ -82,7 +80,107 @@ class ApiService {
     return null;
   }
 
-  /// 6. Create Customer Order
+  /// 6. Customer Authentication (Sign In & Registration)
+  Future<Map<String, dynamic>> customerAuth({
+    required String action, // "login", "register", "otp_request", "otp_verify"
+    required String phone,
+    String? name,
+    String? email,
+    String? password,
+  }) async {
+    final payload = <String, dynamic>{
+      "action": action,
+      "phone": phone.trim(),
+    };
+    if (name != null && name.isNotEmpty) payload["name"] = name.trim();
+    if (email != null && email.isNotEmpty) payload["email"] = email.trim();
+    if (password != null && password.isNotEmpty) payload["password"] = password.trim();
+
+    final response = await http.post(
+      Uri.parse("$_baseUrl/customer/auth"),
+      headers: {"Content-Type": "application/json"},
+      body: json.encode(payload),
+    );
+
+    final data = json.decode(response.body);
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return data;
+    } else {
+      final detail = data['detail'];
+      final msg = detail is String ? detail : (data['message'] ?? "Authentication failed");
+      throw Exception(msg);
+    }
+  }
+
+  /// 7. Google 1-Click Customer Authentication
+  Future<Map<String, dynamic>> customerGoogleAuth({
+    required String email,
+    required String name,
+    String? phone,
+    String? googleId,
+  }) async {
+    final payload = <String, dynamic>{
+      "email": email.trim(),
+      "name": name.trim(),
+    };
+    if (phone != null && phone.isNotEmpty) payload["phone"] = phone.trim();
+    if (googleId != null && googleId.isNotEmpty) payload["google_id"] = googleId.trim();
+
+    final response = await http.post(
+      Uri.parse("$_baseUrl/customer/google-auth"),
+      headers: {"Content-Type": "application/json"},
+      body: json.encode(payload),
+    );
+
+    final data = json.decode(response.body);
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return data;
+    } else {
+      final detail = data['detail'];
+      final msg = detail is String ? detail : (data['message'] ?? "Google login failed");
+      throw Exception(msg);
+    }
+  }
+
+  /// 8. Forgot Password Request
+  Future<Map<String, dynamic>> customerForgotPassword(String identifier) async {
+    final response = await http.post(
+      Uri.parse("$_baseUrl/customer/forgot-password"),
+      headers: {"Content-Type": "application/json"},
+      body: json.encode({"identifier": identifier.trim()}),
+    );
+    final data = json.decode(response.body);
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return data;
+    } else {
+      throw Exception(data['detail'] ?? "Password reset request failed");
+    }
+  }
+
+  /// 9. Reset Password with OTP
+  Future<Map<String, dynamic>> customerResetPassword({
+    required String identifier,
+    required String otp,
+    required String newPassword,
+  }) async {
+    final response = await http.post(
+      Uri.parse("$_baseUrl/customer/reset-password"),
+      headers: {"Content-Type": "application/json"},
+      body: json.encode({
+        "identifier": identifier.trim(),
+        "otp": otp.trim(),
+        "new_password": newPassword.trim(),
+      }),
+    );
+    final data = json.decode(response.body);
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return data;
+    } else {
+      throw Exception(data['detail'] ?? "Password reset failed");
+    }
+  }
+
+  /// 10. Create Customer Order
   Future<Map<String, dynamic>> createOrder(Map<String, dynamic> payload) async {
     final response = await http.post(
       Uri.parse("$_baseUrl/orders"),
@@ -98,7 +196,31 @@ class ApiService {
     }
   }
 
-  /// 7. Track Order by ID
+  /// 11. Confirm Order Online Payment (Razorpay)
+  Future<Map<String, dynamic>> confirmOrderPayment({
+    required String orderId,
+    required String razorpayPaymentId,
+    String? razorpayOrderId,
+    String? razorpaySignature,
+  }) async {
+    final response = await http.post(
+      Uri.parse("$_baseUrl/orders/$orderId/confirm-payment"),
+      headers: {"Content-Type": "application/json"},
+      body: json.encode({
+        "razorpay_payment_id": razorpayPaymentId,
+        "razorpay_order_id": razorpayOrderId,
+        "razorpay_signature": razorpaySignature,
+      }),
+    );
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return json.decode(response.body);
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? "Payment confirmation failed");
+    }
+  }
+
+  /// 12. Track Order by ID or Number
   Future<Map<String, dynamic>?> trackOrder(String orderId) async {
     try {
       final response = await http.get(Uri.parse("$_baseUrl/orders/$orderId"));
@@ -109,7 +231,7 @@ class ApiService {
     return null;
   }
 
-  /// 8. Order History by Customer Phone
+  /// 13. Order History by Customer Phone
   Future<List<dynamic>> getCustomerOrders(String phone) async {
     try {
       final response = await http.get(

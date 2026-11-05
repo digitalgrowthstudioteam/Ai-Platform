@@ -47,20 +47,20 @@ class StoreConfig {
 
   factory StoreConfig.fromJson(Map<String, dynamic> json) {
     return StoreConfig(
-      storeName: json['store_name'] ?? 'Store',
-      storeSlug: json['store_slug'] ?? '',
+      storeName: json['store_name'] ?? 'Glam stree nails',
+      storeSlug: json['store_slug'] ?? 'glam-stree-nails',
       subdomain: json['subdomain'],
       description: json['description'],
-      primaryColorHex: json['primary_color'] ?? '#2563EB',
-      secondaryColorHex: json['secondary_color'] ?? '#1E293B',
+      primaryColorHex: json['primary_color'] ?? '#0B192C',
+      secondaryColorHex: json['secondary_color'] ?? '#DB2777',
       logoUrl: json['logo_url'],
       bannerUrl: json['banner_url'],
       contactEmail: json['contact_email'],
-      contactPhone: json['contact_phone'],
-      businessAddress: json['business_address'],
+      contactPhone: json['contact_phone'] ?? '7499904962',
+      businessAddress: json['business_address'] ?? 'Pune, Maharashtra',
       openingHours: json['opening_hours'] ?? 'Mon - Sat: 9:00 AM - 9:00 PM',
       codEnabled: json['cod_enabled'] ?? true,
-      razorpayEnabled: json['razorpay_enabled'] ?? false,
+      razorpayEnabled: json['razorpay_enabled'] ?? true,
       razorpayKeyId: json['razorpay_key_id'],
       appVersion: json['app_version'] ?? '1.0.0',
       shippingEnabled: json['shipping_enabled'] ?? true,
@@ -76,24 +76,30 @@ class BannerItem {
   final String id;
   final String title;
   final String? subtitle;
+  final String? promoOffer;
   final String imageUrl;
   final String? actionUrl;
+  final int sortOrder;
 
   BannerItem({
     required this.id,
     required this.title,
     this.subtitle,
+    this.promoOffer,
     required this.imageUrl,
     this.actionUrl,
+    this.sortOrder = 0,
   });
 
   factory BannerItem.fromJson(Map<String, dynamic> json) {
     return BannerItem(
-      id: json['id'] ?? '',
+      id: json['id']?.toString() ?? '',
       title: json['title'] ?? '',
-      subtitle: json['subtitle'],
+      subtitle: json['subtitle'] ?? json['description'],
+      promoOffer: json['promo_offer'],
       imageUrl: json['image_url'] ?? '',
-      actionUrl: json['action_url'],
+      actionUrl: json['action_url'] ?? json['link_url'],
+      sortOrder: json['sort_order'] ?? 0,
     );
   }
 }
@@ -103,20 +109,23 @@ class CategoryItem {
   final String name;
   final String slug;
   final String? imageUrl;
+  final int sortOrder;
 
   CategoryItem({
     required this.id,
     required this.name,
     required this.slug,
     this.imageUrl,
+    this.sortOrder = 0,
   });
 
   factory CategoryItem.fromJson(Map<String, dynamic> json) {
     return CategoryItem(
-      id: json['id'] ?? '',
+      id: json['id']?.toString() ?? '',
       name: json['name'] ?? '',
       slug: json['slug'] ?? '',
       imageUrl: json['image_url'],
+      sortOrder: json['sort_order'] ?? 0,
     );
   }
 }
@@ -143,14 +152,23 @@ class ProductVariant {
   });
 
   factory ProductVariant.fromJson(Map<String, dynamic> json) {
+    List<String> imgs = [];
+    if (json['images'] != null) {
+      if (json['images'] is List) {
+        imgs = (json['images'] as List).map((e) => e.toString()).toList();
+      } else if (json['images'] is String && (json['images'] as String).isNotEmpty) {
+        imgs = [(json['images'] as String)];
+      }
+    }
+
     return ProductVariant(
-      id: json['id'] ?? '',
-      title: json['title'] ?? '',
+      id: json['id']?.toString() ?? '',
+      title: json['title'] ?? (json['name'] ?? ''),
       sku: json['sku'] ?? '',
       price: (json['price'] as num?)?.toDouble() ?? 0.0,
       salePrice: (json['sale_price'] as num?)?.toDouble(),
       stockQuantity: json['stock_quantity'] ?? 0,
-      images: (json['images'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
+      images: imgs,
       attributes: (json['attributes'] as Map<String, dynamic>?) ?? {},
     );
   }
@@ -169,6 +187,8 @@ class ProductItem {
   final String? primaryImage;
   final List<String> galleryImages;
   final List<ProductVariant> variants;
+  final bool isFeatured;
+  final bool inStock;
 
   ProductItem({
     required this.id,
@@ -183,11 +203,20 @@ class ProductItem {
     this.primaryImage,
     required this.galleryImages,
     required this.variants,
+    this.isFeatured = false,
+    this.inStock = true,
   });
+
+  int get discountPercentage {
+    if (regularPrice > 0 && effectivePrice < regularPrice) {
+      return (((regularPrice - effectivePrice) / regularPrice) * 100).round();
+    }
+    return 0;
+  }
 
   factory ProductItem.fromJson(Map<String, dynamic> json) {
     List<String> gallery = [];
-    if (json['images'] != null) {
+    if (json['images'] != null && json['images'] is List) {
       gallery = (json['images'] as List<dynamic>).map((e) {
         if (e is Map<String, dynamic>) {
           return e['image_url']?.toString() ?? '';
@@ -197,27 +226,38 @@ class ProductItem {
     }
 
     List<ProductVariant> vars = [];
-    if (json['variants'] != null) {
+    if (json['variants'] != null && json['variants'] is List) {
       vars = (json['variants'] as List<dynamic>)
           .map((v) => ProductVariant.fromJson(v as Map<String, dynamic>))
           .toList();
     }
 
+    final regPrice = (json['regular_price'] as num?)?.toDouble() ?? 0.0;
+    final sPrice = (json['sale_price'] as num?)?.toDouble();
+    final effPrice = (json['effective_price'] as num?)?.toDouble() ??
+        (sPrice != null && sPrice > 0 ? sPrice : regPrice);
+
+    final pImage = json['thumbnail_url'] ??
+        (json['primary_image'] ?? (gallery.isNotEmpty ? gallery.first : null));
+
+    final title = json['name'] ?? (json['title'] ?? 'Luxury Press-On Nails');
+    final catName = json['category_name'] ?? json['category'];
+
     return ProductItem(
-      id: json['id'] ?? '',
-      title: json['title'] ?? '',
+      id: json['id']?.toString() ?? '',
+      title: title,
       slug: json['slug'] ?? '',
       description: json['description'],
-      regularPrice: (json['regular_price'] as num?)?.toDouble() ?? 0.0,
-      salePrice: (json['sale_price'] as num?)?.toDouble(),
-      effectivePrice: (json['effective_price'] as num?)?.toDouble() ??
-          ((json['sale_price'] as num?)?.toDouble() ??
-              ((json['regular_price'] as num?)?.toDouble() ?? 0.0)),
-      stockQuantity: json['stock_quantity'] ?? 0,
-      category: json['category'],
-      primaryImage: json['primary_image'] ?? (gallery.isNotEmpty ? gallery.first : null),
-      galleryImages: gallery,
+      regularPrice: regPrice,
+      salePrice: sPrice,
+      effectivePrice: effPrice,
+      stockQuantity: json['stock_quantity'] ?? 50,
+      category: catName,
+      primaryImage: pImage,
+      galleryImages: gallery.isNotEmpty ? gallery : (pImage != null ? [pImage] : []),
       variants: vars,
+      isFeatured: json['is_featured'] ?? false,
+      inStock: json['in_stock'] ?? (json['stock_quantity'] == null || json['stock_quantity'] > 0),
     );
   }
 }
