@@ -5,6 +5,7 @@ import '../providers/store_provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import 'order_tracking_screen.dart';
+import '../config/app_config.dart';
 
 class CheckoutScreen extends StatefulWidget {
   final double couponDiscount;
@@ -115,6 +116,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       cart.clearCart();
 
       if (mounted) {
+        final store = Provider.of<StoreProvider>(context, listen: false);
         showDialog(
           context: context,
           barrierDismissible: false,
@@ -129,7 +131,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ],
             ),
             content: Text(
-              "Thank you for ordering with Glam Stree Nails!\n\n"
+              "Thank you for ordering with ${store.config?.storeName ?? AppConfig.appTitle}!\n\n"
               "Your Order ID is: $orderNumber\n"
               "Payment: ${_paymentMode == 'RAZORPAY' ? 'Paid Online via Razorpay' : 'Cash on Delivery (COD)'}\n\n"
               "A confirmation message and tracking details have been sent to your phone & email.",

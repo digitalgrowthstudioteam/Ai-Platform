@@ -12,6 +12,7 @@ import 'cart_screen.dart';
 import 'order_tracking_screen.dart';
 import 'profile_screen.dart';
 import 'login_screen.dart';
+import '../config/app_config.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -58,23 +59,24 @@ class HomeScreen extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    store.config?.storeName ?? "Glam stree nails",
-                    style: const TextStyle(
-                      color: Color(0xFF0B192C),
+                    store.config?.storeName ?? AppConfig.appTitle,
+                    style: TextStyle(
+                      color: store.primaryColor,
                       fontSize: 15,
                       fontWeight: FontWeight.w900,
                       letterSpacing: 0.5,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const Text(
-                    "Luxury Press-On Studio",
+                  Text(
+                    store.config?.description ?? AppConfig.appTagline,
                     style: TextStyle(
-                      color: Color(0xFFDB2777),
+                      color: store.secondaryColor,
                       fontSize: 10,
                       fontWeight: FontWeight.bold,
                       letterSpacing: 0.8,
                     ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
@@ -336,20 +338,22 @@ class HomeScreen extends StatelessWidget {
                       border: Border.all(color: const Color(0xFFFDE68A)),
                     ),
                     child: Row(
-                      children: const [
-                        Icon(Icons.straighten, color: Color(0xFFD97706), size: 20),
-                        SizedBox(width: 10),
+                      children: [
+                        const Icon(Icons.straighten, color: Color(0xFFD97706), size: 20),
+                        const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            "Nail Shape & Sizing Guide — Find your custom mm fit",
-                            style: TextStyle(
+                            AppConfig.activeStoreSlug == "ashtekar-collection"
+                                ? "Men's Apparel Size Chart — Find your tailored fit"
+                                : "Nail Shape & Sizing Guide — Find your custom mm fit",
+                            style: const TextStyle(
                               color: Color(0xFF92400E),
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                         ),
-                        Icon(Icons.arrow_forward_ios, size: 12, color: Color(0xFFD97706)),
+                        const Icon(Icons.arrow_forward_ios, size: 12, color: Color(0xFFD97706)),
                       ],
                     ),
                   ),

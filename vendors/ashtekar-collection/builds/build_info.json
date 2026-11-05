@@ -1,0 +1,36 @@
+{
+  "brand_name": "Ashtekar collection",
+  "vendor_code": "VND0012",
+  "vendor_slug": "ashtekar-collection",
+  "category": "Mens Collection Apparels",
+  "package_id": "in.digitalgrowthstudio.ashtekar_collection",
+  "apk_filename": "AshtekarCollection-release.apk",
+  "apk_size_bytes": 54166544,
+  "apk_size_mb": "51.7 MB",
+  "keystore_alias": "dgs-master-key",
+  "keystore_sha1": "5F:53:67:62:97:02:79:9D:63:F9:AA:1B:DE:E1:42:DA:87:B0:C1:8E",
+  "built_at": "2026-11-05T15:10:00+05:30",
+  "theme": {
+    "primary_color": "#0F172A",
+    "secondary_color": "#D4AF37",
+    "style": "Deep Royal Charcoal Navy & Imperial Sovereign Gold"
+  },
+  "branding_assets": {
+    "launcher_icon": "Gold Crown & AC Monogram on Royal Navy Canvas",
+    "adaptive_round_icon": true,
+    "master_icon_path": "vendors/ashtekar-collection/branding/app_icon_512.png",
+    "bundled_asset": "mobile_app/assets/images/logo.png"
+  },
+  "activity_resolution": {
+    "package": "in.digitalgrowthstudio.ashtekar_collection",
+    "main_activity": "in.digitalgrowthstudio.ashtekar_collection.MainActivity",
+    "status": "verified_compiled"
+  },
+  "backend_sync": {
+    "config_endpoint": "https://digital-growth-studio-api.onrender.com/api/store/ashtekar-collection/config",
+    "banners_endpoint": "https://digital-growth-studio-api.onrender.com/api/store/ashtekar-collection/banners",
+    "categories_endpoint": "https://digital-growth-studio-api.onrender.com/api/store/ashtekar-collection/categories",
+    "products_endpoint": "https://digital-growth-studio-api.onrender.com/api/store/ashtekar-collection/products",
+    "status": "HTTP 200 Verified"
+  }
+}

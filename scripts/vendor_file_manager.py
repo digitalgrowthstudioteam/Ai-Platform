@@ -10,12 +10,17 @@ Also automates:
 Prevents any mixing or merging between different brands/stores.
 """
 import os
+import sys
 import io
 import json
 import base64
 import urllib.request
 from pathlib import Path
 from typing import Dict, Any
+
+if sys.platform == "win32":
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 try:
     from PIL import Image, ImageDraw

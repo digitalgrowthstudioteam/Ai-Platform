@@ -7,6 +7,7 @@ import '../services/api_service.dart';
 import '../widgets/sizing_guide_sheet.dart';
 import 'order_tracking_screen.dart';
 import 'login_screen.dart';
+import '../config/app_config.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -54,11 +55,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _handleLogout() {
+    final store = Provider.of<StoreProvider>(context, listen: false);
+    final storeName = store.config?.storeName ?? AppConfig.appTitle;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text("Sign Out?"),
-        content: const Text("Are you sure you want to log out of Glam Stree Nails?"),
+        content: Text("Are you sure you want to log out of $storeName?"),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),

@@ -14,7 +14,7 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace = "in.digitalgrowthstudio.glam_stree_nails"
+    namespace = "in.digitalgrowthstudio.ashtekar_collection"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -42,8 +42,8 @@ android {
     }
 
     defaultConfig {
-        // Unique Application ID for Glam Stree Nails mobile app
-        applicationId = "in.digitalgrowthstudio.glam_stree_nails"
+        // Unique Application ID for Ashtekar Collection mobile app
+        applicationId = "in.digitalgrowthstudio.ashtekar_collection"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode

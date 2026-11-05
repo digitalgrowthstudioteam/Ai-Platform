@@ -321,14 +321,15 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                     const SizedBox(height: 4),
 
                     // Tagline
-                    const Text(
-                      "Handcrafted Luxury Press-On Studio",
+                    Text(
+                      store.config?.description ?? AppConfig.appTagline,
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
                         letterSpacing: 1.2,
-                        color: Color(0xFFF472B6), // Pink Accent
+                        color: store.secondaryColor,
                       ),
+                      textAlign: TextAlign.center,
                     ),
                   ],
                 ),
@@ -420,7 +421,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                   controller: _tabCtrl,
                   children: [
                     // TAB 1: SIGN IN
-                    _buildSignInTab(auth, primary),
+                    _buildSignInTab(auth, primary, storeName),
 
                     // TAB 2: CREATE ACCOUNT
                     _buildRegisterTab(auth, primary),
@@ -434,7 +435,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     );
   }
 
-  Widget _buildSignInTab(AuthProvider auth, Color primary) {
+  Widget _buildSignInTab(AuthProvider auth, Color primary, String storeName) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       child: Form(
@@ -514,9 +515,9 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                       height: 20,
                       child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                     )
-                  : const Text(
-                      "Sign In to Glam Stree",
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                  : Text(
+                      "Sign In to $storeName",
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                     ),
             ),
           ],
