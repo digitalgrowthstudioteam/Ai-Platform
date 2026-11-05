@@ -5,11 +5,11 @@
   "category": "Mens Collection Apparels",
   "package_id": "in.digitalgrowthstudio.ashtekar_collection",
   "apk_filename": "AshtekarCollection-release.apk",
-  "apk_size_bytes": 54166544,
-  "apk_size_mb": "51.7 MB",
+  "apk_size_bytes": 55497505,
+  "apk_size_mb": "52.93 MB",
   "keystore_alias": "dgs-master-key",
   "keystore_sha1": "5F:53:67:62:97:02:79:9D:63:F9:AA:1B:DE:E1:42:DA:87:B0:C1:8E",
-  "built_at": "2026-11-05T15:10:00+05:30",
+  "built_at": "2026-11-05T19:30:00+05:30",
   "theme": {
     "primary_color": "#0F172A",
     "secondary_color": "#D4AF37",
@@ -32,6 +32,15 @@
     "categories_endpoint": "https://digital-growth-studio-api.onrender.com/api/store/ashtekar-collection/categories",
     "products_endpoint": "https://digital-growth-studio-api.onrender.com/api/store/ashtekar-collection/products",
     "status": "HTTP 200 Verified"
-  }
+  },
+  "apk_sha256": "d127fd7d65d31a14dbc1d7693a05a5964720000ebeec198ee218c063045575cb",
+  "version": "1.0.1+2",
+  "changelog": [
+    "Removed WhatsApp sizing floating button from home screen",
+    "Upgraded Add to Cart button to span full card width",
+    "Upgraded Product Detail page with full-aspect contain image and pinch-to-zoom interactive viewer",
+    "Added horizontal variant & gallery image thumbnail carousel",
+    "Implemented persistent Wishlist with SharedPreferences and AppBar/Profile navigation",
+    "Integrated Google Sign-In with resolved Android Gradle Plugin 8.9.1 compatibility"
+  ]
 }
-
