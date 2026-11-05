@@ -706,28 +706,35 @@ export default function AccountClient() {
           {/* Auth Portal Card */}
           <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-xs space-y-6">
             {/* Store Brand Header */}
-            <div className="text-center space-y-2">
+            <div className="text-center space-y-3">
               {config?.logo_url ? (
-                <img
-                  src={config.logo_url}
-                  alt={config.store_name}
-                  className="w-14 h-14 mx-auto rounded-2xl object-cover border border-slate-200 shadow-xs"
-                />
+                <div className="inline-flex p-2 rounded-2xl border border-slate-200 bg-white shadow-xs">
+                  <img
+                    src={config.logo_url}
+                    alt={config.store_name}
+                    className="h-14 sm:h-16 max-w-[200px] object-contain rounded-xl"
+                  />
+                </div>
               ) : (
                 <div
-                  className="w-14 h-14 mx-auto rounded-2xl flex items-center justify-center text-white font-black text-xl shadow-xs uppercase"
+                  className="w-16 h-16 mx-auto rounded-2xl flex items-center justify-center text-white font-black text-2xl shadow-xs uppercase"
                   style={{ backgroundColor: primaryColor }}
                 >
                   {config?.store_name ? config.store_name[0] : "S"}
                 </div>
               )}
-              <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">
-                Customer Account
-              </h1>
-              <p className="text-xs text-slate-500 max-w-xs mx-auto">
+              <div>
+                <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">
+                  {config?.store_name || "Store Account"}
+                </h1>
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+                  Official Customer Portal
+                </p>
+              </div>
+              <p className="text-xs text-slate-500 max-w-xs mx-auto leading-relaxed">
                 {authMode === "login"
-                  ? "Sign in with your mobile number to view past orders, track shipments, and manage saved delivery addresses."
-                  : "Create your personal shopper account to track purchases and enjoy 1-click checkouts."}
+                  ? `Sign in to ${config?.store_name || "your account"} to view past orders, track live shipments, and enjoy 1-click checkout.`
+                  : `Create your verified shopper account for ${config?.store_name || "our store"} to track orders and save your delivery details.`}
               </p>
             </div>
 
@@ -1013,14 +1020,25 @@ export default function AccountClient() {
         {showGooglePhoneModal && (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
             <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-5 animate-in fade-in zoom-in-95">
-              <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto">
-                <Phone className="w-6 h-6" />
-              </div>
-
-              <div className="text-center space-y-1">
-                <h3 className="text-lg font-bold text-slate-900">1 Final Step for Delivery Updates</h3>
+              <div className="text-center space-y-2">
+                {config?.logo_url ? (
+                  <div className="inline-flex p-1.5 rounded-xl border border-slate-200 bg-white shadow-2xs mb-1">
+                    <img
+                      src={config.logo_url}
+                      alt={config.store_name}
+                      className="h-10 max-w-[150px] object-contain rounded-lg"
+                    />
+                  </div>
+                ) : (
+                  <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto mb-1">
+                    <Phone className="w-6 h-6" />
+                  </div>
+                )}
+                <h3 className="text-lg font-bold text-slate-900">
+                  Connect with {config?.store_name || "Store"}
+                </h3>
                 <p className="text-xs text-slate-500 max-w-xs mx-auto">
-                  Indian courier & logistics partners require a 10-digit mobile number for dispatch OTPs and tracking updates.
+                  To receive dispatch updates and courier delivery tracking for orders placed with {config?.store_name || "our store"}, please enter your 10-digit mobile number.
                 </p>
               </div>
 
