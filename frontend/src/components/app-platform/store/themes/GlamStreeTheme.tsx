@@ -250,20 +250,45 @@ export default function GlamStreeTheme({
         </div>
       </div>
 
-      {/* 2. MAIN HEADER (Clean White Luxury Navbar) */}
+      {/* 2. MAIN HEADER (Clean White Luxury Navbar with Standard Left-Aligned Logo) */}
       <header className="bg-white border-b border-slate-200/90 sticky top-0 z-40 shadow-xs">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
-          {/* Left: Mobile Hamburger & Desktop Links */}
-          <div className="flex items-center gap-4">
+        <div className="max-w-6xl mx-auto px-4 py-2.5 sm:py-3 flex items-center justify-between gap-4">
+          {/* Left: Mobile Hamburger + Standard Left Logo + Desktop Nav Links */}
+          <div className="flex items-center gap-3 sm:gap-6 min-w-0">
+            {/* Mobile Menu Hamburger */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-1.5 rounded-lg text-slate-700 hover:bg-slate-100 transition-colors md:hidden"
+              className="p-1.5 rounded-lg text-slate-700 hover:bg-slate-100 transition-colors md:hidden shrink-0"
               aria-label="Open Navigation Menu"
             >
               <Menu className="w-5 h-5" />
             </button>
 
-            <nav className="hidden md:flex items-center gap-6 text-xs font-semibold uppercase tracking-wider text-slate-700">
+            {/* Standard Left-Aligned Brand Logo */}
+            <Link
+              href={getStoreHref(slug, "/")}
+              className="flex items-center gap-2 group select-none shrink-0"
+            >
+              {config?.logo_url ? (
+                <img
+                  src={config.logo_url}
+                  alt={brandName}
+                  className="h-9 sm:h-11 max-w-[170px] sm:max-w-[210px] object-contain group-hover:scale-102 transition-transform"
+                />
+              ) : (
+                <div className="flex flex-col">
+                  <span className="font-serif text-lg sm:text-2xl font-black tracking-tight text-[#0b192c] block uppercase leading-none">
+                    {brandName}
+                  </span>
+                  <span className="text-[9px] font-sans font-bold uppercase tracking-[0.25em] text-pink-600 block mt-0.5">
+                    Luxury Press-On Studio
+                  </span>
+                </div>
+              )}
+            </Link>
+
+            {/* Desktop Navigation Links */}
+            <nav className="hidden md:flex items-center gap-6 text-xs font-semibold uppercase tracking-wider text-slate-700 ml-2">
               <Link
                 href={getStoreHref(slug, "/")}
                 className="text-[#0b192c] font-black border-b-2 border-[#0b192c] pb-0.5"
@@ -290,29 +315,6 @@ export default function GlamStreeTheme({
               </Link>
             </nav>
           </div>
-
-          {/* Center: Brand Logo / Stylized Name */}
-          <Link
-            href={getStoreHref(slug, "/")}
-            className="flex flex-col items-center group select-none"
-          >
-            {config?.logo_url ? (
-              <img
-                src={config.logo_url}
-                alt={brandName}
-                className="h-10 sm:h-12 max-w-[190px] object-contain group-hover:scale-102 transition-transform"
-              />
-            ) : (
-              <div className="text-center">
-                <span className="font-serif text-lg sm:text-2xl font-black tracking-tight text-[#0b192c] block uppercase">
-                  {brandName}
-                </span>
-                <span className="text-[9px] font-sans font-bold uppercase tracking-[0.25em] text-pink-600 block">
-                  Luxury Press-On Studio
-                </span>
-              </div>
-            )}
-          </Link>
 
           {/* Right: Actions (Search, Wishlist, Account, Cart) */}
           <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">

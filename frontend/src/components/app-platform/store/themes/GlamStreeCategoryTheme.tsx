@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useVendorCart } from "@/lib/app-platform/cart-store";
@@ -71,6 +71,20 @@ export default function GlamStreeCategoryTheme({
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
   const [addedMap, setAddedMap] = useState<Record<string, boolean>>({});
   const [activePolicy, setActivePolicy] = useState<PolicyType | null>(null);
+  const [customerName, setCustomerName] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      const sess = localStorage.getItem(`dgs_customer_session_${slug}`);
+      if (sess) {
+        const parsed = JSON.parse(sess);
+        if (parsed?.name && parsed?.isLoggedIn) {
+          const first = parsed.name.trim().split(" ")[0];
+          setCustomerName(first);
+        }
+      }
+    } catch (e) {}
+  }, [slug]);
 
   const brandName = config?.store_name || "Glam stree nails";
   const brandPhone = config?.contact_phone || "7499904962";
@@ -216,18 +230,43 @@ export default function GlamStreeCategoryTheme({
         </div>
       </div>
 
-      {/* 2. MAIN HEADER (Clean White Navbar) */}
+      {/* 2. MAIN HEADER (Clean White Navbar with Standard Left-Aligned Logo) */}
       <header className="bg-white border-b border-slate-200/90 sticky top-0 z-40 shadow-xs">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-4">
+        <div className="max-w-6xl mx-auto px-4 py-2.5 sm:py-3 flex items-center justify-between gap-4">
+          {/* Left: Mobile Hamburger + Standard Left Logo + Desktop Nav */}
+          <div className="flex items-center gap-3 sm:gap-6 min-w-0">
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-1.5 rounded-lg text-slate-700 hover:bg-slate-100 transition-colors md:hidden"
+              className="p-1.5 rounded-lg text-slate-700 hover:bg-slate-100 transition-colors md:hidden shrink-0"
+              aria-label="Open Navigation Menu"
             >
               <Menu className="w-5 h-5" />
             </button>
 
-            <nav className="hidden md:flex items-center gap-6 text-xs font-semibold uppercase tracking-wider text-slate-700">
+            {/* Standard Left-Aligned Brand Logo */}
+            <Link
+              href={getStoreHref(slug, "/")}
+              className="flex items-center gap-2 group select-none shrink-0"
+            >
+              {config?.logo_url ? (
+                <img
+                  src={config.logo_url}
+                  alt={brandName}
+                  className="h-9 sm:h-11 max-w-[170px] sm:max-w-[210px] object-contain group-hover:scale-102 transition-transform"
+                />
+              ) : (
+                <div className="flex flex-col">
+                  <span className="font-serif text-lg sm:text-2xl font-black tracking-tight text-[#0b192c] block uppercase leading-none">
+                    {brandName}
+                  </span>
+                  <span className="text-[9px] font-sans font-bold uppercase tracking-[0.25em] text-pink-600 block mt-0.5">
+                    Studio Catalog
+                  </span>
+                </div>
+              )}
+            </Link>
+
+            <nav className="hidden md:flex items-center gap-6 text-xs font-semibold uppercase tracking-wider text-slate-700 ml-2">
               <Link href={getStoreHref(slug, "/")} className="hover:text-pink-600 transition-colors">
                 Home
               </Link>
@@ -240,36 +279,42 @@ export default function GlamStreeCategoryTheme({
               >
                 <Ruler className="w-3.5 h-3.5 text-yellow-600" /> Sizing Guide
               </button>
+              <Link
+                href={getStoreHref(slug, "/categories?cat=cat-bestsellers")}
+                className="hover:text-pink-600 transition-colors text-pink-600 font-bold"
+              >
+                Bestsellers
+              </Link>
             </nav>
           </div>
 
-          <Link href={getStoreHref(slug, "/")} className="flex flex-col items-center select-none">
-            {config?.logo_url ? (
-              <img src={config.logo_url} alt={brandName} className="h-10 sm:h-12 max-w-[190px] object-contain" />
-            ) : (
-              <div className="text-center">
-                <span className="font-serif text-lg sm:text-2xl font-black tracking-tight text-[#0b192c] block uppercase">
-                  {brandName}
-                </span>
-                <span className="text-[9px] font-sans font-bold uppercase tracking-[0.25em] text-pink-600 block">
-                  Studio Catalog
-                </span>
-              </div>
-            )}
-          </Link>
-
-          <div className="flex items-center gap-2 sm:gap-3">
+          {/* Right: Actions (Search, Account, Cart) */}
+          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
             <button
               onClick={() => setSearchOpen(!searchOpen)}
-              className="p-2 text-slate-700 hover:text-[#0b192c] rounded-full transition-colors"
+              className="p-2 text-slate-700 hover:text-[#0b192c] hover:bg-slate-100 rounded-full transition-colors"
+              title="Search nails"
             >
               <Search className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
 
-            <Link href={getStoreHref(slug, "/cart")} className="relative p-2 text-slate-800 rounded-full transition-colors">
+            <Link
+              href={getStoreHref(slug, "/account")}
+              className="p-2 text-slate-700 hover:text-[#0b192c] hover:bg-slate-100 rounded-full transition-colors hidden sm:flex items-center gap-1.5 text-xs font-semibold"
+              title="Customer Account"
+            >
+              <User className="w-4 h-4 sm:w-5 sm:h-5" />
+              <span>{customerName || "Login"}</span>
+            </Link>
+
+            <Link
+              href={getStoreHref(slug, "/cart")}
+              className="relative p-2 text-slate-800 hover:bg-slate-100 rounded-full transition-colors"
+              title="Shopping Cart"
+            >
               <ShoppingCart className="w-5 h-5 sm:w-6 sm:h-6" />
               {cartCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-[#0b192c] text-white font-black text-[10px] w-5 h-5 rounded-full flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 bg-[#0b192c] text-white font-black text-[10px] w-5 h-5 rounded-full flex items-center justify-center shadow-md">
                   {cartCount}
                 </span>
               )}
