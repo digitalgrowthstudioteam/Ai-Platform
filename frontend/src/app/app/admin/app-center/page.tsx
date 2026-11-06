@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { platformApi } from "@/lib/app-platform/api";
 import { VendorListItem } from "@/lib/app-platform/types";
@@ -23,6 +23,7 @@ import {
   CheckCircle2,
   AlertCircle,
   Filter,
+  RefreshCw,
 } from "lucide-react";
 
 interface AppDefinition {
@@ -95,32 +96,40 @@ const APPS: AppDefinition[] = [
 export default function AdminAppCenterPage() {
   const [vendors, setVendors] = useState<VendorListItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [selectedAppFilter, setSelectedAppFilter] = useState<string>("ALL");
   const [togglingMap, setTogglingMap] = useState<Record<string, boolean>>({});
   const [toastMessage, setToastMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  useEffect(() => {
-    let mounted = true;
+  const loadVendors = useCallback(async () => {
+    setLoading(true);
+    setFetchError(null);
+    let attempts = 0;
+    const maxAttempts = 3;
 
-    async function loadVendors() {
+    while (attempts < maxAttempts) {
       try {
         const data = await platformApi.getAdminVendors();
-        if (mounted) {
-          setVendors(data || []);
+        setVendors(data || []);
+        setLoading(false);
+        return;
+      } catch (err: any) {
+        attempts++;
+        console.error(`Attempt ${attempts} failed to load vendors for App Center:`, err);
+        if (attempts >= maxAttempts) {
+          setFetchError(err?.message || "Failed to load vendors from platform server. Click retry to reconnect.");
+          setLoading(false);
+        } else {
+          await new Promise((res) => setTimeout(res, 1500 * attempts));
         }
-      } catch (err) {
-        console.error("Failed to load vendors for App Center", err);
-      } finally {
-        if (mounted) setLoading(false);
       }
     }
-
-    loadVendors();
-    return () => {
-      mounted = false;
-    };
   }, []);
+
+  useEffect(() => {
+    loadVendors();
+  }, [loadVendors]);
 
   const handleToggle = async (vendorId: string, appCode: string, currentEnabled: boolean) => {
     const key = `${vendorId}_${appCode}`;
@@ -169,21 +178,22 @@ export default function AdminAppCenterPage() {
   const whatsappCount = vendors.filter((v) => v.whatsapp_alerts_enabled).length;
 
   const filteredVendors = vendors.filter((v) => {
-    const q = search.toLowerCase();
-    const matchesSearch =
-      v.business_name.toLowerCase().includes(q) ||
-      v.vendor_code.toLowerCase().includes(q) ||
-      v.store_slug.toLowerCase().includes(q) ||
-      v.email.toLowerCase().includes(q);
+    const q = (search || "").toLowerCase().trim();
+    if (q) {
+      const bName = (v.business_name || "").toLowerCase();
+      const vCode = (v.vendor_code || "").toLowerCase();
+      const sSlug = (v.store_slug || "").toLowerCase();
+      const email = (v.email || "").toLowerCase();
+      const matchesSearch = bName.includes(q) || vCode.includes(q) || sSlug.includes(q) || email.includes(q);
+      if (!matchesSearch) return false;
+    }
 
-    if (!matchesSearch) return false;
-
-    if (selectedAppFilter === "hyperlocal") return v.hyperlocal_enabled;
-    if (selectedAppFilter === "razorpay") return v.razorpay_enabled;
-    if (selectedAppFilter === "sms_gateway") return v.sms_gateway_enabled;
-    if (selectedAppFilter === "custom_domain") return v.custom_domain_enabled;
-    if (selectedAppFilter === "shiprocket") return v.shiprocket_enabled;
-    if (selectedAppFilter === "whatsapp") return v.whatsapp_alerts_enabled;
+    if (selectedAppFilter === "hyperlocal") return !!v.hyperlocal_enabled;
+    if (selectedAppFilter === "razorpay") return !!v.razorpay_enabled;
+    if (selectedAppFilter === "sms_gateway") return !!v.sms_gateway_enabled;
+    if (selectedAppFilter === "custom_domain") return !!v.custom_domain_enabled;
+    if (selectedAppFilter === "shiprocket") return !!v.shiprocket_enabled;
+    if (selectedAppFilter === "whatsapp") return !!v.whatsapp_alerts_enabled;
 
     return true;
   });
@@ -206,7 +216,37 @@ export default function AdminAppCenterPage() {
             Manage platform integrations across all vendors. Inactive apps remain completely hidden from the vendor's dashboard until activated.
           </p>
         </div>
+
+        <button
+          type="button"
+          onClick={() => loadVendors()}
+          disabled={loading}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition-colors shadow-2xs cursor-pointer self-start sm:self-auto shrink-0"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 text-slate-500 ${loading ? "animate-spin" : ""}`} />
+          <span>{loading ? "Refreshing..." : "Refresh Matrix"}</span>
+        </button>
       </div>
+
+      {/* Fetch Error Banner */}
+      {fetchError && (
+        <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
+            <div>
+              <p className="font-bold">Unable to load live vendor matrix</p>
+              <p className="text-amber-700 mt-0.5">{fetchError}</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => loadVendors()}
+            className="px-3.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold transition-colors cursor-pointer shrink-0 self-start sm:self-auto"
+          >
+            Retry Connection
+          </button>
+        </div>
+      )}
 
       {/* Toast Alert */}
       {toastMessage && (
@@ -239,27 +279,45 @@ export default function AdminAppCenterPage() {
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Hyperlocal Active</span>
-          <p className="text-xl font-black text-rose-600 mt-1">{hyperlocalCount} <span className="text-xs font-semibold text-slate-400">/ {totalVendors}</span></p>
+          <p className="text-xl font-black text-rose-600 mt-1">
+            {loading ? <span className="text-slate-300">...</span> : hyperlocalCount}{" "}
+            <span className="text-xs font-semibold text-slate-400">/ {loading ? "..." : totalVendors}</span>
+          </p>
         </div>
         <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Razorpay Active</span>
-          <p className="text-xl font-black text-blue-600 mt-1">{razorpayCount} <span className="text-xs font-semibold text-slate-400">/ {totalVendors}</span></p>
+          <p className="text-xl font-black text-blue-600 mt-1">
+            {loading ? <span className="text-slate-300">...</span> : razorpayCount}{" "}
+            <span className="text-xs font-semibold text-slate-400">/ {loading ? "..." : totalVendors}</span>
+          </p>
         </div>
         <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">SMS Gateway</span>
-          <p className="text-xl font-black text-emerald-600 mt-1">{smsCount} <span className="text-xs font-semibold text-slate-400">/ {totalVendors}</span></p>
+          <p className="text-xl font-black text-emerald-600 mt-1">
+            {loading ? <span className="text-slate-300">...</span> : smsCount}{" "}
+            <span className="text-xs font-semibold text-slate-400">/ {loading ? "..." : totalVendors}</span>
+          </p>
         </div>
         <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Custom Domains</span>
-          <p className="text-xl font-black text-purple-600 mt-1">{customDomainCount} <span className="text-xs font-semibold text-slate-400">/ {totalVendors}</span></p>
+          <p className="text-xl font-black text-purple-600 mt-1">
+            {loading ? <span className="text-slate-300">...</span> : customDomainCount}{" "}
+            <span className="text-xs font-semibold text-slate-400">/ {loading ? "..." : totalVendors}</span>
+          </p>
         </div>
         <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Shiprocket</span>
-          <p className="text-xl font-black text-amber-600 mt-1">{shiprocketCount} <span className="text-xs font-semibold text-slate-400">/ {totalVendors}</span></p>
+          <p className="text-xl font-black text-amber-600 mt-1">
+            {loading ? <span className="text-slate-300">...</span> : shiprocketCount}{" "}
+            <span className="text-xs font-semibold text-slate-400">/ {loading ? "..." : totalVendors}</span>
+          </p>
         </div>
         <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">WhatsApp Alerts</span>
-          <p className="text-xl font-black text-teal-600 mt-1">{whatsappCount} <span className="text-xs font-semibold text-slate-400">/ {totalVendors}</span></p>
+          <p className="text-xl font-black text-teal-600 mt-1">
+            {loading ? <span className="text-slate-300">...</span> : whatsappCount}{" "}
+            <span className="text-xs font-semibold text-slate-400">/ {loading ? "..." : totalVendors}</span>
+          </p>
         </div>
       </div>
 
@@ -383,7 +441,34 @@ export default function AdminAppCenterPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
-              {filteredVendors.length === 0 ? (
+              {loading ? (
+                <tr>
+                  <td colSpan={8} className="text-center py-12 text-xs text-slate-500">
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <Loader2 className="w-6 h-6 text-indigo-600 animate-spin" />
+                      <span className="font-semibold text-slate-700">Loading vendor entitlements...</span>
+                      <span className="text-[11px] text-slate-400">Connecting to secure platform database</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : fetchError ? (
+                <tr>
+                  <td colSpan={8} className="text-center py-10 text-xs text-rose-600 bg-rose-50/40">
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <AlertCircle className="w-6 h-6 text-rose-500" />
+                      <span className="font-semibold">{fetchError}</span>
+                      <button
+                        type="button"
+                        onClick={() => loadVendors()}
+                        className="mt-2 px-3.5 py-1.5 rounded-xl bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 transition-colors shadow-2xs cursor-pointer inline-flex items-center gap-1.5"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" />
+                        <span>Retry Loading Vendors</span>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ) : filteredVendors.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="text-center py-10 text-xs text-slate-400">
                     No vendors matched the selected criteria.
@@ -398,14 +483,14 @@ export default function AdminAppCenterPage() {
                           href={`/app/admin/vendors/${v.id}`}
                           className="font-bold text-slate-900 hover:text-indigo-600 hover:underline block text-xs"
                         >
-                          {v.business_name}
+                          {v.business_name || "Unnamed Store"}
                         </Link>
                         <div className="flex items-center gap-2 mt-0.5">
                           <span className="font-mono text-[10px] text-purple-700 font-semibold bg-purple-50 px-1.5 py-0.2 rounded">
-                            {v.vendor_code}
+                            {v.vendor_code || "VND"}
                           </span>
                           <span className="text-[11px] text-slate-400 font-mono truncate max-w-[150px]">
-                            {v.store_slug}.digitalgrowthstudio.in
+                            {v.store_slug || "store"}.digitalgrowthstudio.in
                           </span>
                         </div>
                       </td>
