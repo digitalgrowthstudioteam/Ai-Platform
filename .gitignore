@@ -92,6 +92,8 @@ Desktop.ini
 **/build/**
 
 # ── Misc ─────────────────────────────────────
+vendors/**/builds/
+vendors/**/*.apk
 *.bak
 *.tmp
 *.temp
