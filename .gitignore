@@ -96,6 +96,8 @@ Desktop.ini
 # ── Misc ─────────────────────────────────────
 vendors/**/builds/
 vendors/**/*.apk
+vendors/partner-app/
+*.db
 *.bak
 *.tmp
 *.temp

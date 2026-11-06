@@ -67,3 +67,17 @@ class PlatformSupplierInquiry(BaseModel):
     status: Mapped[str] = mapped_column(String(50), nullable=False, default="PENDING")  # PENDING, CONTACTED, APPROVED, REJECTED
 
 
+class PlatformCreditTransaction(BaseModel):
+    """Audit ledger for vendor AI credit usage and purchases."""
+    __tablename__ = "platform_credit_transactions"
+
+    vendor_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("platform_vendors.id", ondelete="CASCADE"), nullable=False, index=True)
+    amount: Mapped[int] = mapped_column(nullable=False)  # Positive for top-up, negative for usage
+    balance_after: Mapped[int] = mapped_column(nullable=False)
+    action: Mapped[str] = mapped_column(String(50), nullable=False, index=True)  # PRODUCT_IMPORT, IMAGE_STUDIO, PACK_PURCHASE, ADMIN_GRANT
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    reference_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+
+
+

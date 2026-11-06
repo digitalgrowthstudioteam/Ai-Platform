@@ -434,6 +434,7 @@ async def get_my_platform_session(
     shiprocket_enabled = False
     whatsapp_alerts_enabled = False
     hyperlocal_enabled = False
+    ai_credits = 9999 if user.role == "SUPER_ADMIN" else 5
 
     if user.role == "VENDOR_ADMIN":
         now = datetime.now(timezone.utc)
@@ -450,6 +451,7 @@ async def get_my_platform_session(
         if vendor:
             vendor_id = vendor.id
             vendor_code = vendor.vendor_code
+            ai_credits = getattr(vendor, "ai_credits", 5)
             if vendor.store:
                 store_slug = vendor.store.store_slug
                 store_name = vendor.store.store_name
@@ -516,4 +518,5 @@ async def get_my_platform_session(
         shiprocket_enabled=shiprocket_enabled,
         whatsapp_alerts_enabled=whatsapp_alerts_enabled,
         hyperlocal_enabled=hyperlocal_enabled,
+        ai_credits=ai_credits,
     )

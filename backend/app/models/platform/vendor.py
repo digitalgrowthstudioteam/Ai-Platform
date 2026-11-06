@@ -30,6 +30,7 @@ class PlatformVendor(BaseModel):
     vendor_code: Mapped[str] = mapped_column(String(50), unique=True, index=True, nullable=False)
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("platform_users.id", ondelete="CASCADE"), nullable=False)
     status: Mapped[str] = mapped_column(String(50), nullable=False, default="trial")  # active, inactive, trial, suspended
+    ai_credits: Mapped[int] = mapped_column(Integer, nullable=False, default=5)
 
     user: Mapped["PlatformUser"] = relationship("PlatformUser", back_populates="vendors")
     profile: Mapped[Optional["PlatformVendorProfile"]] = relationship("PlatformVendorProfile", back_populates="vendor", uselist=False, cascade="all, delete-orphan")

@@ -430,20 +430,7 @@ class VendorAnalyticsSummaryResponse(BaseModel):
     average_order_value: float = 0.0
 
 
-class VendorCustomDomainInfoResponse(BaseModel):
-    custom_domain: Optional[str] = None
-    custom_domain_enabled: bool = False
-    custom_domain_status: str = "UNCONFIGURED"  # UNCONFIGURED, PENDING_DNS, ACTIVE, FAILED
-    custom_domain_ssl_status: str = "PENDING"
-    custom_domain_dns_target: str = "cname.digitalgrowthstudio.in"
-    addon_id: Optional[uuid.UUID] = None
-    addon_price_inr: float = 999.0
-    has_paid_addon: bool = False
-
-
-class VendorCustomDomainUpdateRequest(BaseModel):
-    custom_domain: Optional[str] = None
-
+class VendorAnalyticsOverviewResponse(BaseModel):
     store_visits: int = 0
     unique_visitors: int = 0
     product_views: int = 0
@@ -460,72 +447,6 @@ class VendorCustomDomainUpdateRequest(BaseModel):
     device_breakdown: List[dict] = []
     customer_locations: List[dict] = []
     pixel_status: dict = {}
-
-
-class VendorSmsSettingsResponse(BaseModel):
-    sms_gateway_enabled: bool = False
-    sms_provider: str = "FAST2SMS"
-    sms_api_key: Optional[str] = None
-    sms_sender_id: Optional[str] = None
-    sms_custom_url: Optional[str] = None
-    sms_order_placed_active: bool = True
-    sms_order_dispatched_active: bool = True
-    sms_welcome_active: bool = True
-    sms_otp_active: bool = True
-    has_api_key: bool = False
-
-
-class VendorSmsSettingsUpdateRequest(BaseModel):
-    sms_provider: Optional[str] = "FAST2SMS"
-    sms_api_key: Optional[str] = None
-    sms_sender_id: Optional[str] = None
-    sms_custom_url: Optional[str] = None
-    sms_order_placed_active: Optional[bool] = True
-    sms_order_dispatched_active: Optional[bool] = True
-    sms_welcome_active: Optional[bool] = True
-    sms_otp_active: Optional[bool] = True
-
-
-class VendorTestSmsRequest(BaseModel):
-    test_phone: str
-
-
-class AdminAppToggleRequest(BaseModel):
-    app_code: str  # "razorpay", "sms_gateway", "custom_domain", "shiprocket", "whatsapp"
-    enabled: bool
-
-
-    # App info
-    app_name: str
-    app_logo_url: Optional[str] = None
-    splash_screen_url: Optional[str] = None
-    app_primary_color: str
-    app_secondary_color: str
-    package_id: str
-    app_build_status: str
-    app_version: str
-    playstore_url: Optional[str] = None
-    publication_status: str
-    # Stats
-    total_products: int
-    total_orders: int
-    storage_used_mb: float
-    storage_limit_mb: float
-    # Custom Domain info
-    custom_domain: Optional[str] = None
-    custom_domain_enabled: bool = False
-    custom_domain_status: str = "UNCONFIGURED"
-    custom_domain_ssl_status: str = "PENDING"
-    custom_domain_dns_target: Optional[str] = "cname.digitalgrowthstudio.in"
-    # Subscription info
-    plan_name: Optional[str] = None
-    subscription_status: Optional[str] = None
-    renewal_date: Optional[datetime] = None
-    setup_fee_paid: bool = False
-    setup_fee_waived: bool = False
-    setup_fee_custom_price_inr: Optional[float] = None
-    apk_user_approved: bool = False
-    apk_download_url: Optional[str] = None
 
 
 class AdminVendorFullUpdateRequest(BaseModel):
@@ -701,23 +622,6 @@ class VendorCustomDomainInfoResponse(BaseModel):
 class VendorCustomDomainUpdateRequest(BaseModel):
     custom_domain: Optional[str] = None
 
-    store_visits: int = 0
-    unique_visitors: int = 0
-    product_views: int = 0
-    add_to_cart_count: int = 0
-    checkout_count: int = 0
-    whatsapp_clicks: int = 0
-    conversion_rate: float = 0.0
-    add_to_cart_rate: float = 0.0
-    checkout_rate: float = 0.0
-    sales_trend: List[dict] = []
-    funnel_steps: List[dict] = []
-    top_products: List[dict] = []
-    traffic_sources: List[dict] = []
-    device_breakdown: List[dict] = []
-    customer_locations: List[dict] = []
-    pixel_status: dict = {}
-
 
 class VendorSmsSettingsResponse(BaseModel):
     sms_gateway_enabled: bool = False
@@ -750,5 +654,116 @@ class VendorTestSmsRequest(BaseModel):
 class AdminAppToggleRequest(BaseModel):
     app_code: str  # "razorpay", "sms_gateway", "custom_domain", "shiprocket", "whatsapp"
     enabled: bool
+
+
+# ──────────────────────────────────────────────
+# AI Product Importer & Credit System Schemas
+# ──────────────────────────────────────────────
+
+class AiProductImportPreviewRequest(BaseModel):
+    url: str
+
+
+class AiProductImportPreviewResponse(BaseModel):
+    source_url: str
+    title: str
+    category: str
+    description_html: str
+    short_description: str
+    selling_price: float
+    mrp: float
+    variants: List[dict] = []
+    tags: List[str] = []
+    images: List[str] = []
+
+
+class AiProductImportConfirmRequest(BaseModel):
+    source_url: Optional[str] = None
+    title: str
+    category_name: Optional[str] = "General"
+    description_html: Optional[str] = ""
+    short_description: Optional[str] = ""
+    selling_price: float
+    mrp: Optional[float] = None
+    images: List[str] = []
+    variants: List[dict] = []
+    tags: List[str] = []
+
+
+class AiProductImportConfirmResponse(BaseModel):
+    success: bool
+    product_id: str
+    title: str
+    credits_used: int
+    remaining_credits: int
+    message: str
+
+
+class AiImageStudioRequest(BaseModel):
+    image_url: str
+    style: str = "studio-white"  # "studio-white", "minimal-marble", "modern-pastel", "luxury-dark"
+    badge_text: Optional[str] = None
+    product_id: Optional[str] = None
+
+
+class AiImageStudioResponse(BaseModel):
+    enhanced_image_url: str
+    style: str
+    width: int
+    height: int
+    credits_used: int
+    remaining_credits: int
+
+
+class AiCreditPackItem(BaseModel):
+    id: str
+    name: str
+    credits: int
+    price_inr: float
+    tag: Optional[str] = None
+    popular: bool = False
+    active: bool = True
+
+
+class AiCreditBalanceResponse(BaseModel):
+    credits: int
+    import_product_credit_cost: int
+    image_studio_credit_cost: int
+    credit_packs: List[AiCreditPackItem]
+    recent_transactions: List[dict] = []
+
+
+class AiCreditPurchaseOrderRequest(BaseModel):
+    pack_id: str
+
+
+class AiCreditPurchaseOrderResponse(BaseModel):
+    order_id: str
+    amount_inr: float
+    amount_paise: int
+    key_id: Optional[str] = None
+    pack_id: str
+    credits_to_add: int
+
+
+class AiCreditVerifyPaymentRequest(BaseModel):
+    razorpay_order_id: str
+    razorpay_payment_id: str
+    razorpay_signature: str
+    pack_id: str
+
+
+class AiAdminCreditConfigUpdate(BaseModel):
+    welcome_credits: Optional[int] = None
+    import_product_credit_cost: Optional[int] = None
+    image_studio_credit_cost: Optional[int] = None
+    credit_packs: Optional[List[AiCreditPackItem]] = None
+
+
+class AiAdminGrantCreditsRequest(BaseModel):
+    vendor_id: uuid.UUID
+    amount: int
+    reason: str
+
 
 

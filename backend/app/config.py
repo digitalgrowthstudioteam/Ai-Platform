@@ -109,9 +109,10 @@ class Settings(BaseSettings):
         return self.AI_API_KEY or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
 
     model_config = {
-        "env_file": ".env",
+        "env_file": ("backend/.env", ".env"),
         "env_file_encoding": "utf-8",
         "case_sensitive": True,
+        "extra": "ignore",
     }
 
 

@@ -24,6 +24,9 @@ import {
   VendorPixelConfig,
   VendorAnalyticsSummary,
   AdminDetailedAnalytics,
+  AiCreditBalanceData,
+  AiProductImportPreview,
+  AiCreditPack,
 } from './types';
 import { demoSandbox, DEMO_USER } from './demo-sandbox';
 
@@ -1369,9 +1372,131 @@ class PlatformApiClient {
         body: JSON.stringify(payload),
       });
     } catch (e) {
-      // Event tracking is background telemetry, fail gracefully without disrupting UI
       return null;
     }
+  }
+
+  // ──────────────────────────────────────────────
+  // AI 1-Click Product Importer, AI Studio & Credits
+  // ──────────────────────────────────────────────
+  async getVendorAiCredits(): Promise<AiCreditBalanceData> {
+    if (this.isDemoMode()) {
+      return {
+        credits: 15,
+        import_product_credit_cost: 1,
+        image_studio_credit_cost: 2,
+        credit_packs: [
+          { id: "pack_starter", name: "Starter Pack", credits: 25, price_inr: 99, tag: "Standard", popular: false, active: true },
+          { id: "pack_growth", name: "Growth Pack", credits: 75, price_inr: 249, tag: "Most Popular", popular: true, active: true },
+          { id: "pack_pro", name: "Pro Merchant Pack", credits: 250, price_inr: 599, tag: "Best Value", popular: false, active: true },
+        ],
+        recent_transactions: [
+          { id: "tx_1", amount: 5, balance_after: 5, action: "WELCOME_BONUS", description: "Welcome Free AI Credits", created_at: new Date().toISOString() }
+        ]
+      };
+    }
+    return this.request<AiCreditBalanceData>('/api/v1/platform/vendor/ai/credits');
+  }
+
+  async aiImportPreview(url: string): Promise<AiProductImportPreview> {
+    return this.request<AiProductImportPreview>('/api/v1/platform/vendor/ai/import-preview', {
+      method: 'POST',
+      body: JSON.stringify({ url }),
+    });
+  }
+
+  async aiImportConfirm(payload: {
+    source_url?: string;
+    title: string;
+    category_name?: string;
+    description_html?: string;
+    short_description?: string;
+    selling_price: number;
+    mrp?: number;
+    images?: string[];
+    variants?: any[];
+    tags?: string[];
+  }): Promise<{ success: boolean; product_id: string; title: string; credits_used: number; remaining_credits: number; message: string }> {
+    return this.request('/api/v1/platform/vendor/ai/import-confirm', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async aiImageStudio(payload: {
+    image_url: string;
+    style: string;
+    badge_text?: string;
+    product_id?: string;
+  }): Promise<{ enhanced_image_url: string; style: string; width: number; height: number; credits_used: number; remaining_credits: number }> {
+    return this.request('/api/v1/platform/vendor/ai/image-studio', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async createCreditPurchaseOrder(pack_id: string): Promise<{
+    order_id: string;
+    amount_inr: number;
+    amount_paise: number;
+    key_id: string;
+    pack_id: string;
+    credits_to_add: number;
+  }> {
+    return this.request('/api/v1/platform/vendor/ai/credits/purchase-order', {
+      method: 'POST',
+      body: JSON.stringify({ pack_id }),
+    });
+  }
+
+  async verifyCreditPayment(payload: {
+    razorpay_order_id: string;
+    razorpay_payment_id: string;
+    razorpay_signature: string;
+    pack_id: string;
+  }): Promise<{ success: boolean; credits_added: number; new_balance: number; message: string }> {
+    return this.request('/api/v1/platform/vendor/ai/credits/verify-payment', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  // Super Admin AI Credit Pricing & Management
+  async getAdminCreditConfig(): Promise<{
+    welcome_credits: number;
+    import_product_credit_cost: number;
+    image_studio_credit_cost: number;
+    credit_packs: AiCreditPack[];
+  }> {
+    return this.request('/api/v1/platform/admin/credits/config');
+  }
+
+  async updateAdminCreditConfig(payload: {
+    welcome_credits?: number;
+    import_product_credit_cost?: number;
+    image_studio_credit_cost?: number;
+    credit_packs?: AiCreditPack[];
+  }): Promise<any> {
+    return this.request('/api/v1/platform/admin/credits/config', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async getAdminVendorCredits(search?: string): Promise<any[]> {
+    const q = search ? `?search=${encodeURIComponent(search)}` : '';
+    return this.request<any[]>(`/api/v1/platform/admin/credits/vendors${q}`);
+  }
+
+  async grantAdminVendorCredits(payload: {
+    vendor_id: string;
+    amount: number;
+    reason: string;
+  }): Promise<any> {
+    return this.request('/api/v1/platform/admin/credits/grant', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
   }
 }
 

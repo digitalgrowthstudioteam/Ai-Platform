@@ -28,12 +28,16 @@ pool_kwargs = {
     "pool_recycle": 3600,
 }
 
+connect_args = {
+    "statement_cache_size": 0,
+    "prepared_statement_name_func": lambda: "",
+}
+if "supabase" in settings.DATABASE_URL or "6543" in settings.DATABASE_URL or "require" in settings.DATABASE_URL:
+    connect_args["ssl"] = "require"
+
 engine = create_async_engine(
     settings.DATABASE_URL,
-    connect_args={
-        "statement_cache_size": 0,
-        "prepared_statement_name_func": lambda: "",
-    },
+    connect_args=connect_args,
     echo=settings.DEBUG,
     **pool_kwargs
 )

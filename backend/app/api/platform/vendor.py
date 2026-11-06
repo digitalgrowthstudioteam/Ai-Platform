@@ -40,7 +40,11 @@ from app.models.platform.subscription import (
     PlatformAddon,
     PlatformVendorAddon,
 )
-from app.models.platform.system import PlatformNotification
+from app.models.platform.system import (
+    PlatformNotification,
+    PlatformCreditTransaction,
+    PlatformSetting,
+)
 from app.schemas.platform.catalog import (
     CategoryCreatePayload,
     CategoryUpdatePayload,
@@ -80,7 +84,20 @@ from app.schemas.platform.vendor import (
     VendorTestSmsRequest,
     HyperlocalSettingsUpdate,
     HyperlocalSettingsResponse,
+    AiProductImportPreviewRequest,
+    AiProductImportPreviewResponse,
+    AiProductImportConfirmRequest,
+    AiProductImportConfirmResponse,
+    AiImageStudioRequest,
+    AiImageStudioResponse,
+    AiCreditBalanceResponse,
+    AiCreditPurchaseOrderRequest,
+    AiCreditPurchaseOrderResponse,
+    AiCreditVerifyPaymentRequest,
 )
+from app.services.ai_product_importer import fetch_product_raw_data, enhance_product_with_gemini
+from app.services.ai_image_studio import enhance_product_image_studio
+from app.config import get_settings
 from app.services.store_email_service import StoreEmailService
 from app.services.sms_service import SmsService
 
@@ -2048,6 +2065,467 @@ async def mark_vendor_notification_read(
         notif.is_read = True
         await db.commit()
     return {"success": True}
+
+
+# ──────────────────────────────────────────────
+# AI 1-Click Product Importer & AI Studio Endpoints
+# ──────────────────────────────────────────────
+
+DEFAULT_AI_CREDIT_SETTINGS = {
+    "welcome_credits": 5,
+    "import_product_credit_cost": 1,
+    "image_studio_credit_cost": 2,
+    "credit_packs": [
+        {
+            "id": "pack_starter",
+            "name": "Starter Pack",
+            "credits": 25,
+            "price_inr": 99.0,
+            "tag": "Standard",
+            "popular": False,
+            "active": True
+        },
+        {
+            "id": "pack_growth",
+            "name": "Growth Pack",
+            "credits": 75,
+            "price_inr": 249.0,
+            "tag": "Most Popular",
+            "popular": True,
+            "active": True
+        },
+        {
+            "id": "pack_pro",
+            "name": "Pro Merchant Pack",
+            "credits": 250,
+            "price_inr": 599.0,
+            "tag": "Best Value",
+            "popular": False,
+            "active": True
+        },
+        {
+            "id": "pack_scale",
+            "name": "Scale Enterprise Pack",
+            "credits": 1000,
+            "price_inr": 1999.0,
+            "tag": "Enterprise",
+            "popular": False,
+            "active": True
+        }
+    ]
+}
+
+
+async def _get_active_ai_settings(db: AsyncSession) -> dict:
+    stmt = select(PlatformSetting).where(PlatformSetting.key == "ai_credit_settings")
+    row = (await db.execute(stmt)).scalar_one_or_none()
+    if row and row.value:
+        try:
+            return json.loads(row.value)
+        except Exception:
+            pass
+    return DEFAULT_AI_CREDIT_SETTINGS
+
+
+@router.post("/ai/import-preview", response_model=AiProductImportPreviewResponse)
+async def ai_import_preview(
+    payload: AiProductImportPreviewRequest,
+    current: CurrentVendor = Depends(require_vendor_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Extracts raw product metadata from URL and enhances with Gemini 1.5 Flash.
+    Validates vendor has at least 1 credit (preview does NOT deduct credit yet).
+    """
+    config = await _get_active_ai_settings(db)
+    cost = int(config.get("import_product_credit_cost", 1))
+
+    if current.vendor.ai_credits < cost:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail=f"Insufficient AI credits. You have {current.vendor.ai_credits} credits, but {cost} credit(s) are required to import products. Please purchase credits to continue."
+        )
+
+    url_str = payload.url.strip()
+    if not url_str.startswith(("http://", "https://")):
+        url_str = f"https://{url_str}"
+
+    try:
+        raw_data = await fetch_product_raw_data(url_str)
+        enhanced = await enhance_product_with_gemini(raw_data)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unable to extract product from this link: {str(e)}"
+        )
+
+    return enhanced
+
+
+@router.post("/ai/import-confirm", response_model=AiProductImportConfirmResponse)
+async def ai_import_confirm(
+    payload: AiProductImportConfirmRequest,
+    current: CurrentVendor = Depends(require_vendor_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Finalizes product creation, adds category, images, and variants.
+    Atomically deducts 1 AI Credit and logs credit audit transaction.
+    """
+    config = await _get_active_ai_settings(db)
+    cost = int(config.get("import_product_credit_cost", 1))
+    vendor = current.vendor
+
+    if vendor.ai_credits < cost:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail=f"Insufficient AI credits. You have {vendor.ai_credits} credits, but {cost} credit(s) are required."
+        )
+
+    # 1. Resolve or create category
+    cat_name = (payload.category_name or "General").strip()
+    cat_stmt = select(PlatformCategory).where(
+        PlatformCategory.vendor_id == vendor.id,
+        func.lower(PlatformCategory.name) == cat_name.lower()
+    )
+    category = (await db.execute(cat_stmt)).scalar_one_or_none()
+    if not category:
+        category = PlatformCategory(
+            vendor_id=vendor.id,
+            name=cat_name,
+            slug=f"{slugify(cat_name)}-{uuid.uuid4().hex[:4]}",
+            is_active=True
+        )
+        db.add(category)
+        await db.flush()
+
+    # 2. Create PlatformProduct
+    base_slug = slugify(payload.title)
+    unique_slug = f"{base_slug[:50]}-{uuid.uuid4().hex[:6]}"
+    sell_price = float(payload.selling_price)
+    mrp_val = float(payload.mrp) if payload.mrp and float(payload.mrp) >= sell_price else sell_price
+    first_image = payload.images[0] if payload.images else None
+
+    product = PlatformProduct(
+        vendor_id=vendor.id,
+        category_id=category.id,
+        name=payload.title.strip(),
+        slug=unique_slug,
+        description=payload.description_html or "",
+        regular_price=mrp_val,
+        sale_price=sell_price,
+        sku=f"{unique_slug[:8].upper()}",
+        stock_quantity=100,
+        status="active",
+        is_featured=False,
+        has_variants=bool(payload.variants),
+        thumbnail_url=first_image
+    )
+    db.add(product)
+    await db.flush()
+
+    # 3. Add images
+    for idx, img_url in enumerate(payload.images[:8]):
+        if img_url and img_url.startswith("http"):
+            db.add(PlatformProductImage(
+                product_id=product.id,
+                vendor_id=vendor.id,
+                image_url=img_url,
+                sort_order=idx,
+                is_thumbnail=(idx == 0)
+            ))
+
+    # 4. Add variants
+    if payload.variants:
+        for idx, v in enumerate(payload.variants):
+            v_name = v.get("name") or "Standard"
+            v_sku = f"{unique_slug[:6].upper()}-{slugify(v_name)[:6].upper()}"
+            v_price = float(v.get("price") or sell_price)
+            v_stock = int(v.get("stock") or 50)
+            db.add(PlatformProductVariant(
+                product_id=product.id,
+                vendor_id=vendor.id,
+                name=v_name,
+                sku=v_sku,
+                price=v_price,
+                stock_quantity=v_stock,
+                sort_order=idx,
+                is_active=True
+            ))
+    else:
+        db.add(PlatformProductVariant(
+            product_id=product.id,
+            vendor_id=vendor.id,
+            name="Standard",
+            sku=f"{unique_slug[:6].upper()}-STD",
+            price=sell_price,
+            stock_quantity=50,
+            sort_order=0,
+            is_active=True
+        ))
+
+    # 5. Atomically deduct credit & create ledger audit
+    vendor.ai_credits -= cost
+    db.add(PlatformCreditTransaction(
+        vendor_id=vendor.id,
+        amount=-cost,
+        balance_after=vendor.ai_credits,
+        action="PRODUCT_IMPORT",
+        description=f"AI 1-Click Import: {payload.title[:60]}",
+        reference_id=str(product.id)
+    ))
+
+    await db.commit()
+    await db.refresh(product)
+
+    return {
+        "success": True,
+        "product_id": str(product.id),
+        "title": product.name,
+        "credits_used": cost,
+        "remaining_credits": vendor.ai_credits,
+        "message": f"Successfully imported '{product.name}' to your catalog!"
+    }
+
+
+@router.post("/ai/image-studio", response_model=AiImageStudioResponse)
+async def ai_image_studio(
+    payload: AiImageStudioRequest,
+    current: CurrentVendor = Depends(require_vendor_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Phase 2: Generates a high-resolution studio redesign of a product photo.
+    Deducts configured studio credits (default 2 credits) and saves asset to CDN.
+    """
+    config = await _get_active_ai_settings(db)
+    cost = int(config.get("image_studio_credit_cost", 2))
+    vendor = current.vendor
+
+    if vendor.ai_credits < cost:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail=f"Insufficient AI credits. You have {vendor.ai_credits} credits, but {cost} credits are required for AI Studio photo redesign."
+        )
+
+    try:
+        studio_res = await enhance_product_image_studio(
+            image_url=payload.image_url,
+            style=payload.style,
+            vendor_id=str(vendor.id),
+            badge_text=payload.badge_text
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"AI Studio redesign failed: {str(e)}"
+        )
+
+    # Deduct credits
+    vendor.ai_credits -= cost
+    db.add(PlatformCreditTransaction(
+        vendor_id=vendor.id,
+        amount=-cost,
+        balance_after=vendor.ai_credits,
+        action="IMAGE_STUDIO",
+        description=f"AI Studio Redesign ({payload.style})",
+        reference_id=payload.product_id
+    ))
+
+    # If product_id supplied, optionally add as new product image
+    if payload.product_id:
+        try:
+            pid = uuid.UUID(payload.product_id)
+            p_stmt = select(PlatformProduct).where(PlatformProduct.id == pid, PlatformProduct.vendor_id == vendor.id)
+            prod = (await db.execute(p_stmt)).scalar_one_or_none()
+            if prod:
+                db.add(PlatformProductImage(
+                    product_id=prod.id,
+                    vendor_id=vendor.id,
+                    image_url=studio_res["enhanced_image_url"],
+                    sort_order=0,
+                    is_thumbnail=True
+                ))
+        except Exception:
+            pass
+
+    await db.commit()
+
+    return {
+        "enhanced_image_url": studio_res["enhanced_image_url"],
+        "style": studio_res["style"],
+        "width": studio_res["width"],
+        "height": studio_res["height"],
+        "credits_used": cost,
+        "remaining_credits": vendor.ai_credits
+    }
+
+
+@router.get("/ai/credits", response_model=AiCreditBalanceResponse)
+async def get_ai_credit_balance(
+    current: CurrentVendor = Depends(require_vendor_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Returns the vendor's current credit balance, active pricing packs,
+    and recent ledger transaction history.
+    """
+    config = await _get_active_ai_settings(db)
+    vendor = current.vendor
+
+    # Query last 20 transactions
+    t_stmt = (
+        select(PlatformCreditTransaction)
+        .where(PlatformCreditTransaction.vendor_id == vendor.id)
+        .order_by(desc(PlatformCreditTransaction.created_at))
+        .limit(20)
+    )
+    txs = (await db.execute(t_stmt)).scalars().all()
+
+    packs = [p for p in config.get("credit_packs", []) if p.get("active", True)]
+
+    return {
+        "credits": vendor.ai_credits,
+        "import_product_credit_cost": config.get("import_product_credit_cost", 1),
+        "image_studio_credit_cost": config.get("image_studio_credit_cost", 2),
+        "credit_packs": packs,
+        "recent_transactions": [
+            {
+                "id": str(t.id),
+                "amount": t.amount,
+                "balance_after": t.balance_after,
+                "action": t.action,
+                "description": t.description,
+                "created_at": t.created_at.isoformat() if t.created_at else None
+            }
+            for t in txs
+        ]
+    }
+
+
+@router.post("/ai/credits/purchase-order", response_model=AiCreditPurchaseOrderResponse)
+async def create_credit_purchase_order(
+    payload: AiCreditPurchaseOrderRequest,
+    current: CurrentVendor = Depends(require_vendor_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Initiates a Razorpay order to buy a credit pack configured by Super Admin.
+    """
+    config = await _get_active_ai_settings(db)
+    packs = {p["id"]: p for p in config.get("credit_packs", [])}
+
+    if payload.pack_id not in packs:
+        raise HTTPException(status_code=404, detail="Selected credit pack was not found or is no longer active.")
+
+    pack = packs[payload.pack_id]
+    amount_inr = float(pack["price_inr"])
+    amount_paise = int(amount_inr * 100)
+
+    settings_obj = get_settings()
+    rzp_key = settings_obj.RAZORPAY_KEY_ID
+    rzp_secret = settings_obj.RAZORPAY_KEY_SECRET
+
+    order_id = f"order_ai_mock_{uuid.uuid4().hex[:12]}"
+    if rzp_key and rzp_secret:
+        try:
+            import razorpay
+            client = razorpay.Client(auth=(rzp_key, rzp_secret))
+            rzp_order = client.order.create({
+                "amount": amount_paise,
+                "currency": "INR",
+                "receipt": f"ai_{str(current.vendor.id)[:8]}_{int(datetime.now(timezone.utc).timestamp())}",
+                "notes": {
+                    "vendor_id": str(current.vendor.id),
+                    "pack_id": pack["id"],
+                    "credits": str(pack["credits"])
+                }
+            })
+            order_id = rzp_order["id"]
+        except Exception as e:
+            logger.error("razorpay_order_create_failed_using_mock", error=str(e))
+
+    return {
+        "order_id": order_id,
+        "amount_inr": amount_inr,
+        "amount_paise": amount_paise,
+        "key_id": rzp_key or "rzp_test_mock",
+        "pack_id": pack["id"],
+        "credits_to_add": pack["credits"]
+    }
+
+
+@router.post("/ai/credits/verify-payment")
+async def verify_credit_purchase_payment(
+    payload: AiCreditVerifyPaymentRequest,
+    current: CurrentVendor = Depends(require_vendor_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Verifies Razorpay payment signature, adds credits to vendor balance,
+    and writes to credit transaction ledger.
+    """
+    config = await _get_active_ai_settings(db)
+    packs = {p["id"]: p for p in config.get("credit_packs", [])}
+
+    if payload.pack_id not in packs:
+        raise HTTPException(status_code=404, detail="Selected credit pack not found.")
+
+    pack = packs[payload.pack_id]
+    settings_obj = get_settings()
+    rzp_key = settings_obj.RAZORPAY_KEY_ID
+    rzp_secret = settings_obj.RAZORPAY_KEY_SECRET
+
+    # Verify Razorpay signature if live credentials present and not a mock order
+    is_mock = payload.razorpay_order_id.startswith("order_ai_mock_") or payload.razorpay_payment_id.startswith("pay_mock_")
+    if not is_mock and rzp_key and rzp_secret:
+        try:
+            import razorpay
+            client = razorpay.Client(auth=(rzp_key, rzp_secret))
+            client.utility.verify_payment_signature({
+                "razorpay_order_id": payload.razorpay_order_id,
+                "razorpay_payment_id": payload.razorpay_payment_id,
+                "razorpay_signature": payload.razorpay_signature
+            })
+        except Exception as e:
+            logger.error("ai_credit_payment_verification_failed", error=str(e))
+            raise HTTPException(status_code=400, detail="Razorpay signature verification failed.")
+
+    # Prevent duplicate payment crediting
+    dup_stmt = select(PlatformCreditTransaction).where(
+        PlatformCreditTransaction.reference_id == payload.razorpay_payment_id
+    )
+    existing = (await db.execute(dup_stmt)).scalar_one_or_none()
+    if existing:
+        return {
+            "success": True,
+            "credits_added": 0,
+            "new_balance": current.vendor.ai_credits,
+            "message": "Payment already processed."
+        }
+
+    vendor = current.vendor
+    credits_to_add = int(pack["credits"])
+    vendor.ai_credits += credits_to_add
+
+    db.add(PlatformCreditTransaction(
+        vendor_id=vendor.id,
+        amount=credits_to_add,
+        balance_after=vendor.ai_credits,
+        action="PACK_PURCHASE",
+        description=f"Purchased {pack['name']} (+{credits_to_add} Credits) for ₹{pack['price_inr']}",
+        reference_id=payload.razorpay_payment_id
+    ))
+
+    await db.commit()
+
+    return {
+        "success": True,
+        "credits_added": credits_to_add,
+        "new_balance": vendor.ai_credits,
+        "message": f"Successfully added {credits_to_add} AI Credits! Your new balance is {vendor.ai_credits} credits."
+    }
+
 
 
 

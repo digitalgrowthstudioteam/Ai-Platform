@@ -619,4 +619,49 @@ export interface AdminDetailedAnalytics {
   total_tracking_events_logged: number;
 }
 
+// ──────────────────────────────────────────────
+// AI Product Importer & Credit System Types
+// ──────────────────────────────────────────────
+
+export interface AiCreditPack {
+  id: string;
+  name: string;
+  credits: number;
+  price_inr: number;
+  tag?: string;
+  popular?: boolean;
+  active?: boolean;
+}
+
+export interface AiCreditTransaction {
+  id: string;
+  amount: number;
+  balance_after: number;
+  action: string;
+  description: string;
+  created_at: string;
+}
+
+export interface AiCreditBalanceData {
+  credits: number;
+  import_product_credit_cost: number;
+  image_studio_credit_cost: number;
+  credit_packs: AiCreditPack[];
+  recent_transactions: AiCreditTransaction[];
+}
+
+export interface AiProductImportPreview {
+  source_url: string;
+  title: string;
+  category: string;
+  description_html: string;
+  short_description: string;
+  selling_price: number;
+  mrp: number;
+  variants: Array<{ name: string; sku_suffix?: string; price_diff?: number; stock?: number }>;
+  tags: string[];
+  images: string[];
+}
+
+
 

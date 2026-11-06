@@ -39,7 +39,7 @@ class PlatformProduct(BaseModel):
     status: Mapped[str] = mapped_column(String(50), nullable=False, default="active")  # active, inactive, out_of_stock
     is_featured: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     has_variants: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    thumbnail_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    thumbnail_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     category: Mapped[Optional["PlatformCategory"]] = relationship("PlatformCategory", back_populates="products")
     images: Mapped[List["PlatformProductImage"]] = relationship(
@@ -79,7 +79,7 @@ class PlatformProductImage(BaseModel):
 
     product_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("platform_products.id", ondelete="CASCADE"), nullable=False, index=True)
     vendor_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("platform_vendors.id", ondelete="CASCADE"), nullable=False, index=True)
-    image_url: Mapped[str] = mapped_column(String(500), nullable=False)
+    image_url: Mapped[str] = mapped_column(Text, nullable=False)
     storage_path: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     file_size_bytes: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -96,7 +96,7 @@ class PlatformBanner(BaseModel):
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     promo_offer: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    image_url: Mapped[str] = mapped_column(String(500), nullable=False)
+    image_url: Mapped[str] = mapped_column(Text, nullable=False)
     link_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)

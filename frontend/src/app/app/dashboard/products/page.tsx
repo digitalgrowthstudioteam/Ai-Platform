@@ -3,8 +3,11 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { platformApi } from "@/lib/app-platform/api";
-import { Product, Category } from "@/lib/app-platform/types";
+import { Product, Category, AiCreditPack } from "@/lib/app-platform/types";
 import StatusBadge from "@/components/app-platform/shared/StatusBadge";
+import AiProductImportModal from "@/components/app-platform/ai/AiProductImportModal";
+import AiImageStudioModal from "@/components/app-platform/ai/AiImageStudioModal";
+import BuyAiCreditsModal from "@/components/app-platform/ai/BuyAiCreditsModal";
 import {
   Package,
   Plus,
@@ -16,6 +19,8 @@ import {
   ExternalLink,
   Check,
   AlertCircle,
+  Sparkles,
+  Wand2,
 } from "lucide-react";
 
 export default function VendorProductsPage() {
@@ -23,21 +28,35 @@ export default function VendorProductsPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [selectedCat, setSelectedCat] = useState<string>("");
+  const [selectedCat, setSelectedCat] = useState<string>("" );
   const [storeSlug, setStoreSlug] = useState<string>("abc");
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
+  // AI & Credits state
+  const [aiCredits, setAiCredits] = useState<number>(5);
+  const [creditPacks, setCreditPacks] = useState<AiCreditPack[]>([]);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isStudioModalOpen, setIsStudioModalOpen] = useState(false);
+  const [isBuyCreditsModalOpen, setIsBuyCreditsModalOpen] = useState(false);
+  const [studioTargetImage, setStudioTargetImage] = useState<string>("");
+  const [studioTargetProductId, setStudioTargetProductId] = useState<string | undefined>(undefined);
+
   const loadData = async () => {
     try {
-      const [prods, cats, me] = await Promise.all([
+      const [prods, cats, me, creditsData] = await Promise.all([
         platformApi.getProducts({ category_id: selectedCat || undefined }),
         platformApi.getCategories(),
         platformApi.getMe().catch(() => null),
+        platformApi.getVendorAiCredits().catch(() => null),
       ]);
       setProducts(prods);
       setCategories(cats);
       if (me?.store_slug) {
         setStoreSlug(me.store_slug);
+      }
+      if (creditsData) {
+        setAiCredits(creditsData.credits);
+        setCreditPacks(creditsData.credit_packs);
       }
     } catch (e: any) {
       console.error(e);
@@ -77,13 +96,39 @@ export default function VendorProductsPage() {
             Manage your store catalog, upload photos, configure variants, inventory, and pricing
           </p>
         </div>
-        <Link
-          href="/app/dashboard/products/new"
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 text-white font-semibold text-xs shadow-xs hover:bg-blue-700 transition-colors self-start sm:self-auto cursor-pointer"
-        >
-          <Plus className="w-4 h-4" />
-          Add New Product
-        </Link>
+        <div className="flex items-center gap-2.5 flex-wrap self-start sm:self-auto">
+          {/* Credit Balance Pill */}
+          <div className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-50 border border-amber-200/80 text-xs font-semibold text-amber-900 shadow-xs">
+            <Sparkles className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+            <span>{aiCredits} AI Credits</span>
+            <button
+              type="button"
+              onClick={() => setIsBuyCreditsModalOpen(true)}
+              className="ml-1 text-[11px] text-blue-600 hover:text-blue-800 font-bold underline cursor-pointer"
+            >
+              + Buy
+            </button>
+          </div>
+
+          {/* AI 1-Click Import CTA */}
+          <button
+            type="button"
+            onClick={() => setIsImportModalOpen(true)}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-linear-to-r from-blue-600 to-indigo-600 text-white font-semibold text-xs shadow-md hover:from-blue-700 hover:to-indigo-700 transition-all cursor-pointer"
+          >
+            <Sparkles className="w-4 h-4" />
+            ✨ AI 1-Click Import
+          </button>
+
+          {/* Manual Add Product */}
+          <Link
+            href="/app/dashboard/products/new"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 text-white font-semibold text-xs shadow-xs hover:bg-slate-800 transition-colors cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            Add Product
+          </Link>
+        </div>
       </div>
 
       {message && (
@@ -248,6 +293,23 @@ export default function VendorProductsPage() {
                           >
                             <Edit2 className="w-3.5 h-3.5" />
                           </Link>
+
+                          {/* AI Image Studio Action */}
+                          {p.thumbnail_url && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setStudioTargetImage(p.thumbnail_url!);
+                                setStudioTargetProductId(p.id);
+                                setIsStudioModalOpen(true);
+                              }}
+                              className="p-1.5 text-purple-600 hover:text-purple-700 hover:bg-purple-50 rounded-lg transition-colors cursor-pointer"
+                              title="✨ AI Image Studio: 1-Click Photo Redesign"
+                            >
+                              <Wand2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+
                           <button
                             onClick={() => handleDelete(p.id, p.name)}
                             className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer"
@@ -265,6 +327,62 @@ export default function VendorProductsPage() {
           </div>
         )}
       </div>
+
+      {/* ── Modals ── */}
+      {/* 1. AI 1-Click Product Importer */}
+      <AiProductImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        currentCredits={aiCredits}
+        onSuccess={(remCredits) => {
+          setAiCredits(remCredits);
+          setMessage({
+            type: "success",
+            text: "🎉 Product imported successfully! Your catalog and mobile app have been updated.",
+          });
+          loadData();
+        }}
+        onBuyCreditsClick={() => {
+          setIsImportModalOpen(false);
+          setIsBuyCreditsModalOpen(true);
+        }}
+      />
+
+      {/* 2. AI Image Studio (Phase 2) */}
+      <AiImageStudioModal
+        isOpen={isStudioModalOpen}
+        onClose={() => setIsStudioModalOpen(false)}
+        imageUrl={studioTargetImage}
+        productId={studioTargetProductId}
+        currentCredits={aiCredits}
+        onSuccess={(enhancedUrl, remCredits) => {
+          setAiCredits(remCredits);
+          setMessage({
+            type: "success",
+            text: "✨ Studio photo generated and applied to your product catalog!",
+          });
+          loadData();
+        }}
+        onBuyCreditsClick={() => {
+          setIsStudioModalOpen(false);
+          setIsBuyCreditsModalOpen(true);
+        }}
+      />
+
+      {/* 3. Buy AI Credits Modal */}
+      <BuyAiCreditsModal
+        isOpen={isBuyCreditsModalOpen}
+        onClose={() => setIsBuyCreditsModalOpen(false)}
+        currentCredits={aiCredits}
+        creditPacks={creditPacks}
+        onSuccess={(newBalance) => {
+          setAiCredits(newBalance);
+          setMessage({
+            type: "success",
+            text: `✨ Credits recharged successfully! Your new balance is ${newBalance} credits.`,
+          });
+        }}
+      />
     </div>
   );
 }

@@ -33,6 +33,7 @@ from app.models.platform.system import (
     PlatformAuditLog,
     PlatformSetting,
     PlatformSupplierInquiry,
+    PlatformCreditTransaction,
 )
 
 __all__ = [
@@ -59,5 +60,6 @@ __all__ = [
     "PlatformAuditLog",
     "PlatformSetting",
     "PlatformSupplierInquiry",
+    "PlatformCreditTransaction",
 ]
 

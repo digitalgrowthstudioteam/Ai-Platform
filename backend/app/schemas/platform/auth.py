@@ -75,4 +75,5 @@ class PlatformUserMeResponse(BaseModel):
     custom_domain_enabled: bool = False
     shiprocket_enabled: bool = False
     whatsapp_alerts_enabled: bool = False
+    ai_credits: int = 5
 

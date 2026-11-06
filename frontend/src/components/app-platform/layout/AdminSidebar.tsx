@@ -16,6 +16,7 @@ import {
   BarChart3,
   TrendingUp,
   Layers,
+  Sparkles,
   X,
 } from "lucide-react";
 
@@ -29,6 +30,7 @@ export default function AdminSidebar() {
     { label: "Vendor Management", href: "/app/admin/vendors", icon: Users },
     { label: "App Center", href: "/app/admin/app-center", icon: Layers },
     { label: "Subscriptions & Plans", href: "/app/admin/subscriptions", icon: CreditCard },
+    { label: "AI Credits & Pricing", href: "/app/admin/credits", icon: Sparkles },
     { label: "Add-on Services", href: "/app/admin/addons", icon: PlusCircle },
     { label: "Android App Builds", href: "/app/admin/app-configs", icon: Smartphone },
     { label: "Storage Tracking", href: "/app/admin/storage", icon: HardDrive },

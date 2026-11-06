@@ -48,6 +48,7 @@ from app.models.platform.system import (
     PlatformAuditLog,
     PlatformSetting,
     PlatformNotification,
+    PlatformCreditTransaction,
 )
 from app.schemas.platform.payments import (
     AdminCouponCreateRequest,
@@ -78,6 +79,8 @@ from app.schemas.platform.vendor import (
     VendorDetailFullResponse,
     AdminVendorFullUpdateRequest,
     AdminAppToggleRequest,
+    AiAdminCreditConfigUpdate,
+    AiAdminGrantCreditsRequest,
 )
 
 router = APIRouter(prefix="/platform/admin", tags=["Super Admin Panel"])
@@ -1989,4 +1992,230 @@ async def list_audit_logs(
     """Inspect sensitive actions and modifications across the platform."""
     stmt = select(PlatformAuditLog).order_by(desc(PlatformAuditLog.created_at)).limit(100)
     return (await db.execute(stmt)).scalars().all()
+
+
+# ──────────────────────────────────────────────
+# 6. AI Credits & Pricing Configuration
+# ──────────────────────────────────────────────
+
+DEFAULT_AI_CREDIT_CONFIG = {
+    "welcome_credits": 5,
+    "import_product_credit_cost": 1,
+    "image_studio_credit_cost": 2,
+    "credit_packs": [
+        {
+            "id": "pack_starter",
+            "name": "Starter Pack",
+            "credits": 25,
+            "price_inr": 99.0,
+            "tag": "Standard",
+            "popular": False,
+            "active": True
+        },
+        {
+            "id": "pack_growth",
+            "name": "Growth Pack",
+            "credits": 75,
+            "price_inr": 249.0,
+            "tag": "Most Popular",
+            "popular": True,
+            "active": True
+        },
+        {
+            "id": "pack_pro",
+            "name": "Pro Merchant Pack",
+            "credits": 250,
+            "price_inr": 599.0,
+            "tag": "Best Value",
+            "popular": False,
+            "active": True
+        },
+        {
+            "id": "pack_scale",
+            "name": "Scale Enterprise Pack",
+            "credits": 1000,
+            "price_inr": 1999.0,
+            "tag": "Enterprise",
+            "popular": False,
+            "active": True
+        }
+    ]
+}
+
+
+@router.get("/credits/config")
+async def get_admin_credit_config(
+    admin: PlatformUser = Depends(require_super_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Retrieve global AI credit pricing and package settings."""
+    stmt = select(PlatformSetting).where(PlatformSetting.key == "ai_credit_settings")
+    row = (await db.execute(stmt)).scalar_one_or_none()
+    if row and row.value:
+        try:
+            return json.loads(row.value)
+        except Exception:
+            pass
+    return DEFAULT_AI_CREDIT_CONFIG
+
+
+@router.put("/credits/config")
+async def update_admin_credit_config(
+    payload: AiAdminCreditConfigUpdate,
+    admin: PlatformUser = Depends(require_super_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Super Admin sets the prices, credit quantities, and active status for packs,
+    as well as the cost in credits for 1-Click Import and AI Image Studio.
+    """
+    stmt = select(PlatformSetting).where(PlatformSetting.key == "ai_credit_settings")
+    row = (await db.execute(stmt)).scalar_one_or_none()
+
+    current_config = dict(DEFAULT_AI_CREDIT_CONFIG)
+    if row and row.value:
+        try:
+            current_config = json.loads(row.value)
+        except Exception:
+            pass
+
+    if payload.welcome_credits is not None:
+        current_config["welcome_credits"] = int(payload.welcome_credits)
+    if payload.import_product_credit_cost is not None:
+        current_config["import_product_credit_cost"] = int(payload.import_product_credit_cost)
+    if payload.image_studio_credit_cost is not None:
+        current_config["image_studio_credit_cost"] = int(payload.image_studio_credit_cost)
+    if payload.credit_packs is not None:
+        current_config["credit_packs"] = [p.model_dump() for p in payload.credit_packs]
+
+    json_str = json.dumps(current_config, indent=2)
+
+    if not row:
+        row = PlatformSetting(
+            key="ai_credit_settings",
+            value=json_str,
+            description="Global AI credit pricing and pack configuration"
+        )
+        db.add(row)
+    else:
+        row.value = json_str
+
+    # Record audit log
+    db.add(PlatformAuditLog(
+        actor_id=admin.id,
+        actor_role="SUPER_ADMIN",
+        action="UPDATE_AI_CREDIT_CONFIG",
+        resource_type="SETTING",
+        resource_id="ai_credit_settings",
+        details_json=json_str
+    ))
+
+    await db.commit()
+
+    return current_config
+
+
+@router.get("/credits/vendors")
+async def list_vendor_credit_balances(
+    search: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+    admin: PlatformUser = Depends(require_super_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Lists vendor accounts with their current credit balances and total transactions."""
+    query = (
+        select(
+            PlatformVendor,
+            PlatformVendorProfile,
+            PlatformStore,
+            func.count(PlatformCreditTransaction.id).label("total_transactions")
+        )
+        .outerjoin(PlatformVendorProfile, PlatformVendorProfile.vendor_id == PlatformVendor.id)
+        .outerjoin(PlatformStore, PlatformStore.vendor_id == PlatformVendor.id)
+        .outerjoin(PlatformCreditTransaction, PlatformCreditTransaction.vendor_id == PlatformVendor.id)
+        .group_by(PlatformVendor.id, PlatformVendorProfile.id, PlatformStore.id)
+        .order_by(desc(PlatformVendor.created_at))
+    )
+
+    if search:
+        search_filter = f"%{search.strip()}%"
+        query = query.where(
+            or_(
+                PlatformVendor.vendor_code.ilike(search_filter),
+                PlatformVendorProfile.business_name.ilike(search_filter),
+                PlatformVendorProfile.owner_name.ilike(search_filter),
+                PlatformVendor.email.ilike(search_filter),
+            )
+        )
+
+    query = query.offset(offset).limit(limit)
+    rows = (await db.execute(query)).all()
+
+    results = []
+    for v, profile, store, tx_count in rows:
+        results.append({
+            "vendor_id": str(v.id),
+            "vendor_code": v.vendor_code,
+            "business_name": profile.business_name if profile else "Store",
+            "owner_name": profile.owner_name if profile else "Merchant",
+            "email": v.email,
+            "ai_credits": v.ai_credits,
+            "total_transactions": tx_count or 0,
+            "store_name": store.store_name if store else None,
+            "subdomain": store.subdomain if store else None,
+            "created_at": v.created_at.isoformat() if v.created_at else None,
+        })
+
+    return results
+
+
+@router.post("/credits/grant")
+async def grant_vendor_credits(
+    payload: AiAdminGrantCreditsRequest,
+    admin: PlatformUser = Depends(require_super_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Super Admin manually adds or deducts AI credits for any vendor account.
+    """
+    stmt = select(PlatformVendor).where(PlatformVendor.id == payload.vendor_id)
+    vendor = (await db.execute(stmt)).scalar_one_or_none()
+
+    if not vendor:
+        raise HTTPException(status_code=404, detail="Vendor not found")
+
+    vendor.ai_credits = max(0, vendor.ai_credits + payload.amount)
+
+    action_name = "ADMIN_GRANT" if payload.amount >= 0 else "ADMIN_DEDUCT"
+    db.add(PlatformCreditTransaction(
+        vendor_id=vendor.id,
+        amount=payload.amount,
+        balance_after=vendor.ai_credits,
+        action=action_name,
+        description=f"Admin Adjustment: {payload.reason.strip()}",
+        reference_id=str(admin.id)
+    ))
+
+    db.add(PlatformAuditLog(
+        actor_id=admin.id,
+        actor_role="SUPER_ADMIN",
+        vendor_id=vendor.id,
+        action=action_name,
+        resource_type="VENDOR_CREDIT",
+        resource_id=str(vendor.id),
+        details_json=json.dumps({"amount": payload.amount, "reason": payload.reason, "new_balance": vendor.ai_credits})
+    ))
+
+    await db.commit()
+
+    return {
+        "success": True,
+        "vendor_id": str(vendor.id),
+        "vendor_code": vendor.vendor_code,
+        "amount_adjusted": payload.amount,
+        "new_balance": vendor.ai_credits,
+        "message": f"Successfully updated credits for vendor {vendor.vendor_code}. New balance: {vendor.ai_credits} credits."
+    }
+
 
