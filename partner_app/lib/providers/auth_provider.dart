@@ -16,9 +16,11 @@ class AuthProvider extends ChangeNotifier {
   // Subscription check (Condition 4: Restrict access if monthly payment is unpaid)
   bool get isSubscriptionExpired {
     if (_user == null) return false;
-    if (_user!.isSubscriptionExpired) return true;
+    if (_user!.role == 'SUPER_ADMIN') return false;
+    if (_user!.status == 'active' && !_user!.isSubscriptionExpired) return false;
     final status = _user!.subscriptionStatus.toLowerCase();
-    return status == 'expired' || status == 'suspended' || status == 'unpaid';
+    if (status == 'active' || status == 'trial') return false;
+    return status == 'expired' || status == 'suspended' || status == 'unpaid' || _user!.isSubscriptionExpired;
   }
 
   // Active Entitlements check (Condition 1: Hide services which admin turned off)
@@ -61,6 +63,26 @@ class AuthProvider extends ChangeNotifier {
 
     try {
       await ApiService.login(email, password);
+      final profile = await ApiService.getMe();
+      _user = VendorUser.fromJson(profile);
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString().replaceAll('Exception: ', '');
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> loginWithGoogle(String idToken) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      await ApiService.googleLogin(idToken);
       final profile = await ApiService.getMe();
       _user = VendorUser.fromJson(profile);
       _isLoading = false;

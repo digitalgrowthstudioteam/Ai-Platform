@@ -1,5 +1,7 @@
 class ApiConfig {
-  static const String baseUrl = 'https://digitalgrowthstudio.in';
+  // Live API Base URL (Render FastAPI Backend)
+  static const String baseUrl = 'https://digital-growth-studio-api.onrender.com';
+  static const String webBaseUrl = 'https://digitalgrowthstudio.in';
 
   // Auth endpoints
   static const String loginUrl = '$baseUrl/api/v1/platform/auth/login';
@@ -17,9 +19,9 @@ class ApiConfig {
   static String productStockUrl(String productId) => '$baseUrl/api/v1/platform/vendor/products/$productId';
   static String readNotificationUrl(String id) => '$baseUrl/api/v1/platform/vendor/notifications/$id/read';
 
-  // External Web URLs (Strictly opened in Browser)
-  static const String webRegisterUrl = '$baseUrl/app/register';
-  static const String webSubscriptionRenewUrl = '$baseUrl/app/dashboard/subscription';
-  static const String webSupportUrl = '$baseUrl/app/support';
+  // External Web URLs
+  static const String webRegisterUrl = '$webBaseUrl/app/register';
+  static const String webSubscriptionRenewUrl = '$webBaseUrl/app/dashboard/subscription';
+  static const String webSupportUrl = '$webBaseUrl/app/support';
 }
 

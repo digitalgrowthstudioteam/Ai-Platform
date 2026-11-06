@@ -44,12 +44,14 @@ class ProfileTab extends StatelessWidget {
                   Container(
                     width: 52,
                     height: 52,
+                    padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF4F46E5).withOpacity(0.1),
+                      color: Colors.white,
                       borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
                     ),
-                    child: const Center(
-                      child: Icon(Icons.store_rounded, size: 28, color: Color(0xFF4F46E5)),
+                    child: Center(
+                      child: Image.asset('assets/images/dgs_logo.png', fit: BoxFit.contain),
                     ),
                   ),
                   const SizedBox(width: 14),

@@ -53,24 +53,42 @@ class AuthGate extends StatelessWidget {
 
     // 1. Initial Loading Splash
     if (auth.isLoading) {
-      return const Scaffold(
+      return Scaffold(
         backgroundColor: Colors.white,
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              SizedBox(
-                width: 44,
-                height: 44,
-                child: CircularProgressIndicator(color: Color(0xFF4F46E5), strokeWidth: 3),
+              Container(
+                width: 80,
+                height: 80,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.06),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: Image.asset('assets/images/dgs_logo.png', fit: BoxFit.contain),
               ),
-              SizedBox(height: 20),
-              Text(
+              const SizedBox(height: 24),
+              const SizedBox(
+                width: 32,
+                height: 32,
+                child: CircularProgressIndicator(color: Color(0xFF4F46E5), strokeWidth: 2.5),
+              ),
+              const SizedBox(height: 16),
+              const Text(
                 'DGS Store Partner',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
               ),
-              SizedBox(height: 4),
-              Text(
+              const SizedBox(height: 4),
+              const Text(
                 'Connecting to merchant engine...',
                 style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
               ),
