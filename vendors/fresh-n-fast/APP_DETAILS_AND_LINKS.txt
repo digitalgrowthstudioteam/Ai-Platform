@@ -1,0 +1,21 @@
+=======================================================
+DIGITAL GROWTH STUDIO — VENDOR MOBILE APPLICATION
+=======================================================
+Vendor Code: VND0013
+Brand Name: Fresh N Fast
+Store Slug: fresh-n-fast
+Store URL: https://fresh-n-fast.digitalgrowthstudio.in
+API Endpoint: https://digital-growth-studio-api.onrender.com/api/store/fresh-n-fast
+App Type: Quick Commerce (Zepto / Bigbasket Style)
+Primary Color: #15803D (Farm Fresh Green)
+Package Name: in.digitalgrowthstudio.fresh_n_fast
+
+KEY FEATURES:
+1. No initial login required — Guests can immediately browse farm-fresh produce and add items to cart.
+2. Login prompt only triggered at order placement / checkout.
+3. Live GPS and radius delivery eligibility geofencing (15 km max radius).
+4. Direct-on-card ADD and [-] quantity [+] steppers.
+5. Persistent bottom quick-commerce floating cart pill.
+6. Cash on Delivery (COD) and Online Payment options.
+=======================================================
+

@@ -1,20 +1,20 @@
 import 'package:flutter/material.dart';
 
 /// Central Configuration for Digital Growth Studio Client App
-/// Brand: Ashtekar Collection (ashtekar-collection)
+/// Brand: Fresh N Fast (fresh-n-fast)
 class AppConfig {
   static const String baseApiUrl = "https://digital-growth-studio-api.onrender.com/api/store";
-  static String activeStoreSlug = "ashtekar-collection";
+  static String activeStoreSlug = "fresh-n-fast";
   
-  // Luxury Men's Apparel Theme Colors
-  static Color primaryColor = const Color(0xFF0F172A);     // Deep Royal Charcoal Navy
-  static Color secondaryColor = const Color(0xFFD4AF37);   // Imperial Sovereign Gold
-  static Color accentGold = const Color(0xFFC5A059);       // Warm Regal Gold
+  // Quick-Commerce Fresh Farm Theme Colors
+  static Color primaryColor = const Color(0xFF15803D);     // Vibrant Farm Leaf Green
+  static Color secondaryColor = const Color(0xFF166534);   // Deep Harvest Green
+  static Color accentGreen = const Color(0xFF22C55E);      // Bright Emerald Green
   static Color backgroundWarm = const Color(0xFFF8FAFC);   // Crisp Clean White
   
-  static String appTitle = "Ashtekar Collection";
-  static String appTagline = "Premium Men's Apparels & Festive Wear";
+  static String appTitle = "Fresh N Fast";
+  static String appTagline = "Farm Fresh Veggies & Fruits in 15-25 Mins";
   static const String currency = "₹";
-  static const String supportPhone = "9960143578";
+  static const String supportPhone = "+91 7595982230";
   static const String defaultLogoUrl = "assets/images/logo.png";
 }

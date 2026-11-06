@@ -14,7 +14,7 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace = "in.digitalgrowthstudio.ashtekar_collection"
+    namespace = "in.digitalgrowthstudio.fresh_n_fast"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -42,8 +42,8 @@ android {
     }
 
     defaultConfig {
-        // Unique Application ID for Ashtekar Collection mobile app
-        applicationId = "in.digitalgrowthstudio.ashtekar_collection"
+        // Unique Application ID for Fresh N Fast quick commerce mobile app
+        applicationId = "in.digitalgrowthstudio.fresh_n_fast"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode

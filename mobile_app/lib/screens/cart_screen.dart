@@ -69,6 +69,7 @@ class _CartScreenState extends State<CartScreen> {
 
     final effectiveDiscount = _couponApplied ? _couponDiscount : 0.0;
     final totalPayable = (subtotal - effectiveDiscount + shipping).clamp(0.0, double.infinity);
+    final bool cannotDeliver = isHyperlocal && eligibility != null && !eligibility.isDeliverable;
 
     return Scaffold(
       backgroundColor: const Color(0xFFFDFCFB),
@@ -390,8 +391,6 @@ class _CartScreenState extends State<CartScreen> {
                         const SizedBox(height: 14),
 
                         // Proceed to Checkout (Prompt login if not signed in)
-                        final bool cannotDeliver = isHyperlocal && eligibility != null && !eligibility.isDeliverable;
-
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton(
@@ -426,7 +425,7 @@ class _CartScreenState extends State<CartScreen> {
                               }
                             },
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: cannotDeliver ? const Color(0xFF94A3B8) : const Color(0xFFDB2777), // Glam Pink
+                              backgroundColor: cannotDeliver ? const Color(0xFF94A3B8) : primary,
                               foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(vertical: 14),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

@@ -14,6 +14,11 @@ class CartProvider extends ChangeNotifier {
     return total;
   }
 
+  int getQuantity(String productId, {String? variantId}) {
+    final key = variantId != null ? "${productId}_${variantId}" : productId;
+    return _items[key]?.quantity ?? 0;
+  }
+
   double get subtotal {
     double total = 0.0;
     _items.forEach((key, item) {

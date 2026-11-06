@@ -165,7 +165,6 @@ class HyperlocalEligibility {
     );
   }
 }
-}
 
 class BannerItem {
   final String id;

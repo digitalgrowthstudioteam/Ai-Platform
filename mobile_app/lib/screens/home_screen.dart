@@ -370,7 +370,7 @@ class HomeScreen extends StatelessWidget {
                               SmartStoreImage(
                                 imageUrl: b.imageUrl,
                                 fit: BoxFit.cover,
-                                fallbackText: "GLAM STREE",
+                                fallbackText: store.config?.storeName ?? AppConfig.appTitle,
                               ),
                               // Gradient Overlay
                               Container(
@@ -451,27 +451,37 @@ class HomeScreen extends StatelessWidget {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFEF3C7), // Warm Gold Tint
+                      color: store.isHyperlocalActive ? const Color(0xFFDCFCE7) : const Color(0xFFFEF3C7),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFFDE68A)),
+                      border: Border.all(color: store.isHyperlocalActive ? const Color(0xFF86EFAC) : const Color(0xFFFDE68A)),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.straighten, color: Color(0xFFD97706), size: 20),
+                        Icon(
+                          store.isHyperlocalActive ? Icons.eco_rounded : Icons.straighten,
+                          color: store.isHyperlocalActive ? const Color(0xFF15803D) : const Color(0xFFD97706),
+                          size: 20,
+                        ),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            AppConfig.activeStoreSlug == "ashtekar-collection"
-                                ? "Men's Apparel Size Chart — Find your tailored fit"
-                                : "Nail Shape & Sizing Guide — Find your custom mm fit",
-                            style: const TextStyle(
-                              color: Color(0xFF92400E),
+                            store.isHyperlocalActive
+                                ? "⚡ Farm Fresh Quality — Harvested Daily & Delivered in Minutes"
+                                : AppConfig.activeStoreSlug == "ashtekar-collection"
+                                    ? "Men's Apparel Size Chart — Find your tailored fit"
+                                    : "Nail Shape & Sizing Guide — Find your custom mm fit",
+                            style: TextStyle(
+                              color: store.isHyperlocalActive ? const Color(0xFF14532D) : const Color(0xFF92400E),
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                         ),
-                        const Icon(Icons.arrow_forward_ios, size: 12, color: Color(0xFFD97706)),
+                        Icon(
+                          Icons.arrow_forward_ios,
+                          size: 12,
+                          color: store.isHyperlocalActive ? const Color(0xFF15803D) : const Color(0xFFD97706),
+                        ),
                       ],
                     ),
                   ),
@@ -603,10 +613,91 @@ class HomeScreen extends StatelessWidget {
                 ),
               ),
 
-            const SliverToBoxAdapter(child: SizedBox(height: 40)),
+            const SliverToBoxAdapter(child: SizedBox(height: 70)),
           ],
         ),
       ),
+      bottomNavigationBar: cart.itemCount > 0
+          ? SafeArea(
+              child: Container(
+                margin: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: primary,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: primary.withAlpha(90),
+                      blurRadius: 14,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: InkWell(
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const CartScreen()),
+                    );
+                  },
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(7),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withAlpha(45),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(Icons.shopping_basket_rounded, color: Colors.white, size: 20),
+                          ),
+                          const SizedBox(width: 12),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                "${cart.itemCount} ${cart.itemCount == 1 ? 'ITEM' : 'ITEMS'}",
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.6,
+                                ),
+                              ),
+                              Text(
+                                "₹${cart.subtotal.toStringAsFixed(0)}",
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      Row(
+                        children: const [
+                          Text(
+                            "View Cart",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          SizedBox(width: 4),
+                          Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 13),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            )
+          : null,
     );
   }
 
@@ -731,12 +822,33 @@ class HomeScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Rating
+                  // Rating & Veg badge
                   Row(
-                    children: const [
-                      Icon(Icons.star, color: Color(0xFFEAB308), size: 12),
-                      SizedBox(width: 3),
-                      Text("5.0 (24)", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF475569))),
+                    children: [
+                      Container(
+                        width: 12,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          border: Border.all(color: const Color(0xFF15803D), width: 1.2),
+                          borderRadius: BorderRadius.circular(2.5),
+                        ),
+                        child: Center(
+                          child: Container(
+                            width: 5,
+                            height: 5,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF15803D),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 5),
+                      const Icon(Icons.bolt_rounded, color: Color(0xFF16A34A), size: 13),
+                      const Text(
+                        "15-25 mins",
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF15803D)),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 4),
@@ -781,47 +893,75 @@ class HomeScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
 
-                  // Full-Width Add to Cart Button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        cart.addToCart(p);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text("${p.title} added to bag!"),
-                            duration: const Duration(milliseconds: 1400),
-                            backgroundColor: const Color(0xFF0F172A),
-                            action: SnackBarAction(
-                              label: "VIEW BAG",
-                              textColor: const Color(0xFFD4AF37),
-                              onPressed: () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(builder: (_) => const CartScreen()),
-                                );
-                              },
+                  // Quick-Commerce ADD / Stepper Button
+                  Builder(
+                    builder: (context) {
+                      final int qty = cart.getQuantity(p.id);
+                      if (qty == 0) {
+                        return SizedBox(
+                          width: double.infinity,
+                          height: 34,
+                          child: OutlinedButton(
+                            onPressed: () => cart.addToCart(p),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF15803D),
+                              backgroundColor: const Color(0xFFF0FDF4),
+                              side: const BorderSide(color: Color(0xFF16A34A), width: 1.2),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              padding: EdgeInsets.zero,
+                              elevation: 0,
+                            ),
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  "ADD",
+                                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 0.5),
+                                ),
+                                SizedBox(width: 3),
+                                Icon(Icons.add, size: 15),
+                              ],
                             ),
                           ),
                         );
-                      },
-                      icon: const Icon(Icons.shopping_bag_outlined, size: 13),
-                      label: const Text(
-                        "Add to Cart",
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF0F172A),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 7),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        elevation: 0,
-                      ),
-                    ),
+                      } else {
+                        return Container(
+                          width: double.infinity,
+                          height: 34,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF15803D),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              InkWell(
+                                onTap: () => cart.updateQuantity(p.id, qty - 1),
+                                borderRadius: const BorderRadius.horizontal(left: Radius.circular(8)),
+                                child: const Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  child: Icon(Icons.remove, size: 16, color: Colors.white),
+                                ),
+                              ),
+                              Text(
+                                "$qty",
+                                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: Colors.white),
+                              ),
+                              InkWell(
+                                onTap: () => cart.updateQuantity(p.id, qty + 1),
+                                borderRadius: const BorderRadius.horizontal(right: Radius.circular(8)),
+                                child: const Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  child: Icon(Icons.add, size: 16, color: Colors.white),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+                    },
                   ),
                 ],
               ),

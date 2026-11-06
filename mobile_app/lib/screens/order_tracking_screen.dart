@@ -928,7 +928,8 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
               OutlinedButton.icon(
                 onPressed: () async {
                   final phone = AppConfig.supportPhone;
-                  final url = "https://wa.me/91$phone?text=Hi%20Ashtekar%20Collection,%20I%20have%20a%20question%20regarding%20my%20order%20$ordNum";
+                  final brandName = Uri.encodeComponent(AppConfig.appTitle);
+                  final url = "https://wa.me/91$phone?text=Hi%20$brandName,%20I%20have%20a%20question%20regarding%20my%20order%20$ordNum";
                   final uri = Uri.parse(url);
                   if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
                 },
@@ -1020,10 +1021,10 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
           ),
           const SizedBox(height: 6),
-          const Text(
-            "Looks like you haven't placed an order with Ashtekar Collection yet. Explore our latest Men's apparel collection!",
+          Text(
+            "Looks like you haven't placed an order with ${AppConfig.appTitle} yet. Explore our fresh fruits and vegetables!",
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B), height: 1.4),
+            style: const TextStyle(fontSize: 12.5, color: Color(0xFF64748B), height: 1.4),
           ),
           const SizedBox(height: 20),
           ElevatedButton(

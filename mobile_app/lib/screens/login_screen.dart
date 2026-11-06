@@ -734,6 +734,24 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
             _buildOrDivider(),
             const SizedBox(height: 14),
             _buildGoogleButton(auth, isSignUp: false),
+            if (widget.redirectTo != null) ...[
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(builder: (_) => widget.redirectTo!),
+                  );
+                },
+                child: const Text(
+                  "Continue as Guest to Checkout →",
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF15803D),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -830,6 +848,24 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
             _buildOrDivider(),
             const SizedBox(height: 12),
             _buildGoogleButton(auth, isSignUp: true),
+            if (widget.redirectTo != null) ...[
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(builder: (_) => widget.redirectTo!),
+                  );
+                },
+                child: const Text(
+                  "Continue as Guest to Checkout →",
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF15803D),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),

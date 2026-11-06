@@ -5,6 +5,8 @@ import '../services/api_service.dart';
 import '../providers/cart_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/wishlist_provider.dart';
+import '../providers/store_provider.dart';
+import '../config/app_config.dart';
 import '../widgets/smart_store_image.dart';
 import '../widgets/sizing_guide_sheet.dart';
 import 'cart_screen.dart';
@@ -88,6 +90,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     }
 
     final p = _product!;
+    final store = Provider.of<StoreProvider>(context);
+    final primary = store.primaryColor;
     final images = _selectedVariant != null && _selectedVariant!.images.isNotEmpty
         ? _selectedVariant!.images
         : (p.galleryImages.isNotEmpty
@@ -390,13 +394,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       border: Border.all(color: const Color(0xFFE2E8F0)),
                     ),
                     child: Row(
-                      children: const [
-                        Icon(Icons.verified, color: Color(0xFFD4AF37), size: 20),
-                        SizedBox(width: 10),
+                      children: [
+                        Icon(Icons.verified, color: primary, size: 20),
+                        const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            "Ashtekar Tailored Guarantee: 100% fine fabrics, handcrafted tailoring & complimentary size exchange.",
-                            style: TextStyle(fontSize: 11.5, color: Color(0xFF334155), fontWeight: FontWeight.w600),
+                            "${store.config?.storeName ?? AppConfig.appTitle} Quality Guarantee: 100% farm-fresh, hygienic, & contactless doorstep delivery.",
+                            style: const TextStyle(fontSize: 11.5, color: Color(0xFF334155), fontWeight: FontWeight.w600),
                           ),
                         ),
                       ],

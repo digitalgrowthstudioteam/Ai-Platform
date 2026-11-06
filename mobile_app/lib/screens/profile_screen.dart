@@ -48,9 +48,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  Future<void> _launchWhatsApp(String phone) async {
+  Future<void> _launchWhatsApp(String phone, String brandName) async {
     final clean = phone.replaceAll(RegExp(r'[^0-9]'), '');
-    final uri = Uri.parse("https://wa.me/91$clean?text=Hi%20Glam%20Stree!%20I%20have%20an%20inquiry%20regarding%20my%20order.");
+    final uri = Uri.parse("https://wa.me/91$clean?text=Hi%20${Uri.encodeComponent(brandName)}!%20I%20have%20an%20inquiry%20regarding%20my%20order.");
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
@@ -224,7 +224,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: InkWell(
-                      onTap: () => _launchWhatsApp(supportPhone),
+                      onTap: () => _launchWhatsApp(supportPhone, store.config?.storeName ?? AppConfig.appTitle),
                       borderRadius: BorderRadius.circular(12),
                       child: Container(
                         padding: const EdgeInsets.all(14),

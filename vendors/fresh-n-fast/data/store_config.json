@@ -1,0 +1,20 @@
+{
+  "vendor_code": "VND0013",
+  "store_name": "Fresh N Fast",
+  "store_slug": "fresh-n-fast",
+  "subdomain": "fresh-n-fast.digitalgrowthstudio.in",
+  "primary_color": "#15803D",
+  "secondary_color": "#166534",
+  "app_title": "Fresh N Fast",
+  "app_tagline": "Farm Fresh Veggies & Fruits in 15-25 Mins",
+  "hyperlocal_enabled": true,
+  "hyperlocal_mode": "radius",
+  "estimated_delivery_mins": 20,
+  "max_delivery_radius_km": 15.0,
+  "min_order_value": 50.0,
+  "base_delivery_fee": 25.0,
+  "free_delivery_above": 249.0,
+  "package_name": "in.digitalgrowthstudio.fresh_n_fast",
+  "support_phone": "+91 7595982230"
+}
+
