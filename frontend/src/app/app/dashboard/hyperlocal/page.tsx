@@ -216,6 +216,19 @@ export default function VendorHyperlocalPage() {
         </div>
       )}
 
+      {/* Active Mode Notice */}
+      {!isLocked && form.hyperlocal_enabled && (
+        <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-3 text-emerald-900 shadow-2xs">
+          <div className="w-2.5 h-2.5 rounded-full bg-emerald-600 animate-pulse shrink-0" />
+          <div className="text-xs">
+            <span className="font-bold">Primary Fulfillment Mode: Hyperlocal Quick-Commerce.</span>{" "}
+            <span className="text-emerald-700">
+              Courier shipping rules and flat rates are completely disabled. Minimum order values (MOQ), delivery fees, and radius geofencing operate exclusively through the settings below.
+            </span>
+          </div>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Card 1: Master Toggle & Mode */}
         <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-5">

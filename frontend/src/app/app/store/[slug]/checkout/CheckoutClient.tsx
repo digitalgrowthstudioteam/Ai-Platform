@@ -149,6 +149,11 @@ export default function CheckoutClient() {
       setError("Your cart is empty. Please add products to checkout.");
       return;
     }
+    const minOrderVal = Number(config?.min_order_value) || 0;
+    if (minOrderVal > 0 && subtotal < minOrderVal) {
+      setError(`Minimum order value for this store is ₹${minOrderVal}. Please add more items to your cart.`);
+      return;
+    }
     if (!canPlaceOrder) {
       setError("Entered delivery pincode is outside this vendor's serviceable zones.");
       return;

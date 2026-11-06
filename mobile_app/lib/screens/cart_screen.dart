@@ -69,6 +69,12 @@ class _CartScreenState extends State<CartScreen> {
     final totalPayable = (subtotal - effectiveDiscount + shipping).clamp(0.0, double.infinity);
     final bool cannotDeliver = isHyperlocal && eligibility != null && !eligibility.isDeliverable;
 
+    // Mutually Exclusive Minimum Order Value (MOQ)
+    final double minOrderValue = isHyperlocal
+        ? (eligibility?.minOrderValue ?? config?.minOrderValue ?? 0.0)
+        : (config?.minOrderValue ?? 0.0);
+    final bool isBelowMinOrder = minOrderValue > 0 && subtotal < minOrderValue;
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -495,7 +501,7 @@ class _CartScreenState extends State<CartScreen> {
                         width: double.infinity,
                         height: 54,
                         child: ElevatedButton(
-                          onPressed: cannotDeliver
+                          onPressed: (cannotDeliver || isBelowMinOrder)
                               ? null
                               : () {
                                   if (!auth.isLoggedIn) {
@@ -521,7 +527,11 @@ class _CartScreenState extends State<CartScreen> {
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(27)),
                           ),
                           child: Text(
-                            cannotDeliver ? "DELIVERY UNAVAILABLE AT LOCATION" : "CHECK OUT",
+                            cannotDeliver
+                                ? "DELIVERY UNAVAILABLE AT LOCATION"
+                                : isBelowMinOrder
+                                    ? "MIN ORDER VALUE IS ₹${minOrderValue.toStringAsFixed(0)}"
+                                    : "CHECK OUT",
                             style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w900, letterSpacing: 1.0),
                           ),
                         ),

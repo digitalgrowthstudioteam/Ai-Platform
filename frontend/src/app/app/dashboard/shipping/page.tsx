@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import Link from "next/link";
 import { platformApi } from "@/lib/app-platform/api";
 import { StoreSettings } from "@/lib/app-platform/types";
 import {
@@ -95,6 +96,32 @@ export default function VendorShippingSettingsPage() {
             : "Set delivery fees, free delivery order thresholds (MOV), and serviceable delivery regions"}
         </p>
       </div>
+
+      {store?.hyperlocal_enabled && (
+        <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-950 flex items-start gap-3 shadow-xs">
+          <div className="p-2 rounded-xl bg-amber-100 text-amber-700 shrink-0 mt-0.5">
+            <MapPin className="w-5 h-5" />
+          </div>
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <h4 className="text-sm font-bold">Hyperlocal Quick-Commerce Fulfillment is Active</h4>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-200 text-amber-800 uppercase tracking-wide">
+                Fulfillment Mode Active
+              </span>
+            </div>
+            <p className="text-xs text-amber-800 mt-1 leading-relaxed">
+              To prevent delivery fee collisions and conflicting minimum order values (MOQ), standard courier shipping is currently disabled for your store. Delivery charges, serviceable radius, and order thresholds are controlled under Hyperlocal Delivery.
+            </p>
+            <Link
+              href="/app/dashboard/hyperlocal"
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-900 bg-amber-200/80 hover:bg-amber-200 px-3 py-1.5 rounded-xl transition-colors mt-3"
+            >
+              <span>Manage Hyperlocal Radius & Delivery Slabs</span>
+              <span>→</span>
+            </Link>
+          </div>
+        </div>
+      )}
 
       {message && (
         <div
