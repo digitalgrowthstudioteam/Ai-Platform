@@ -59,7 +59,10 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      final googleSignIn = GoogleSignIn(scopes: ['email', 'profile']);
+      final googleSignIn = GoogleSignIn(
+        serverClientId: '455814773569-9a3aj81jb1f0t18etfa7pvgiel2mv4vu.apps.googleusercontent.com',
+        scopes: ['email', 'profile'],
+      );
       final account = await googleSignIn.signIn();
 
       if (account == null) {
@@ -97,9 +100,14 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } catch (err) {
       if (!mounted) return;
+      final errStr = err.toString();
+      String message = 'Google Sign-In failed. Please sign in directly with your merchant email and password.';
+      if (errStr.contains('10') || errStr.contains('DEVELOPER_ERROR')) {
+        message = 'Google Sign-In notice: App SHA-1 not yet linked in Firebase. Please sign in using your email and password above.';
+      }
       setState(() {
         _isLoading = false;
-        _error = 'Google Sign-In notice: $err. Please sign in directly with your merchant email and password.';
+        _error = message;
       });
     }
   }
