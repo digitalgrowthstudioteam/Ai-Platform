@@ -40,14 +40,19 @@ class _LoginScreenState extends State<LoginScreen> {
       _error = null;
     });
 
-    final auth = Provider.of<AuthProvider>(context, listen: false);
-    final success = await auth.login(email, password);
+    try {
+      final auth = Provider.of<AuthProvider>(context, listen: false);
+      final success = await auth.login(email, password);
 
-    if (!mounted) return;
-    setState(() => _isLoading = false);
-
-    if (!success) {
-      setState(() => _error = auth.errorMessage ?? 'Invalid login credentials. Please check your email and password.');
+      if (!mounted) return;
+      if (!success) {
+        setState(() => _error = auth.errorMessage ?? 'Invalid login credentials. Please check your email and password.');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = 'Login error: $e');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -61,17 +66,22 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       final googleSignIn = GoogleSignIn(
         serverClientId: '455814773569-9a3aj81jb1f0t18etfa7pvgiel2mv4vu.apps.googleusercontent.com',
-        scopes: ['email', 'profile'],
+        scopes: ['email'],
       );
-      final account = await googleSignIn.signIn();
+      final account = await googleSignIn.signIn().timeout(
+        const Duration(seconds: 20),
+        onTimeout: () => null,
+      );
 
       if (account == null) {
-        // User cancelled account picker
+        // User cancelled account picker or timed out
         if (mounted) setState(() => _isLoading = false);
         return;
       }
 
-      final googleAuth = await account.authentication;
+      final googleAuth = await account.authentication.timeout(
+        const Duration(seconds: 15),
+      );
       final idToken = googleAuth.idToken;
 
       if (idToken == null || idToken.isEmpty) {
@@ -90,8 +100,6 @@ class _LoginScreenState extends State<LoginScreen> {
       final success = await auth.loginWithGoogle(idToken);
 
       if (!mounted) return;
-      setState(() => _isLoading = false);
-
       if (!success) {
         setState(() {
           _error = auth.errorMessage ?? 'Google authentication failed. Please enter your password below.';
@@ -101,14 +109,17 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (err) {
       if (!mounted) return;
       final errStr = err.toString();
-      String message = 'Google Sign-In failed. Please sign in directly with your merchant email and password.';
+      String message = 'Google Sign-In failed ($err). Please sign in directly with your merchant email and password.';
       if (errStr.contains('10') || errStr.contains('DEVELOPER_ERROR')) {
         message = 'Google Sign-In notice: App SHA-1 not yet linked in Firebase. Please sign in using your email and password above.';
       }
       setState(() {
-        _isLoading = false;
         _error = message;
       });
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 

@@ -19,8 +19,8 @@ android {
         applicationId = "in.digitalgrowthstudio.dgs_partner_app"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
-        versionCode = 3
-        versionName = "1.0.2"
+        versionCode = 4
+        versionName = "1.0.3"
     }
 
     buildTypes {

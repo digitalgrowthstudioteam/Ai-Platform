@@ -36,7 +36,7 @@ class ApiService {
       Uri.parse(ApiConfig.loginUrl),
       headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
       body: jsonEncode({'email': email.trim(), 'password': password}),
-    );
+    ).timeout(const Duration(seconds: 15));
 
     final data = jsonDecode(response.body);
     if (response.statusCode >= 200 && response.statusCode < 300) {
@@ -55,7 +55,7 @@ class ApiService {
       Uri.parse(ApiConfig.googleLoginUrl),
       headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
       body: jsonEncode({'id_token': idToken}),
-    );
+    ).timeout(const Duration(seconds: 15));
 
     final data = jsonDecode(response.body);
     if (response.statusCode >= 200 && response.statusCode < 300) {
