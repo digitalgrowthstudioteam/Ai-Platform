@@ -139,4 +139,19 @@ async def verify_firebase_token(id_token: str) -> Optional[dict]:
         logger.info("firebase_token_verified_public", uid=decoded_public.get("uid"))
         return decoded_public
 
+    # Fallback Path: Verify Google OAuth ID Token via Google's tokeninfo API (for Android app Google Sign-In)
+    try:
+        import httpx
+        async with httpx.AsyncClient(timeout=6.0) as client:
+            resp = await client.get(f"https://oauth2.googleapis.com/tokeninfo?id_token={id_token}")
+            if resp.status_code == 200:
+                data = resp.json()
+                if data.get("email") and str(data.get("email_verified", "")).lower() == "true":
+                    if "uid" not in data:
+                        data["uid"] = data.get("sub")
+                    logger.info("google_oauth_token_verified_online", email=data.get("email"), uid=data.get("uid"))
+                    return data
+    except Exception as g_err:
+        logger.warning("google_oauth_tokeninfo_failed", error=str(g_err))
+
     return None
