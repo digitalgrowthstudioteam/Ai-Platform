@@ -3,7 +3,12 @@ Backend Test Script: 1-Click AI Importer, AI Image Studio & Super Admin Credit P
 Tests all endpoints directly via FastAPI ASGI transport without opening any browser.
 """
 import asyncio
+import os
+import sys
 import uuid
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend"))
+
 from httpx import AsyncClient, ASGITransport
 from app.main import app
 from app.database import async_session_factory
