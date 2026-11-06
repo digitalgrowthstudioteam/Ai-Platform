@@ -2,7 +2,7 @@
 Digital Growth Studio — Platform Vendor, Store & App Config Schemas
 """
 import uuid
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 from pydantic import BaseModel, Field
 
@@ -675,6 +675,10 @@ class AiProductImportPreviewResponse(BaseModel):
     variants: List[dict] = []
     tags: List[str] = []
     images: List[str] = []
+    features: List[str] = []
+    specifications: Dict[str, str] = {}
+    colors: List[str] = []
+    sizes: List[str] = []
 
 
 class AiProductImportConfirmRequest(BaseModel):

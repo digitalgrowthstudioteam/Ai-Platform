@@ -103,6 +103,9 @@ async def fetch_product_raw_data(url: str) -> Dict[str, Any]:
     brand = ""
     images = []
     features = []
+    specifications = {}
+    colors = []
+    sizes = []
 
     # 1. Parse JSON-LD if present (Shopify, Amazon, WooCommerce)
     if product_ld:
@@ -159,12 +162,78 @@ async def fetch_product_raw_data(url: str) -> Dict[str, Any]:
         if title_el:
             title = title_el.get_text(strip=True)
 
-        bullets_el = soup.find(id="feature-bullets")
-        if bullets_el:
-            for li in bullets_el.find_all("li"):
-                t = li.get_text(strip=True)
-                if t and not t.lower().startswith("make sure this fits"):
-                    features.append(t)
+        # Amazon "About this item" bullet points (Modern and classic selectors)
+        about_h = soup.find(lambda el: el.name in ["h1", "h2", "h3", "h4"] and "about this item" in el.get_text().lower())
+        if about_h:
+            parent = about_h.find_parent()
+            if parent:
+                for li in parent.find_all("li"):
+                    t = li.get_text(strip=True)
+                    if t and not t.lower().startswith("make sure this fits") and t not in features:
+                        features.append(t)
+        if not features:
+            bullets_el = soup.find(id="feature-bullets") or soup.find(id="featurebullets_feature_div")
+            if bullets_el:
+                for li in bullets_el.find_all("li"):
+                    t = li.get_text(strip=True)
+                    if t and not t.lower().startswith("make sure this fits") and t not in features:
+                        features.append(t)
+
+        # Amazon Product Overview / Specifications
+        overview = soup.find(id="productOverview_feature_div")
+        if overview:
+            for tr in overview.find_all("tr"):
+                tds = tr.find_all(["td", "th"])
+                if len(tds) >= 2:
+                    k = tds[0].get_text(strip=True)
+                    v = tds[1].get_text(strip=True)
+                    if k and v and len(k) < 50 and len(v) < 150:
+                        specifications[k] = v
+
+        for tr in soup.find_all("tr"):
+            th = tr.find(["th", "td"], class_=re.compile(r"a-color-secondary|prodDetSectionEntry|label", re.I))
+            td = tr.find("td", class_=re.compile(r"prodDetAttrValue|value", re.I))
+            if th and td and th != td:
+                k = th.get_text(strip=True)
+                v = td.get_text(strip=True)
+                if k and v and len(k) < 40 and len(v) < 120 and not k.isdigit():
+                    if k not in specifications:
+                        specifications[k] = v
+
+        # Amazon Sizes & Colors Variations (From script variationValues JSON)
+        m_var = re.search(r'"variationValues"\s*:\s*(\{[^}]+\})', html)
+        if m_var:
+            try:
+                v_dict = json.loads(m_var.group(1))
+                for vk, vlist in v_dict.items():
+                    if isinstance(vlist, list):
+                        if "color" in vk.lower():
+                            for c in vlist:
+                                if c not in colors:
+                                    colors.append(c)
+                        elif "size" in vk.lower():
+                            for s in vlist:
+                                if s not in sizes:
+                                    sizes.append(s)
+            except Exception:
+                pass
+
+        if not colors:
+            c_div = soup.find(id=re.compile(r"color_name", re.I))
+            if c_div:
+                for img in c_div.find_all("img"):
+                    alt = img.get("alt")
+                    if alt and alt not in colors:
+                        colors.append(alt)
+
+        if not sizes:
+            s_div = soup.find(id=re.compile(r"size_name", re.I))
+            if s_div:
+                for el in s_div.find_all(["span", "option"]):
+                    txt = el.get_text(strip=True)
+                    if txt and not any(skip in txt.lower() for skip in ["select", "size", "make a", "chart"]):
+                        if txt not in sizes and len(txt) <= 15:
+                            sizes.append(txt)
 
         # Amazon Dynamic High-Res Images JSON
         landing_img = soup.find(id="landingImage")
@@ -223,6 +292,24 @@ async def fetch_product_raw_data(url: str) -> Dict[str, Any]:
         f_title = soup.find("span", class_="B_NuCI") or soup.find("h1", class_="cPHDOP")
         if f_title:
             title = f_title.get_text(strip=True)
+
+        for fb_li in soup.find_all("li", class_="_21Ahn-"):
+            t = fb_li.get_text(strip=True)
+            if t and t not in features:
+                features.append(t)
+
+        for f_tr in soup.find_all("tr", class_="_1s_Smc"):
+            tds = f_tr.find_all("td")
+            if len(tds) >= 2:
+                k = tds[0].get_text(strip=True)
+                v = tds[1].get_text(strip=True)
+                if k and v and k not in specifications:
+                    specifications[k] = v
+
+        for s_link in soup.find_all("a", class_=re.compile(r"_1q8qwO", re.I)):
+            s_text = s_link.get_text(strip=True)
+            if s_text and s_text not in sizes:
+                sizes.append(s_text)
 
         f_price = soup.find("div", class_="_30jeq3")
         if f_price:
@@ -286,8 +373,29 @@ async def fetch_product_raw_data(url: str) -> Dict[str, Any]:
         "price": price,
         "mrp": mrp if mrp > price else price,
         "images": clean_images[:10],
-        "features": features[:8],
+        "features": features[:10],
+        "specifications": specifications,
+        "colors": colors[:10],
+        "sizes": sizes[:15],
     }
+
+
+def _infer_category(title: str) -> str:
+    """Smart local category inference based on title keywords."""
+    t = (title or "").lower()
+    if any(w in t for w in ["shoe", "sandal", "footwear", "sneaker", "boot", "slipper", "wedge", "clog", "loaf"]):
+        return "Footwear"
+    if any(w in t for w in ["shirt", "t-shirt", "tshirt", "jeans", "dress", "kurti", "saree", "pant", "jacket", "hoodie", "top", "trouser", "suit", "blazer", "wear"]):
+        return "Apparel & Fashion"
+    if any(w in t for w in ["phone", "laptop", "earbud", "earphone", "headphone", "charger", "cable", "watch", "smartwatch", "speaker", "camera"]):
+        return "Electronics"
+    if any(w in t for w in ["cream", "serum", "lotion", "perfume", "shampoo", "lipstick", "makeup", "facewash", "skincare", "soap"]):
+        return "Beauty & Personal Care"
+    if any(w in t for w in ["bottle", "kitchen", "pan", "cooker", "bed", "pillow", "curtain", "towel", "mop", "lamp", "cushion", "decor"]):
+        return "Home & Kitchen"
+    if any(w in t for w in ["grocery", "tea", "coffee", "oil", "spice", "almond", "cashew", "dry fruit", "snack"]):
+        return "Groceries & Essentials"
+    return "General"
 
 
 async def enhance_product_with_gemini(raw_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -298,54 +406,98 @@ async def enhance_product_with_gemini(raw_data: Dict[str, Any]) -> Dict[str, Any
     api_key = settings.resolved_api_key
     model_name = getattr(settings, "GEMINI_MODEL", "gemini-1.5-flash")
 
-    system_prompt = (
-        "You are an expert e-commerce catalog specialist and copywriter for direct-to-consumer online brands.\n"
-        "Your job is to take raw, messy scraped product details from marketplaces like Amazon or Flipkart and format "
-        "them into a clean, compelling, professional product listing for an independent store.\n\n"
-        "STRICT RULES:\n"
-        "1. Remove ALL marketplace watermarks/branding: 'Amazon', 'Amazon's Choice', 'Fulfilled by Amazon', 'Flipkart Assured', 'Best Seller', warranty mentions.\n"
-        "2. Generate an SEO-friendly, catchy, concise product title (max 90 chars).\n"
-        "3. Generate a rich, formatted description with bullet points (Features, Material/Build, What's in the Box).\n"
-        "4. Suggest a clean store category name (e.g., 'Groceries & Essentials', 'Men\\'s Apparel', 'Electronics', 'Footwear', 'Home Decor').\n"
-        "5. Detect standard variants if implied (e.g. standard garment sizes: S, M, L, XL or pack sizes: 500g, 1kg).\n"
-        "6. Return ONLY a valid JSON object matching the requested schema. No code fences, no extra commentary."
-    )
+    # Generate structured variant combinations from extracted colors and sizes
+    colors = raw_data.get("colors") or []
+    sizes = raw_data.get("sizes") or []
+    base_variants = []
+    if colors and sizes:
+        for c in colors[:5]:
+            for s in sizes[:6]:
+                clean_c = re.sub(r'[^a-zA-Z0-9]', '', c)[:3].upper() or "VAR"
+                clean_s = re.sub(r'[^a-zA-Z0-9]', '', s) or "SZ"
+                base_variants.append({
+                    "name": f"{c} / {s}",
+                    "sku_suffix": f"{clean_c}-{clean_s}",
+                    "price_diff": 0.0,
+                    "stock": 50
+                })
+    elif colors:
+        for c in colors[:10]:
+            clean_c = re.sub(r'[^a-zA-Z0-9]', '', c)[:4].upper() or "VAR"
+            base_variants.append({
+                "name": c,
+                "sku_suffix": clean_c,
+                "price_diff": 0.0,
+                "stock": 50
+            })
+    elif sizes:
+        for s in sizes[:10]:
+            clean_s = re.sub(r'[^a-zA-Z0-9]', '', s) or "SZ"
+            base_variants.append({
+                "name": s,
+                "sku_suffix": clean_s,
+                "price_diff": 0.0,
+                "stock": 50
+            })
+    else:
+        base_variants.append({
+            "name": "Standard",
+            "sku_suffix": "STD",
+            "price_diff": 0.0,
+            "stock": 50
+        })
 
-    user_payload = {
-        "title": raw_data.get("raw_title"),
-        "description": raw_data.get("raw_description"),
-        "features": raw_data.get("features"),
-        "brand": raw_data.get("brand"),
-        "detected_price": raw_data.get("price"),
-        "detected_mrp": raw_data.get("mrp"),
-    }
+    # Build rich formatted description with bullets and specs table
+    features = raw_data.get("features") or []
+    specs = raw_data.get("specifications") or {}
+    raw_desc = raw_data.get("raw_description") or ""
+    clean_title = re.sub(r"(?i)(Amazon\s*Brand\s*-\s*|Flipkart\s*SmartBuy\s*-\s*|\s*\|.*$|\s*-.*$)", "", raw_data.get("raw_title") or "Imported Product").strip()
 
-    schema_format = {
-        "title": "Optimized Product Title",
-        "category": "Suggested Category",
-        "description_html": "<p>Overview paragraph...</p><ul><li>Feature 1</li><li>Feature 2</li></ul>",
-        "short_description": "Catchy 1-line product punchline",
-        "selling_price": raw_data.get("price") or 499.0,
-        "mrp": raw_data.get("mrp") or 999.0,
-        "variants": [
-            {"name": "Default / Regular", "sku_suffix": "REG", "price_diff": 0.0, "stock": 50}
-        ],
-        "tags": ["Tag1", "Tag2"],
-    }
+    bullet_items = "".join([f"<li>{f}</li>" for f in features])
+    specs_rows = "".join([
+        f"<tr><td style='padding:6px 12px;font-weight:600;border:1px solid #e2e8f0;background:#f8fafc;width:35%;'>{k}</td><td style='padding:6px 12px;border:1px solid #e2e8f0;'>{v}</td></tr>"
+        for k, v in list(specs.items())[:12]
+    ])
 
-    full_prompt = (
-        f"Input Product Data:\n{json.dumps(user_payload, indent=2)}\n\n"
-        f"Please output a JSON object adhering to this structure:\n{json.dumps(schema_format, indent=2)}"
-    )
+    desc_parts = []
+    if raw_desc:
+        desc_parts.append(f"<p style='font-size:14px;line-height:1.6;color:#334155;margin-bottom:12px;'>{raw_desc[:400]}</p>")
+    else:
+        desc_parts.append(f"<p style='font-size:14px;line-height:1.6;color:#334155;margin-bottom:12px;'>High-quality {clean_title[:60]}, designed for exceptional comfort, lasting durability, and modern styling.</p>")
+    if bullet_items:
+        desc_parts.append(f"<h4 style='font-size:14px;font-weight:700;color:#0f172a;margin-top:16px;margin-bottom:8px;'>Key Highlights & Features:</h4><ul style='padding-left:20px;line-height:1.7;color:#475569;margin-bottom:12px;'>{bullet_items}</ul>")
+    if specs_rows:
+        desc_parts.append(f"<h4 style='font-size:14px;font-weight:700;color:#0f172a;margin-top:16px;margin-bottom:8px;'>Product Specifications:</h4><table style='width:100%;border-collapse:collapse;font-size:13px;border:1px solid #e2e8f0;margin-top:8px;'><tbody>{specs_rows}</tbody></table>")
 
-    # 1. Call Gemini REST API directly if API key available
+    rich_desc_html = "".join(desc_parts)
+
+    suggested_category = _infer_category(clean_title)
+
+    # 1. Attempt Gemini Enhancement if API Key configured
     if api_key:
+        system_prompt = (
+            "You are an expert e-commerce catalog specialist and copywriter for direct-to-consumer online brands.\n"
+            "Format raw scraped product data into a clean, compelling, professional product listing.\n"
+            "Remove ALL marketplace branding ('Amazon', 'Flipkart', 'Best Seller', etc.).\n"
+            "Generate concise catchy title and clean category.\n"
+            "Return valid JSON only."
+        )
+
+        user_payload = {
+            "title": raw_data.get("raw_title"),
+            "description": raw_data.get("raw_description"),
+            "features": features,
+            "specifications": specs,
+            "detected_price": raw_data.get("price"),
+            "detected_mrp": raw_data.get("mrp"),
+        }
+
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
         body = {
             "contents": [
                 {
                     "role": "user",
-                    "parts": [{"text": f"{system_prompt}\n\n{full_prompt}"}]
+                    "parts": [{"text": f"{system_prompt}\n\nInput Product Data:\n{json.dumps(user_payload, indent=2)}"}]
                 }
             ],
             "generationConfig": {
@@ -361,13 +513,23 @@ async def enhance_product_with_gemini(raw_data: Dict[str, Any]) -> Dict[str, Any
                     candidates = resp_json.get("candidates", [])
                     if candidates and "content" in candidates[0]:
                         raw_text = candidates[0]["content"]["parts"][0]["text"].strip()
-                        # Clean potential markdown fences
                         raw_text = re.sub(r"^```json\s*", "", raw_text)
                         raw_text = re.sub(r"\s*```$", "", raw_text)
                         parsed = json.loads(raw_text)
                         logger.info("gemini_product_enhanced_successfully", title=parsed.get("title"))
                         return {
-                            **parsed,
+                            "title": parsed.get("title") or clean_title[:90],
+                            "category": parsed.get("category") or suggested_category,
+                            "description_html": parsed.get("description_html") or rich_desc_html,
+                            "short_description": parsed.get("short_description") or clean_title[:120],
+                            "selling_price": raw_data.get("price") or 499.0,
+                            "mrp": raw_data.get("mrp") or 999.0,
+                            "variants": base_variants,
+                            "features": features,
+                            "specifications": specs,
+                            "colors": colors,
+                            "sizes": sizes,
+                            "tags": parsed.get("tags") or ["Featured", "New Arrival"],
                             "images": raw_data.get("images", []),
                             "source_url": raw_data.get("source_url"),
                         }
@@ -376,24 +538,19 @@ async def enhance_product_with_gemini(raw_data: Dict[str, Any]) -> Dict[str, Any
         except Exception as e:
             logger.error("gemini_call_exception_using_fallback", error=str(e))
 
-    # 2. Robust Local Fallback (runs if Gemini is offline or quota reached)
-    clean_title = re.sub(r"(?i)(Amazon\s*Brand\s*-\s*|Flipkart\s*SmartBuy\s*-\s*|\s*\|.*$|\s*-.*$)", "", raw_data.get("raw_title") or "Imported Product").strip()
-    raw_desc = raw_data.get("raw_description") or ""
-    bullet_items = "".join([f"<li>{f}</li>" for f in raw_data.get("features", [])])
-    desc_html = f"<p>{raw_desc[:400]}</p>"
-    if bullet_items:
-        desc_html += f"<h4>Product Highlights:</h4><ul>{bullet_items}</ul>"
-
+    # 2. Local Fallback
     return {
-        "title": clean_title[:100] or "Quality E-Commerce Item",
-        "category": "General",
-        "description_html": desc_html,
+        "title": clean_title[:90] or "Quality E-Commerce Item",
+        "category": suggested_category,
+        "description_html": rich_desc_html,
         "short_description": clean_title[:120],
         "selling_price": raw_data.get("price") or 499.0,
         "mrp": raw_data.get("mrp") or 999.0,
-        "variants": [
-            {"name": "Standard", "sku_suffix": "STD", "price_diff": 0.0, "stock": 50}
-        ],
+        "variants": base_variants,
+        "features": features,
+        "specifications": specs,
+        "colors": colors,
+        "sizes": sizes,
         "tags": ["Featured", "New Arrival"],
         "images": raw_data.get("images", []),
         "source_url": raw_data.get("source_url"),

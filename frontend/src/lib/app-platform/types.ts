@@ -661,6 +661,10 @@ export interface AiProductImportPreview {
   variants: Array<{ name: string; sku_suffix?: string; price_diff?: number; stock?: number }>;
   tags: string[];
   images: string[];
+  features?: string[];
+  specifications?: Record<string, string>;
+  colors?: string[];
+  sizes?: string[];
 }
 
 

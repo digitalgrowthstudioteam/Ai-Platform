@@ -114,7 +114,7 @@ export default function AiImageStudioModal({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-base font-bold text-slate-900">AI Image Studio (Phase 2)</h3>
+                <h3 className="text-base font-bold text-slate-900">AI Image Studio</h3>
                 <span className="px-2 py-0.5 text-[10px] font-semibold bg-purple-100 text-purple-700 rounded-full">
                   1-Click Redesign
                 </span>

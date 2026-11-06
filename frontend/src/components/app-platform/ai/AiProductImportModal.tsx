@@ -10,13 +10,12 @@ import {
   Check,
   AlertCircle,
   Loader2,
-  Image as ImageIcon,
-  CheckCircle2,
-  ArrowRight,
   TrendingUp,
   Tag,
   Layers,
-  Percent,
+  Plus,
+  Trash2,
+  CheckCircle2,
 } from "lucide-react";
 
 interface AiProductImportModalProps {
@@ -48,8 +47,17 @@ export default function AiProductImportModal({
   const [mrp, setMrp] = useState<number>(999);
   const [shortDesc, setShortDesc] = useState("");
   const [descHtml, setDescHtml] = useState("");
+  const [showRawDescHtml, setShowRawDescHtml] = useState(false);
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
   const [variants, setVariants] = useState<any[]>([]);
+
+  // Custom Variant creator state
+  const [isAddingVariant, setIsAddingVariant] = useState(false);
+  const [newVariantName, setNewVariantName] = useState("");
+  const [newVariantPriceDiff, setNewVariantPriceDiff] = useState(0);
+  const [newVariantStock, setNewVariantStock] = useState(50);
+  const [isBatchOpen, setIsBatchOpen] = useState(false);
+  const [batchVariantsText, setBatchVariantsText] = useState("");
 
   if (!isOpen) return null;
 
@@ -98,6 +106,91 @@ export default function AiProductImportModal({
     }
   };
 
+  // Variant operations
+  const handleRemoveVariant = (index: number) => {
+    setVariants(variants.filter((_, i) => i !== index));
+  };
+
+  const handleUpdateVariant = (index: number, field: string, value: any) => {
+    const updated = [...variants];
+    updated[index] = { ...updated[index], [field]: value };
+    setVariants(updated);
+  };
+
+  const handleAddCustomVariant = () => {
+    if (!newVariantName.trim()) return;
+    setVariants([
+      ...variants,
+      {
+        name: newVariantName.trim(),
+        sku_suffix: newVariantName.trim().replace(/[^a-zA-Z0-9]/g, "").toUpperCase() || "VAR",
+        price_diff: Number(newVariantPriceDiff) || 0,
+        stock: Number(newVariantStock) || 50,
+      },
+    ]);
+    setNewVariantName("");
+    setNewVariantPriceDiff(0);
+    setNewVariantStock(50);
+    setIsAddingVariant(false);
+  };
+
+  const handleApplyPreset = (presetType: "shoes" | "clothing" | "colors") => {
+    let newItems: string[] = [];
+    if (presetType === "shoes") {
+      newItems = ["6 UK", "7 UK", "8 UK", "9 UK", "10 UK"];
+    } else if (presetType === "clothing") {
+      newItems = ["S", "M", "L", "XL", "XXL"];
+    } else if (presetType === "colors") {
+      newItems = ["Black", "White", "Navy Blue", "Grey", "Beige"];
+    }
+
+    const existingNames = new Set(variants.map((v) => v.name.toLowerCase()));
+    const additions = newItems
+      .filter((n) => !existingNames.has(n.toLowerCase()))
+      .map((n) => ({
+        name: n,
+        sku_suffix: n.replace(/[^a-zA-Z0-9]/g, "").toUpperCase(),
+        price_diff: 0,
+        stock: 50,
+      }));
+
+    if (additions.length > 0) {
+      if (variants.length === 1 && variants[0].name.toLowerCase() === "standard") {
+        setVariants(additions);
+      } else {
+        setVariants([...variants, ...additions]);
+      }
+    }
+  };
+
+  const handleBatchAdd = () => {
+    if (!batchVariantsText.trim()) return;
+    const items = batchVariantsText
+      .split(/[,;\n]+/)
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+
+    const existingNames = new Set(variants.map((v) => v.name.toLowerCase()));
+    const additions = items
+      .filter((n) => !existingNames.has(n.toLowerCase()))
+      .map((n) => ({
+        name: n,
+        sku_suffix: n.replace(/[^a-zA-Z0-9]/g, "").toUpperCase(),
+        price_diff: 0,
+        stock: 50,
+      }));
+
+    if (additions.length > 0) {
+      if (variants.length === 1 && variants[0].name.toLowerCase() === "standard") {
+        setVariants(additions);
+      } else {
+        setVariants([...variants, ...additions]);
+      }
+    }
+    setBatchVariantsText("");
+    setIsBatchOpen(false);
+  };
+
   const handleConfirmImport = async () => {
     if (currentCredits < 1) {
       setError("Insufficient AI credits. Please buy credits to continue.");
@@ -134,12 +227,15 @@ export default function AiProductImportModal({
     setStep("input");
     setPreview(null);
     setError(null);
+    setIsAddingVariant(false);
+    setIsBatchOpen(false);
+    setShowRawDescHtml(false);
     onClose();
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
-      <div className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden my-8">
+      <div className="relative w-full max-w-3xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden my-8">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-linear-to-r from-blue-50/60 via-indigo-50/40 to-white">
           <div className="flex items-center gap-3">
@@ -149,9 +245,6 @@ export default function AiProductImportModal({
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-base font-bold text-slate-900">AI 1-Click Product Importer</h3>
-                <span className="px-2 py-0.5 text-[10px] font-semibold bg-blue-100 text-blue-700 rounded-full">
-                  Phase 1 Free Tier
-                </span>
               </div>
               <p className="text-xs text-slate-500">
                 Paste any link from Amazon, Flipkart, Meesho or Shopify to auto-create listings
@@ -160,7 +253,7 @@ export default function AiProductImportModal({
           </div>
           <button
             onClick={handleClose}
-            className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
+            className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -233,19 +326,19 @@ export default function AiProductImportModal({
               </div>
             </div>
 
-            {/* AI Scrubbing Highlights */}
+            {/* Features Highlight */}
             <div className="bg-blue-50/50 rounded-xl p-4 border border-blue-100 text-xs text-blue-900 space-y-2">
               <div className="font-semibold flex items-center gap-1.5 text-blue-800">
                 <Sparkles className="w-4 h-4 text-blue-600" />
-                What Gemini AI does automatically:
+                What the AI Importer extracts & optimizes:
               </div>
               <ul className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-slate-600 text-[11px]">
-                <li>✨ Removes "Amazon's Choice" & warranty notices</li>
-                <li>✨ Re-writes titles for high mobile conversion</li>
-                <li>✨ Extracts full-size high-res product photos</li>
-                <li>✨ Formats bulleted features & specifications</li>
-                <li>✨ Re-maps standard sizing & color variants</li>
-                <li>✨ Auto-categorizes for your store catalog</li>
+                <li>✨ Extracts full descriptions, specifications & highlights</li>
+                <li>✨ Re-writes titles cleanly for high mobile conversion</li>
+                <li>✨ Fetches full-size uncompressed master photos</li>
+                <li>✨ Automatically detects all sizes (6 UK - 10 UK / S - XXL)</li>
+                <li>✨ Automatically detects color variants (Black, Grey, Blue)</li>
+                <li>✨ Lets you create & customize any variants with 1 click</li>
               </ul>
             </div>
 
@@ -267,7 +360,7 @@ export default function AiProductImportModal({
                 {isExtracting ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    Extracting & AI Scrubbing (takes ~3s)...
+                    Extracting Descriptions, Variants & Photos (takes ~3s)...
                   </>
                 ) : (
                   <>
@@ -282,11 +375,11 @@ export default function AiProductImportModal({
 
         {/* Step 2: Review & Customization */}
         {step === "preview" && preview && (
-          <div className="p-6 space-y-5 max-h-[70vh] overflow-y-auto">
+          <div className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
             {/* Title */}
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                AI-Optimized Product Title
+                Product Title
               </label>
               <input
                 type="text"
@@ -382,24 +475,209 @@ export default function AiProductImportModal({
               </div>
             </div>
 
-            {/* Variants Preview */}
-            {variants.length > 0 && (
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  Detected Variants ({variants.length})
+            {/* Product Description & Highlights */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                  <Layers className="w-3.5 h-3.5 text-blue-600" />
+                  Product Description & Highlights
                 </label>
-                <div className="flex flex-wrap gap-2">
-                  {variants.map((v, i) => (
-                    <span
-                      key={i}
-                      className="px-2.5 py-1 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-700 text-xs font-medium"
-                    >
-                      {v.name}
-                    </span>
-                  ))}
+                <button
+                  type="button"
+                  onClick={() => setShowRawDescHtml(!showRawDescHtml)}
+                  className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 underline cursor-pointer"
+                >
+                  {showRawDescHtml ? "Show Formatted Preview" : "Edit HTML"}
+                </button>
+              </div>
+
+              {showRawDescHtml ? (
+                <textarea
+                  rows={6}
+                  value={descHtml}
+                  onChange={(e) => setDescHtml(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-800 font-mono focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+                  placeholder="HTML description with bullet points and specs..."
+                />
+              ) : (
+                <div
+                  className="w-full p-3.5 rounded-xl border border-slate-200 bg-slate-50/60 text-xs text-slate-700 max-h-48 overflow-y-auto prose prose-xs"
+                  dangerouslySetInnerHTML={{ __html: descHtml || "<p class='text-slate-400 italic'>No description generated.</p>" }}
+                />
+              )}
+            </div>
+
+            {/* Variants Section (Sizes & Colors) */}
+            <div className="space-y-3 pt-1">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                    <Tag className="w-3.5 h-3.5 text-indigo-600" />
+                    Product Variants, Sizes & Colors ({variants.length})
+                  </label>
+                  <p className="text-[11px] text-slate-400">
+                    Review extracted variants or add your own custom sizes and color options.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddingVariant(!isAddingVariant)}
+                    className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 text-[11px] font-semibold hover:bg-indigo-100 transition-colors cursor-pointer"
+                  >
+                    + Add Variant
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsBatchOpen(!isBatchOpen)}
+                    className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 border border-slate-200 text-[11px] font-semibold hover:bg-slate-200 transition-colors cursor-pointer"
+                  >
+                    ⚡ Batch Sizes/Colors
+                  </button>
                 </div>
               </div>
-            )}
+
+              {/* Quick Preset Buttons */}
+              <div className="flex flex-wrap items-center gap-1.5 p-2 bg-slate-50/80 rounded-xl border border-slate-200/60 text-[11px]">
+                <span className="text-slate-500 font-medium mr-1">Quick Presets:</span>
+                <button
+                  type="button"
+                  onClick={() => handleApplyPreset("shoes")}
+                  className="px-2 py-0.5 rounded-md bg-white border border-slate-200 text-slate-700 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition-colors cursor-pointer"
+                >
+                  👟 Footwear (6 UK – 10 UK)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleApplyPreset("clothing")}
+                  className="px-2 py-0.5 rounded-md bg-white border border-slate-200 text-slate-700 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition-colors cursor-pointer"
+                >
+                  👕 Apparel (S – XXL)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleApplyPreset("colors")}
+                  className="px-2 py-0.5 rounded-md bg-white border border-slate-200 text-slate-700 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition-colors cursor-pointer"
+                >
+                  🎨 Colors (Black, White, Navy, Grey)
+                </button>
+              </div>
+
+              {/* Batch Add Input Box */}
+              {isBatchOpen && (
+                <div className="p-3 bg-indigo-50/60 rounded-xl border border-indigo-200 space-y-2">
+                  <label className="text-[11px] font-semibold text-indigo-900 block">
+                    Enter sizes or colors separated by commas:
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={batchVariantsText}
+                      onChange={(e) => setBatchVariantsText(e.target.value)}
+                      placeholder="e.g. 6 UK, 7 UK, 8 UK, 9 UK, 10 UK or Red, Blue, Green, Yellow"
+                      className="flex-1 px-3 py-1.5 rounded-lg border border-indigo-200 bg-white text-xs focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleBatchAdd();
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleBatchAdd}
+                      className="px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 cursor-pointer"
+                    >
+                      Add All
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Add Single Variant Box */}
+              {isAddingVariant && (
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+                  <div className="text-[11px] font-semibold text-slate-800">Create New Variant:</div>
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+                    <input
+                      type="text"
+                      value={newVariantName}
+                      onChange={(e) => setNewVariantName(e.target.value)}
+                      placeholder="Name (e.g. Black / 8 UK)"
+                      className="sm:col-span-2 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs"
+                    />
+                    <input
+                      type="number"
+                      value={newVariantPriceDiff}
+                      onChange={(e) => setNewVariantPriceDiff(Number(e.target.value))}
+                      placeholder="Price Diff (₹)"
+                      className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs"
+                    />
+                    <input
+                      type="number"
+                      value={newVariantStock}
+                      onChange={(e) => setNewVariantStock(Number(e.target.value))}
+                      placeholder="Stock"
+                      className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs"
+                    />
+                  </div>
+                  <div className="flex justify-end gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setIsAddingVariant(false)}
+                      className="px-2.5 py-1 text-xs text-slate-500 hover:text-slate-700 cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleAddCustomVariant}
+                      disabled={!newVariantName.trim()}
+                      className="px-3 py-1 bg-indigo-600 text-white rounded-lg text-xs font-semibold hover:bg-indigo-700 disabled:opacity-50 cursor-pointer"
+                    >
+                      Save Variant
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Variant Table / List */}
+              <div className="max-h-48 overflow-y-auto rounded-xl border border-slate-200 divide-y divide-slate-100 bg-white">
+                {variants.map((v, i) => (
+                  <div key={i} className="flex items-center justify-between p-2.5 text-xs hover:bg-slate-50/60 gap-3">
+                    <div className="flex-1 min-w-0">
+                      <input
+                        type="text"
+                        value={v.name}
+                        onChange={(e) => handleUpdateVariant(i, "name", e.target.value)}
+                        className="w-full px-2 py-1 rounded-md border border-transparent hover:border-slate-300 focus:border-blue-500 focus:bg-white text-xs font-medium text-slate-800"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex items-center gap-1 text-slate-500 text-[11px]">
+                        <span>Price:</span>
+                        <span className="font-semibold text-slate-900">₹{sellingPrice + (v.price_diff || 0)}</span>
+                      </div>
+                      <div className="flex items-center gap-1 text-slate-500 text-[11px]">
+                        <span>Stock:</span>
+                        <input
+                          type="number"
+                          value={v.stock ?? 50}
+                          onChange={(e) => handleUpdateVariant(i, "stock", Number(e.target.value))}
+                          className="w-16 px-1.5 py-0.5 rounded-md border border-slate-200 text-center text-[11px] font-semibold text-slate-800"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveVariant(i)}
+                        className="p-1 text-slate-400 hover:text-rose-600 rounded-md hover:bg-rose-50 transition-colors cursor-pointer"
+                        title="Delete variant"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
 
             {/* Action Buttons */}
             <div className="flex items-center justify-between pt-4 border-t border-slate-100">
