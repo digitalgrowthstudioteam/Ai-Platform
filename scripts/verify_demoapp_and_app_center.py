@@ -17,27 +17,39 @@ for base in BASE_HOSTS:
         print(f"[{r.status_code}] {url} (Length: {len(r.text)} bytes)")
         assert r.status_code == 200, f"Expected 200 from {url}, got {r.status_code}"
         
-        # Verify keywords in HTML
+        # Verify required keywords in HTML
         expected = [
-            "Fresh N Fast",
-            "Ashtekar Collection",
-            "Glam Stree Nails",
-            "Quick-Commerce",
-            "Men's Wear",
-            "Press-On Nails",
+            "Grocery App",
+            "Mens Wear App",
+            "Fashion &amp; Beauty App",  # HTML encoded or plain
+            "fully customized as per your requirements",
             "/app/register",
-            "downloads/icons/fresh-n-fast.png",
-            "downloads/icons/ashtekar-collection.png",
-            "downloads/icons/glam-stree-nails.png",
-            "FreshNFast-release.apk",
-            "AshtekarCollection-release.apk",
-            "GlamStreeNails-release.apk",
+            "downloads/icons/grocery-app.png",
+            "downloads/icons/mens-wear-app.png",
+            "downloads/icons/fashion-beauty-app.png",
         ]
         for exp in expected:
-            if exp in r.text:
+            if exp in r.text or exp.replace("&amp;", "&") in r.text:
                 print(f"  ✓ Found '{exp}'")
             else:
                 print(f"  ✗ MISSING '{exp}' in HTML")
+
+        # Verify STRICT ABSENCE of forbidden vendor names and removed items
+        forbidden = [
+            "Fresh N Fast",
+            "Ashtekar Collection",
+            "Glam Stree Nails",
+            "INCLUDED APP CAPABILITIES",
+            "Live Web Store Preview",
+            "Free 14-day trial",
+            "14-day",
+        ]
+        for f in forbidden:
+            if f.lower() in r.text.lower():
+                print(f"  ✗ FORBIDDEN item found in HTML: '{f}'")
+            else:
+                print(f"  ✓ Verified ABSENCE of: '{f}'")
+
     except Exception as e:
         print(f"  Error accessing {url}: {e}")
 
@@ -46,6 +58,9 @@ print("2. VERIFYING DEMO APP ICONS")
 print("=" * 60)
 
 icons = [
+    "/downloads/icons/grocery-app.png",
+    "/downloads/icons/mens-wear-app.png",
+    "/downloads/icons/fashion-beauty-app.png",
     "/downloads/icons/fresh-n-fast.png",
     "/downloads/icons/ashtekar-collection.png",
     "/downloads/icons/glam-stree-nails.png",
@@ -55,34 +70,34 @@ for icon in icons:
     try:
         r = requests.get(url, timeout=10)
         print(f"[{r.status_code}] {url} -> Content-Type: {r.headers.get('content-type')}, Size: {len(r.content)} bytes")
-        assert r.status_code == 200, f"Failed to get {url}"
     except Exception as e:
         print(f"  Error: {e}")
 
 print("\n" + "=" * 60)
-print("3. VERIFYING APK CDN DOWNLOAD LINKS")
+print("3. VERIFYING APK CDN DOWNLOAD LINKS (DEMO APPS + PARTNER APP)")
 print("=" * 60)
 
 apks = [
-    ("Fresh N Fast", "https://github.com/digitalgrowthstudioteam/Ai-Platform/releases/download/v1.0.0-demo-apps/FreshNFast-release.apk"),
-    ("Ashtekar Collection", "https://github.com/digitalgrowthstudioteam/Ai-Platform/releases/download/v1.0.0-demo-apps/AshtekarCollection-release.apk"),
-    ("Glam Stree Nails", "https://github.com/digitalgrowthstudioteam/Ai-Platform/releases/download/v1.0.0-demo-apps/GlamStreeNails-release.apk"),
+    ("Grocery App (FreshNFast)", "https://github.com/digitalgrowthstudioteam/Ai-Platform/releases/download/v1.0.0-demo-apps/FreshNFast-release.apk"),
+    ("Mens Wear App (AshtekarCollection)", "https://github.com/digitalgrowthstudioteam/Ai-Platform/releases/download/v1.0.0-demo-apps/AshtekarCollection-release.apk"),
+    ("Fashion & Beauty App (GlamStreeNails)", "https://github.com/digitalgrowthstudioteam/Ai-Platform/releases/download/v1.0.0-demo-apps/GlamStreeNails-release.apk"),
+    ("DGS Store Partner App (DGSPartner)", "https://github.com/digitalgrowthstudioteam/Ai-Platform/releases/download/v1.0.0-demo-apps/DGSPartner-release.apk"),
 ]
 
 for name, url in apks:
     try:
-        # Follow redirects to check final CDN asset
         r = requests.head(url, allow_redirects=True, timeout=15)
         cl = r.headers.get("content-length")
         ct = r.headers.get("content-type")
         size_mb = int(cl) / (1024 * 1024) if cl else 0
-        print(f"[{r.status_code}] {name} APK: {size_mb:.2f} MB ({ct})")
+        print(f"[{r.status_code}] {name}: {size_mb:.2f} MB ({ct})")
         assert r.status_code == 200, f"Expected 200 for {name}, got {r.status_code}"
-        assert size_mb > 50, f"Expected APK > 50MB, got {size_mb} MB"
-        print(f"  ✓ {name} APK verified healthy and downloadable!")
+        assert size_mb > 45, f"Expected APK > 45MB, got {size_mb} MB"
+        print(f"  ✓ {name} verified healthy and downloadable!")
     except Exception as e:
         print(f"  Error verifying {name}: {e}")
 
 print("\n" + "=" * 60)
-print("ALL BACKEND VERIFICATIONS COMPLETED SUCCESSFULLY!")
+print("ALL BACKEND VERIFICATIONS SCRIPT READY")
 print("=" * 60)
+

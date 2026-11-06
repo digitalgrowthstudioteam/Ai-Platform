@@ -2,34 +2,25 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import {
   Smartphone,
   Download,
   Sparkles,
-  CheckCircle2,
   ArrowRight,
-  ExternalLink,
   ShieldCheck,
-  ShoppingBag,
   Store,
   Zap,
   Truck,
   MapPin,
   CreditCard,
-  HelpCircle,
   ChevronDown,
   ChevronUp,
-  Star,
   Check,
-  PackageCheck,
   Building2,
   Clock,
   Layers,
   HeartHandshake,
   QrCode,
-  Shield,
-  Apple,
 } from "lucide-react";
 
 interface DemoAppItem {
@@ -49,12 +40,8 @@ interface DemoAppItem {
   iconPath: string;
   apkPath: string;
   apkFilename: string;
-  apkSize: string;
   version: string;
-  storeSlug: string;
-  webStoreUrl: string;
   badges: string[];
-  keyHighlights: string[];
   description: string;
   industry: string;
   bestFor: string;
@@ -62,9 +49,9 @@ interface DemoAppItem {
 
 const DEMO_APPS: DemoAppItem[] = [
   {
-    id: "fresh-n-fast",
-    name: "Fresh N Fast",
-    tagline: "Quick-Commerce Veggies, Fruits & Grocery App",
+    id: "grocery-app",
+    name: "Grocery App",
+    tagline: "Quick-Commerce Veggies, Fruits & Grocery Store",
     category: "Hyperlocal Quick-Commerce",
     colorTheme: {
       primary: "emerald",
@@ -75,30 +62,20 @@ const DEMO_APPS: DemoAppItem[] = [
       glow: "shadow-emerald-500/10 hover:shadow-emerald-500/20",
       accentBtn: "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/25",
     },
-    iconPath: "/downloads/icons/fresh-n-fast.png",
+    iconPath: "/downloads/icons/grocery-app.png",
     apkPath: "https://github.com/digitalgrowthstudioteam/Ai-Platform/releases/download/v1.0.0-demo-apps/FreshNFast-release.apk",
-    apkFilename: "FreshNFast-release.apk",
-    apkSize: "52.8 MB",
+    apkFilename: "GroceryApp-release.apk",
     version: "v1.0.2",
-    storeSlug: "fresh-n-fast",
-    webStoreUrl: "/app/store/fresh-n-fast",
     badges: ["15-25 Min Delivery", "Live GPS Geofence", "Produce Cart Stepper"],
-    keyHighlights: [
-      "15–25 minute hyperlocal delivery with dynamic radius restriction (1-50 km)",
-      "Bigbasket & Zepto style produce quantity steppers (kg, grams, pieces)",
-      "Zero-friction guest shopping: browse immediately, sign in only when checking out",
-      "Live order dispatch notification with direct merchant WhatsApp connectivity",
-      "Pale sage (#EDF4EE) visual theme with instant category filtering",
-    ],
     description:
-      "A lightning-fast quick-commerce application crafted for local grocery stores, organic vegetable & fruit vendors, and dairy merchants. Features real-time distance calculation, live GPS coordinate validation, and customizable minimum order values.",
+      "A lightning-fast quick-commerce application crafted for local grocery stores, organic vegetable & fruit vendors, and daily essentials. Features real-time distance calculation, live GPS coordinate validation, customizable minimum order values, and direct WhatsApp order dispatch.",
     industry: "Grocery, Produce & Daily Essentials",
     bestFor: "Local Kiranas, Farm-Fresh Produce, Quick Marts & Cloud Kitchens",
   },
   {
-    id: "ashtekar-collection",
-    name: "Ashtekar Collection",
-    tagline: "Premium Men's Wear & Ethnic Fashion App",
+    id: "mens-wear-app",
+    name: "Mens Wear App",
+    tagline: "Premium Men's Wear & Ethnic Fashion Store",
     category: "Apparel & Ethnic Couture",
     colorTheme: {
       primary: "amber",
@@ -109,30 +86,20 @@ const DEMO_APPS: DemoAppItem[] = [
       glow: "shadow-amber-500/10 hover:shadow-amber-500/20",
       accentBtn: "bg-amber-600 hover:bg-amber-700 text-white shadow-amber-600/25",
     },
-    iconPath: "/downloads/icons/ashtekar-collection.png",
+    iconPath: "/downloads/icons/mens-wear-app.png",
     apkPath: "https://github.com/digitalgrowthstudioteam/Ai-Platform/releases/download/v1.0.0-demo-apps/AshtekarCollection-release.apk",
-    apkFilename: "AshtekarCollection-release.apk",
-    apkSize: "52.9 MB",
+    apkFilename: "MensWearApp-release.apk",
     version: "v1.0.1",
-    storeSlug: "ashtekar",
-    webStoreUrl: "/app/store/ashtekar",
     badges: ["Size Selectors", "Pan-India Shipping", "Curated Lookbook"],
-    keyHighlights: [
-      "Garment size matrix (38, 40, 42, 44) with precise body measurements",
-      "High-resolution lookbook galleries with multi-angle photography zoom",
-      "Pan-India courier shipping powered by Shiprocket, Bluedart & Delhivery",
-      "Instant checkout via Razorpay: UPI, Google Pay, PhonePe, Cards & Netbanking",
-      "Regal navy & champagne gold theme customized for traditional couture",
-    ],
     description:
       "A sophisticated fashion boutique app designed for designer kurtas, wedding sherwanis, blazers, and menswear. Packed with rich visual lookbooks, variant size selection, order tracking, and seamless courier delivery across India.",
     industry: "Men's Fashion & Ethnic Wear",
     bestFor: "Fashion Designers, Boutiques, Tailoring Brands & Apparel Stores",
   },
   {
-    id: "glam-stree-nails",
-    name: "Glam Stree Nails",
-    tagline: "Handcrafted Luxury Press-On Nails & Beauty App",
+    id: "fashion-beauty-app",
+    name: "Fashion & Beauty App",
+    tagline: "Handcrafted Luxury Press-On Nails & Beauty Store",
     category: "Beauty & Cosmetics",
     colorTheme: {
       primary: "rose",
@@ -143,21 +110,11 @@ const DEMO_APPS: DemoAppItem[] = [
       glow: "shadow-rose-500/10 hover:shadow-rose-500/20",
       accentBtn: "bg-rose-600 hover:bg-rose-700 text-white shadow-rose-600/25",
     },
-    iconPath: "/downloads/icons/glam-stree-nails.png",
+    iconPath: "/downloads/icons/fashion-beauty-app.png",
     apkPath: "https://github.com/digitalgrowthstudioteam/Ai-Platform/releases/download/v1.0.0-demo-apps/GlamStreeNails-release.apk",
-    apkFilename: "GlamStreeNails-release.apk",
-    apkSize: "52.0 MB",
+    apkFilename: "FashionBeautyApp-release.apk",
     version: "v1.0.1",
-    storeSlug: "glam-stree",
-    webStoreUrl: "/app/store/glam-stree",
     badges: ["Nail Shape Selector", "Custom Sizing Kit", "COD & Prepaid"],
-    keyHighlights: [
-      "Interactive nail shape picker: Almond, Coffin, Stiletto, Square & Oval",
-      "Comprehensive nail sizing guide (XS, S, M, L) with custom millimeter entry",
-      "Nail prep kit add-ons (adhesive tabs, liquid glue, cuticle pusher)",
-      "Instagram-style aesthetic cards with customer review galleries",
-      "Rose-gold luxury palette with fluid product transitions",
-    ],
     description:
       "A high-converting beauty studio mobile app designed for handcrafted press-on nails, cosmetic accessories, and bespoke self-care kits. Delivers a boutique salon shopping experience with visual shape guides and custom nail measurements.",
     industry: "Beauty, Cosmetics & Salon Accessories",
@@ -171,12 +128,8 @@ const FAQS = [
     a: "Click 'Download Android APK' on any demo card. Once downloaded, tap the file in your notification bar or Downloads folder. If your phone asks for permission to install from your browser, toggle 'Allow from this source'. The app installs in seconds and connects directly to live platform data.",
   },
   {
-    q: "Are these apps fully functional with real orders?",
-    a: "Yes! Each demo app is a genuine production build generated by the Digital Growth Studio build engine. You can browse categories, add items to cart, test size selectors or quantity steppers, and view checkout. They are connected to live demo stores.",
-  },
-  {
-    q: "Can I get an app with my own business name, logo, and colors?",
-    a: "Absolutely! When you register as a vendor, you choose your brand name, store logo, color scheme, and fulfillment method. Our automated platform compiles a 100% white-labeled Flutter Android APK dedicated to your business.",
+    q: "Will my app be customized to match my brand and requirements?",
+    a: "Yes! Your app will be fully customized as per your requirements. You choose your business name, store logo, color scheme, categories, payment methods, and delivery radius. Our automated platform compiles a 100% white-labeled Flutter Android APK dedicated to your brand.",
   },
   {
     q: "How do customer payments work in my custom app?",
@@ -198,7 +151,6 @@ export default function DemoAppLandingPage() {
 
   const handleDownloadClick = (app: DemoAppItem) => {
     setDownloadModalApp(app);
-    // Programmatically trigger download
     const link = document.createElement("a");
     link.href = app.apkPath;
     link.download = app.apkFilename;
@@ -254,6 +206,9 @@ export default function DemoAppLandingPage() {
           <nav className="hidden md:flex items-center gap-8 text-xs font-semibold text-slate-300">
             <a href="#demo-apps" className="hover:text-purple-400 transition-colors">
               Featured Apps
+            </a>
+            <a href="#customization" className="hover:text-purple-400 transition-colors">
+              Customization
             </a>
             <a href="#how-it-works" className="hover:text-purple-400 transition-colors">
               How It Works
@@ -313,8 +268,14 @@ export default function DemoAppLandingPage() {
 
           {/* Subheading */}
           <p className="text-sm sm:text-base lg:text-lg text-slate-300 max-w-2xl mx-auto mt-6 leading-relaxed">
-            Test 15-minute quick-commerce delivery, designer fashion lookbooks, and custom beauty shape selectors on your own Android phone. Ready to launch? Turn your store into a white-labeled mobile app today.
+            Test fast 15-min hyperlocal quick commerce, designer fashion size selectors, and luxury cosmetic catalogs on your own Android phone.
           </p>
+
+          {/* Prominent Customization Banner */}
+          <div className="mt-7 max-w-xl mx-auto p-3.5 rounded-2xl bg-gradient-to-r from-purple-900/40 via-indigo-900/30 to-purple-900/40 border border-purple-500/40 shadow-xl flex items-center justify-center gap-2.5 text-xs sm:text-sm font-bold text-purple-200">
+            <Sparkles className="w-4 h-4 text-purple-400 shrink-0" />
+            <span>Your app will be fully customized as per your requirements.</span>
+          </div>
 
           {/* Action CTAs */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mt-8">
@@ -379,14 +340,18 @@ export default function DemoAppLandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-3xl mx-auto mb-14">
             <span className="text-xs font-black tracking-widest text-purple-400 uppercase">
-              FEATURED CLIENT PROFILES
+              FEATURED INDUSTRY APPS
             </span>
             <h2 className="text-2xl sm:text-4xl font-black text-white tracking-tight mt-2">
               Select an Industry App to Download & Test
             </h2>
             <p className="text-sm sm:text-base text-slate-300 mt-3">
-              Each demo is a tailored Android APK with distinct color palettes, category trees, cart workflows, and checkout logic suited to that specific business model.
+              Experience the native responsiveness, cart steppers, and payment workflows on your Android phone.
             </p>
+            <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-purple-500/20 via-indigo-500/20 to-purple-500/20 border border-purple-500/40 text-purple-200 text-xs sm:text-sm font-bold shadow-lg">
+              <Sparkles className="w-4 h-4 text-purple-400" />
+              <span>Your app will be fully customized as per your requirements.</span>
+            </div>
           </div>
 
           {/* Cards Grid */}
@@ -394,7 +359,6 @@ export default function DemoAppLandingPage() {
             {DEMO_APPS.map((app) => {
               const isGreen = app.colorTheme.primary === "emerald";
               const isAmber = app.colorTheme.primary === "amber";
-              const isRose = app.colorTheme.primary === "rose";
 
               return (
                 <div
@@ -444,7 +408,7 @@ export default function DemoAppLandingPage() {
                           {app.category}
                         </span>
                         <span className="text-[11px] text-slate-400 mt-1 font-mono">
-                          {app.apkSize} • Android 8.0+
+                          Android 8.0+
                         </span>
                       </div>
                     </div>
@@ -483,21 +447,12 @@ export default function DemoAppLandingPage() {
                       {app.description}
                     </p>
 
-                    {/* Key Highlights Checklist */}
-                    <div className="mt-5 space-y-2 border-t border-slate-900 pt-4">
-                      <span className="text-[10px] font-black uppercase text-slate-500 tracking-wider block">
-                        Included App Capabilities:
+                    {/* Fully Customized Assurance Pill */}
+                    <div className="mt-5 p-3 rounded-2xl bg-purple-950/40 border border-purple-500/30 flex items-center gap-2 text-xs text-purple-200">
+                      <Sparkles className="w-4 h-4 text-purple-400 shrink-0" />
+                      <span className="font-semibold text-[11px] leading-tight">
+                        Your app will be fully customized as per your requirements.
                       </span>
-                      {app.keyHighlights.map((feat, i) => (
-                        <div key={i} className="flex items-start gap-2 text-xs text-slate-300">
-                          <CheckCircle2
-                            className={`w-4 h-4 shrink-0 mt-0.5 ${
-                              isGreen ? "text-emerald-400" : isAmber ? "text-amber-400" : "text-rose-400"
-                            }`}
-                          />
-                          <span className="leading-tight">{feat}</span>
-                        </div>
-                      ))}
                     </div>
                   </div>
 
@@ -511,20 +466,7 @@ export default function DemoAppLandingPage() {
                     >
                       <Download className="w-4 h-4" />
                       <span>Download Android APK</span>
-                      <span className="text-[10px] opacity-80 font-mono">({app.apkSize})</span>
                     </button>
-
-                    {/* Live Web Store Link */}
-                    <div className="flex items-center gap-2">
-                      <Link
-                        href={app.webStoreUrl}
-                        target="_blank"
-                        className="flex-1 py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors"
-                      >
-                        <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
-                        <span>Live Web Store Preview</span>
-                      </Link>
-                    </div>
 
                     <p className="text-[10px] text-center text-slate-500 pt-1">
                       Direct download • SHA-256 Verified • No Google Play login required
@@ -538,9 +480,41 @@ export default function DemoAppLandingPage() {
       </section>
 
       {/* ───────────────────────────────────────────────────────────── */}
+      {/* Customization Callout Banner */}
+      {/* ───────────────────────────────────────────────────────────── */}
+      <section id="customization" className="py-14 max-w-5xl mx-auto px-4 sm:px-6">
+        <div className="rounded-3xl bg-gradient-to-r from-purple-950/70 via-indigo-950/60 to-purple-950/70 border border-purple-500/40 p-6 sm:p-8 text-center relative overflow-hidden shadow-2xl">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-purple-500/20 border border-purple-500/40 text-purple-300 text-xs font-bold mb-4">
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>100% Tailored App Solution</span>
+          </div>
+          <h3 className="text-xl sm:text-3xl font-black text-white tracking-tight">
+            Your App Will Be Fully Customized As Per Your Requirements
+          </h3>
+          <p className="text-xs sm:text-sm text-slate-300 max-w-2xl mx-auto mt-3 leading-relaxed">
+            From unique store layouts, custom categories, distance-based delivery slabs, product customizers, to your personal logo and color palette — we tailor every screen to match your business needs.
+          </p>
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-3 text-xs">
+            <span className="px-3 py-1.5 rounded-xl bg-slate-900/80 border border-slate-700 text-slate-200 font-semibold">
+              ✓ Custom Brand Logo & Colors
+            </span>
+            <span className="px-3 py-1.5 rounded-xl bg-slate-900/80 border border-slate-700 text-slate-200 font-semibold">
+              ✓ Bespoke Product Options & Steppers
+            </span>
+            <span className="px-3 py-1.5 rounded-xl bg-slate-900/80 border border-slate-700 text-slate-200 font-semibold">
+              ✓ Tailored Payment & Shipping Rules
+            </span>
+            <span className="px-3 py-1.5 rounded-xl bg-slate-900/80 border border-slate-700 text-slate-200 font-semibold">
+              ✓ Personalized Android App Icon
+            </span>
+          </div>
+        </div>
+      </section>
+
+      {/* ───────────────────────────────────────────────────────────── */}
       {/* Installation Instructions & Android Safety Note */}
       {/* ───────────────────────────────────────────────────────────── */}
-      <section className="py-14 max-w-5xl mx-auto px-4 sm:px-6">
+      <section className="py-8 max-w-5xl mx-auto px-4 sm:px-6">
         <div className="rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900/90 to-purple-950/40 border border-slate-800 p-6 sm:p-8 relative overflow-hidden">
           <div className="flex flex-col md:flex-row items-center gap-6 sm:gap-8">
             <div className="w-16 h-16 rounded-2xl bg-purple-600/20 border border-purple-500/30 flex items-center justify-center shrink-0">
@@ -554,7 +528,7 @@ export default function DemoAppLandingPage() {
                 How to Install the APK on Your Android Device
               </h3>
               <p className="text-xs sm:text-sm text-slate-400 mt-2 leading-relaxed">
-                Android displays a standard security prompt for apps downloaded outside Google Play. Our APKs are digitally signed with verified platform release keys.
+                Android displays a standard prompt for apps downloaded directly. Our APKs are digitally signed with verified platform release keys.
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4 text-xs">
                 <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800">
@@ -604,7 +578,7 @@ export default function DemoAppLandingPage() {
                 <Link href="/app/register" className="text-purple-400 underline font-semibold">
                   /app/register
                 </Link>
-                . Pick your brand name, color palette, custom logo, and your personal subdomain (e.g. yourbrand.digitalgrowthstudio.in).
+                . Pick your brand name, color palette, custom logo, and your personal subdomain.
               </p>
               <div className="mt-4 flex items-center gap-1.5 text-xs text-purple-300 font-semibold">
                 <Clock className="w-3.5 h-3.5" /> Takes only 60 seconds
@@ -655,7 +629,7 @@ export default function DemoAppLandingPage() {
               Why Businesses Choose Digital Growth Studio
             </h2>
             <p className="text-sm sm:text-base text-slate-400 mt-3">
-              Enterprise-grade mobile commerce capabilities built specifically for Indian local businesses and direct-to-consumer brands.
+              Enterprise-grade mobile commerce capabilities built specifically for direct-to-consumer businesses and growing brands.
             </p>
           </div>
 
@@ -768,7 +742,7 @@ export default function DemoAppLandingPage() {
       </section>
 
       {/* ───────────────────────────────────────────────────────────── */}
-      {/* Bottom Mega Call to Action (Register As A Vendor) */}
+      {/* Bottom Mega Call to Action */}
       {/* ───────────────────────────────────────────────────────────── */}
       <section className="py-20 sm:py-28 bg-gradient-to-b from-slate-950 via-purple-950/40 to-slate-950 border-t border-purple-900/40 relative overflow-hidden">
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] bg-purple-600/15 blur-3xl rounded-full pointer-events-none" />
@@ -793,7 +767,7 @@ export default function DemoAppLandingPage() {
               className="w-full sm:w-auto inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-gradient-to-r from-purple-500 via-indigo-600 to-purple-600 hover:from-purple-400 hover:to-indigo-500 text-white font-black text-sm sm:text-base shadow-2xl shadow-purple-600/50 hover:scale-105 transition-all"
             >
               <Store className="w-5 h-5" />
-              <span>Create Your Free Vendor Account</span>
+              <span>Create Your Vendor Account Today</span>
               <ArrowRight className="w-4 h-4" />
             </Link>
             <Link
@@ -807,7 +781,7 @@ export default function DemoAppLandingPage() {
           {/* Guarantees */}
           <div className="flex flex-wrap items-center justify-center gap-6 mt-10 text-xs text-slate-400 font-medium">
             <span className="flex items-center gap-1.5">
-              <Check className="w-4 h-4 text-emerald-400" /> Free 14-day trial
+              <Check className="w-4 h-4 text-emerald-400" /> Fully customized as per your requirements
             </span>
             <span className="flex items-center gap-1.5">
               <Check className="w-4 h-4 text-emerald-400" /> No credit card required
@@ -838,14 +812,11 @@ export default function DemoAppLandingPage() {
             <Link href="/app/login" className="hover:text-purple-400 transition-colors">
               Vendor Login
             </Link>
-            <Link href="/app/store/fresh-n-fast" className="hover:text-purple-400 transition-colors">
-              Fresh N Fast Web
+            <Link href="/privacy" className="hover:text-purple-400 transition-colors">
+              Privacy Policy
             </Link>
-            <Link href="/app/store/ashtekar" className="hover:text-purple-400 transition-colors">
-              Ashtekar Web
-            </Link>
-            <Link href="/app/store/glam-stree" className="hover:text-purple-400 transition-colors">
-              Glam Stree Web
+            <Link href="/terms" className="hover:text-purple-400 transition-colors">
+              Terms of Service
             </Link>
           </div>
         </div>
@@ -863,7 +834,7 @@ export default function DemoAppLandingPage() {
             <div className="flex-1">
               <h4 className="font-bold text-xs">Downloading {downloadModalApp.name} APK</h4>
               <p className="text-[11px] text-slate-400 mt-0.5">
-                File: <span className="font-mono text-purple-300">{downloadModalApp.apkFilename}</span> ({downloadModalApp.apkSize})
+                File: <span className="font-mono text-purple-300">{downloadModalApp.apkFilename}</span>
               </p>
               <p className="text-[10px] text-slate-500 mt-1">
                 Tap the downloaded file in your Android notifications to install.
@@ -882,4 +853,3 @@ export default function DemoAppLandingPage() {
     </div>
   );
 }
-
