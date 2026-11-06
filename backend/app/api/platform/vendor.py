@@ -2423,33 +2423,36 @@ async def create_credit_purchase_order(
     amount_paise = int(amount_inr * 100)
 
     settings_obj = get_settings()
-    rzp_key = settings_obj.RAZORPAY_KEY_ID
-    rzp_secret = settings_obj.RAZORPAY_KEY_SECRET
+    rzp_key = settings_obj.RAZORPAY_KEY_ID or "rzp_live_TMVFKc46c6u9N8"
+    rzp_secret = settings_obj.RAZORPAY_KEY_SECRET or "J2K2x2GjmFz8au3bUmVZBJD6"
 
-    order_id = f"order_ai_mock_{uuid.uuid4().hex[:12]}"
-    if rzp_key and rzp_secret:
-        try:
-            import razorpay
-            client = razorpay.Client(auth=(rzp_key, rzp_secret))
-            rzp_order = client.order.create({
-                "amount": amount_paise,
-                "currency": "INR",
-                "receipt": f"ai_{str(current.vendor.id)[:8]}_{int(datetime.now(timezone.utc).timestamp())}",
-                "notes": {
-                    "vendor_id": str(current.vendor.id),
-                    "pack_id": pack["id"],
-                    "credits": str(pack["credits"])
-                }
-            })
-            order_id = rzp_order["id"]
-        except Exception as e:
-            logger.error("razorpay_order_create_failed_using_mock", error=str(e))
+    order_id = ""
+    try:
+        import razorpay
+        client = razorpay.Client(auth=(rzp_key, rzp_secret))
+        rzp_order = client.order.create({
+            "amount": amount_paise,
+            "currency": "INR",
+            "receipt": f"ai_{str(current.vendor.id)[:8]}_{int(datetime.now(timezone.utc).timestamp())}",
+            "notes": {
+                "vendor_id": str(current.vendor.id),
+                "pack_id": pack["id"],
+                "credits": str(pack["credits"])
+            }
+        })
+        order_id = rzp_order["id"]
+    except Exception as e:
+        logger.error("razorpay_order_create_failed", error=str(e))
+        raise HTTPException(
+            status_code=502,
+            detail=f"Unable to initialize Razorpay payment order: {str(e)}"
+        )
 
     return {
         "order_id": order_id,
         "amount_inr": amount_inr,
         "amount_paise": amount_paise,
-        "key_id": rzp_key or "rzp_test_mock",
+        "key_id": rzp_key,
         "pack_id": pack["id"],
         "credits_to_add": pack["credits"]
     }
@@ -2473,8 +2476,8 @@ async def verify_credit_purchase_payment(
 
     pack = packs[payload.pack_id]
     settings_obj = get_settings()
-    rzp_key = settings_obj.RAZORPAY_KEY_ID
-    rzp_secret = settings_obj.RAZORPAY_KEY_SECRET
+    rzp_key = settings_obj.RAZORPAY_KEY_ID or "rzp_live_TMVFKc46c6u9N8"
+    rzp_secret = settings_obj.RAZORPAY_KEY_SECRET or "J2K2x2GjmFz8au3bUmVZBJD6"
 
     # Verify Razorpay signature if live credentials present and not a mock order
     is_mock = payload.razorpay_order_id.startswith("order_ai_mock_") or payload.razorpay_payment_id.startswith("pay_mock_")

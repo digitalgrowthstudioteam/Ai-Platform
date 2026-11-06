@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { platformApi } from "@/lib/app-platform/api";
 import { AiCreditPack } from "@/lib/app-platform/types";
 import {
@@ -23,6 +23,31 @@ interface BuyAiCreditsModalProps {
   onSuccess: (newCredits: number) => void;
 }
 
+const loadRazorpayScript = (): Promise<boolean> => {
+  return new Promise((resolve) => {
+    if (typeof window === "undefined") {
+      resolve(false);
+      return;
+    }
+    if ((window as any).Razorpay) {
+      resolve(true);
+      return;
+    }
+    const existing = document.querySelector('script[src="https://checkout.razorpay.com/v1/checkout.js"]');
+    if (existing) {
+      existing.addEventListener("load", () => resolve(true));
+      existing.addEventListener("error", () => resolve(false));
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.async = true;
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+};
+
 export default function BuyAiCreditsModal({
   isOpen,
   onClose,
@@ -37,6 +62,12 @@ export default function BuyAiCreditsModal({
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (isOpen) {
+      loadRazorpayScript();
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const handlePurchase = async (pack: AiCreditPack) => {
@@ -44,63 +75,63 @@ export default function BuyAiCreditsModal({
     setIsProcessing(true);
 
     try {
-      // 1. Create order
+      // 1. Ensure Razorpay Checkout SDK is ready
+      const scriptReady = await loadRazorpayScript();
+      if (!scriptReady || typeof window === "undefined" || !(window as any).Razorpay) {
+        throw new Error("Unable to load Razorpay payment gateway. Please check your internet connection.");
+      }
+
+      // 2. Create official Razorpay order from backend
       const order = await platformApi.createCreditPurchaseOrder(pack.id);
 
-      // Check if Razorpay script is present on window
-      const hasRazorpay = typeof window !== "undefined" && (window as any).Razorpay;
+      // 3. Launch official Razorpay Checkout Gateway modal
+      const options = {
+        key: order.key_id,
+        amount: order.amount_paise,
+        currency: "INR",
+        name: "Digital Growth Studio",
+        description: `${pack.name} — ${pack.credits} AI Credits`,
+        order_id: order.order_id,
+        theme: {
+          color: "#2563EB",
+        },
+        handler: async (response: any) => {
+          try {
+            setIsProcessing(true);
+            const verifyRes = await platformApi.verifyCreditPayment({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              pack_id: pack.id,
+            });
 
-      if (!hasRazorpay || order.order_id.startsWith("order_ai_mock_") || order.key_id.includes("mock")) {
-        // Mock verification for local sandbox or test environment
-        const verifyRes = await platformApi.verifyCreditPayment({
-          razorpay_order_id: order.order_id,
-          razorpay_payment_id: `pay_mock_${Date.now()}`,
-          razorpay_signature: "mock_signature_test",
-          pack_id: pack.id,
-        });
-
-        setSuccessMsg(verifyRes.message);
-        onSuccess(verifyRes.new_balance);
-        setTimeout(() => {
-          onClose();
-        }, 1800);
-      } else {
-        // Open official live Razorpay checkout modal
-        const rzp = new (window as any).Razorpay({
-          key: order.key_id,
-          amount: order.amount_paise,
-          currency: "INR",
-          name: "Digital Growth Studio",
-          description: `${pack.name} — ${pack.credits} AI Credits`,
-          order_id: order.order_id,
-          handler: async (response: any) => {
-            try {
-              const verifyRes = await platformApi.verifyCreditPayment({
-                razorpay_order_id: response.razorpay_order_id,
-                razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_signature: response.razorpay_signature,
-                pack_id: pack.id,
-              });
-
-              setSuccessMsg(verifyRes.message);
-              onSuccess(verifyRes.new_balance);
-              setTimeout(() => {
-                onClose();
-              }, 1800);
-            } catch (err: any) {
-              setError(err.message || "Payment verification failed.");
-            }
+            setSuccessMsg(verifyRes.message);
+            onSuccess(verifyRes.new_balance);
+            setTimeout(() => {
+              onClose();
+            }, 2000);
+          } catch (err: any) {
+            setError(err.message || "Payment verification failed. If your payment was deducted, please contact support.");
+          } finally {
+            setIsProcessing(false);
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            setIsProcessing(false);
           },
-          theme: {
-            color: "#2563EB",
-          },
-        });
-        rzp.open();
-      }
+        },
+      };
+
+      const rzp = new (window as any).Razorpay(options);
+      rzp.on("payment.failed", (response: any) => {
+        setIsProcessing(false);
+        setError(response.error?.description || "Payment failed or was cancelled. Please try again.");
+      });
+      rzp.open();
     } catch (err: any) {
-      console.error(err);
-      setError(err.message || "Failed to initiate payment. Please try again.");
-    } finally {
+      console.error("Razorpay Checkout Error:", err);
+      setError(err.message || "Failed to initiate Razorpay payment. Please try again.");
       setIsProcessing(false);
     }
   };

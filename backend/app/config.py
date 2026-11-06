@@ -53,8 +53,8 @@ class Settings(BaseSettings):
     REDIS_URL: str = Field(default="redis://localhost:6379/0", description="Redis URL for Celery broker")
 
     # Razorpay (Phase 9)
-    RAZORPAY_KEY_ID: Optional[str] = Field(default=None, description="Razorpay API Key ID")
-    RAZORPAY_KEY_SECRET: Optional[str] = Field(default=None, description="Razorpay API Key Secret")
+    RAZORPAY_KEY_ID: Optional[str] = Field(default="rzp_live_TMVFKc46c6u9N8", description="Razorpay API Key ID")
+    RAZORPAY_KEY_SECRET: Optional[str] = Field(default="J2K2x2GjmFz8au3bUmVZBJD6", description="Razorpay API Key Secret")
     RAZORPAY_WEBHOOK_SECRET: Optional[str] = Field(default=None, description="Razorpay Webhook Secret for signature verification")
 
     # AI (Phase 8)
