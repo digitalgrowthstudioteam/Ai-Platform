@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/store_provider.dart';
 import '../providers/auth_provider.dart';
-import '../widgets/smart_store_image.dart';
 import '../config/app_config.dart';
 import 'home_screen.dart';
+import 'welcome_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -23,7 +24,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     super.initState();
     _animCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1400),
+      duration: const Duration(milliseconds: 1200),
     );
 
     _scaleAnimation = Tween<double>(begin: 0.85, end: 1.0).animate(
@@ -48,33 +49,40 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     final store = Provider.of<StoreProvider>(context, listen: false);
     final auth = Provider.of<AuthProvider>(context, listen: false);
 
-    // Concurrently initialize store catalog & customer auth session
-    await Future.wait([
+    // Concurrently initialize store catalog, customer auth session, and preferences
+    final results = await Future.wait([
       store.initializeStore(),
       auth.loadSession(),
-      Future.delayed(const Duration(milliseconds: 1600)), // Smooth branded intro
+      SharedPreferences.getInstance(),
+      Future.delayed(const Duration(milliseconds: 1400)), // Smooth branded intro
     ]);
 
     if (!mounted) return;
 
-    // Keep the app open for seamless shopping: navigate directly to HomeScreen
+    final prefs = results[2] as SharedPreferences;
+    final hasSeenWelcome = prefs.getBool('has_seen_welcome_screen') ?? false;
+
+    // Navigate to Welcome screen on first launch, or HomeScreen
+    final targetScreen = hasSeenWelcome ? const HomeScreen() : const WelcomeScreen();
+    if (!hasSeenWelcome) {
+      await prefs.setBool('has_seen_welcome_screen', true);
+    }
+
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
-        pageBuilder: (ctx, anim, secAnim) => const HomeScreen(),
+        pageBuilder: (ctx, anim, secAnim) => targetScreen,
         transitionsBuilder: (ctx, anim, secAnim, child) => FadeTransition(opacity: anim, child: child),
-        transitionDuration: const Duration(milliseconds: 400),
+        transitionDuration: const Duration(milliseconds: 350),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final store = Provider.of<StoreProvider>(context);
-    final logoUrl = store.config?.logoUrl ?? AppConfig.defaultLogoUrl;
-    final storeName = store.config?.storeName ?? AppConfig.appTitle;
+    const primaryGreen = Color(0xFF15803D);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0B192C), // Deep Luxury Navy
+      backgroundColor: Colors.white,
       body: Center(
         child: FadeTransition(
           opacity: _fadeAnimation,
@@ -83,76 +91,67 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Branded Logo with Luxury Gold Border
+                // Branded Food Name Logo
                 Container(
-                  padding: const EdgeInsets.all(4),
+                  width: 120,
+                  height: 120,
                   decoration: BoxDecoration(
+                    color: const Color(0xFFEAF2EB),
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFFD97706).withAlpha(89),
-                        blurRadius: 28,
-                        spreadRadius: 4,
+                        color: primaryGreen.withValues(alpha: 0.15),
+                        blurRadius: 24,
+                        spreadRadius: 2,
                       ),
                     ],
-                    border: Border.all(
-                      color: const Color(0xFFD97706).withAlpha(204),
-                      width: 2.5,
-                    ),
                   ),
                   child: ClipOval(
-                    child: SmartStoreImage(
-                      imageUrl: logoUrl,
-                      width: 110,
-                      height: 110,
+                    child: Image.asset(
+                      'assets/images/logo.png',
+                      width: 120,
+                      height: 120,
                       fit: BoxFit.cover,
-                      fallbackText: "GS",
                     ),
                   ),
                 ),
-                const SizedBox(height: 28),
+                const SizedBox(height: 24),
 
-                // Brand Name
+                // Brand Food Name
                 Text(
-                  storeName.toUpperCase(),
+                  AppConfig.appTitle.toUpperCase(),
                   style: const TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.w900,
-                    letterSpacing: 2.5,
-                    color: Colors.white,
+                    letterSpacing: 2.0,
+                    color: primaryGreen,
                   ),
                 ),
                 const SizedBox(height: 6),
 
                 // Subtitle Tagline
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(width: 24, height: 1, color: const Color(0xFFDB2777)),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
-                      child: Text(
-                        AppConfig.appTagline.toUpperCase(),
-                        style: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 2.0,
-                          color: Color(0xFFF472B6), // Soft Pink
-                        ),
-                      ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Text(
+                    AppConfig.appTagline,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.5,
+                      color: Color(0xFF6B7280),
                     ),
-                    Container(width: 24, height: 1, color: const Color(0xFFDB2777)),
-                  ],
+                  ),
                 ),
-                const SizedBox(height: 48),
+                const SizedBox(height: 36),
 
-                // Elegant Loading Spinner
+                // Clean Green Loading Spinner
                 const SizedBox(
-                  width: 26,
-                  height: 26,
+                  width: 24,
+                  height: 24,
                   child: CircularProgressIndicator(
                     strokeWidth: 2.5,
-                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFD97706)),
+                    valueColor: AlwaysStoppedAnimation<Color>(primaryGreen),
                   ),
                 ),
               ],

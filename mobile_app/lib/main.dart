@@ -40,11 +40,11 @@ class DgsStoreApp extends StatelessWidget {
                 secondary: secondary,
                 surface: Colors.white,
               ),
-              scaffoldBackgroundColor: const Color(0xFFFDFCFB),
+              scaffoldBackgroundColor: Colors.white,
               fontFamily: 'Roboto',
               appBarTheme: const AppBarTheme(
                 backgroundColor: Colors.white,
-                foregroundColor: Color(0xFF0B192C),
+                foregroundColor: Color(0xFF111827),
                 elevation: 0,
                 centerTitle: false,
               ),
@@ -53,7 +53,7 @@ class DgsStoreApp extends StatelessWidget {
                   backgroundColor: primary,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(28),
                   ),
                 ),
               ),

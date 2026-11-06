@@ -16,7 +16,7 @@ class CartScreen extends StatefulWidget {
 }
 
 class _CartScreenState extends State<CartScreen> {
-  final _couponCtrl = TextEditingController();
+  final _couponCtrl = TextEditingController(text: "Fresh01");
   bool _couponApplied = false;
   double _couponDiscount = 0.0;
   String? _couponMessage;
@@ -29,17 +29,17 @@ class _CartScreenState extends State<CartScreen> {
 
   void _applyCoupon(double subtotal) {
     final code = _couponCtrl.text.trim().toUpperCase();
-    if (code == "FIRST10") {
+    if (code == "FRESH01" || code == "FIRST10") {
       setState(() {
         _couponApplied = true;
-        _couponDiscount = (subtotal * 0.10).roundToDouble();
-        _couponMessage = "Coupon FIRST10 applied! 10% discount added.";
+        _couponDiscount = (subtotal * 0.15).roundToDouble();
+        _couponMessage = "Coupon $code applied! 15% fresh produce discount unlocked 🎉";
       });
     } else {
       setState(() {
         _couponApplied = false;
         _couponDiscount = 0.0;
-        _couponMessage = "Invalid coupon code. Try FIRST10.";
+        _couponMessage = "Invalid promo code. Try Fresh01.";
       });
     }
   }
@@ -49,7 +49,10 @@ class _CartScreenState extends State<CartScreen> {
     final cart = Provider.of<CartProvider>(context);
     final store = Provider.of<StoreProvider>(context);
     final auth = Provider.of<AuthProvider>(context);
-    final primary = store.primaryColor;
+    const primaryGreen = Color(0xFF15803D);
+    const sageBg = Color(0xFFEDF4EE);
+    const textDark = Color(0xFF111827);
+
     final config = store.config;
     final eligibility = store.hyperlocalEligibility;
     final isHyperlocal = store.isHyperlocalActive;
@@ -61,170 +64,303 @@ class _CartScreenState extends State<CartScreen> {
       shipping = cart.calculateShipping(config);
     }
 
-    final freeShippingThreshold = isHyperlocal && eligibility?.freeDeliveryAbove != null
-        ? eligibility!.freeDeliveryAbove!
-        : (config?.freeShippingMinOrder ?? 999.0);
     final subtotal = cart.subtotal;
-    final remainingForFreeShipping = freeShippingThreshold - subtotal;
-
     final effectiveDiscount = _couponApplied ? _couponDiscount : 0.0;
     final totalPayable = (subtotal - effectiveDiscount + shipping).clamp(0.0, double.infinity);
     final bool cannotDeliver = isHyperlocal && eligibility != null && !eligibility.isDeliverable;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFDFCFB),
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text(
-          "Shopping Bag",
-          style: TextStyle(color: Color(0xFF0B192C), fontWeight: FontWeight.bold, fontSize: 17),
-        ),
         backgroundColor: Colors.white,
-        elevation: 0.5,
-        leading: const BackButton(color: Color(0xFF0B192C)),
+        elevation: 0,
+        centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: textDark, size: 20),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: const Text(
+          "Checkout",
+          style: TextStyle(
+            color: textDark,
+            fontWeight: FontWeight.w900,
+            fontSize: 18,
+            letterSpacing: -0.3,
+          ),
+        ),
         actions: [
-          if (cart.items.isNotEmpty)
-            TextButton(
-              onPressed: () => cart.clearCart(),
-              child: const Text("Clear All", style: TextStyle(color: Color(0xFFDC2626), fontSize: 13)),
+          IconButton(
+            icon: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                const Icon(Icons.shopping_bag_outlined, color: textDark, size: 22),
+                if (cart.itemCount > 0)
+                  Positioned(
+                    right: -4,
+                    top: -2,
+                    child: Container(
+                      padding: const EdgeInsets.all(3),
+                      decoration: const BoxDecoration(
+                        color: primaryGreen,
+                        shape: BoxShape.circle,
+                      ),
+                      constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
+                      child: Text(
+                        '${cart.itemCount}',
+                        style: const TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.bold),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+              ],
             ),
+            onPressed: () {},
+          ),
         ],
       ),
       body: cart.items.isEmpty
           ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.shopping_bag_outlined, size: 70, color: Color(0xFFCBD5E1)),
-                  const SizedBox(height: 16),
-                  const Text(
-                    "Your Shopping Bag is Empty",
-                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF0B192C)),
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    "Explore our handcrafted press-on nails collection",
-                    style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
-                  ),
-                  const SizedBox(height: 24),
-                  ElevatedButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: primary,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              child: Padding(
+                padding: const EdgeInsets.all(32.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 100,
+                      height: 100,
+                      decoration: const BoxDecoration(
+                        color: sageBg,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.shopping_bag_outlined, size: 48, color: primaryGreen),
                     ),
-                    child: const Text("Explore Nails", style: TextStyle(fontWeight: FontWeight.bold)),
-                  ),
-                ],
+                    const SizedBox(height: 20),
+                    const Text(
+                      "Your Cart is Empty",
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: textDark),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      "Explore fresh vegetables and fruits delivered to your doorstep in 15-25 minutes.",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 13, color: Color(0xFF64748B), height: 1.4),
+                    ),
+                    const SizedBox(height: 28),
+                    SizedBox(
+                      height: 52,
+                      width: 220,
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: primaryGreen,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
+                        ),
+                        child: const Text("SHOP PRODUCE", style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             )
           : Column(
               children: [
-                // 1. Free Shipping Progress Bar
-                Container(
-                  color: remainingForFreeShipping <= 0 ? const Color(0xFFF0FDF4) : const Color(0xFFFEF3C7),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Row(
-                    children: [
-                      Icon(
-                        remainingForFreeShipping <= 0 ? Icons.check_circle : Icons.local_shipping_outlined,
-                        size: 18,
-                        color: remainingForFreeShipping <= 0 ? const Color(0xFF16A34A) : const Color(0xFFD97706),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          remainingForFreeShipping <= 0
-                              ? "Congratulations! You've unlocked FREE Shipping! 🎉"
-                              : "Add ₹${remainingForFreeShipping.toStringAsFixed(0)} more to get FREE Delivery!",
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: remainingForFreeShipping <= 0 ? const Color(0xFF166534) : const Color(0xFF92400E),
+                // Hyperlocal Geofencing Alert Banner
+                if (isHyperlocal)
+                  InkWell(
+                    onTap: () => LocationSelectorSheet.show(context),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      color: cannotDeliver ? const Color(0xFFFEF2F2) : const Color(0xFFF0FDF4),
+                      child: Row(
+                        children: [
+                          Icon(
+                            cannotDeliver ? Icons.error_outline_rounded : Icons.bolt_rounded,
+                            color: cannotDeliver ? const Color(0xFFDC2626) : primaryGreen,
+                            size: 18,
                           ),
-                        ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              cannotDeliver
+                                  ? "Current location outside service area (Max 15km). Tap to change."
+                                  : "⚡ Express 15-25 Mins delivery to ${store.deliveryLocationDisplayText}",
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.bold,
+                                color: cannotDeliver ? const Color(0xFFB91C1C) : primaryGreen,
+                              ),
+                            ),
+                          ),
+                          const Icon(Icons.chevron_right_rounded, size: 18, color: Color(0xFF94A3B8)),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
-                ),
 
-                // 2. Items List
+                // Cart Items List (Matching Reference Screen 3)
                 Expanded(
                   child: ListView.separated(
-                    padding: const EdgeInsets.all(14),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                     itemCount: cart.items.length,
-                    separatorBuilder: (_, idx) => const SizedBox(height: 10),
+                    separatorBuilder: (_, __) => const SizedBox(height: 14),
                     itemBuilder: (context, idx) {
                       final key = cart.items.keys.elementAt(idx);
                       final item = cart.items[key]!;
-                      final imgUrl = item.variant?.images.isNotEmpty == true
-                          ? item.variant!.images.first
-                          : item.product.primaryImage;
+                      final p = item.product;
+                      final int qty = item.quantity;
 
                       return Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: const Color(0xFFF1F5F9), width: 1.2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.03),
+                              blurRadius: 10,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(10),
-                              child: SmartStoreImage(
-                                imageUrl: imgUrl,
-                                width: 68,
-                                height: 68,
-                                fit: BoxFit.cover,
-                                fallbackText: "NAIL",
-                              ),
+                            // Product Image Container (Pale Sage Background with Trash Icon)
+                            Stack(
+                              children: [
+                                Container(
+                                  width: 84,
+                                  height: 84,
+                                  decoration: BoxDecoration(
+                                    color: sageBg,
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  padding: const EdgeInsets.all(8),
+                                  child: SmartStoreImage(
+                                    imageUrl: p.primaryImage,
+                                    fit: BoxFit.contain,
+                                    fallbackText: "VG",
+                                  ),
+                                ),
+                                Positioned(
+                                  top: 4,
+                                  right: 4,
+                                  child: InkWell(
+                                    onTap: () => cart.removeItem(p.id),
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: Container(
+                                      width: 22,
+                                      height: 22,
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withValues(alpha: 0.9),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(Icons.delete_outline_rounded, size: 13, color: Color(0xFF94A3B8)),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: 14),
+
+                            // Details & Stepper (Matching Screen 3)
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
+                                  // Product Title
                                   Text(
-                                    item.product.title,
+                                    p.title,
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w800,
+                                      color: textDark,
+                                    ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0B192C)),
                                   ),
-                                  if (item.variant != null)
-                                    Padding(
-                                      padding: const EdgeInsets.only(top: 2),
-                                      child: Text(
-                                        "Size: ${item.variant!.title}",
-                                        style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                  const SizedBox(height: 4),
+
+                                  // Unit Badge (e.g. "1kg" or "500gm")
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF1F5F9),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Text(
+                                      "500gm",
+                                      style: TextStyle(
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xFF64748B),
                                       ),
                                     ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    "₹${item.unitPrice.toStringAsFixed(0)}",
-                                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: Color(0xFF0B192C)),
+                                  ),
+                                  const SizedBox(height: 8),
+
+                                  // Price & Stepper Row
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        "₹${(p.effectivePrice * qty).toStringAsFixed(0)}",
+                                        style: const TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w900,
+                                          color: textDark,
+                                        ),
+                                      ),
+
+                                      // Stepper [-]  qty  [+]
+                                      Row(
+                                        children: [
+                                          InkWell(
+                                            onTap: () => cart.updateQuantity(p.id, qty - 1),
+                                            borderRadius: BorderRadius.circular(14),
+                                            child: Container(
+                                              width: 28,
+                                              height: 28,
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFF1F5F9),
+                                                borderRadius: BorderRadius.circular(14),
+                                              ),
+                                              child: const Icon(Icons.remove, size: 14, color: textDark),
+                                            ),
+                                          ),
+                                          Padding(
+                                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                                            child: Text(
+                                              "$qty",
+                                              style: const TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w900,
+                                                color: textDark,
+                                              ),
+                                            ),
+                                          ),
+                                          InkWell(
+                                            onTap: () => cart.updateQuantity(p.id, qty + 1),
+                                            borderRadius: BorderRadius.circular(14),
+                                            child: Container(
+                                              width: 28,
+                                              height: 28,
+                                              decoration: BoxDecoration(
+                                                color: textDark,
+                                                borderRadius: BorderRadius.circular(14),
+                                              ),
+                                              child: const Icon(Icons.add, size: 14, color: Colors.white),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),
-                            ),
-                            // Qty controls
-                            Row(
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.remove_circle_outline, size: 20, color: Color(0xFF64748B)),
-                                  onPressed: () => cart.updateQuantity(key, item.quantity - 1),
-                                ),
-                                Text(
-                                  "${item.quantity}",
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.add_circle_outline, size: 20, color: Color(0xFF0B192C)),
-                                  onPressed: () => cart.updateQuantity(key, item.quantity + 1),
-                                ),
-                              ],
                             ),
                           ],
                         ),
@@ -233,212 +369,164 @@ class _CartScreenState extends State<CartScreen> {
                   ),
                 ),
 
-                // 3. Coupon Code Input & Order Summary
+                // Bottom Panel: Promo Code, Breakdown, & "CHECK OUT" Button
                 Container(
-                  padding: const EdgeInsets.all(18),
+                  padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
                   decoration: BoxDecoration(
                     color: Colors.white,
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withAlpha(15),
-                        offset: const Offset(0, -3),
-                        blurRadius: 10,
+                        color: Colors.black.withValues(alpha: 0.05),
+                        blurRadius: 16,
+                        offset: const Offset(0, -4),
                       ),
                     ],
                   ),
-                  child: SafeArea(
-                    child: Column(
-                      children: [
-                        // Coupon Code Field
-                        Row(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Promo Code Card (Matching Reference Screen 3)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: Row(
                           children: [
                             Expanded(
                               child: TextField(
                                 controller: _couponCtrl,
-                                textCapitalization: TextCapitalization.characters,
-                                decoration: InputDecoration(
-                                  hintText: "Enter Coupon (e.g. FIRST10)",
-                                  hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: textDark),
+                                decoration: const InputDecoration(
+                                  hintText: "Promo Code",
+                                  hintStyle: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                                  border: InputBorder.none,
                                   isDense: true,
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 8),
-                            ElevatedButton(
-                              onPressed: () => _applyCoupon(subtotal),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF0B192C),
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            InkWell(
+                              onTap: () => _applyCoupon(subtotal),
+                              borderRadius: BorderRadius.circular(20),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: textDark,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  _couponApplied ? "Applied" : "Fresh01",
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
                               ),
-                              child: const Text("Apply", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                             ),
                           ],
                         ),
-                        if (_couponMessage != null)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 6),
-                            child: Text(
-                              _couponMessage!,
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                color: _couponApplied ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
-                              ),
-                            ),
-                          ),
-                        const SizedBox(height: 12),
-
-                        // Hyperlocal Delivery Zone Indicator
-                        InkWell(
-                          onTap: () => LocationSelectorSheet.show(context),
-                          child: Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF8FAFC),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: const Color(0xFFE2E8F0)),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(Icons.location_on, size: 16, color: primary),
-                                const SizedBox(width: 6),
-                                Expanded(
-                                  child: Text(
-                                    "Delivering to: ${store.deliveryLocationDisplayText}",
-                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                const Text("Change", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF2563EB))),
-                              ],
+                      ),
+                      if (_couponMessage != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: Text(
+                            _couponMessage!,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: _couponApplied ? primaryGreen : const Color(0xFFDC2626),
                             ),
                           ),
                         ),
-                        if (isHyperlocal && eligibility != null && !eligibility.isDeliverable) ...[
-                          const SizedBox(height: 8),
-                          Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFEF2F2),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: const Color(0xFFFCA5A5)),
-                            ),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Icon(Icons.error_outline, size: 16, color: Color(0xFFDC2626)),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    eligibility.reason ?? "Delivery is unavailable to your selected area.",
-                                    style: const TextStyle(fontSize: 11, color: Color(0xFF991B1B), fontWeight: FontWeight.w500),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                        const SizedBox(height: 12),
+                      const SizedBox(height: 14),
 
-                        // Subtotal
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text("Bag Subtotal", style: TextStyle(color: Color(0xFF64748B), fontSize: 13)),
-                            Text("₹${subtotal.toStringAsFixed(0)}", style: const TextStyle(fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                        if (_couponApplied) ...[
-                          const SizedBox(height: 6),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text("Coupon Discount (FIRST10)", style: TextStyle(color: Color(0xFF16A34A), fontSize: 13, fontWeight: FontWeight.bold)),
-                              Text("- ₹${_couponDiscount.toStringAsFixed(0)}", style: const TextStyle(color: Color(0xFF16A34A), fontWeight: FontWeight.bold)),
-                            ],
-                          ),
+                      // Breakdown Rows
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text("Sub Total", style: TextStyle(fontSize: 13, color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+                          Text("₹${subtotal.toStringAsFixed(0)}", style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: textDark)),
                         ],
+                      ),
+                      if (_couponApplied) ...[
                         const SizedBox(height: 6),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text("Delivery Charges", style: TextStyle(color: Color(0xFF64748B), fontSize: 13)),
-                            Text(
-                              shipping == 0 ? "FREE" : "₹${shipping.toStringAsFixed(0)}",
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: shipping == 0 ? const Color(0xFF16A34A) : const Color(0xFF0B192C),
-                              ),
-                            ),
+                            const Text("Promo Discount", style: TextStyle(fontSize: 13, color: primaryGreen, fontWeight: FontWeight.w600)),
+                            Text("-₹${_couponDiscount.toStringAsFixed(0)}", style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: primaryGreen)),
                           ],
                         ),
-                        const Divider(height: 18),
-
-                        // Total Payable
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text("Total Payable", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF0B192C))),
-                            Text(
-                              "₹${totalPayable.toStringAsFixed(0)}",
-                              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 20, color: Color(0xFF0B192C)),
+                      ],
+                      const SizedBox(height: 6),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text("Shipping", style: TextStyle(fontSize: 13, color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+                          Text(
+                            shipping == 0 ? "FREE" : "₹${shipping.toStringAsFixed(0)}",
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                              color: shipping == 0 ? primaryGreen : textDark,
                             ),
-                          ],
-                        ),
-                        const SizedBox(height: 14),
+                          ),
+                        ],
+                      ),
+                      const Divider(height: 18, color: Color(0xFFF1F5F9)),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text("Total Amount", style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: textDark)),
+                          Text(
+                            "₹${totalPayable.toStringAsFixed(0)}",
+                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: primaryGreen),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
 
-                        // Proceed to Checkout (Prompt login if not signed in)
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed: cannotDeliver
-                                ? () {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text(eligibility.reason ?? "Delivery is unavailable to your selected area."),
-                                        action: SnackBarAction(
-                                          label: "Change",
-                                          onPressed: () => LocationSelectorSheet.show(context),
+                      // Large Rounded "CHECK OUT" Button (Matching Screen 3)
+                      SizedBox(
+                        width: double.infinity,
+                        height: 54,
+                        child: ElevatedButton(
+                          onPressed: cannotDeliver
+                              ? null
+                              : () {
+                                  if (!auth.isLoggedIn) {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) => const LoginScreen(
+                                          promptMessage: "Sign in to complete your order or continue as guest.",
+                                          redirectTo: CheckoutScreen(),
                                         ),
                                       ),
                                     );
+                                  } else {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(builder: (_) => const CheckoutScreen()),
+                                    );
                                   }
-                                : () {
-                              if (auth.isLoggedIn) {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => CheckoutScreen(couponDiscount: effectiveDiscount),
-                                  ),
-                                );
-                              } else {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => LoginScreen(
-                                      promptMessage: "Please sign in to complete your order and track delivery.",
-                                      redirectTo: CheckoutScreen(couponDiscount: effectiveDiscount),
-                                    ),
-                                  ),
-                                );
-                              }
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: cannotDeliver ? const Color(0xFF94A3B8) : primary,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              elevation: cannotDeliver ? 0 : 2,
-                            ),
-                            child: Text(
-                              cannotDeliver ? "DELIVERY UNAVAILABLE TO THIS AREA" : "PROCEED TO CHECKOUT →",
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                            ),
+                                },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: primaryGreen,
+                            foregroundColor: Colors.white,
+                            disabledBackgroundColor: const Color(0xFFE2E8F0),
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(27)),
+                          ),
+                          child: Text(
+                            cannotDeliver ? "DELIVERY UNAVAILABLE AT LOCATION" : "CHECK OUT",
+                            style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w900, letterSpacing: 1.0),
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
               ],
