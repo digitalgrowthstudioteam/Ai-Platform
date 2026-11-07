@@ -786,6 +786,10 @@ class PlatformApiClient {
     });
   }
 
+  async getPublicPlans(): Promise<Plan[]> {
+    return this.request<Plan[]>('/api/v1/platform/auth/plans');
+  }
+
   async getAdminPlans(): Promise<Plan[]> {
     return this.request<Plan[]>('/api/v1/platform/admin/plans');
   }

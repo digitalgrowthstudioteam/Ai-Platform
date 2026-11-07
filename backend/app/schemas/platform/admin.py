@@ -78,8 +78,9 @@ class PlanCreateOrUpdateRequest(BaseModel):
     name: str
     slug: str
     monthly_price_inr: float
+    yearly_price_inr: Optional[float] = 4990.0
     setup_fee_inr: float
-    setup_fee_sale_price_inr: Optional[float] = 999.0
+    setup_fee_sale_price_inr: Optional[float] = 2000.0
     storage_limit_mb: int = 1024
     max_products: int = 100
     is_active: bool = True
@@ -91,8 +92,9 @@ class PlanResponse(BaseModel):
     name: str
     slug: str
     monthly_price_inr: float
+    yearly_price_inr: Optional[float] = 4990.0
     setup_fee_inr: float
-    setup_fee_sale_price_inr: Optional[float] = 999.0
+    setup_fee_sale_price_inr: Optional[float] = 2000.0
     storage_limit_mb: int
     max_products: int
     is_active: bool

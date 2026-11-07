@@ -4,6 +4,7 @@ Digital Growth Studio — Platform Authentication Endpoints
 import re
 import uuid
 import secrets
+from typing import List, Optional
 import structlog
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -38,8 +39,16 @@ from app.schemas.platform.auth import (
     PlatformTokenResponse,
     PlatformUserMeResponse,
 )
+from app.schemas.platform.admin import PlanResponse
 
 router = APIRouter(prefix="/platform/auth", tags=["Platform Authentication"])
+
+
+@router.get("/plans", response_model=List[PlanResponse])
+async def get_public_plans(db: AsyncSession = Depends(get_db)):
+    """Public endpoint to fetch all active subscription plans for pricing pages and dynamic store showcases."""
+    stmt = select(PlatformPlan).where(PlatformPlan.is_active == True).order_by(PlatformPlan.monthly_price_inr.asc())
+    return (await db.execute(stmt)).scalars().all()
 
 
 def slugify(text: str) -> str:

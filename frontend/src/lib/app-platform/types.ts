@@ -369,6 +369,7 @@ export interface Plan {
   name: string;
   slug: string;
   monthly_price_inr: number;
+  yearly_price_inr?: number;
   setup_fee_inr: number;
   setup_fee_sale_price_inr?: number;
   storage_limit_mb: number;

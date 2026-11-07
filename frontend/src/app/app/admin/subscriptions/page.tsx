@@ -31,10 +31,11 @@ export default function AdminSubscriptionsPage() {
     name: "",
     slug: "",
     monthly_price_inr: "499",
-    setup_fee_inr: "2000",
-    setup_fee_sale_price_inr: "999",
+    yearly_price_inr: "4990",
+    setup_fee_inr: "10000",
+    setup_fee_sale_price_inr: "2000",
     storage_limit_mb: "1024",
-    max_products: "100",
+    max_products: "150",
     is_active: true,
   });
   const [submitting, setSubmitting] = useState(false);
@@ -99,10 +100,11 @@ export default function AdminSubscriptionsPage() {
       name: "",
       slug: "",
       monthly_price_inr: "499",
-      setup_fee_inr: "2000",
-      setup_fee_sale_price_inr: "999",
+      yearly_price_inr: "4990",
+      setup_fee_inr: "10000",
+      setup_fee_sale_price_inr: "2000",
       storage_limit_mb: "1024",
-      max_products: "100",
+      max_products: "150",
       is_active: true,
     });
     setIsModalOpen(true);
@@ -114,8 +116,9 @@ export default function AdminSubscriptionsPage() {
       name: p.name,
       slug: p.slug,
       monthly_price_inr: String(p.monthly_price_inr),
+      yearly_price_inr: String(p.yearly_price_inr ?? p.monthly_price_inr * 10),
       setup_fee_inr: String(p.setup_fee_inr),
-      setup_fee_sale_price_inr: String(p.setup_fee_sale_price_inr ?? 999),
+      setup_fee_sale_price_inr: String(p.setup_fee_sale_price_inr ?? 2000),
       storage_limit_mb: String(p.storage_limit_mb),
       max_products: String(p.max_products),
       is_active: p.is_active,
@@ -131,6 +134,7 @@ export default function AdminSubscriptionsPage() {
         name: formData.name,
         slug: formData.slug || formData.name.toLowerCase().replace(/[^a-z0-9]/g, "-"),
         monthly_price_inr: parseFloat(formData.monthly_price_inr),
+        yearly_price_inr: parseFloat(formData.yearly_price_inr || "4990"),
         setup_fee_inr: parseFloat(formData.setup_fee_inr),
         setup_fee_sale_price_inr: parseFloat(formData.setup_fee_sale_price_inr),
         storage_limit_mb: parseInt(formData.storage_limit_mb, 10),
@@ -274,9 +278,17 @@ export default function AdminSubscriptionsPage() {
                   <p className="font-mono text-[11px] text-slate-400 mt-0.5">{p.slug}</p>
 
                   <div className="mt-4 pt-4 border-t border-slate-100">
-                    <div className="flex items-baseline gap-1.5">
-                      <span className="text-3xl font-extrabold text-slate-900">₹{p.monthly_price_inr}</span>
-                      <span className="text-xs text-slate-500">/ month (Auto-debit on APK approval)</span>
+                    <div className="space-y-1">
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="text-3xl font-extrabold text-slate-900">₹{p.monthly_price_inr}</span>
+                        <span className="text-xs text-slate-500">/ month (Auto-debit on APK approval)</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-purple-700 font-bold">
+                        <span>Yearly: ₹{p.yearly_price_inr ?? p.monthly_price_inr * 10}/yr</span>
+                        <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">
+                          Waives Setup Fee
+                        </span>
+                      </div>
                     </div>
 
                     <div className="mt-2.5 p-2.5 bg-purple-50/70 border border-purple-100 rounded-xl">
@@ -493,18 +505,29 @@ export default function AdminSubscriptionsPage() {
                 />
               </div>
 
-              <div>
-                <label className="font-semibold text-slate-700 block mb-1">Monthly Subscription Fee (₹)</label>
-                <input
-                  type="number"
-                  required
-                  value={formData.monthly_price_inr}
-                  onChange={(e) => setFormData({ ...formData, monthly_price_inr: e.target.value })}
-                  className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl"
-                />
-                <p className="text-[11px] text-slate-400 mt-1">
-                  Charged on auto-debit basis once Android APK is tested and approved by vendor.
-                </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Monthly Fee (₹/mo)</label>
+                  <input
+                    type="number"
+                    required
+                    value={formData.monthly_price_inr}
+                    onChange={(e) => setFormData({ ...formData, monthly_price_inr: e.target.value })}
+                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-0.5">Charged monthly</p>
+                </div>
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Yearly Fee (₹/yr)</label>
+                  <input
+                    type="number"
+                    required
+                    value={formData.yearly_price_inr}
+                    onChange={(e) => setFormData({ ...formData, yearly_price_inr: e.target.value })}
+                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl"
+                  />
+                  <p className="text-[10px] text-emerald-600 font-semibold mt-0.5">Waives setup fee 100%</p>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">

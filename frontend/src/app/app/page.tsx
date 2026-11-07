@@ -1,8 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePlatformAuth } from "@/lib/app-platform/auth";
+import { platformApi } from "@/lib/app-platform/api";
+import { Plan } from "@/lib/app-platform/types";
 import {
   Smartphone,
   Sparkles,
@@ -28,11 +30,57 @@ import {
   Share2,
   Sliders,
   Send,
+  HardDrive,
+  Gift,
 } from "lucide-react";
+
+const FALLBACK_PLANS: Plan[] = [
+  {
+    id: "b8f38d9f-e1f9-49c9-b032-0ca958e00441",
+    name: "Starter Store",
+    slug: "starter-store",
+    monthly_price_inr: 499,
+    yearly_price_inr: 4990,
+    setup_fee_inr: 10000,
+    setup_fee_sale_price_inr: 2000,
+    storage_limit_mb: 1024,
+    max_products: 150,
+    is_active: true,
+    features_json: "[]",
+    created_at: new Date().toISOString(),
+  },
+];
 
 export default function PlatformHomePage() {
   const { user } = usePlatformAuth();
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
+  const [plans, setPlans] = useState<Plan[]>(FALLBACK_PLANS);
+  const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("monthly");
+  const [plansLoading, setPlansLoading] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    async function fetchPlans() {
+      try {
+        setPlansLoading(true);
+        const fetched = await platformApi.getPublicPlans();
+        if (isMounted && fetched && fetched.length > 0) {
+          const activeOnly = fetched.filter((p) => p.is_active);
+          if (activeOnly.length > 0) {
+            setPlans(activeOnly);
+          }
+        }
+      } catch (err) {
+        console.warn("Could not fetch dynamic plans from server, using configured defaults", err);
+      } finally {
+        if (isMounted) setPlansLoading(false);
+      }
+    }
+    fetchPlans();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const toggleFaq = (idx: number) => {
     setActiveFaq(activeFaq === idx ? null : idx);
@@ -239,7 +287,7 @@ export default function PlatformHomePage() {
           <div id="android-showcase" className="mt-16 max-w-5xl mx-auto bg-gradient-to-b from-slate-800/40 to-slate-900/60 border border-slate-700/60 rounded-3xl p-6 sm:p-10 shadow-2xl backdrop-blur-xl relative overflow-hidden">
             <div className="flex flex-col lg:flex-row items-center justify-between gap-10">
               {/* Phone Mockup - Showing Real Android App Experience */}
-              <div className="w-full max-w-[290px] sm:max-w-[320px] bg-slate-950 rounded-[44px] p-3 border-4 border-slate-700 shadow-2xl shadow-purple-900/40 relative flex-shrink-0">
+              <div className="w-full max-w-[290px] sm:max-w-[320px] bg-slate-950 rounded-[44px] p-3 border-4 border-slate-700 shadow-2xl shadow-purple-900/40 relative flex-shrink-0 mx-auto">
                 {/* Speaker Notch */}
                 <div className="w-24 h-4 bg-slate-800 rounded-full mx-auto mb-3" />
                 
@@ -405,13 +453,13 @@ export default function PlatformHomePage() {
       </section>
 
       {/* ──────────────────────────────────────────────────────────── */}
-      {/* 4. MAIN HIGHLIGHT PLAN (PRICING SECTION) */}
+      {/* 4. DYNAMIC PRICING SECTION (MONTHLY / YEARLY + SETUP FEE)     */}
       {/* ──────────────────────────────────────────────────────────── */}
       <section id="pricing" className="py-20 bg-slate-950 border-t border-slate-800/80 relative">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-semibold mb-4">
             <Flame className="w-4 h-4 text-amber-400" />
-            Special Launch Plan • Everything Included
+            Special Launch Plans • Everything Included
           </div>
 
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight">
@@ -419,116 +467,235 @@ export default function PlatformHomePage() {
             <span className="text-amber-300">Just ₹499 Today</span>
           </h2>
           <p className="text-sm sm:text-base text-slate-400 max-w-2xl mx-auto mt-3">
-            No expensive app agency fees (₹50,000+). No 25-30% marketplace commissions. One honest, all-inclusive plan that gives your business its own official Android application.
+            Choose monthly flexibility or unlock massive savings with annual billing. Go yearly to get <strong>100% Free Setup Fee (Save ₹2,000)</strong> + 2 months free!
           </p>
 
-          {/* Pricing Highlight Card */}
-          <div className="mt-12 max-w-xl mx-auto bg-gradient-to-b from-purple-950/80 via-slate-900 to-slate-950 border-2 border-purple-500/60 rounded-3xl p-6 sm:p-10 shadow-2xl shadow-purple-950/60 relative text-left">
-            {/* Corner Badge */}
-            <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-black text-xs uppercase px-4 py-1 rounded-full shadow-lg tracking-wider flex items-center gap-1.5">
-              <Star className="w-3.5 h-3.5 fill-slate-950" />
-              Most Popular • Official Android App Plan
-            </div>
-
-            <div className="flex items-baseline justify-between flex-wrap gap-2 border-b border-slate-800 pb-6 mt-2">
-              <div>
-                <h3 className="text-2xl font-black text-white">Official Branded Android App</h3>
-                <p className="text-xs text-slate-400 mt-1">Full production Android APK with your brand name, logo & catalog</p>
-              </div>
-              <div className="text-right">
-                <div className="flex items-baseline gap-1">
-                  <span className="text-4xl sm:text-5xl font-black text-amber-300">₹499</span>
-                  <span className="text-sm font-semibold text-slate-400">/ month</span>
-                </div>
-                <span className="text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                  Cancel anytime
-                </span>
-              </div>
-            </div>
-
-            {/* Feature List */}
-            <div className="py-6 space-y-3.5">
-              <p className="text-xs font-bold uppercase tracking-wider text-purple-300">What’s Included in Your ₹499 Plan:</p>
-
-              <div className="space-y-2.5 text-xs sm:text-sm text-slate-200">
-                <div className="flex items-start gap-2.5">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
-                  <span>
-                    <strong>Branded Android Mobile Application</strong> — Customized with your brand name, logo, colors, and signed production APK ready for customer installation & Play Store publishing.
-                  </span>
-                </div>
-
-                <div className="flex items-start gap-2.5">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
-                  <span>
-                    <strong>Unlimited Lock-Screen Push Notifications</strong> — Broadcast flash sales, price cuts, and new arrivals directly to customer lock screens with 85%+ open rates.
-                  </span>
-                </div>
-
-                <div className="flex items-start gap-2.5">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
-                  <span>
-                    <strong>AI 1-Click Product Importer</strong> — Copy-paste links from Amazon, Flipkart, Meesho, or Shopify to auto-create listings in your app catalog in 3 seconds.
-                  </span>
-                </div>
-
-                <div className="flex items-start gap-2.5">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
-                  <span>
-                    <strong>0% Platform Commission</strong> — All payments (Razorpay UPI, GPay, PhonePe, Cards, Netbanking & COD) settle directly into your bank account.
-                  </span>
-                </div>
-
-                <div className="flex items-start gap-2.5">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
-                  <span>
-                    <strong>AI Image Studio Photo Redesign</strong> — Convert ordinary phone camera photos into commercial catalog product mockups with AI lighting.
-                  </span>
-                </div>
-
-                <div className="flex items-start gap-2.5">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
-                  <span>
-                    <strong>Automated Logistics & Hyperlocal Delivery</strong> — Integrated Shiprocket dispatch across 29,000+ Indian pincodes + local 45-minute delivery radius.
-                  </span>
-                </div>
-
-                <div className="flex items-start gap-2.5">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
-                  <span>
-                    <strong>Automated WhatsApp & SMS Updates</strong> — Instant order confirmation, tracking links, and dispatch updates sent automatically to customers.
-                  </span>
-                </div>
-
-                <div className="flex items-start gap-2.5">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
-                  <span>
-                    <strong>Live Vendor Management Portal</strong> — Easily manage catalog, banner sliders, inventory, and orders from your smartphone or computer.
-                  </span>
-                </div>
-
-                <div className="flex items-start gap-2.5">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
-                  <span>
-                    <strong>1,024 MB High-Speed Cloud CDN Storage</strong> — Fast-loading image hosting and asset management included free.
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* CTA Button */}
-            <Link
-              href="/app/register"
-              className="w-full inline-flex items-center justify-center gap-2 py-4 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-black text-base shadow-lg shadow-purple-600/30 transition-all hover:scale-[1.02]"
+          {/* Interactive Monthly / Yearly Billing Toggle */}
+          <div className="mt-8 inline-flex items-center p-1.5 rounded-2xl bg-slate-900 border border-slate-800 shadow-xl">
+            <button
+              type="button"
+              onClick={() => setBillingCycle("monthly")}
+              className={`px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                billingCycle === "monthly"
+                  ? "bg-purple-600 text-white shadow-md shadow-purple-600/30"
+                  : "text-slate-400 hover:text-white"
+              }`}
             >
-              <Smartphone className="w-5 h-5" />
-              <span>Get Your Own App Today — Instant Setup</span>
-              <ArrowRight className="w-5 h-5" />
-            </Link>
+              Monthly Billing
+            </button>
+            <button
+              type="button"
+              onClick={() => setBillingCycle("yearly")}
+              className={`px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                billingCycle === "yearly"
+                  ? "bg-gradient-to-r from-purple-600 via-indigo-600 to-emerald-600 text-white shadow-md shadow-purple-600/30"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <span>Yearly Billing</span>
+              <span className="bg-emerald-400 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider animate-pulse">
+                ₹0 Setup Fee • Save ₹2,000
+              </span>
+            </button>
+          </div>
 
-            <p className="text-[11px] text-center text-slate-400 mt-3 font-medium">
-              🛡️ Secure online checkout via Razorpay • Signed Android APK ready in 24 hours
-            </p>
+          {/* Dynamic Plans Responsive Grid (Mobile / Tablet / Desktop) */}
+          <div
+            className={`mt-12 grid gap-8 items-stretch ${
+              plans.length === 1
+                ? "max-w-xl mx-auto"
+                : plans.length === 2
+                ? "max-w-4xl mx-auto grid-cols-1 md:grid-cols-2"
+                : "max-w-7xl mx-auto grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
+            }`}
+          >
+            {plans.map((p, idx) => {
+              const saleSetup = p.setup_fee_sale_price_inr ?? 2000;
+              const originalSetup = p.setup_fee_inr ?? 10000;
+              const yearlyPrice = p.yearly_price_inr ?? p.monthly_price_inr * 10;
+              const monthlyEquivalent = Math.round(yearlyPrice / 12);
+              const isPopular = p.slug === "starter-store" || idx === 0;
+
+              return (
+                <div
+                  key={p.id || idx}
+                  className="bg-gradient-to-b from-purple-950/80 via-slate-900 to-slate-950 border-2 border-purple-500/60 rounded-3xl p-6 sm:p-10 shadow-2xl shadow-purple-950/60 relative text-left flex flex-col justify-between hover:border-purple-400/80 transition-all"
+                >
+                  {/* Popular Corner Badge */}
+                  {isPopular && (
+                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-black text-xs uppercase px-4 py-1 rounded-full shadow-lg tracking-wider flex items-center gap-1.5 whitespace-nowrap">
+                      <Star className="w-3.5 h-3.5 fill-slate-950" />
+                      Most Popular • Official Android App Plan
+                    </div>
+                  )}
+
+                  <div>
+                    {/* Plan Header */}
+                    <div className="flex items-baseline justify-between flex-wrap gap-2 border-b border-slate-800 pb-5 mt-2">
+                      <div>
+                        <h3 className="text-2xl font-black text-white">{p.name}</h3>
+                        <p className="text-xs text-slate-400 mt-1">
+                          Full production Android APK with your brand name, logo & catalog
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        {billingCycle === "monthly" ? (
+                          <>
+                            <div className="flex items-baseline gap-1">
+                              <span className="text-4xl sm:text-5xl font-black text-amber-300">
+                                ₹{p.monthly_price_inr}
+                              </span>
+                              <span className="text-sm font-semibold text-slate-400">/ mo</span>
+                            </div>
+                            <span className="text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                              Cancel anytime
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <div className="flex items-baseline gap-1">
+                              <span className="text-4xl sm:text-5xl font-black text-emerald-400">
+                                ₹{yearlyPrice}
+                              </span>
+                              <span className="text-sm font-semibold text-slate-400">/ yr</span>
+                            </div>
+                            <span className="text-[11px] font-semibold text-purple-300 bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/20">
+                              Only ₹{monthlyEquivalent}/mo • 2 Months Free
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* One-Time Setup Fee Highlight Box */}
+                    <div className="mt-4">
+                      {billingCycle === "monthly" ? (
+                        <div className="p-3.5 rounded-2xl bg-purple-950/60 border border-purple-500/40">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="font-bold text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                              <CreditCard className="w-4 h-4 text-purple-400" />
+                              One-Time Setup Fee:
+                            </span>
+                            <span className="text-[10px] font-bold text-emerald-300 bg-emerald-500/20 px-2 py-0.5 rounded">
+                              Active Price (80% OFF)
+                            </span>
+                          </div>
+                          <div className="flex items-baseline gap-2 mt-1.5">
+                            <span className="text-2xl font-black text-amber-300">₹{saleSetup}</span>
+                            {originalSetup > saleSetup && (
+                              <span className="text-xs text-slate-400 line-through">₹{originalSetup}</span>
+                            )}
+                            <span className="text-[11px] text-slate-300">
+                              (One-time custom APK compilation & publishing)
+                            </span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="p-3.5 rounded-2xl bg-emerald-950/60 border border-emerald-500/40">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="font-bold text-emerald-300 uppercase tracking-wider flex items-center gap-1.5">
+                              <Gift className="w-4 h-4 text-emerald-400" />
+                              One-Time Setup Fee:
+                            </span>
+                            <span className="text-[10px] font-black text-slate-950 bg-emerald-400 px-2 py-0.5 rounded uppercase">
+                              100% Free / Waived
+                            </span>
+                          </div>
+                          <div className="flex items-baseline gap-2 mt-1.5">
+                            <span className="text-2xl font-black text-emerald-400">₹0 Free</span>
+                            <span className="text-xs text-slate-400 line-through">₹{originalSetup}</span>
+                            <span className="text-[11px] text-emerald-200 font-semibold">
+                              🎉 Setup Fee 100% Waived with Annual Plan
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Plan Features Checklist */}
+                    <div className="py-6 space-y-3.5">
+                      <p className="text-xs font-bold uppercase tracking-wider text-purple-300">
+                        What’s Included in Your Plan:
+                      </p>
+
+                      <div className="space-y-2.5 text-xs sm:text-sm text-slate-200">
+                        <div className="flex items-start gap-2.5">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+                          <span>
+                            <strong>Branded Android Mobile Application</strong> — Customized with your brand name, logo, colors, and signed production APK ready for customer installation & Play Store publishing.
+                          </span>
+                        </div>
+
+                        <div className="flex items-start gap-2.5">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+                          <span>
+                            <strong>Unlimited Lock-Screen Push Notifications</strong> — Broadcast flash sales, price cuts, and new arrivals directly to customer lock screens with 85%+ open rates.
+                          </span>
+                        </div>
+
+                        <div className="flex items-start gap-2.5">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+                          <span>
+                            <strong>AI 1-Click Product Importer</strong> — Copy-paste links from Amazon, Flipkart, Meesho, or Shopify to auto-create listings in your app catalog in 3 seconds.
+                          </span>
+                        </div>
+
+                        <div className="flex items-start gap-2.5">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+                          <span>
+                            <strong>0% Platform Commission</strong> — All payments (Razorpay UPI, GPay, PhonePe, Cards, Netbanking & COD) settle directly into your bank account.
+                          </span>
+                        </div>
+
+                        <div className="flex items-start gap-2.5">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+                          <span>
+                            <strong>{p.storage_limit_mb} MB High-Speed Cloud CDN Storage</strong> — Fast-loading image hosting and asset management included.
+                          </span>
+                        </div>
+
+                        <div className="flex items-start gap-2.5">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+                          <span>
+                            <strong>Up to {p.max_products} Products in App Catalog</strong> — Manage variants, sizes, colors, and real-time inventory.
+                          </span>
+                        </div>
+
+                        <div className="flex items-start gap-2.5">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+                          <span>
+                            <strong>Automated Logistics & Hyperlocal Delivery</strong> — Integrated Shiprocket dispatch across 29,000+ Indian pincodes + local 45-minute delivery radius.
+                          </span>
+                        </div>
+
+                        <div className="flex items-start gap-2.5">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+                          <span>
+                            <strong>Live Vendor Management Portal</strong> — Easily manage catalog, banner sliders, inventory, and orders from your smartphone or computer.
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* CTA Button */}
+                  <div className="pt-2">
+                    <Link
+                      href={`/app/register?plan=${p.slug}&billing=${billingCycle}`}
+                      className="w-full inline-flex items-center justify-center gap-2 py-4 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-black text-base shadow-lg shadow-purple-600/30 transition-all hover:scale-[1.02]"
+                    >
+                      <Smartphone className="w-5 h-5" />
+                      <span>Get Your Own App Today</span>
+                      <ArrowRight className="w-5 h-5" />
+                    </Link>
+
+                    <p className="text-[11px] text-center text-slate-400 mt-3 font-medium">
+                      🛡️ Secure online checkout via Razorpay • Signed Android APK ready in 24 hours
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -675,6 +842,10 @@ export default function PlatformHomePage() {
 
           <div className="space-y-4">
             {[
+              {
+                q: "What is the One-Time Setup Fee and how do I get it waived?",
+                a: "The standard one-time setup fee for compiling, digitally signing, and configuring your Android APK is ₹2,000 (discounted from ₹10,000). If you choose the Yearly Subscription plan, the entire ₹2,000 setup fee is 100% WAIVED (₹0 setup fee)!",
+              },
               {
                 q: "Is the Branded Android App really included for just ₹499/month?",
                 a: "Yes! For just ₹499/month, you receive your own official, customized Android Mobile Application (signed APK bundle) with your brand name, logo, colors, and live product catalog, alongside a vendor companion dashboard.",
