@@ -192,8 +192,8 @@ export default function AiProductImportModal({
   };
 
   const handleConfirmImport = async () => {
-    if (currentCredits < 1) {
-      setError("Insufficient AI credits. Please buy credits to continue.");
+    if (currentCredits < 3) {
+      setError("Insufficient AI credits. 3 credits are required to import and publish a product.");
       return;
     }
     setError(null);
@@ -267,7 +267,7 @@ export default function AiProductImportModal({
               <Sparkles className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
               {currentCredits} Credits
             </span>
-            <span className="text-slate-400">• (1 credit per import)</span>
+            <span className="text-slate-400">• (3 credits per import)</span>
           </div>
           {currentCredits < 3 && (
             <button
@@ -691,7 +691,7 @@ export default function AiProductImportModal({
 
               <button
                 type="button"
-                disabled={isImporting || currentCredits < 1}
+                disabled={isImporting || currentCredits < 3}
                 onClick={handleConfirmImport}
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 text-white font-semibold text-xs shadow-md hover:bg-emerald-700 transition-colors disabled:opacity-50 cursor-pointer"
               >
@@ -703,7 +703,7 @@ export default function AiProductImportModal({
                 ) : (
                   <>
                     <CheckCircle2 className="w-4 h-4" />
-                    Import & Publish (1 Credit)
+                    Import & Publish (3 Credits)
                   </>
                 )}
               </button>

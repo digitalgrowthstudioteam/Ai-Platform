@@ -73,8 +73,8 @@ export default function AiImageStudioModal({
   if (!isOpen) return null;
 
   const handleEnhance = async () => {
-    if (currentCredits < 2) {
-      setError("Insufficient AI credits. You need 2 credits for AI Studio Photo Redesign.");
+    if (currentCredits < 5) {
+      setError("Insufficient AI credits. You need 5 credits for AI Studio Photo Redesign.");
       return;
     }
     setError(null);
@@ -140,9 +140,9 @@ export default function AiImageStudioModal({
               <Sparkles className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
               {currentCredits} Credits
             </span>
-            <span className="text-slate-400">• (2 credits per studio redesign)</span>
+            <span className="text-slate-400">• (5 credits per studio redesign)</span>
           </div>
-          {currentCredits < 2 && (
+          {currentCredits < 5 && (
             <button
               onClick={onBuyCreditsClick}
               className="text-purple-600 hover:text-purple-700 font-semibold flex items-center gap-1 cursor-pointer"
@@ -253,7 +253,7 @@ export default function AiImageStudioModal({
 
               <button
                 type="button"
-                disabled={isProcessing || currentCredits < 2}
+                disabled={isProcessing || currentCredits < 5}
                 onClick={handleEnhance}
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-purple-600 text-white font-semibold text-xs shadow-md hover:bg-purple-700 transition-colors disabled:opacity-50 cursor-pointer"
               >
@@ -265,7 +265,7 @@ export default function AiImageStudioModal({
                 ) : (
                   <>
                     <Wand2 className="w-4 h-4" />
-                    {enhancedUrl ? "Re-generate (2 Credits)" : "Redesign Photo (2 Credits)"}
+                    {enhancedUrl ? "Re-generate (5 Credits)" : "Redesign Photo (5 Credits)"}
                   </>
                 )}
               </button>

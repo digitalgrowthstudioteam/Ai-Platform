@@ -64,8 +64,8 @@ async def run_tests():
         print("\n[TEST 2] PUT /api/v1/platform/admin/credits/config (Super Admin setting prices)")
         update_payload = {
             "welcome_credits": 10,
-            "import_product_credit_cost": 1,
-            "image_studio_credit_cost": 2,
+            "import_product_credit_cost": 3,
+            "image_studio_credit_cost": 5,
             "credit_packs": [
                 {"id": "pack_starter", "name": "Starter Pack", "credits": 30, "price_inr": 119.0, "popular": False, "active": True},
                 {"id": "pack_growth", "name": "Growth Pro Pack", "credits": 100, "price_inr": 299.0, "popular": True, "active": True},
@@ -117,7 +117,8 @@ async def run_tests():
         confirm_res = res.json()
         print(f"  Product Created ID: {confirm_res['product_id']}")
         print(f"  Credits Used: {confirm_res['credits_used']}, Remaining: {confirm_res['remaining_credits']}")
-        assert confirm_res["remaining_credits"] == initial_credits - 1
+        assert confirm_res["credits_used"] == 3
+        assert confirm_res["remaining_credits"] == initial_credits - 3
 
         # TEST 6: Phase 2 AI Image Studio (deducts 2 credits)
         print("\n[TEST 6] POST /api/v1/platform/vendor/ai/image-studio (Phase 2 Studio Redesign)")
@@ -132,7 +133,8 @@ async def run_tests():
         print(f"  Studio Redesign Style: {studio_res['style']}")
         print(f"  Canvas Dimensions: {studio_res['width']}x{studio_res['height']}")
         print(f"  Credits Used: {studio_res['credits_used']}, Remaining: {studio_res['remaining_credits']}")
-        assert studio_res["remaining_credits"] == initial_credits - 3
+        assert studio_res["credits_used"] == 5
+        assert studio_res["remaining_credits"] == initial_credits - 3 - 5
 
         # TEST 7: Super Admin Grants Credits
         print("\n[TEST 7] POST /api/v1/platform/admin/credits/grant (Admin manually adds 50 credits)")

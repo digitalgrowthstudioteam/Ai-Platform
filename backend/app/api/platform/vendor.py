@@ -2073,8 +2073,8 @@ async def mark_vendor_notification_read(
 
 DEFAULT_AI_CREDIT_SETTINGS = {
     "welcome_credits": 5,
-    "import_product_credit_cost": 1,
-    "image_studio_credit_cost": 2,
+    "import_product_credit_cost": 3,
+    "image_studio_credit_cost": 5,
     "credit_packs": [
         {
             "id": "pack_starter",
@@ -2138,7 +2138,7 @@ async def ai_import_preview(
     Validates vendor has at least 1 credit (preview does NOT deduct credit yet).
     """
     config = await _get_active_ai_settings(db)
-    cost = int(config.get("import_product_credit_cost", 1))
+    cost = int(config.get("import_product_credit_cost", 3))
 
     if current.vendor.ai_credits < cost:
         raise HTTPException(
@@ -2173,7 +2173,7 @@ async def ai_import_confirm(
     Atomically deducts 1 AI Credit and logs credit audit transaction.
     """
     config = await _get_active_ai_settings(db)
-    cost = int(config.get("import_product_credit_cost", 1))
+    cost = int(config.get("import_product_credit_cost", 3))
     vendor = current.vendor
 
     if vendor.ai_credits < cost:
@@ -2299,7 +2299,7 @@ async def ai_image_studio(
     Deducts configured studio credits (default 2 credits) and saves asset to CDN.
     """
     config = await _get_active_ai_settings(db)
-    cost = int(config.get("image_studio_credit_cost", 2))
+    cost = int(config.get("image_studio_credit_cost", 5))
     vendor = current.vendor
 
     if vendor.ai_credits < cost:
@@ -2386,8 +2386,8 @@ async def get_ai_credit_balance(
 
     return {
         "credits": vendor.ai_credits,
-        "import_product_credit_cost": config.get("import_product_credit_cost", 1),
-        "image_studio_credit_cost": config.get("image_studio_credit_cost", 2),
+        "import_product_credit_cost": config.get("import_product_credit_cost", 3),
+        "image_studio_credit_cost": config.get("image_studio_credit_cost", 5),
         "credit_packs": packs,
         "recent_transactions": [
             {

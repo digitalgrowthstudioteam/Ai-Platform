@@ -2000,8 +2000,8 @@ async def list_audit_logs(
 
 DEFAULT_AI_CREDIT_CONFIG = {
     "welcome_credits": 5,
-    "import_product_credit_cost": 1,
-    "image_studio_credit_cost": 2,
+    "import_product_credit_cost": 3,
+    "image_studio_credit_cost": 5,
     "credit_packs": [
         {
             "id": "pack_starter",

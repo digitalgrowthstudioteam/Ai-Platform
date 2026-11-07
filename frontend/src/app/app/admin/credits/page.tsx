@@ -55,8 +55,8 @@ export default function SuperAdminCreditsPage() {
 
       if (config) {
         setWelcomeCredits(config.welcome_credits ?? 5);
-        setImportCost(config.import_product_credit_cost ?? 1);
-        setImageCost(config.image_studio_credit_cost ?? 2);
+        setImportCost(config.import_product_credit_cost ?? 3);
+        setImageCost(config.image_studio_credit_cost ?? 5);
         setCreditPacks(config.credit_packs ?? []);
       }
       setVendors(vendorList || []);
