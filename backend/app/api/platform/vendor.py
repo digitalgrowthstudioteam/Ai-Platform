@@ -5,6 +5,7 @@ All operations strictly enforce vendor isolation.
 import uuid
 import re
 import json
+import httpx
 from typing import List, Optional
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
