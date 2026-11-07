@@ -134,7 +134,7 @@ export default function PlatformLoginPage() {
             <p className="text-xs text-slate-500">
               New business owner?{" "}
               <Link href="/app/register" className="font-semibold text-blue-600 hover:text-blue-700">
-                Register store now
+                Get Your Own App Today (₹499)
               </Link>
             </p>
           </div>

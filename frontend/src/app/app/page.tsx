@@ -17,20 +17,17 @@ import {
   Truck,
   Bell,
   ShoppingBag,
-  Store,
-  Globe,
   HelpCircle,
-  Layers,
   ArrowUpRight,
   Check,
   Flame,
-  Award,
   Package,
   Clock,
-  Send,
-  Sliders,
   DollarSign,
-  HeartHandshake,
+  Download,
+  Share2,
+  Sliders,
+  Send,
 } from "lucide-react";
 
 export default function PlatformHomePage() {
@@ -53,7 +50,7 @@ export default function PlatformHomePage() {
             Limited Offer
           </span>
           <span>
-            Now start with your own official <strong>Branded Android App & Online Store</strong> just for{" "}
+            Now start with your own official <strong>Branded Android App</strong> just for{" "}
             <span className="underline decoration-amber-300 decoration-2 font-bold text-amber-200">
               ₹499 today!
             </span>
@@ -62,7 +59,7 @@ export default function PlatformHomePage() {
             href="/app/register"
             className="inline-flex items-center gap-1 font-bold underline underline-offset-4 hover:text-amber-200 transition-colors ml-1"
           >
-            Claim ₹499 Offer <ArrowRight className="w-3.5 h-3.5" />
+            Get Your Own App Today <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         </div>
       </div>
@@ -83,23 +80,23 @@ export default function PlatformHomePage() {
                   Digital Growth Studio
                 </span>
                 <span className="text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">
-                  App Platform
+                  Android App Engine
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400 font-medium">Branded Android Apps & E-Commerce Stores</p>
+              <p className="text-[11px] text-slate-400 font-medium">Branded Android Apps for Businesses</p>
             </div>
           </Link>
 
           {/* Desktop Nav Links */}
           <div className="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-300">
-            <a href="#features" className="hover:text-white transition-colors">Features</a>
-            <a href="#android-app" className="hover:text-white transition-colors flex items-center gap-1">
+            <a href="#android-showcase" className="hover:text-white transition-colors flex items-center gap-1">
               Android App
               <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.2 rounded font-bold">New</span>
             </a>
+            <a href="#features" className="hover:text-white transition-colors">Features</a>
             <a href="#ai-importer" className="hover:text-white transition-colors">AI Importer</a>
             <Link href="/app/demoapp" className="hover:text-purple-300 transition-colors flex items-center gap-1">
-              Live Demo
+              Live Demo App
               <ArrowUpRight className="w-3.5 h-3.5 opacity-70" />
             </Link>
             <a href="#pricing" className="hover:text-amber-300 transition-colors">Pricing (₹499)</a>
@@ -126,10 +123,10 @@ export default function PlatformHomePage() {
                 </Link>
                 <Link
                   href="/app/register"
-                  className="inline-flex items-center gap-1.5 px-4 sm:px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-bold text-sm shadow-lg shadow-purple-600/25 transition-all hover:scale-[1.02]"
+                  className="inline-flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-bold text-sm shadow-lg shadow-purple-600/25 transition-all hover:scale-[1.02]"
                 >
-                  Start for ₹499
-                  <ArrowRight className="w-4 h-4" />
+                  <Smartphone className="w-4 h-4" />
+                  Get Your Own App Today
                 </Link>
               </>
             )}
@@ -138,7 +135,7 @@ export default function PlatformHomePage() {
       </nav>
 
       {/* ──────────────────────────────────────────────────────────── */}
-      {/* 3. HERO SECTION */}
+      {/* 3. HERO SECTION (100% ANDROID APP FOCUS) */}
       {/* ──────────────────────────────────────────────────────────── */}
       <section className="relative overflow-hidden pt-12 pb-24 md:pt-20 md:pb-32 bg-radial from-purple-950/40 via-slate-900 to-slate-950">
         {/* Ambient Glow Orbs */}
@@ -150,16 +147,16 @@ export default function PlatformHomePage() {
             {/* Tag Badge */}
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-purple-500/10 border border-purple-500/30 text-purple-300 text-xs sm:text-sm font-semibold mb-6 shadow-xs">
               <Sparkles className="w-4 h-4 text-purple-400" />
-              <span>India’s #1 Branded Android App Engine for Merchants</span>
+              <span>India’s #1 Branded Android App Engine for Businesses</span>
             </div>
 
             {/* Main Headline */}
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-white leading-[1.12]">
-              Turn Your Business Into A{" "}
+              Get Your Own{" "}
               <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-amber-300 bg-clip-text text-transparent">
                 Branded Android Mobile App
               </span>{" "}
-              & Online Store.
+              For Your Business.
             </h1>
 
             {/* Highlighted Callout Box */}
@@ -169,7 +166,7 @@ export default function PlatformHomePage() {
                 Now start with your own Android App just for ₹499 today!
               </p>
               <p className="text-xs sm:text-sm text-slate-300 mt-2 font-medium max-w-2xl mx-auto leading-relaxed">
-                Zero coding required. Keep your brand on customers’ home screens, send unlimited free push notifications, and accept direct UPI payments with <strong>0% platform commission</strong>.
+                Zero coding required. Get a production-ready, signed Android APK with your custom logo, colors, and catalog. Keep your brand on customers’ home screens, send unlimited free push notifications, and accept direct UPI payments with <strong>0% platform commission</strong>.
               </p>
             </div>
 
@@ -177,9 +174,10 @@ export default function PlatformHomePage() {
             <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
               <Link
                 href="/app/register"
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-4 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-extrabold text-base shadow-xl shadow-purple-600/30 transition-all hover:scale-105"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-8 py-4 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-extrabold text-base shadow-xl shadow-purple-600/30 transition-all hover:scale-105"
               >
-                Get Started for ₹499 Today
+                <Smartphone className="w-5 h-5" />
+                <span>Get Your Own App Today — ₹499</span>
                 <ArrowRight className="w-5 h-5" />
               </Link>
               <Link
@@ -187,7 +185,7 @@ export default function PlatformHomePage() {
                 className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-4 rounded-xl bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700 text-slate-200 font-bold text-base transition-all hover:scale-105"
               >
                 <Play className="w-4 h-4 text-purple-400 fill-purple-400" />
-                Try Live Interactive App Demo
+                Test Live Demo App
               </Link>
             </div>
 
@@ -205,11 +203,11 @@ export default function PlatformHomePage() {
 
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center flex-shrink-0 text-emerald-400">
-                  <DollarSign className="w-4 h-4" />
+                  <Bell className="w-4 h-4" />
                 </div>
                 <div>
-                  <p className="text-xs font-bold text-white">0% Platform Fee</p>
-                  <p className="text-[11px] text-slate-400">Direct Bank Deposit</p>
+                  <p className="text-xs font-bold text-white">Push Notifications</p>
+                  <p className="text-[11px] text-slate-400">85%+ Open Rates</p>
                 </div>
               </div>
 
@@ -219,121 +217,185 @@ export default function PlatformHomePage() {
                 </div>
                 <div>
                   <p className="text-xs font-bold text-white">AI 1-Click Importer</p>
-                  <p className="text-[11px] text-slate-400">Amazon / Flipkart / Meesho</p>
+                  <p className="text-[11px] text-slate-400">Flipkart / Amazon / Meesho</p>
                 </div>
               </div>
 
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center flex-shrink-0 text-amber-400">
-                  <Truck className="w-4 h-4" />
+                  <DollarSign className="w-4 h-4" />
                 </div>
                 <div>
-                  <p className="text-xs font-bold text-white">29,000+ Pincodes</p>
-                  <p className="text-[11px] text-slate-400">Shiprocket & Hyperlocal</p>
+                  <p className="text-xs font-bold text-white">0% Platform Fee</p>
+                  <p className="text-[11px] text-slate-400">Direct Bank Deposit</p>
                 </div>
               </div>
             </div>
           </div>
 
           {/* ──────────────────────────────────────────────────────────── */}
-          {/* VISUAL PHONE & DESKTOP DUAL SHOWCASE */}
+          {/* ANDROID APP EXPERIENCE SHOWCASE (100% FOCUS ON ANDROID APP) */}
           {/* ──────────────────────────────────────────────────────────── */}
-          <div className="mt-16 max-w-5xl mx-auto bg-gradient-to-b from-slate-800/40 to-slate-900/60 border border-slate-700/60 rounded-3xl p-6 sm:p-10 shadow-2xl backdrop-blur-xl relative overflow-hidden">
+          <div id="android-showcase" className="mt-16 max-w-5xl mx-auto bg-gradient-to-b from-slate-800/40 to-slate-900/60 border border-slate-700/60 rounded-3xl p-6 sm:p-10 shadow-2xl backdrop-blur-xl relative overflow-hidden">
             <div className="flex flex-col lg:flex-row items-center justify-between gap-10">
-              {/* Phone Mockup */}
-              <div className="w-full max-w-[280px] sm:max-w-[320px] bg-slate-950 rounded-[44px] p-3 border-4 border-slate-700 shadow-2xl shadow-purple-900/40 relative">
+              {/* Phone Mockup - Showing Real Android App Experience */}
+              <div className="w-full max-w-[290px] sm:max-w-[320px] bg-slate-950 rounded-[44px] p-3 border-4 border-slate-700 shadow-2xl shadow-purple-900/40 relative flex-shrink-0">
                 {/* Speaker Notch */}
                 <div className="w-24 h-4 bg-slate-800 rounded-full mx-auto mb-3" />
-                {/* Inner Phone Screen */}
+                
+                {/* Inner Android Screen */}
                 <div className="bg-slate-900 rounded-[32px] overflow-hidden border border-slate-800 p-4 space-y-3">
-                  <div className="flex items-center justify-between text-[11px] text-slate-400 border-b border-slate-800 pb-2">
-                    <span className="font-bold text-white">YOUR BRAND APP</span>
-                    <span className="text-emerald-400 font-mono">Live</span>
+                  {/* Android Status Bar */}
+                  <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono pb-1 border-b border-slate-800">
+                    <span>09:41</span>
+                    <span className="flex items-center gap-1">5G • 100%</span>
                   </div>
 
-                  {/* Banner */}
-                  <div className="rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 p-3 text-white">
-                    <span className="text-[10px] uppercase font-bold bg-white/20 px-1.5 py-0.5 rounded">Mega Sale</span>
-                    <p className="font-extrabold text-sm mt-1">Get 30% OFF On First Order</p>
+                  {/* Android Lock-Screen Style Push Notification Alert */}
+                  <div className="bg-purple-950/90 border border-purple-500/50 rounded-xl p-2.5 shadow-md flex items-start gap-2.5 animate-pulse">
+                    <div className="w-6 h-6 rounded-lg bg-purple-600 flex items-center justify-center flex-shrink-0 text-white">
+                      <Bell className="w-3.5 h-3.5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-purple-300">YOUR APP • PUSH ALERT</span>
+                        <span className="text-[9px] text-slate-400">now</span>
+                      </div>
+                      <p className="text-[11px] text-white font-medium mt-0.5 leading-tight">
+                        🔥 Flash Sale: 40% OFF all items! Tap to shop now.
+                      </p>
+                    </div>
                   </div>
 
-                  {/* Product Grid Mock */}
+                  {/* App Header Inside Phone */}
+                  <div className="flex items-center justify-between text-xs pt-1">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-6 h-6 rounded-lg bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center font-bold text-white text-[11px]">
+                        Y
+                      </div>
+                      <span className="font-extrabold text-white">Your Brand App</span>
+                    </div>
+                    <span className="text-[10px] bg-emerald-500/20 text-emerald-400 font-bold px-1.5 py-0.5 rounded">
+                      Android Native
+                    </span>
+                  </div>
+
+                  {/* In-App Promo Banner */}
+                  <div className="rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 p-3 text-white">
+                    <span className="text-[9px] uppercase font-black bg-white/20 px-1.5 py-0.5 rounded">Mega Sale</span>
+                    <p className="font-extrabold text-xs mt-1">Get 30% OFF On First App Order</p>
+                  </div>
+
+                  {/* Product Grid Mock Inside Phone */}
                   <div className="grid grid-cols-2 gap-2">
                     <div className="bg-slate-800/80 rounded-xl p-2 border border-slate-700/60">
-                      <div className="w-full h-16 bg-slate-700 rounded-lg flex items-center justify-center text-xs text-slate-400">
-                        👟 Photo
+                      <div className="w-full h-14 bg-slate-700 rounded-lg flex items-center justify-center text-xs text-slate-400">
+                        👟 Products
                       </div>
-                      <p className="text-[11px] font-bold text-white mt-1 truncate">Running Shoes</p>
+                      <p className="text-[10px] font-bold text-white mt-1 truncate">Running Shoes</p>
                       <p className="text-xs font-black text-amber-300">₹499</p>
                     </div>
 
                     <div className="bg-slate-800/80 rounded-xl p-2 border border-slate-700/60">
-                      <div className="w-full h-16 bg-slate-700 rounded-lg flex items-center justify-center text-xs text-slate-400">
-                        🎧 Photo
+                      <div className="w-full h-14 bg-slate-700 rounded-lg flex items-center justify-center text-xs text-slate-400">
+                        🎧 Gadgets
                       </div>
-                      <p className="text-[11px] font-bold text-white mt-1 truncate">Wireless Earbuds</p>
+                      <p className="text-[10px] font-bold text-white mt-1 truncate">Wireless Earbuds</p>
                       <p className="text-xs font-black text-amber-300">₹799</p>
                     </div>
                   </div>
 
-                  {/* Push notification banner */}
-                  <div className="bg-purple-950/80 border border-purple-600/40 rounded-xl p-2.5 flex items-center gap-2">
-                    <Bell className="w-4 h-4 text-purple-400 flex-shrink-0" />
-                    <p className="text-[10px] text-purple-200 leading-tight">
-                      <strong>Push Alert:</strong> Flash sale started! Tap to buy now.
-                    </p>
+                  {/* 1-Tap UPI In-App Button */}
+                  <div className="pt-1">
+                    <button className="w-full py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl text-xs font-extrabold shadow-md flex items-center justify-center gap-1.5">
+                      <CreditCard className="w-3.5 h-3.5" />
+                      1-Tap In-App UPI & COD
+                    </button>
                   </div>
 
-                  {/* CTA button inside phone */}
-                  <button className="w-full py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg text-xs font-bold shadow-md">
-                    1-Click Checkout (Razorpay & COD)
-                  </button>
+                  {/* Android Bottom Navigation Bar */}
+                  <div className="flex items-center justify-around pt-2 border-t border-slate-800 text-[9px] text-slate-400 font-semibold">
+                    <span className="text-purple-400 font-bold">● Home</span>
+                    <span>Categories</span>
+                    <span>Orders</span>
+                    <span>Account</span>
+                  </div>
                 </div>
               </div>
 
-              {/* Beside Phone: Desktop Storefront & Dashboard Preview */}
+              {/* Beside Phone: 100% Focused on Why Merchants Need Their Own Android App */}
               <div className="flex-1 space-y-6 text-left">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 text-blue-300 border border-blue-500/20 text-xs font-semibold">
-                  <Globe className="w-3.5 h-3.5" />
-                  Dual Engine: Android App + High-Speed Web Storefront
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/10 text-purple-300 border border-purple-500/20 text-xs font-semibold">
+                  <Smartphone className="w-3.5 h-3.5" />
+                  Your Own Android App • Permanent Customer Retention
                 </div>
 
                 <h3 className="text-2xl sm:text-3xl font-extrabold text-white leading-tight">
-                  One Unified Dashboard. Two Channels Generating Sales 24/7.
+                  Stop Relying on Browser Tabs. Put Your App on Every Customer’s Phone.
                 </h3>
 
                 <p className="text-sm text-slate-300 leading-relaxed">
-                  Every product, category, or banner you add in your dashboard automatically synchronizes across your <strong>Android Mobile App</strong> and your <strong>Web Storefront</strong> in real-time. No double entry.
+                  Websites get forgotten in open tabs and search results. With your <strong>official Android App</strong>, your brand logo sits permanently on your customer’s phone home screen. One tap opens your catalog, and push notifications drive repeat purchases on demand.
                 </p>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="p-4 rounded-xl bg-slate-800/60 border border-slate-700/80">
                     <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                      <Smartphone className="w-4 h-4 text-purple-400" />
-                      Branded Mobile App
+                      <Bell className="w-4 h-4 text-purple-400" />
+                      Free Lock-Screen Push
                     </h4>
                     <p className="text-xs text-slate-400 mt-1">
-                      Customers install your app once and purchase with 1 tap. Push notifications drive repeat orders without ad spend.
+                      85%+ open rates! Send flash sales, new stock alerts, and coupon codes directly to customer lock screens for ₹0 ad spend.
                     </p>
                   </div>
 
                   <div className="p-4 rounded-xl bg-slate-800/60 border border-slate-700/80">
                     <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                      <Store className="w-4 h-4 text-blue-400" />
-                      Web Storefront
+                      <Download className="w-4 h-4 text-emerald-400" />
+                      Signed APK in 24 Hours
                     </h4>
                     <p className="text-xs text-slate-400 mt-1">
-                      Works on mobile browsers and desktops. Connect your custom domain like <em>yourbrand.com</em> with free SSL.
+                      We compile and digitally sign your official Android APK. Ready for direct installation via WhatsApp or Google Play Store listing.
+                    </p>
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-slate-800/60 border border-slate-700/80">
+                    <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                      <Zap className="w-4 h-4 text-blue-400" />
+                      1-Click AI Catalog
+                    </h4>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Import all your products from Flipkart, Meesho, or Amazon into your Android app in 3 seconds. Zero manual entry.
+                    </p>
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-slate-800/60 border border-slate-700/80">
+                    <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                      <CreditCard className="w-4 h-4 text-amber-400" />
+                      0% Commission UPI & COD
+                    </h4>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Customers pay via Google Pay, PhonePe, Paytm, or COD. Payments go directly to your bank account with zero platform cut.
                     </p>
                   </div>
                 </div>
 
-                <div className="pt-2 flex items-center gap-4">
+                <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+                  <Link
+                    href="/app/register"
+                    className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-extrabold text-sm shadow-lg shadow-purple-600/30 transition-all hover:scale-105"
+                  >
+                    <Smartphone className="w-4 h-4" />
+                    <span>Get Your Own App Today</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </Link>
+
                   <Link
                     href="/app/demoapp"
-                    className="inline-flex items-center gap-2 text-sm font-bold text-purple-400 hover:text-purple-300 transition-colors"
+                    className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-sm transition-all"
                   >
-                    Open Live Interactive Demo <ArrowRight className="w-4 h-4" />
+                    <Play className="w-4 h-4 text-purple-400 fill-purple-400" />
+                    <span>Try Interactive App Demo</span>
                   </Link>
                 </div>
               </div>
@@ -357,7 +419,7 @@ export default function PlatformHomePage() {
             <span className="text-amber-300">Just ₹499 Today</span>
           </h2>
           <p className="text-sm sm:text-base text-slate-400 max-w-2xl mx-auto mt-3">
-            No developer salaries. No 30% commission cuts. One simple, transparent plan that empowers any Indian store to sell like a multi-crore D2C brand.
+            No expensive app agency fees (₹50,000+). No 25-30% marketplace commissions. One honest, all-inclusive plan that gives your business its own official Android application.
           </p>
 
           {/* Pricing Highlight Card */}
@@ -365,13 +427,13 @@ export default function PlatformHomePage() {
             {/* Corner Badge */}
             <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-black text-xs uppercase px-4 py-1 rounded-full shadow-lg tracking-wider flex items-center gap-1.5">
               <Star className="w-3.5 h-3.5 fill-slate-950" />
-              Most Popular • Starter Store Plan
+              Most Popular • Official Android App Plan
             </div>
 
             <div className="flex items-baseline justify-between flex-wrap gap-2 border-b border-slate-800 pb-6 mt-2">
               <div>
-                <h3 className="text-2xl font-black text-white">Starter Store & Android App</h3>
-                <p className="text-xs text-slate-400 mt-1">Everything you need to launch, sell, and scale online</p>
+                <h3 className="text-2xl font-black text-white">Official Branded Android App</h3>
+                <p className="text-xs text-slate-400 mt-1">Full production Android APK with your brand name, logo & catalog</p>
               </div>
               <div className="text-right">
                 <div className="flex items-baseline gap-1">
@@ -392,49 +454,56 @@ export default function PlatformHomePage() {
                 <div className="flex items-start gap-2.5">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
                   <span>
-                    <strong>Branded Android Mobile Application</strong> — Customized with your logo, colors, and signed APK bundle ready for customer installation & Play Store publishing.
+                    <strong>Branded Android Mobile Application</strong> — Customized with your brand name, logo, colors, and signed production APK ready for customer installation & Play Store publishing.
                   </span>
                 </div>
 
                 <div className="flex items-start gap-2.5">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
                   <span>
-                    <strong>High-Speed Web Storefront</strong> — Responsive online shop with your custom subdomain (e.g. <em>yourbrand.digitalgrowthstudio.in</em>) or your own custom domain.
+                    <strong>Unlimited Lock-Screen Push Notifications</strong> — Broadcast flash sales, price cuts, and new arrivals directly to customer lock screens with 85%+ open rates.
                   </span>
                 </div>
 
                 <div className="flex items-start gap-2.5">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
                   <span>
-                    <strong>AI 1-Click Product Importer</strong> — Copy-paste links from Amazon, Flipkart, Meesho, or Shopify to auto-create listings in 3 seconds.
+                    <strong>AI 1-Click Product Importer</strong> — Copy-paste links from Amazon, Flipkart, Meesho, or Shopify to auto-create listings in your app catalog in 3 seconds.
                   </span>
                 </div>
 
                 <div className="flex items-start gap-2.5">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
                   <span>
-                    <strong>AI Image Studio Photo Redesign</strong> — Convert phone photos into professional catalog photos with AI lighting.
+                    <strong>0% Platform Commission</strong> — All payments (Razorpay UPI, GPay, PhonePe, Cards, Netbanking & COD) settle directly into your bank account.
                   </span>
                 </div>
 
                 <div className="flex items-start gap-2.5">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
                   <span>
-                    <strong>0% Platform Commission</strong> — All payments (Razorpay UPI, Debit/Credit, Netbanking & COD) settle directly into your bank account.
+                    <strong>AI Image Studio Photo Redesign</strong> — Convert ordinary phone camera photos into commercial catalog product mockups with AI lighting.
                   </span>
                 </div>
 
                 <div className="flex items-start gap-2.5">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
                   <span>
-                    <strong>Automated Logistics & Hyperlocal</strong> — Integrated Shiprocket dispatch across 29,000+ Indian pincodes + local 45-minute radius delivery.
+                    <strong>Automated Logistics & Hyperlocal Delivery</strong> — Integrated Shiprocket dispatch across 29,000+ Indian pincodes + local 45-minute delivery radius.
                   </span>
                 </div>
 
                 <div className="flex items-start gap-2.5">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
                   <span>
-                    <strong>Automated WhatsApp & SMS Updates</strong> — Automated order confirmation, live courier tracking, and dispatch alerts.
+                    <strong>Automated WhatsApp & SMS Updates</strong> — Instant order confirmation, tracking links, and dispatch updates sent automatically to customers.
+                  </span>
+                </div>
+
+                <div className="flex items-start gap-2.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+                  <span>
+                    <strong>Live Vendor Management Portal</strong> — Easily manage catalog, banner sliders, inventory, and orders from your smartphone or computer.
                   </span>
                 </div>
 
@@ -442,13 +511,6 @@ export default function PlatformHomePage() {
                   <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
                   <span>
                     <strong>1,024 MB High-Speed Cloud CDN Storage</strong> — Fast-loading image hosting and asset management included free.
-                  </span>
-                </div>
-
-                <div className="flex items-start gap-2.5">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
-                  <span>
-                    <strong>Live Vendor Management Dashboard</strong> — Track sales, inventory, variants, customer records, and order fulfillment.
                   </span>
                 </div>
               </div>
@@ -459,12 +521,13 @@ export default function PlatformHomePage() {
               href="/app/register"
               className="w-full inline-flex items-center justify-center gap-2 py-4 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-black text-base shadow-lg shadow-purple-600/30 transition-all hover:scale-[1.02]"
             >
-              Start for ₹499 Today — Instant Activation
+              <Smartphone className="w-5 h-5" />
+              <span>Get Your Own App Today — Instant Setup</span>
               <ArrowRight className="w-5 h-5" />
             </Link>
 
             <p className="text-[11px] text-center text-slate-400 mt-3 font-medium">
-              🛡️ Secure online checkout via Razorpay • Setup ready in 24 hours
+              🛡️ Secure online checkout via Razorpay • Signed Android APK ready in 24 hours
             </p>
           </div>
         </div>
@@ -476,68 +539,68 @@ export default function PlatformHomePage() {
       <section id="features" className="py-24 bg-slate-900 border-t border-slate-800/80">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-2xl mx-auto mb-16">
-            <span className="text-xs uppercase font-extrabold tracking-wider text-purple-400">Complete Merchant Toolkit</span>
+            <span className="text-xs uppercase font-extrabold tracking-wider text-purple-400">Complete Android App Engine</span>
             <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight mt-2">
-              Everything Built Specifically for Indian Sellers
+              Everything Your Business Needs In An Android App
             </h2>
             <p className="text-sm text-slate-400 mt-2">
-              Designed to solve the real challenges Indian store owners face every day: customer retention, catalog creation, COD fraud, and logistics.
+              Designed to solve the real challenges Indian store owners face every day: customer retention, catalog creation, high commission fees, and fast delivery.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {/* Card 1 */}
-            <div id="android-app" className="p-6 rounded-2xl bg-slate-950/80 border border-slate-800 hover:border-purple-500/50 transition-all group shadow-sm">
+            <div className="p-6 rounded-2xl bg-slate-950/80 border border-slate-800 hover:border-purple-500/50 transition-all group shadow-sm">
               <div className="w-12 h-12 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 mb-4 group-hover:scale-110 transition-transform">
                 <Smartphone className="w-6 h-6" />
               </div>
               <h3 className="text-lg font-bold text-white">Your Branded Android Mobile App</h3>
               <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-                We generate a customized, production-signed Android APK bundle with your logo, colors, and catalog. Publish on Google Play or share direct download links with customers.
+                We generate a customized, production-signed Android APK bundle with your logo, colors, and catalog. Publish on Google Play or share direct download links with customers via WhatsApp.
               </p>
             </div>
 
             {/* Card 2 */}
+            <div className="p-6 rounded-2xl bg-slate-950/80 border border-slate-800 hover:border-purple-500/50 transition-all group shadow-sm">
+              <div className="w-12 h-12 rounded-xl bg-pink-500/10 border border-pink-500/20 flex items-center justify-center text-pink-400 mb-4 group-hover:scale-110 transition-transform">
+                <Bell className="w-6 h-6" />
+              </div>
+              <h3 className="text-lg font-bold text-white">Lock-Screen Push Notifications</h3>
+              <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+                Re-engage customers anytime without spending a single rupee on SMS or paid ads. Broadcast flash sale alerts, coupon codes, and restock notifications with 85%+ open rates.
+              </p>
+            </div>
+
+            {/* Card 3 */}
             <div id="ai-importer" className="p-6 rounded-2xl bg-slate-950/80 border border-slate-800 hover:border-purple-500/50 transition-all group shadow-sm">
               <div className="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 mb-4 group-hover:scale-110 transition-transform">
                 <Zap className="w-6 h-6" />
               </div>
               <h3 className="text-lg font-bold text-white">AI 1-Click Product Importer</h3>
               <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-                Save dozens of hours typing listings. Paste any product link from Flipkart, Meesho, Amazon, or Shopify, and Gemini AI extracts photos, variants, sizes, colors, and prices in seconds.
+                Save dozens of hours typing listings. Paste any product link from Flipkart, Meesho, Amazon, or Shopify, and Gemini AI extracts photos, variants, sizes, colors, and prices into your app in seconds.
               </p>
             </div>
 
-            {/* Card 3 */}
+            {/* Card 4 */}
             <div className="p-6 rounded-2xl bg-slate-950/80 border border-slate-800 hover:border-purple-500/50 transition-all group shadow-sm">
               <div className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mb-4 group-hover:scale-110 transition-transform">
                 <CreditCard className="w-6 h-6" />
               </div>
               <h3 className="text-lg font-bold text-white">Direct Razorpay UPI & COD (0% Fee)</h3>
               <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-                Connect your own Razorpay credentials so payments go directly to your bank account with zero intermediate delays. We take 0% cut on your revenue.
+                Connect your own Razorpay credentials so customer payments via Google Pay, PhonePe, Paytm, and COD go directly to your bank account. We take 0% cut on your revenue.
               </p>
             </div>
 
-            {/* Card 4 */}
+            {/* Card 5 */}
             <div className="p-6 rounded-2xl bg-slate-950/80 border border-slate-800 hover:border-purple-500/50 transition-all group shadow-sm">
               <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mb-4 group-hover:scale-110 transition-transform">
                 <Truck className="w-6 h-6" />
               </div>
               <h3 className="text-lg font-bold text-white">Shiprocket & Hyperlocal Delivery</h3>
               <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-                Automated courier generation across 29,000+ Indian pincodes. Deliver groceries or local essentials within a 10 km radius in 45 minutes using custom hyperlocal fee slabs.
-              </p>
-            </div>
-
-            {/* Card 5 */}
-            <div className="p-6 rounded-2xl bg-slate-950/80 border border-slate-800 hover:border-purple-500/50 transition-all group shadow-sm">
-              <div className="w-12 h-12 rounded-xl bg-pink-500/10 border border-pink-500/20 flex items-center justify-center text-pink-400 mb-4 group-hover:scale-110 transition-transform">
-                <Bell className="w-6 h-6" />
-              </div>
-              <h3 className="text-lg font-bold text-white">Automated SMS & WhatsApp Alerts</h3>
-              <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-                Build customer trust with instant order confirmations and dispatched tracking links sent via Fast2SMS and WhatsApp without manual typing.
+                Automated courier generation across 29,000+ Indian pincodes. Deliver local groceries or daily essentials within a 10 km radius in 45 minutes using custom hyperlocal delivery fees.
               </p>
             </div>
 
@@ -566,16 +629,16 @@ export default function PlatformHomePage() {
               From Zero to Live Android App in 3 Steps
             </h2>
             <p className="text-sm text-slate-400 mt-2">
-              You don’t need an engineering team or technical skills. We handle the compilation, servers, and database.
+              You don’t need an engineering team or technical skills. We handle the compilation, code generation, and backend servers.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 relative">
               <div className="text-4xl font-black text-purple-500/30 mb-3 font-mono">01</div>
-              <h3 className="text-base font-bold text-white">Register & Brand Your App</h3>
+              <h3 className="text-base font-bold text-white">Brand Your Android App</h3>
               <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-                Choose your brand name, upload your store logo, and customize your primary app colors in 2 minutes.
+                Pick your app name, upload your brand logo, and customize your primary theme colors in 2 minutes.
               </p>
             </div>
 
@@ -583,15 +646,15 @@ export default function PlatformHomePage() {
               <div className="text-4xl font-black text-indigo-500/30 mb-3 font-mono">02</div>
               <h3 className="text-base font-bold text-white">Add Products with 1-Click AI</h3>
               <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-                Paste existing links from Meesho, Flipkart, or Amazon to import all your photos, sizes, and variants instantly.
+                Paste existing links from Meesho, Flipkart, or Amazon to import all your photos, sizes, and variants instantly into your app.
               </p>
             </div>
 
             <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 relative">
               <div className="text-4xl font-black text-amber-500/30 mb-3 font-mono">03</div>
-              <h3 className="text-base font-bold text-white">Get Your APK & Start Selling</h3>
+              <h3 className="text-base font-bold text-white">Get Your Signed APK & Start Selling</h3>
               <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-                Download your official signed Android APK within 24 hours, publish to the Google Play Store, and collect orders.
+                Download your official signed Android APK within 24 hours, publish to the Google Play Store or share via WhatsApp, and collect orders.
               </p>
             </div>
           </div>
@@ -614,7 +677,7 @@ export default function PlatformHomePage() {
             {[
               {
                 q: "Is the Branded Android App really included for just ₹499/month?",
-                a: "Yes! For just ₹499/month, you receive your own official, customized Android Mobile Application (signed APK bundle) with your brand name, logo, colors, and live product catalog, alongside your web storefront.",
+                a: "Yes! For just ₹499/month, you receive your own official, customized Android Mobile Application (signed APK bundle) with your brand name, logo, colors, and live product catalog, alongside a vendor companion dashboard.",
               },
               {
                 q: "Do I need coding or technical knowledge to manage my app?",
@@ -622,15 +685,19 @@ export default function PlatformHomePage() {
               },
               {
                 q: "Can I publish my app to the Google Play Store?",
-                a: "Absolutely! We provide the production-ready Android package. You can publish it under your own Google Play Developer Console, or request our team to publish and maintain it for you.",
+                a: "Absolutely! We provide the production-ready signed Android package. You can publish it under your own Google Play Developer Console, or request our team to guide and assist you with publishing.",
               },
               {
-                q: "Do you take any commission on my sales?",
-                a: "0% Commission! Unlike food delivery apps or big marketplaces that take 15%–30% cuts, you keep 100% of your earnings. Payments via UPI, Cards, and COD go straight to your bank account.",
+                q: "How do Push Notifications help my business?",
+                a: "App push notifications appear directly on your customers' phone lock screens. With 85%+ open rates, they allow you to announce flash sales, discounts, and new arrivals instantly without paying for costly SMS campaigns or running paid ads.",
               },
               {
-                q: "Can I use my own custom domain (e.g. mystore.com)?",
-                a: "Yes! You can connect any existing custom domain with 1-click automatic SSL certificate configuration in your dashboard.",
+                q: "Do you take any commission on my app sales?",
+                a: "0% Commission! Unlike marketplaces or aggregators that take 15%–30% cuts, you keep 100% of your earnings. Payments via UPI, Cards, and COD go straight to your bank account.",
+              },
+              {
+                q: "How fast do I get my Android APK after registering?",
+                a: "Your account is activated instantly upon registration, and your production-signed Android APK bundle is generated and delivered to your dashboard within 24 hours.",
               },
             ].map((faq, idx) => (
               <div
@@ -669,30 +736,32 @@ export default function PlatformHomePage() {
           </div>
 
           <h2 className="text-3xl sm:text-5xl font-black text-white tracking-tight">
-            Put Your Brand on Your Customers’ Phones Today.
+            Put Your Brand App on Every Customer’s Phone Today.
           </h2>
           <p className="text-sm sm:text-base text-slate-300 max-w-xl mx-auto mt-4 leading-relaxed">
-            Stop losing customers to marketplaces. Build real brand equity with your own official Android application and online store.
+            Stop losing customers to marketplaces and browser tabs. Build lasting brand loyalty with your own official Android application starting at just ₹499 today.
           </p>
 
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link
               href="/app/register"
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-4 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-black text-base shadow-2xl shadow-purple-600/40 transition-all hover:scale-105"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-8 py-4 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-black text-base shadow-2xl shadow-purple-600/40 transition-all hover:scale-105"
             >
-              Start With Your Android App for ₹499
+              <Smartphone className="w-5 h-5" />
+              <span>Get Your Own App Today</span>
               <ArrowRight className="w-5 h-5" />
             </Link>
             <Link
               href="/app/demoapp"
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-base transition-all"
             >
-              Test Live App Demo
+              <Play className="w-4 h-4 text-purple-400 fill-purple-400" />
+              <span>Test Live App Demo</span>
             </Link>
           </div>
 
           <p className="text-xs text-slate-400 mt-4">
-            ✓ Instant Activation • ✓ Cancel Anytime • ✓ 24-Hour Delivery
+            ✓ Instant Activation • ✓ Cancel Anytime • ✓ 24-Hour APK Delivery • ✓ 0% Commission
           </p>
         </div>
       </section>
@@ -714,7 +783,7 @@ export default function PlatformHomePage() {
             <Link href="/terms" className="hover:text-white transition-colors">Terms of Service</Link>
             <Link href="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>
             <Link href="/app/login" className="hover:text-white transition-colors">Merchant Login</Link>
-            <Link href="/app/register" className="hover:text-amber-300 font-bold transition-colors">Get Started (₹499)</Link>
+            <Link href="/app/register" className="hover:text-amber-300 font-bold transition-colors">Get Your Own App Today (₹499)</Link>
           </div>
         </div>
       </footer>

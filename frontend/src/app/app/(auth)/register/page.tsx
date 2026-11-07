@@ -25,6 +25,7 @@ import {
   ChevronDown,
   X,
   Upload,
+  Smartphone,
 } from "lucide-react";
 
 const COUNTRY_CODES = [
@@ -295,18 +296,18 @@ export default function PlatformRegisterPage() {
     <div className="flex-1 min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-50 py-10 px-4 sm:px-6 lg:px-8">
       {/* Top Header */}
       <div className="sm:mx-auto sm:w-full sm:max-w-2xl text-center">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 border border-blue-200/80 text-blue-700 text-xs font-semibold shadow-2xs mb-4">
-          <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-          <span>Launch Your Online Business</span>
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-50 border border-purple-200/80 text-purple-700 text-xs font-semibold shadow-2xs mb-4">
+          <Smartphone className="w-3.5 h-3.5 text-purple-600" />
+          <span>Get Your Official Android App • ₹499 Launch Offer</span>
         </div>
 
         <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-slate-900">
-          Launch Your Branded Store & App
+          Get Your Own Branded Android App
         </h1>
         <p className="mt-2 text-xs sm:text-sm text-slate-600 max-w-md mx-auto leading-relaxed">
           {stage === "signup"
-            ? "Create your account to start provisioning your storefront and mobile shopping app."
-            : "Complete your store setup in 2 simple steps to generate your live portal."}
+            ? "Create your account to start provisioning your official branded Android mobile app."
+            : "Complete your app setup in 2 simple steps to generate your signed Android APK."}
         </p>
 
         {/* Modern Interactive Stepper Bar (Only for Step 1 & Step 2) */}
@@ -985,7 +986,7 @@ export default function PlatformRegisterPage() {
                     <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   ) : (
                     <>
-                      <span>Register & Launch My App 🚀</span>
+                      <span>Get My Branded Android App 🚀</span>
                       <ArrowRight className="w-4 h-4" />
                     </>
                   )}

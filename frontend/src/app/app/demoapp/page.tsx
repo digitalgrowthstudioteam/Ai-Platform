@@ -290,8 +290,8 @@ export default function DemoAppLandingPage() {
               href="/app/register"
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-2xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 hover:border-slate-600 font-bold text-sm transition-all"
             >
-              <Store className="w-4 h-4 text-purple-400" />
-              <span>Register as a Vendor</span>
+              <Smartphone className="w-4 h-4 text-purple-400" />
+              <span>Get Your Own App</span>
             </Link>
           </div>
 
@@ -766,8 +766,8 @@ export default function DemoAppLandingPage() {
               href="/app/register"
               className="w-full sm:w-auto inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-gradient-to-r from-purple-500 via-indigo-600 to-purple-600 hover:from-purple-400 hover:to-indigo-500 text-white font-black text-sm sm:text-base shadow-2xl shadow-purple-600/50 hover:scale-105 transition-all"
             >
-              <Store className="w-5 h-5" />
-              <span>Create Your Vendor Account Today</span>
+              <Smartphone className="w-5 h-5" />
+              <span>Get Your Own App Today</span>
               <ArrowRight className="w-4 h-4" />
             </Link>
             <Link
@@ -807,7 +807,7 @@ export default function DemoAppLandingPage() {
           </div>
           <div className="flex items-center gap-6">
             <Link href="/app/register" className="hover:text-purple-400 transition-colors">
-              Vendor Register
+              Get Your Own App
             </Link>
             <Link href="/app/login" className="hover:text-purple-400 transition-colors">
               Vendor Login
