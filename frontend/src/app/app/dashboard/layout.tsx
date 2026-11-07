@@ -68,7 +68,7 @@ export default function VendorDashboardLayout({ children }: { children: React.Re
         }`}
       >
         <VendorSidebar />
-        <div className="flex-1 p-4 sm:p-6 md:p-8 max-w-7xl mx-auto w-full overflow-y-auto">
+        <div className="flex-1 p-4 sm:p-6 lg:p-8 w-full overflow-y-auto">
           {/* Mobile Navigation Quick Bar */}
           <div className="md:hidden mb-4 flex items-center justify-between p-3 rounded-2xl bg-white border border-slate-200 shadow-2xs">
             <div className="flex items-center gap-2 min-w-0">

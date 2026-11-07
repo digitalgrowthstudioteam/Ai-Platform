@@ -221,7 +221,7 @@ export default function BuyAiCreditsModal({
                     </div>
 
                     <p className="mt-2 text-[11px] text-slate-500">
-                      Only ₹{perCreditPrice} per 1-click import
+                      Only ₹{perCreditPrice} per credit
                     </p>
                   </div>
 

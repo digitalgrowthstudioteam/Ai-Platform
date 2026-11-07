@@ -87,7 +87,7 @@ export default function VendorShippingSettingsPage() {
   const isShiprocketAllowed = Boolean(store?.shiprocket_enabled);
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6 w-full">
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-slate-900">Shipping & Delivery Settings</h1>
         <p className="text-sm text-slate-500">

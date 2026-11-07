@@ -45,3 +45,4 @@ async def update_costs():
 
 if __name__ == "__main__":
     asyncio.run(update_costs())
+

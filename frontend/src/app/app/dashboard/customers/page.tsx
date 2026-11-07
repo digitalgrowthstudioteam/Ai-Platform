@@ -24,7 +24,7 @@ export default function VendorCustomersPage() {
   }, []);
 
   return (
-    <div className="space-y-6 max-w-5xl">
+    <div className="space-y-6 w-full">
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-slate-900">Customer Directory</h1>
         <p className="text-sm text-slate-500">View shoppers who have purchased from your online store or Android mobile application</p>

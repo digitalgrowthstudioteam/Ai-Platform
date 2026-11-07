@@ -261,7 +261,7 @@ export default function CustomDomainTab({
   const finalPrice = appliedCoupon ? appliedCoupon.final_price_inr : originalPrice;
 
   return (
-    <div className="space-y-6 max-w-5xl">
+    <div className="space-y-6 w-full">
       {/* Alert Banner */}
       {message && (
         <div
