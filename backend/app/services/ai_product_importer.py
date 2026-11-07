@@ -327,34 +327,119 @@ async def _scrape_flipkart_specialized(soup: BeautifulSoup, html: str, url: str)
     specifications = {}
     colors = []
     sizes = []
+    variants = []
+
+    # 0. Direct Flipkart __INITIAL_STATE__ Deep Extraction (extracts master images, swatches, capacities, and exact pricing)
+    m_init = re.search(r'window\.__INITIAL_STATE__\s*=\s*(\{.*?\});\s*</script>', html, re.DOTALL)
+    if m_init:
+        try:
+            state = json.loads(m_init.group(1))
+            mws = state.get("multiWidgetState", {})
+            slots = mws.get("widgetsData", {}).get("slots", [])
+            for slot in slots:
+                dls = slot.get("slotData", {}).get("widget", {}).get("data", {}).get("dlsData", {})
+                if not dls:
+                    continue
+
+                # Master uncompressed images from multimedia view
+                for k, v in dls.items():
+                    if "multimedia" in k.lower():
+                        val_list = v.get("value") if isinstance(v, dict) else None
+                        if isinstance(val_list, list):
+                            for it in val_list:
+                                dyn_u = it.get("value", {}).get("multiMediaItem_0", {}).get("dynamicImageUrl")
+                                if dyn_u:
+                                    hires = dyn_u.replace("{@width}", "1500").replace("{@height}", "1500").replace("{@quality}", "90")
+                                    hires = hires.replace("http://", "https://")
+                                    if hires not in images:
+                                        images.append(hires)
+
+                    # Colors from variant-selector-image-view
+                    if "variant-selector-image" in k.lower():
+                        h_list = v.get("value", {}).get("horizontalListData_0", {}).get("value", [])
+                        for it in h_list:
+                            c_t = it.get("value", {}).get("trackerData_0", {}).get("tracking", {}).get("contentTitle")
+                            if c_t and c_t not in colors:
+                                colors.append(c_t)
+
+                    # Variants & prices from variant-selector-details-view (e.g. Non-WiFi 6.5kg, 7kg)
+                    if "variant-selector-details" in k.lower():
+                        s_list = v.get("value", {}).get("scrollToListData_0", {}).get("value", [])
+                        for it in s_list:
+                            val = it.get("value", {})
+                            v_n = val.get("label_0", {}).get("value", {}).get("text")
+                            p_t = val.get("label_3", {}).get("value", {}).get("text")
+                            p_v = None
+                            if p_t:
+                                pm = re.search(r"[\d,]+(?:\.\d+)?", p_t)
+                                if pm:
+                                    try:
+                                        p_v = float(pm.group(0).replace(",", ""))
+                                    except Exception:
+                                        pass
+                            if v_n and v_n not in [x.get("name") for x in variants]:
+                                variants.append({
+                                    "name": v_n,
+                                    "sku_suffix": re.sub(r'[^a-zA-Z0-9]', '', v_n)[:6].upper() or "VAR",
+                                    "price": p_v,
+                                    "stock": 50
+                                })
+
+                    # Price from price description
+                    if "price_description" in k.lower():
+                        for sub_k, sub_v in v.get("value", {}).items():
+                            if isinstance(sub_v, dict):
+                                raw_t = sub_v.get("value", {}).get("text") or sub_v.get("value", {}).get("UNLOCKED", {}).get("value", {}).get("text")
+                                if raw_t and "₹" in raw_t:
+                                    pm = re.search(r"[\d,]+(?:\.\d+)?", raw_t)
+                                    if pm:
+                                        try:
+                                            cand = float(pm.group(0).replace(",", ""))
+                                            if price == 0.0 and 10 < cand < 10000000:
+                                                price = cand
+                                            elif cand > price and mrp == 0.0:
+                                                mrp = cand
+                                        except Exception:
+                                            pass
+
+                    # Highlights
+                    if "highlight" in k.lower():
+                        for it in v.get("value", {}).get("data", []):
+                            t = it.get("value", {}).get("text")
+                            if t and t not in features:
+                                features.append(t)
+        except Exception as e:
+            logger.debug("flipkart_initial_state_parse_failed", error=str(e))
 
     # 1. Extract from Flipkart's JSON-LD Product Schema FIRST (contains un-truncated official title)
     json_ld_items = _extract_json_ld(soup)
     product_ld = _find_product_in_json_ld(json_ld_items)
     if product_ld:
-        title = (product_ld.get("name") or "").strip()
+        if not title:
+            title = (product_ld.get("name") or "").strip()
         
         raw_images = product_ld.get("image", [])
         if isinstance(raw_images, list):
             for img in raw_images:
-                if isinstance(img, str) and img.startswith("http"):
+                if isinstance(img, str) and img.startswith("http") and img not in images:
                     images.append(img)
-                elif isinstance(img, dict) and img.get("url"):
+                elif isinstance(img, dict) and img.get("url") and img["url"] not in images:
                     images.append(img["url"])
-        elif isinstance(raw_images, str) and raw_images.startswith("http"):
+        elif isinstance(raw_images, str) and raw_images.startswith("http") and raw_images not in images:
             images.append(raw_images)
 
         offers = product_ld.get("offers")
-        if isinstance(offers, dict):
-            try:
-                price = float(offers.get("price") or 0.0)
-            except Exception:
-                pass
-        elif isinstance(offers, list) and len(offers) > 0:
-            try:
-                price = float(offers[0].get("price") or 0.0)
-            except Exception:
-                pass
+        if price == 0.0:
+            if isinstance(offers, dict):
+                try:
+                    price = float(offers.get("price") or 0.0)
+                except Exception:
+                    pass
+            elif isinstance(offers, list) and len(offers) > 0:
+                try:
+                    price = float(offers[0].get("price") or 0.0)
+                except Exception:
+                    pass
 
         raw_brand = product_ld.get("brand")
         if isinstance(raw_brand, dict):
@@ -371,6 +456,19 @@ async def _scrape_flipkart_specialized(soup: BeautifulSoup, html: str, url: str)
         if desc:
             description = desc
             mrp_m = re.search(r"Rs\.?\s*([\d,]+(?:\.\d+)?)", desc)
+            if mrp_m:
+                try:
+                    parsed_m = float(mrp_m.group(1).replace(",", ""))
+                    if parsed_m > price and mrp == 0.0:
+                        mrp = parsed_m
+                except Exception:
+                    pass
+
+    # Extract MRP from meta description if missing
+    if mrp == 0.0:
+        desc_meta = soup.find("meta", attrs={"name": re.compile(r"description", re.I)})
+        if desc_meta and desc_meta.get("content"):
+            mrp_m = re.search(r"Rs\.?\s*([\d,]+(?:\.\d+)?)", desc_meta["content"])
             if mrp_m:
                 try:
                     parsed_m = float(mrp_m.group(1).replace(",", ""))
@@ -397,7 +495,6 @@ async def _scrape_flipkart_specialized(soup: BeautifulSoup, html: str, url: str)
         title = ""
 
     # 3. Truncated URL / Blocked page recovery via Search Catalog
-    # If title, price, or images are missing, extract directly from Flipkart Search (never blocked by datacenter IP filters)
     if (not title or price == 0.0 or not images) and "flipkart.com" in url.lower():
         search_data = await _scrape_flipkart_from_search(url)
         if search_data and (search_data.get("title") or search_data.get("price", 0) > 0):
@@ -409,29 +506,30 @@ async def _scrape_flipkart_specialized(soup: BeautifulSoup, html: str, url: str)
         if slug_m:
             title = slug_m.group(1).replace("-", " ").title()
 
-    # 5. Extract Swatches, Colors, Sizes & Highlights
-    swatch_elements = soup.find_all(class_=re.compile(r"_1psv1zeb9"))
-    swatch_texts = [el.get_text(strip=True) for el in swatch_elements]
+    # 5. Extract Swatches, Colors, Sizes & Highlights from DOM if missing
+    if not colors or not sizes:
+        swatch_elements = soup.find_all(class_=re.compile(r"_1psv1zeb9"))
+        swatch_texts = [el.get_text(strip=True) for el in swatch_elements]
 
-    in_highlights = False
-    for st in swatch_texts:
-        if st.startswith("Selected Color:"):
-            c = st.replace("Selected Color:", "").strip()
-            if c and c not in colors:
-                colors.append(c)
-        elif st.startswith("Variant:"):
-            v = st.replace("Variant:", "").strip()
-            clean_v = re.sub(r"[↓↑]?\d+%[\d,]+.*$", "", v).strip()
-            if clean_v and clean_v not in sizes:
-                sizes.append(clean_v)
-        elif "product highlights" in st.lower():
-            in_highlights = True
-            continue
-        elif in_highlights:
-            if any(term in st.lower() for term in ["buy with", "similar products", "specifications", "ratings", "reviews", "top discount"]):
-                in_highlights = False
-            elif 5 < len(st) < 80 and st not in features:
-                features.append(st)
+        in_highlights = False
+        for st in swatch_texts:
+            if st.startswith("Selected Color:"):
+                c = st.replace("Selected Color:", "").strip()
+                if c and c not in colors:
+                    colors.append(c)
+            elif st.startswith("Variant:"):
+                v = st.replace("Variant:", "").strip()
+                clean_v = re.sub(r"[↓↑]?\d+%[\d,]+.*$", "", v).strip()
+                if clean_v and clean_v not in sizes:
+                    sizes.append(clean_v)
+            elif "product highlights" in st.lower():
+                in_highlights = True
+                continue
+            elif in_highlights:
+                if any(term in st.lower() for term in ["buy with", "similar products", "specifications", "ratings", "reviews", "top discount"]):
+                    in_highlights = False
+                elif 5 < len(st) < 80 and st not in features:
+                    features.append(st)
 
     # 6. Fallback image extraction from thumbnails upscaling
     if not images:
@@ -442,18 +540,30 @@ async def _scrape_flipkart_specialized(soup: BeautifulSoup, html: str, url: str)
                 if hires not in images:
                     images.append(hires)
 
+    # Calculate price_diff for variants relative to main selling price
+    formatted_variants = []
+    for v in variants:
+        v_price = v.get("price")
+        diff = round(v_price - price, 2) if (v_price and price > 0) else 0.0
+        formatted_variants.append({
+            "name": v["name"],
+            "sku_suffix": v["sku_suffix"],
+            "price_diff": diff,
+            "stock": v.get("stock", 50)
+        })
+
     return {
         "title": title,
         "description": description,
         "price": price,
         "mrp": mrp if mrp > price else (round(price * 1.5, 2) if price > 0 else 0.0),
         "brand": brand,
-        "images": images[:10],
+        "images": images[:12],
         "features": features[:10],
         "specifications": specifications,
         "colors": colors[:10],
         "sizes": sizes[:15],
-        "variants": [],
+        "variants": formatted_variants,
     }
 
 
@@ -494,7 +604,10 @@ async def _scrape_meesho_specialized(url: str) -> Dict[str, Any]:
                     for p in data.get("products", []):
                         p_title = p.get("title", "").lower()
                         p_handle = p.get("handle", "").lower()
-                        if model.lower() in p_title or model.lower() in p_handle or brand.lower() in p_title:
+                        # Strictly match model or distinct product identifiers, NOT just the brand name!
+                        matches_model = bool(model and (model.lower() in p_title or model.lower() in p_handle))
+                        matches_words = len(words) >= 3 and words[1].lower() in p_title and words[2].lower() in p_title
+                        if matches_model or matches_words:
                             logger.info("meesho_recovered_from_brand_store", brand=brand, domain=domain, title=p.get("title"))
                             title = p.get("title") or title
                             images = [img.get("src") for img in p.get("images", []) if img.get("src") and img.get("src").startswith("http")]
@@ -516,25 +629,51 @@ async def _scrape_meesho_specialized(url: str) -> Dict[str, Any]:
         except Exception as e:
             logger.debug("brand_store_lookup_failed", domain=domain, error=str(e))
 
-    # Strategy 2: If no images yet, query Flipkart search for the branded item to get authentic studio photos
+    # Strategy 2: If no images yet, query Flipkart catalog for authentic product master photos
     if not images:
         try:
-            search_q = f"{brand} {model}".strip()
+            search_q = f"{brand} {model} {' '.join(words[2:4])}".strip()
             fk_search_url = f"https://www.flipkart.com/search?q={search_q.replace(' ', '+')}"
             headers = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
                 "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             }
-            async with httpx.AsyncClient(timeout=8.0, headers=headers) as client:
+            async with httpx.AsyncClient(timeout=10.0, headers=headers) as client:
                 r_fk = await client.get(fk_search_url)
-                fk_imgs = re.findall(r'https://rukmini\d*\.flixcart\.com/image/\d+/\d+/([a-zA-Z0-9/._-]+)', r_fk.text)
-                for ip in fk_imgs:
-                    if not any(skip in ip.lower() for skip in ["placeholder", "logo", "icon", "banner", "fk-p"]):
-                        hires = f"https://rukmini1.flixcart.com/image/1500/1500/{ip}"
-                        if hires not in images:
-                            images.append(hires)
-                    if len(images) >= 8:
-                        break
+                m = re.search(r'window\.__INITIAL_STATE__\s*=\s*(\{.*?\});\s*</script>', r_fk.text, re.DOTALL)
+                if m:
+                    data = json.loads(m.group(1))
+                    page_data = data.get("pageDataV4", {}).get("page", {}).get("data", {})
+                    prods = []
+                    for slot in page_data.values():
+                        if isinstance(slot, list):
+                            for it in slot:
+                                if isinstance(it, dict):
+                                    for p in it.get("widget", {}).get("data", {}).get("products", []):
+                                        val = p.get("productInfo", {}).get("value", {})
+                                        if val:
+                                            prods.append(val)
+                    best_p = None
+                    for p in prods:
+                        p_t = (p.get("titles", {}).get("title", "") + " " + (p.get("titles", {}).get("subtitle") or "")).lower()
+                        if brand.lower() in p_t and (model.lower() in p_t or any(kw in p_t for kw in ["earbud", "headphone", "audio", "wireless"])):
+                            best_p = p
+                            break
+                    if not best_p and prods:
+                        best_p = prods[0]
+                    if best_p:
+                        for img in best_p.get("media", {}).get("images", []):
+                            u = img.get("url", "")
+                            if u:
+                                hires = u.replace("{@width}", "1500").replace("{@height}", "1500").replace("{@quality}", "90")
+                                hires = hires.replace("http://", "https://")
+                                if hires not in images and not any(skip in hires.lower() for skip in ["placeholder", "logo", "icon", "banner", "poster"]):
+                                    images.append(hires)
+                        for pr in best_p.get("pricing", {}).get("prices", []):
+                            if pr.get("strikeOff"):
+                                mrp = float(pr.get("value", mrp))
+                            else:
+                                price = float(pr.get("value", price))
         except Exception as e:
             logger.debug("meesho_flipkart_cross_search_failed", error=str(e))
 
@@ -1144,6 +1283,7 @@ async def enhance_product_with_gemini(raw_data: Dict[str, Any]) -> Dict[str, Any
             "You are an expert e-commerce catalog specialist for direct-to-consumer online brands.\n"
             "Format raw scraped product data into a clean, compelling product listing.\n"
             "Remove ALL marketplace branding ('Amazon', 'Flipkart', 'Meesho', etc.).\n"
+            "In description_html, use ONLY clean semantic HTML (<p>, <h4>, <ul><li>, <table>). NEVER include inline style attributes (style='...'), script tags, or iframe tags.\n"
             "Generate concise catchy title and clean category.\n"
             "Return valid JSON only."
         )

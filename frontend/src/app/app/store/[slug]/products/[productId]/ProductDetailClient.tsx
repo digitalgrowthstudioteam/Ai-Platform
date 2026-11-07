@@ -594,7 +594,7 @@ export default function ProductDetailClient() {
                 {/<[a-z][\s\S]*>/i.test(product.description) ? (
                   <div
                     className="text-xs text-slate-700 leading-relaxed space-y-2 [&_p]:mb-2 [&_h4]:font-bold [&_h4]:text-slate-900 [&_h4]:mt-3 [&_h4]:mb-1.5 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:space-y-1 [&_li]:text-slate-600 [&_table]:w-full [&_table]:border-collapse [&_table]:my-2.5 [&_table]:text-xs [&_td]:p-2 [&_td]:border [&_td]:border-slate-200 [&_th]:p-2 [&_th]:border [&_th]:border-slate-200 [&_strong]:text-slate-900"
-                    dangerouslySetInnerHTML={{ __html: product.description }}
+                    dangerouslySetInnerHTML={{ __html: product.description.replace(/style=(["']).*?\1/gi, "") }}
                   />
                 ) : (
                   <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-line">

@@ -1296,17 +1296,23 @@ async def create_vendor_product(
     prod_slug = slugify(payload.name)
 
     # Verify category belongs to vendor if provided
+    cat_id = None
     if payload.category_id:
-        c_stmt = select(PlatformCategory).where(PlatformCategory.id == payload.category_id, PlatformCategory.vendor_id == vid)
-        if not (await db.execute(c_stmt)).scalar_one_or_none():
-            raise HTTPException(status_code=400, detail="Invalid category ID")
+        try:
+            cat_id = uuid.UUID(str(payload.category_id))
+        except (ValueError, TypeError):
+            cat_id = None
+        if cat_id:
+            c_stmt = select(PlatformCategory).where(PlatformCategory.id == cat_id, PlatformCategory.vendor_id == vid)
+            if not (await db.execute(c_stmt)).scalar_one_or_none():
+                cat_id = None
 
     has_variants = bool(payload.variants and len(payload.variants) > 0)
     stock_qty = sum(v.stock_quantity for v in payload.variants) if has_variants else payload.stock_quantity
 
     product = PlatformProduct(
         vendor_id=vid,
-        category_id=payload.category_id,
+        category_id=cat_id,
         name=payload.name.strip(),
         slug=prod_slug,
         description=payload.description,
@@ -1403,16 +1409,27 @@ async def create_vendor_product(
 
 @router.put("/products/{product_id}", response_model=ProductResponse)
 async def update_vendor_product(
-    product_id: uuid.UUID,
+    product_id: str,
     payload: ProductUpdatePayload,
     current: CurrentVendor = Depends(require_vendor_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """Update product information."""
+    """Update product information by UUID or slug."""
     vid = current.vendor.id
+    target_uuid = None
+    try:
+        target_uuid = uuid.UUID(product_id)
+    except (ValueError, AttributeError):
+        pass
+
     stmt = (
         select(PlatformProduct)
-        .where(PlatformProduct.id == product_id, PlatformProduct.vendor_id == vid)
+        .where(
+            PlatformProduct.vendor_id == vid,
+            or_(PlatformProduct.id == target_uuid, PlatformProduct.slug == product_id)
+            if target_uuid
+            else PlatformProduct.slug == product_id,
+        )
         .options(
             selectinload(PlatformProduct.category),
             selectinload(PlatformProduct.images),
@@ -1428,9 +1445,26 @@ async def update_vendor_product(
     variants_payload = data.pop("variants", None)
     has_variants_payload = data.pop("has_variants", None)
 
+    if "category_id" in data:
+        raw_cid = data.pop("category_id")
+        cat_id = None
+        if raw_cid:
+            try:
+                cat_id = uuid.UUID(str(raw_cid))
+            except (ValueError, TypeError):
+                cat_id = None
+            if cat_id:
+                c_stmt = select(PlatformCategory).where(PlatformCategory.id == cat_id, PlatformCategory.vendor_id == vid)
+                if not (await db.execute(c_stmt)).scalar_one_or_none():
+                    cat_id = None
+        product.category_id = cat_id
+
     for field, value in data.items():
         if field == "name" and value:
-            product.slug = slugify(value)
+            # Preserve existing slug if already present and name unchanged, or append unique salt if slugify is needed
+            if not product.slug or slugify(product.name or "") != slugify(value):
+                base_slug = slugify(value)[:50]
+                product.slug = f"{base_slug}-{product.id.hex[:6]}"
         setattr(product, field, value)
 
     if image_urls is not None:
@@ -1455,21 +1489,59 @@ async def update_vendor_product(
         has_vars = len(variants_payload) > 0
         product.has_variants = has_vars
         if has_vars:
-            product.stock_quantity = sum(v.stock_quantity for v in variants_payload)
+            total_stock = 0
             for idx, v in enumerate(variants_payload):
-                var_sku = v.sku.strip() if (v.sku and v.sku.strip()) else f"{product.sku}-{idx+1}"
+                # Handle both dict and Pydantic object safely
+                v_name = (v.get("name") if isinstance(v, dict) else getattr(v, "name", "")) or f"Option {idx+1}"
+                v_name = str(v_name).strip()
+
+                raw_sku = v.get("sku") if isinstance(v, dict) else getattr(v, "sku", "")
+                v_sku = str(raw_sku).strip() if raw_sku and str(raw_sku).strip() else f"{product.sku}-{idx+1}"
+
+                raw_price = v.get("price") if isinstance(v, dict) else getattr(v, "price", None)
+                v_price = None
+                if raw_price is not None and str(raw_price).strip() != "":
+                    try:
+                        v_price = float(raw_price)
+                    except (ValueError, TypeError):
+                        v_price = None
+                if v_price is None:
+                    v_price = product.sale_price if product.sale_price is not None else product.regular_price
+
+                raw_stock = v.get("stock_quantity") if isinstance(v, dict) else getattr(v, "stock_quantity", 0)
+                try:
+                    v_stock = int(raw_stock)
+                except (ValueError, TypeError):
+                    v_stock = 0
+
+                v_images = (v.get("images") if isinstance(v, dict) else getattr(v, "images", [])) or []
+                if not isinstance(v_images, list):
+                    v_images = []
+
+                raw_sort = v.get("sort_order") if isinstance(v, dict) else getattr(v, "sort_order", idx)
+                try:
+                    v_sort = int(raw_sort)
+                except (ValueError, TypeError):
+                    v_sort = idx
+
+                raw_active = v.get("is_active") if isinstance(v, dict) else getattr(v, "is_active", True)
+                v_active = bool(raw_active)
+
+                total_stock += v_stock
+
                 var_record = PlatformProductVariant(
                     product_id=product.id,
                     vendor_id=vid,
-                    name=v.name.strip(),
-                    sku=var_sku,
-                    price=v.price,
-                    stock_quantity=v.stock_quantity,
-                    images_json=json.dumps(v.images or []),
-                    sort_order=v.sort_order if v.sort_order else idx,
-                    is_active=v.is_active,
+                    name=v_name,
+                    sku=v_sku,
+                    price=v_price,
+                    stock_quantity=v_stock,
+                    images_json=json.dumps(v_images),
+                    sort_order=v_sort,
+                    is_active=v_active,
                 )
                 db.add(var_record)
+            product.stock_quantity = total_stock
     elif has_variants_payload is not None:
         product.has_variants = has_variants_payload
 
@@ -1518,13 +1590,24 @@ async def update_vendor_product(
 
 @router.delete("/products/{product_id}")
 async def delete_vendor_product(
-    product_id: uuid.UUID,
+    product_id: str,
     current: CurrentVendor = Depends(require_vendor_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """Delete product owned by the authenticated vendor."""
+    """Delete product owned by the authenticated vendor by UUID or slug."""
     vid = current.vendor.id
-    stmt = select(PlatformProduct).where(PlatformProduct.id == product_id, PlatformProduct.vendor_id == vid)
+    target_uuid = None
+    try:
+        target_uuid = uuid.UUID(product_id)
+    except (ValueError, AttributeError):
+        pass
+
+    stmt = select(PlatformProduct).where(
+        PlatformProduct.vendor_id == vid,
+        or_(PlatformProduct.id == target_uuid, PlatformProduct.slug == product_id)
+        if target_uuid
+        else PlatformProduct.slug == product_id,
+    )
     product = (await db.execute(stmt)).scalar_one_or_none()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found or access denied")

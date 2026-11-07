@@ -2,7 +2,7 @@
 Digital Growth Studio — Platform Catalog Schemas
 """
 import uuid
-from typing import Optional, List
+from typing import Optional, List, Any, Union
 from datetime import datetime
 from pydantic import BaseModel, Field
 
@@ -42,7 +42,7 @@ class ProductImageItem(BaseModel):
 
 
 class ProductVariantPayload(BaseModel):
-    id: Optional[uuid.UUID] = None
+    id: Optional[Any] = None
     name: str = Field(min_length=1)
     sku: Optional[str] = ""
     price: Optional[float] = None
@@ -70,7 +70,7 @@ class ProductCreatePayload(BaseModel):
     sale_price: Optional[float] = Field(default=None, ge=0)
     sku: Optional[str] = ""
     stock_quantity: int = Field(default=0, ge=0)
-    category_id: Optional[uuid.UUID] = None
+    category_id: Optional[Any] = None
     status: str = "active"  # active, inactive, out_of_stock
     is_featured: bool = False
     has_variants: bool = False
@@ -86,7 +86,7 @@ class ProductUpdatePayload(BaseModel):
     sale_price: Optional[float] = None
     sku: Optional[str] = None
     stock_quantity: Optional[int] = None
-    category_id: Optional[uuid.UUID] = None
+    category_id: Optional[Any] = None
     status: Optional[str] = None
     is_featured: Optional[bool] = None
     has_variants: Optional[bool] = None

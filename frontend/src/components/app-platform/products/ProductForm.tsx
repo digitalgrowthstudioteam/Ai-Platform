@@ -128,9 +128,11 @@ export default function ProductForm({ productId }: ProductFormProps) {
           if (!isMounted) return;
 
           if (prod) {
+            const rawDesc = prod.description || "";
+            const isHtml = /<[a-z][\s\S]*>/i.test(rawDesc);
             setFormData({
               name: prod.name,
-              description: prod.description || "",
+              description: isHtml ? convertHtmlToPlainText(rawDesc) : rawDesc,
               regular_price: String(prod.regular_price),
               sale_price: prod.sale_price ? String(prod.sale_price) : "",
               sku: prod.sku,
@@ -341,7 +343,7 @@ export default function ProductForm({ productId }: ProductFormProps) {
 
       if (hasVariants && variants.length > 0) {
         const formattedVariants = variants.map((v, i) => ({
-          id: v.id.startsWith("var-") ? undefined : v.id,
+          id: (v.id && !v.id.startsWith("var-") && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v.id)) ? v.id : undefined,
           name: v.name.trim() || `Option ${i + 1}`,
           sku: v.sku.trim() || `${formData.sku}-V${i + 1}`,
           price: v.price ? parseFloat(v.price) : null,
@@ -501,37 +503,52 @@ export default function ProductForm({ productId }: ProductFormProps) {
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
                 Description
               </label>
-              {Boolean(formData.description && /<[a-z][\s\S]*>/i.test(formData.description)) && (
-                <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2.5">
+                {Boolean(formData.description && /<[a-z][\s\S]*>/i.test(formData.description)) && (
                   <button
                     type="button"
                     onClick={() => {
                       const plain = convertHtmlToPlainText(formData.description);
                       setFormData({ ...formData, description: plain });
-                      setDescMode("html");
                     }}
-                    className="text-[11px] font-semibold text-slate-500 hover:text-slate-800 underline cursor-pointer"
+                    className="text-[11px] font-semibold text-rose-600 hover:text-rose-700 underline cursor-pointer"
                   >
-                    Clean to Plain Text
+                    Clean HTML to Plain Text
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setDescMode(descMode === "formatted" ? "html" : "formatted")}
-                    className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 underline cursor-pointer"
-                  >
-                    {descMode === "formatted" ? "Edit Raw HTML" : "Show Formatted View"}
-                  </button>
-                </div>
-              )}
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFormData((prev) => ({
+                      ...prev,
+                      description: prev.description ? `${prev.description}\n• ` : "• ",
+                    }));
+                  }}
+                  className="text-[11px] font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 px-2 py-0.5 rounded cursor-pointer"
+                >
+                  + Add Bullet
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDescMode(descMode === "formatted" ? "html" : "formatted")}
+                  className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 underline cursor-pointer"
+                >
+                  {descMode === "formatted" ? "Show Store Preview" : "Back to Editor"}
+                </button>
+              </div>
             </div>
 
-            {Boolean(formData.description && /<[a-z][\s\S]*>/i.test(formData.description)) && descMode === "formatted" ? (
-              <div className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 space-y-2 max-h-60 overflow-y-auto [&_p]:mb-2 [&_h4]:font-bold [&_h4]:text-slate-900 [&_h4]:mt-3 [&_h4]:mb-1.5 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:space-y-1 [&_li]:text-slate-600 [&_table]:w-full [&_table]:border-collapse [&_table]:my-2 [&_td]:p-2 [&_td]:border [&_td]:border-slate-200 [&_th]:p-2 [&_th]:border [&_th]:border-slate-200">
-                <div dangerouslySetInnerHTML={{ __html: formData.description }} />
+            {descMode === "html" ? (
+              <div className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 space-y-2 min-h-32 max-h-60 overflow-y-auto [&_p]:mb-2 [&_h4]:font-bold [&_h4]:text-slate-900 [&_h4]:mt-3 [&_h4]:mb-1.5 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:space-y-1 [&_li]:text-slate-600 [&_table]:w-full [&_table]:border-collapse [&_table]:my-2 [&_td]:p-2 [&_td]:border [&_td]:border-slate-200 [&_th]:p-2 [&_th]:border [&_th]:border-slate-200 whitespace-pre-line">
+                {/<[a-z][\s\S]*>/i.test(formData.description) ? (
+                  <div dangerouslySetInnerHTML={{ __html: formData.description }} />
+                ) : (
+                  <p>{formData.description || "No description provided yet."}</p>
+                )}
               </div>
             ) : (
               <textarea
-                rows={5}
+                rows={6}
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 placeholder="Detailed description of features, materials, care instructions, and sizing..."
