@@ -2128,42 +2128,6 @@ async def _get_active_ai_settings(db: AsyncSession) -> dict:
     return DEFAULT_AI_CREDIT_SETTINGS
 
 
-@router.get("/ai/debug-fetch")
-async def debug_fetch(url: str):
-    """Temporary diagnostic endpoint to inspect outbound fetch on Render."""
-    results = {}
-    test_agents = {
-        "browser": {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Language": "en-US,en;q=0.9",
-        },
-        "googlebot": {
-            "User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
-            "Accept": "*/*",
-        },
-        "facebook": {
-            "User-Agent": "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)",
-            "Accept": "*/*",
-        },
-    }
-    for name, headers in test_agents.items():
-        try:
-            async with httpx.AsyncClient(timeout=10.0, follow_redirects=True, headers=headers) as client:
-                r = await client.get(url)
-                results[name] = {
-                    "status": r.status_code,
-                    "length": len(r.text),
-                    "title": re.findall(r'<title>(.*?)</title>', r.text, re.I),
-                    "has_json_ld": "application/ld+json" in r.text,
-                    "has_rukmini": "rukmini" in r.text,
-                    "sample": r.text[:300]
-                }
-        except Exception as e:
-            results[name] = {"error": str(e), "type": type(e).__name__}
-    return results
-
-
 @router.post("/ai/import-preview", response_model=AiProductImportPreviewResponse)
 async def ai_import_preview(
     payload: AiProductImportPreviewRequest,

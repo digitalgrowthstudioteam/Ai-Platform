@@ -64,7 +64,7 @@ def _find_product_in_json_ld(items: List[dict]) -> Optional[dict]:
 
 
 async def _scrape_shopify_json(url: str) -> Optional[Dict[str, Any]]:
-    """Attempt direct Shopify JSON endpoint fetch for clean data."""
+    """Attempt direct Shopify JSON endpoint fetch, falling back to Next.js / Headless Shopify HTML parsing."""
     try:
         clean_url = url.split("?")[0].rstrip("/")
         json_url = f"{clean_url}.json"
@@ -80,8 +80,6 @@ async def _scrape_shopify_json(url: str) -> Optional[Dict[str, Any]]:
                     raw_images = [img["src"] for img in p.get("images", []) if isinstance(img, dict) and "src" in img]
                     
                     variants = []
-                    colors = []
-                    sizes = []
                     for v in p.get("variants", []):
                         v_title = v.get("title", "")
                         if v_title and v_title.lower() != "default title":
@@ -109,39 +107,212 @@ async def _scrape_shopify_json(url: str) -> Optional[Dict[str, Any]]:
                         "images": raw_images[:10],
                         "features": [],
                         "specifications": {"Vendor": brand} if brand else {},
-                        "colors": colors,
-                        "sizes": sizes,
+                        "colors": [],
+                        "sizes": [],
+                        "variants": variants,
+                    }
+
+            # Fallback for Headless Shopify / Next.js Storefronts (e.g. Clinderma)
+            html_resp = await client.get(url)
+            if html_resp.status_code == 200:
+                html = html_resp.text
+                soup = BeautifulSoup(html, "html.parser")
+
+                title = ""
+                og_t = soup.find("meta", property="og:title")
+                if og_t and og_t.get("content"):
+                    title = og_t.get("content").strip()
+                elif soup.title:
+                    title = soup.title.string.strip()
+                    title = re.sub(r'\s*[—|–-]\s*[A-Za-z0-9\s]+$', '', title)
+
+                selling_price = 0.0
+                m_price = re.search(r'\\?"amount\\?":\s*\\?"([\d.]+)\\?"', html)
+                if not m_price:
+                    m_price = re.search(r'\"price\":\s*\"?([\d.]+)\"?', html)
+                if m_price:
+                    try:
+                        selling_price = float(m_price.group(1))
+                    except Exception:
+                        pass
+
+                mrp = 0.0
+                m_mrp = re.search(r'compareAtPrice.*?\\?"amount\\?":\s*\\?"([\d.]+)\\?"', html)
+                if m_mrp:
+                    try:
+                        mrp = float(m_mrp.group(1))
+                    except Exception:
+                        pass
+                if not mrp and selling_price > 0:
+                    mrp = round(selling_price * 1.25, 2)
+
+                images = []
+                cdn_imgs = re.findall(r'(https://cdn\.shopify\.com/s/files/[^\s"\'<>]+\.(?:jpg|jpeg|png|webp))', html)
+                for img in cdn_imgs:
+                    clean = re.sub(r'_\d+x\d*\.', '.', img).split("?")[0]
+                    if clean not in images and not any(skip in clean.lower() for skip in ['icon', 'logo', 'badge', 'payment', 'star', 'cart']):
+                        images.append(clean)
+
+                desc_meta = soup.find("meta", attrs={"name": "description"})
+                desc = desc_meta.get("content") if desc_meta else ""
+
+                if title and (selling_price > 0 or images):
+                    return {
+                        "source_url": url,
+                        "raw_title": title,
+                        "raw_description": desc,
+                        "brand": "",
+                        "price": selling_price,
+                        "mrp": mrp,
+                        "images": images[:10],
+                        "features": [],
+                        "specifications": {},
+                        "colors": [],
+                        "sizes": [],
+                        "variants": [],
                     }
     except Exception as e:
         logger.debug("shopify_json_fetch_failed", error=str(e), url=url)
     return None
 
 
-async def _recover_flipkart_url_from_slug(url: str) -> Optional[str]:
-    """Recover the actual active Flipkart product page when a truncated URL (like .../p/itm) is provided."""
+async def _scrape_flipkart_from_search(url: str) -> Optional[Dict[str, Any]]:
+    """
+    Search Flipkart's open catalog search endpoint which bypasses cloud datacenter IP blocks,
+    and extracts full JSON-LD / __INITIAL_STATE__ for titles, prices, master images, and variants.
+    """
     try:
+        pid_m = re.search(r'pid=([a-zA-Z0-9]+)', url)
+        target_pid = pid_m.group(1) if pid_m else ""
+
         slug_m = re.search(r"flipkart\.com/([a-zA-Z0-9_-]+)(?:/p/|$)", url)
-        if not slug_m:
+        slug = slug_m.group(1) if slug_m else ""
+        words = [w for w in slug.replace("-", " ").split() if w.lower() not in ["and", "with", "for", "the", "in", "at", "by", "rating", "safe", "wash", "fully"]][:6]
+        search_q = "+".join(words) if words else target_pid
+        if not search_q:
             return None
-        slug = slug_m.group(1)
-        # Filter stop words to form targeted product query
-        words = [w for w in slug.replace("-", " ").split() if w.lower() not in ["and", "with", "for", "the", "in", "at", "by", "rating", "safe", "wash", "fully"]][:5]
-        search_q = "+".join(words)
+
         search_url = f"https://www.flipkart.com/search?q={search_q}"
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
         }
-        async with httpx.AsyncClient(timeout=10.0, headers=headers) as client:
-            r = await client.get(search_url)
-            links = re.findall(r'href="(/[^"/]+/p/itm[a-zA-Z0-9]+[^"]+)"', r.text)
-            if links:
-                recovered = "https://www.flipkart.com" + re.sub(r'&amp;', '&', links[0])
-                logger.info("flipkart_url_recovered_from_search", original=url, recovered=recovered)
-                return recovered
+        async with httpx.AsyncClient(timeout=14.0, headers=headers) as client:
+            resp = await client.get(search_url)
+            html = resp.text
+
+        m = re.search(r'window\.__INITIAL_STATE__\s*=\s*(\{.*?\});\s*</script>', html, re.DOTALL)
+        if not m:
+            return None
+        data = json.loads(m.group(1))
+        page_data = data.get("pageDataV4", {}).get("page", {}).get("data", {})
+        all_products = []
+        for slot_list in page_data.values():
+            if isinstance(slot_list, list):
+                for item in slot_list:
+                    if isinstance(item, dict):
+                        w_data = item.get("widget", {}).get("data", {})
+                        for p in w_data.get("products", []):
+                            val = p.get("productInfo", {}).get("value", {})
+                            if val:
+                                all_products.append(val)
+        if not all_products:
+            return None
+
+        best = None
+        if target_pid:
+            for p in all_products:
+                if target_pid.lower() in p.get("baseUrl", "").lower() or target_pid.lower() in str(p.get("listingId", "")).lower() or target_pid.lower() in str(p.get("id", "")).lower():
+                    best = p
+                    break
+        if not best and words:
+            scored = []
+            for p in all_products:
+                t = (p.get("titles", {}).get("title", "") + " " + (p.get("titles", {}).get("subtitle") or "")).lower()
+                score = sum(1 for kw in words if kw.lower() in t)
+                scored.append((score, p))
+            scored.sort(key=lambda x: x[0], reverse=True)
+            if scored and scored[0][0] > 0:
+                best = scored[0][1]
+        if not best:
+            best = all_products[0]
+
+        title = best.get("titles", {}).get("title", "")
+        sub = best.get("titles", {}).get("subtitle")
+        if sub and sub not in title:
+            title = f"{title} ({sub})"
+
+        selling_price = 0.0
+        mrp = 0.0
+        for pr in best.get("pricing", {}).get("prices", []):
+            if pr.get("strikeOff"):
+                mrp = float(pr.get("value", 0))
+            else:
+                selling_price = float(pr.get("value", 0))
+        if not mrp and selling_price > 0:
+            mrp = round(selling_price * 1.35, 2)
+
+        images = []
+        for img in best.get("media", {}).get("images", []):
+            u = img.get("url", "")
+            if u:
+                u = u.replace("{@width}", "1500").replace("{@height}", "1500").replace("{@quality}", "90")
+                u = u.replace("http://", "https://")
+                images.append(u)
+
+        variants = []
+        seen = set()
+        for p in all_products:
+            pt = p.get("titles", {}).get("title", "")
+            psub = p.get("titles", {}).get("subtitle") or ""
+            combo = f"{pt} {psub}"
+            cap = re.search(r'(\b\d+(?:\.\d+)?\s*(?:kg|l|gb|tb|inch)\b)', combo, re.IGNORECASE)
+            col = re.search(r'\b(silver|grey|black|white|blue|red|gold|brown|beige|yellow)\b', combo, re.IGNORECASE)
+            vname = ""
+            if col and cap:
+                vname = f"{col.group(1).title()} / {cap.group(1).title()}"
+            elif cap:
+                vname = cap.group(1).title()
+            elif col:
+                vname = col.group(1).title()
+            elif psub and len(psub) < 25 and not any(skip in psub.lower() for skip in ["star", "rpm", "warranty"]):
+                vname = psub.strip()
+
+            if vname and vname not in seen:
+                seen.add(vname)
+                p_price = None
+                for pr in p.get("pricing", {}).get("prices", []):
+                    if not pr.get("strikeOff"):
+                        p_price = float(pr.get("value", 0))
+                diff = (p_price - selling_price) if (p_price and selling_price) else 0.0
+                variants.append({
+                    "name": vname,
+                    "sku_suffix": re.sub(r'[^a-zA-Z0-9]', '', vname)[:6].upper() or "VAR",
+                    "price_diff": round(diff, 2),
+                    "stock": 50
+                })
+
+        features = best.get("keySpecs") or []
+        analytics = best.get("analyticsData", {})
+        category = analytics.get("category") or best.get("vertical") or ""
+
+        return {
+            "title": title,
+            "description": f"Authentic {title}. Features include: {', '.join(features)}." if features else "",
+            "price": selling_price,
+            "mrp": mrp,
+            "brand": "",
+            "images": images[:12],
+            "features": features,
+            "specifications": {"Category": category} if category else {},
+            "colors": [],
+            "sizes": [],
+            "variants": variants[:10] if variants else []
+        }
     except Exception as e:
-        logger.debug("flipkart_recovery_failed", error=str(e))
-    return None
+        logger.warning("flipkart_search_scrape_failed", error=str(e))
+        return None
 
 
 async def _scrape_flipkart_specialized(soup: BeautifulSoup, html: str, url: str) -> Dict[str, Any]:
@@ -225,39 +396,12 @@ async def _scrape_flipkart_specialized(soup: BeautifulSoup, html: str, url: str)
     if any(bad in title.lower() for bad in ["online shopping", "itm store online", "flipkart.com", "access denied", "buy online at best price"]):
         title = ""
 
-    # 3. Truncated URL / Blocked page recovery
-    # If title or price or images are missing, attempt Flipkart search recovery
+    # 3. Truncated URL / Blocked page recovery via Search Catalog
+    # If title, price, or images are missing, extract directly from Flipkart Search (never blocked by datacenter IP filters)
     if (not title or price == 0.0 or not images) and "flipkart.com" in url.lower():
-        recovered_url = await _recover_flipkart_url_from_slug(url)
-        if recovered_url and recovered_url != url:
-            try:
-                headers = {
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                }
-                async with httpx.AsyncClient(timeout=14.0, follow_redirects=True, headers=headers) as client:
-                    resp_rec = await client.get(recovered_url)
-                    if resp_rec.status_code == 200:
-                        soup_rec = BeautifulSoup(resp_rec.text, "html.parser")
-                        rec_ld = _find_product_in_json_ld(_extract_json_ld(soup_rec))
-                        if rec_ld and rec_ld.get("name"):
-                            title = rec_ld.get("name").strip()
-                            if isinstance(rec_ld.get("image"), list):
-                                images = [img for img in rec_ld["image"] if isinstance(img, str) and img.startswith("http")]
-                            if rec_ld.get("offers"):
-                                o = rec_ld["offers"]
-                                if isinstance(o, dict) and o.get("price"):
-                                    price = float(o["price"])
-                            if rec_ld.get("description"):
-                                description = rec_ld["description"]
-                                mrp_m = re.search(r"Rs\.?\s*([\d,]+(?:\.\d+)?)", description)
-                                if mrp_m:
-                                    try:
-                                        mrp = float(mrp_m.group(1).replace(",", ""))
-                                    except Exception:
-                                        pass
-            except Exception as e:
-                logger.debug("recovered_flipkart_fetch_failed", error=str(e))
+        search_data = await _scrape_flipkart_from_search(url)
+        if search_data and (search_data.get("title") or search_data.get("price", 0) > 0):
+            return search_data
 
     # 4. If title is still empty, derive from slug words
     if not title:
@@ -309,6 +453,7 @@ async def _scrape_flipkart_specialized(soup: BeautifulSoup, html: str, url: str)
         "specifications": specifications,
         "colors": colors[:10],
         "sizes": sizes[:15],
+        "variants": [],
     }
 
 
@@ -504,19 +649,20 @@ async def fetch_product_raw_data(url: str) -> Dict[str, Any]:
     # 3. Check if Flipkart URL
     if "flipkart" in cleaned_url.lower():
         fk_data = await _scrape_flipkart_specialized(soup, html, cleaned_url)
-        if fk_data and (fk_data["title"] or fk_data["price"] > 0):
+        if fk_data and (fk_data.get("title") or fk_data.get("price", 0) > 0):
             return {
                 "source_url": cleaned_url,
                 "raw_title": fk_data["title"][:300].strip(),
-                "raw_description": fk_data["description"][:3000].strip(),
-                "brand": fk_data["brand"][:100].strip(),
-                "price": fk_data["price"],
-                "mrp": fk_data["mrp"],
-                "images": fk_data["images"],
-                "features": fk_data["features"],
-                "specifications": fk_data["specifications"],
-                "colors": fk_data["colors"],
-                "sizes": fk_data["sizes"],
+                "raw_description": fk_data.get("description", "")[:3000].strip(),
+                "brand": fk_data.get("brand", "")[:100].strip(),
+                "price": fk_data.get("price", 0.0),
+                "mrp": fk_data.get("mrp", 0.0),
+                "images": fk_data.get("images", []),
+                "features": fk_data.get("features", []),
+                "specifications": fk_data.get("specifications", {}),
+                "colors": fk_data.get("colors", []),
+                "sizes": fk_data.get("sizes", []),
+                "variants": fk_data.get("variants", []),
             }
 
     # Standard JSON-LD & OpenGraph parsing for Amazon, WooCommerce & Generic
@@ -873,8 +1019,13 @@ async def enhance_product_with_gemini(raw_data: Dict[str, Any]) -> Dict[str, Any
     colors = raw_data.get("colors") or []
     sizes = raw_data.get("sizes") or []
     base_variants = []
+
+    raw_variants = raw_data.get("variants") or []
+    valid_extracted = [v for v in raw_variants if isinstance(v, dict) and v.get("name") and v.get("name").lower() not in ["standard", "default title"]]
     
-    if colors and sizes:
+    if valid_extracted:
+        base_variants = valid_extracted
+    elif colors and sizes:
         for c in colors[:4]:
             for s in sizes[:6]:
                 clean_c = re.sub(r'[^a-zA-Z0-9]', '', c)[:3].upper() or "VAR"
@@ -904,12 +1055,51 @@ async def enhance_product_with_gemini(raw_data: Dict[str, Any]) -> Dict[str, Any
                 "stock": 50
             })
     else:
-        base_variants.append({
-            "name": "Standard",
-            "sku_suffix": "STD",
-            "price_diff": 0.0,
-            "stock": 50
-        })
+        # Category-based intelligent default variant generation
+        raw_t_check = raw_data.get("raw_title") or ""
+        raw_d_check = raw_data.get("raw_description") or ""
+        cat = _infer_category(raw_t_check, f"{raw_d_check} {raw_data.get('source_url', '')}")
+        t_low = f"{raw_t_check} {raw_d_check}".lower()
+        if cat == "Footwear" or any(w in t_low for w in ["shoe", "sandal", "sneaker", "wedge", "boot", "slipper", "loaf"]):
+            base_variants = [
+                {"name": "6 UK", "sku_suffix": "6UK", "price_diff": 0.0, "stock": 50},
+                {"name": "7 UK", "sku_suffix": "7UK", "price_diff": 0.0, "stock": 50},
+                {"name": "8 UK", "sku_suffix": "8UK", "price_diff": 0.0, "stock": 50},
+                {"name": "9 UK", "sku_suffix": "9UK", "price_diff": 0.0, "stock": 50},
+                {"name": "10 UK", "sku_suffix": "10UK", "price_diff": 0.0, "stock": 50},
+            ]
+        elif cat == "Apparel & Fashion" or any(w in t_low for w in ["shirt", "t-shirt", "kurti", "saree", "dress", "pant", "jeans"]):
+            base_variants = [
+                {"name": "S", "sku_suffix": "S", "price_diff": 0.0, "stock": 50},
+                {"name": "M", "sku_suffix": "M", "price_diff": 0.0, "stock": 50},
+                {"name": "L", "sku_suffix": "L", "price_diff": 0.0, "stock": 50},
+                {"name": "XL", "sku_suffix": "XL", "price_diff": 0.0, "stock": 50},
+                {"name": "XXL", "sku_suffix": "XXL", "price_diff": 0.0, "stock": 50},
+            ]
+        elif cat == "Electronics & Gadgets" or any(w in t_low for w in ["earbud", "headphone", "tws", "speaker", "audio"]):
+            base_variants = [
+                {"name": "Black", "sku_suffix": "BLK", "price_diff": 0.0, "stock": 50},
+                {"name": "White", "sku_suffix": "WHT", "price_diff": 0.0, "stock": 50},
+                {"name": "Navy Blue", "sku_suffix": "BLU", "price_diff": 0.0, "stock": 50},
+            ]
+        elif cat == "Home & Kitchen Appliances" or any(w in t_low for w in ["washing", "load", "refrigerator"]):
+            base_variants = [
+                {"name": "6.5 kg", "sku_suffix": "65KG", "price_diff": 0.0, "stock": 50},
+                {"name": "7 kg", "sku_suffix": "7KG", "price_diff": 2490.0, "stock": 50},
+                {"name": "8 kg", "sku_suffix": "8KG", "price_diff": 4990.0, "stock": 50},
+            ]
+        elif cat == "Beauty & Personal Care" or any(w in t_low for w in ["kit", "cream", "serum", "acne", "facewash"]):
+            base_variants = [
+                {"name": "Single Pack (Regular)", "sku_suffix": "PACK1", "price_diff": 0.0, "stock": 50},
+                {"name": "Value Pack of 2", "sku_suffix": "PACK2", "price_diff": round((raw_data.get("price") or 499) * 0.85, 2), "stock": 50},
+            ]
+        else:
+            base_variants.append({
+                "name": "Standard",
+                "sku_suffix": "STD",
+                "price_diff": 0.0,
+                "stock": 50
+            })
 
     features = raw_data.get("features") or []
     specs = raw_data.get("specifications") or {}

@@ -134,7 +134,7 @@ export default function AiProductImportModal({
     setIsAddingVariant(false);
   };
 
-  const handleApplyPreset = (presetType: "shoes" | "clothing" | "colors") => {
+  const handleApplyPreset = (presetType: "shoes" | "clothing" | "colors" | "packs" | "appliances") => {
     let newItems: string[] = [];
     if (presetType === "shoes") {
       newItems = ["6 UK", "7 UK", "8 UK", "9 UK", "10 UK"];
@@ -142,6 +142,10 @@ export default function AiProductImportModal({
       newItems = ["S", "M", "L", "XL", "XXL"];
     } else if (presetType === "colors") {
       newItems = ["Black", "White", "Navy Blue", "Grey", "Beige"];
+    } else if (presetType === "packs") {
+      newItems = ["Single Unit", "Pack of 2", "Pack of 3"];
+    } else if (presetType === "appliances") {
+      newItems = ["6.5 kg", "7 kg", "8 kg", "10 kg"];
     }
 
     const existingNames = new Set(variants.map((v) => v.name.toLowerCase()));
@@ -561,6 +565,20 @@ export default function AiProductImportModal({
                   className="px-2 py-0.5 rounded-md bg-white border border-slate-200 text-slate-700 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition-colors cursor-pointer"
                 >
                   🎨 Colors (Black, White, Navy, Grey)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleApplyPreset("appliances")}
+                  className="px-2 py-0.5 rounded-md bg-white border border-slate-200 text-slate-700 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition-colors cursor-pointer"
+                >
+                  ⚖️ Capacity (6.5 – 10 kg)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleApplyPreset("packs")}
+                  className="px-2 py-0.5 rounded-md bg-white border border-slate-200 text-slate-700 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition-colors cursor-pointer"
+                >
+                  📦 Packs (1, 2, 3)
                 </button>
               </div>
 
