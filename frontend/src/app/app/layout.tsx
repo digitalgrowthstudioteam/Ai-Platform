@@ -12,6 +12,7 @@ export default function PlatformRootLayout({ children }: { children: React.React
 
   // Public shopping customers or landing page visitors NEVER see the SaaS admin header
   const isPublicMarketingOrStore =
+    pathname === "/app" ||
     pathname.startsWith("/app/store") ||
     pathname.startsWith("/store") ||
     pathname.startsWith("/app/demoapp") ||
