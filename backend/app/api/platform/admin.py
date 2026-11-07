@@ -2132,12 +2132,14 @@ async def list_vendor_credit_balances(
             PlatformVendor,
             PlatformVendorProfile,
             PlatformStore,
+            PlatformUser,
             func.count(PlatformCreditTransaction.id).label("total_transactions")
         )
+        .outerjoin(PlatformUser, PlatformUser.id == PlatformVendor.user_id)
         .outerjoin(PlatformVendorProfile, PlatformVendorProfile.vendor_id == PlatformVendor.id)
         .outerjoin(PlatformStore, PlatformStore.vendor_id == PlatformVendor.id)
         .outerjoin(PlatformCreditTransaction, PlatformCreditTransaction.vendor_id == PlatformVendor.id)
-        .group_by(PlatformVendor.id, PlatformVendorProfile.id, PlatformStore.id)
+        .group_by(PlatformVendor.id, PlatformVendorProfile.id, PlatformStore.id, PlatformUser.id)
         .order_by(desc(PlatformVendor.created_at))
     )
 
@@ -2148,7 +2150,8 @@ async def list_vendor_credit_balances(
                 PlatformVendor.vendor_code.ilike(search_filter),
                 PlatformVendorProfile.business_name.ilike(search_filter),
                 PlatformVendorProfile.owner_name.ilike(search_filter),
-                PlatformVendor.email.ilike(search_filter),
+                PlatformVendorProfile.email.ilike(search_filter),
+                PlatformUser.email.ilike(search_filter),
             )
         )
 
@@ -2156,13 +2159,13 @@ async def list_vendor_credit_balances(
     rows = (await db.execute(query)).all()
 
     results = []
-    for v, profile, store, tx_count in rows:
+    for v, profile, store, user, tx_count in rows:
         results.append({
             "vendor_id": str(v.id),
             "vendor_code": v.vendor_code,
             "business_name": profile.business_name if profile else "Store",
             "owner_name": profile.owner_name if profile else "Merchant",
-            "email": v.email,
+            "email": (profile.email if profile and profile.email else (user.email if user else "N/A")),
             "ai_credits": v.ai_credits,
             "total_transactions": tx_count or 0,
             "store_name": store.store_name if store else None,
