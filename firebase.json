@@ -11,6 +11,14 @@
     "trailingSlash": false,
     "rewrites": [
       {
+        "source": "/app",
+        "destination": "/app.html"
+      },
+      {
+        "source": "/app/",
+        "destination": "/app.html"
+      },
+      {
         "source": "/campaigns/**",
         "destination": "/campaigns.html"
       },
