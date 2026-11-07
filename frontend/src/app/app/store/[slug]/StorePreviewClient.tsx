@@ -419,7 +419,7 @@ export default function StorePreviewClient() {
                         {p.name}
                       </h3>
                       <p className="text-[11px] text-slate-500 mt-1 line-clamp-2 leading-relaxed">
-                        {p.description}
+                        {p.description ? p.description.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim() : ""}
                       </p>
                     </div>
                   </Link>

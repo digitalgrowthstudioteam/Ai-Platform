@@ -1121,19 +1121,19 @@ async def enhance_product_with_gemini(raw_data: Dict[str, Any]) -> Dict[str, Any
 
     bullet_items = "".join([f"<li>{f}</li>" for f in features])
     specs_rows = "".join([
-        f"<tr><td style='padding:6px 12px;font-weight:600;border:1px solid #e2e8f0;background:#f8fafc;width:35%;'>{k}</td><td style='padding:6px 12px;border:1px solid #e2e8f0;'>{v}</td></tr>"
+        f"<tr><td><strong>{k}</strong></td><td>{v}</td></tr>"
         for k, v in list(specs.items())[:12]
     ])
 
     desc_parts = []
     if raw_desc and len(raw_desc) > 30:
-        desc_parts.append(f"<p style='font-size:14px;line-height:1.6;color:#334155;margin-bottom:12px;'>{raw_desc[:500]}</p>")
+        desc_parts.append(f"<p>{raw_desc[:500]}</p>")
     else:
-        desc_parts.append(f"<p style='font-size:14px;line-height:1.6;color:#334155;margin-bottom:12px;'>Premium quality {clean_title[:70]}, engineered for superior performance, durability, and daily satisfaction.</p>")
+        desc_parts.append(f"<p>Premium quality {clean_title[:70]}, engineered for superior performance, durability, and daily satisfaction.</p>")
     if bullet_items:
-        desc_parts.append(f"<h4 style='font-size:14px;font-weight:700;color:#0f172a;margin-top:16px;margin-bottom:8px;'>Key Highlights & Features:</h4><ul style='padding-left:20px;line-height:1.7;color:#475569;margin-bottom:12px;'>{bullet_items}</ul>")
+        desc_parts.append(f"<h4>Key Highlights & Features:</h4><ul>{bullet_items}</ul>")
     if specs_rows:
-        desc_parts.append(f"<h4 style='font-size:14px;font-weight:700;color:#0f172a;margin-top:16px;margin-bottom:8px;'>Product Specifications:</h4><table style='width:100%;border-collapse:collapse;font-size:13px;border:1px solid #e2e8f0;margin-top:8px;'><tbody>{specs_rows}</tbody></table>")
+        desc_parts.append(f"<h4>Product Specifications:</h4><table><tbody>{specs_rows}</tbody></table>")
 
     rich_desc_html = "".join(desc_parts)
     suggested_category = _infer_category(clean_title, f"{raw_desc} {' '.join(features)} {raw_data.get('source_url', '')}")

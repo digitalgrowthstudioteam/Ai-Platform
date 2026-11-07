@@ -51,8 +51,16 @@ export const initPlatformKeepAlive = () => {
   };
   // Fire immediate warmup
   ping();
-  // Keep warm every 4 minutes (Render spins down after 15 minutes of inactivity)
-  setInterval(ping, 4 * 60 * 1000);
+  // Keep warm every 2 minutes (Render spins down after 15 minutes of inactivity)
+  setInterval(ping, 2 * 60 * 1000);
+
+  // Proactively warm up server whenever user returns to or focuses the tab
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      ping();
+    }
+  });
+  window.addEventListener('focus', ping);
 };
 
 if (typeof window !== 'undefined') {
@@ -82,11 +90,12 @@ class PlatformApiClient {
       ...(options.headers || {}),
     };
 
-    const maxRetries = options.retries ?? 3;
+    // 5 retries with adaptive backoff (~30s window) ensures Render cold starts never drop users
+    const maxRetries = options.retries ?? 5;
     const timeoutMs = options.timeout ?? 50000;
 
     let lastError: any = null;
-    const retryDelays = [1500, 3000, 5000, 7000];
+    const retryDelays = [1500, 3000, 5000, 8000, 12000, 15000];
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       const controller = new AbortController();

@@ -79,6 +79,27 @@ export default function ProductForm({ productId }: ProductFormProps) {
 
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [descMode, setDescMode] = useState<"formatted" | "html">("formatted");
+
+  const convertHtmlToPlainText = (html: string): string => {
+    if (!html) return "";
+    return html
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<\/p>/gi, "\n\n")
+      .replace(/<li>/gi, "• ")
+      .replace(/<\/li>/gi, "\n")
+      .replace(/<\/h[1-6]>/gi, "\n\n")
+      .replace(/<\/tr>/gi, "\n")
+      .replace(/<td[^>]*>/gi, " ")
+      .replace(/<\/td>/gi, " | ")
+      .replace(/<[^>]+>/g, "")
+      .replace(/&nbsp;/gi, " ")
+      .replace(/&amp;/gi, "&")
+      .replace(/&lt;/gi, "<")
+      .replace(/&gt;/gi, ">")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+  };
 
   // Load existing product or default categories
   useEffect(() => {
@@ -421,18 +442,33 @@ export default function ProductForm({ productId }: ProductFormProps) {
       {/* Status Message */}
       {message && (
         <div
-          className={`p-4 rounded-2xl text-sm flex items-center gap-3 ${
+          className={`p-4 rounded-2xl text-sm flex items-center justify-between gap-3 ${
             message.type === "success"
               ? "bg-emerald-50 border border-emerald-200 text-emerald-800"
               : "bg-rose-50 border border-rose-200 text-rose-800"
           }`}
         >
-          {message.type === "success" ? (
-            <Check className="w-5 h-5 text-emerald-600 shrink-0" />
-          ) : (
-            <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
+          <div className="flex items-center gap-3">
+            {message.type === "success" ? (
+              <Check className="w-5 h-5 text-emerald-600 shrink-0" />
+            ) : (
+              <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
+            )}
+            <span className="font-medium">{message.text}</span>
+          </div>
+          {message.type === "error" && (
+            <button
+              type="button"
+              onClick={() => {
+                setMessage(null);
+                setLoading(true);
+                window.location.reload();
+              }}
+              className="px-3 py-1 bg-rose-600 text-white rounded-lg text-xs font-semibold hover:bg-rose-700 transition-colors cursor-pointer shrink-0"
+            >
+              Retry
+            </button>
           )}
-          <span className="font-medium">{message.text}</span>
         </div>
       )}
 
@@ -461,16 +497,47 @@ export default function ProductForm({ productId }: ProductFormProps) {
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-              Description
-            </label>
-            <textarea
-              rows={4}
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="Detailed description of features, materials, care instructions, and sizing..."
-              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Description
+              </label>
+              {Boolean(formData.description && /<[a-z][\s\S]*>/i.test(formData.description)) && (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const plain = convertHtmlToPlainText(formData.description);
+                      setFormData({ ...formData, description: plain });
+                      setDescMode("html");
+                    }}
+                    className="text-[11px] font-semibold text-slate-500 hover:text-slate-800 underline cursor-pointer"
+                  >
+                    Clean to Plain Text
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDescMode(descMode === "formatted" ? "html" : "formatted")}
+                    className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 underline cursor-pointer"
+                  >
+                    {descMode === "formatted" ? "Edit Raw HTML" : "Show Formatted View"}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {Boolean(formData.description && /<[a-z][\s\S]*>/i.test(formData.description)) && descMode === "formatted" ? (
+              <div className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 space-y-2 max-h-60 overflow-y-auto [&_p]:mb-2 [&_h4]:font-bold [&_h4]:text-slate-900 [&_h4]:mt-3 [&_h4]:mb-1.5 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:space-y-1 [&_li]:text-slate-600 [&_table]:w-full [&_table]:border-collapse [&_table]:my-2 [&_td]:p-2 [&_td]:border [&_td]:border-slate-200 [&_th]:p-2 [&_th]:border [&_th]:border-slate-200">
+                <div dangerouslySetInnerHTML={{ __html: formData.description }} />
+              </div>
+            ) : (
+              <textarea
+                rows={5}
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="Detailed description of features, materials, care instructions, and sizing..."
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-sans"
+              />
+            )}
           </div>
 
           {/* Pricing & Inventory Grid */}
