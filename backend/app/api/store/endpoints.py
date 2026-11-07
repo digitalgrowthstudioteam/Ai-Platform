@@ -45,6 +45,7 @@ from app.schemas.platform.store_public import (
 )
 from app.utils.geo import check_store_hyperlocal_eligibility, haversine_distance, is_pincode_serviceable
 from app.schemas.platform.order import PublicOrderCreateRequest, OrderResponse, OrderItemResponse
+from app.services.platform_storage import recalculate_and_save_vendor_storage
 
 router = APIRouter(prefix="/store", tags=["Public Store & Android App"])
 
@@ -700,6 +701,7 @@ async def create_store_order(
             action_url=f"/orders/{order.id}",
         ))
         await db.commit()
+        await recalculate_and_save_vendor_storage(db, store.vendor_id)
     except Exception:
         pass
 

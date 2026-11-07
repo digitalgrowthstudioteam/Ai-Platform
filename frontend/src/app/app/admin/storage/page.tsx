@@ -58,59 +58,79 @@ export default function AdminStoragePage() {
               <tr>
                 <th className="py-3 px-4">Vendor ID</th>
                 <th className="py-3 px-4">Business / Store</th>
-                <th className="py-3 px-4">Products Uploaded</th>
-                <th className="py-3 px-4">Default Quota</th>
-                <th className="py-3 px-4 text-right">Adjust Limit</th>
+                <th className="py-3 px-4">Products</th>
+                <th className="py-3 px-4">Storage Consumed</th>
+                <th className="py-3 px-4">Quota Limit</th>
+                <th className="py-3 px-4 text-right">Adjust Quota</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {vendors.map((v) => (
-                <tr key={v.id} className="hover:bg-slate-50/60 transition-colors">
-                  <td className="py-3.5 px-4 font-mono font-bold text-purple-700">{v.vendor_code}</td>
-                  <td className="py-3.5 px-4">
-                    <p className="font-semibold text-slate-900">{v.business_name}</p>
-                    <p className="text-[11px] font-mono text-slate-400">{v.subdomain}</p>
-                  </td>
-                  <td className="py-3.5 px-4 font-semibold text-slate-700">{v.total_products} products</td>
-                  <td className="py-3.5 px-4 font-mono text-slate-800">1,024 MB (1 GB)</td>
-                  <td className="py-3.5 px-4 text-right">
-                    {editingVendorId === v.id ? (
-                      <div className="flex items-center justify-end gap-1.5">
-                        <input
-                          type="number"
-                          value={newLimitMb}
-                          onChange={(e) => setNewLimitMb(e.target.value)}
-                          className="w-20 px-2 py-1 bg-slate-50 border border-slate-300 rounded text-xs font-mono"
-                        />
-                        <button
-                          onClick={() => handleUpdateLimit(v.id)}
-                          disabled={updating}
-                          className="px-2 py-1 rounded bg-purple-600 text-white font-semibold text-xs"
-                        >
-                          Save
-                        </button>
-                        <button
-                          onClick={() => setEditingVendorId(null)}
-                          className="px-2 py-1 rounded text-slate-500 hover:bg-slate-100 text-xs"
-                        >
-                          Cancel
-                        </button>
+              {vendors.map((v) => {
+                const usedMb = v.storage_used_mb ?? 0;
+                const limitMb = v.storage_limit_mb ?? 1024;
+                const pct = Math.min(100, Math.round((usedMb / limitMb) * 100));
+                return (
+                  <tr key={v.id} className="hover:bg-slate-50/60 transition-colors">
+                    <td className="py-3.5 px-4 font-mono font-bold text-purple-700">{v.vendor_code}</td>
+                    <td className="py-3.5 px-4">
+                      <p className="font-semibold text-slate-900">{v.business_name}</p>
+                      <p className="text-[11px] font-mono text-slate-400">{v.subdomain}</p>
+                    </td>
+                    <td className="py-3.5 px-4 font-semibold text-slate-700">{v.total_products} items</td>
+                    <td className="py-3.5 px-4">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-semibold text-slate-800">{usedMb.toFixed(1)} MB</span>
+                        <span className="text-[11px] text-slate-400">({pct}%)</span>
                       </div>
-                    ) : (
-                      <button
-                        onClick={() => {
-                          setEditingVendorId(v.id);
-                          setNewLimitMb("2048");
-                        }}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-purple-700 bg-purple-50 border border-purple-200 hover:bg-purple-100"
-                      >
-                        <Edit2 className="w-3.5 h-3.5" />
-                        Modify Quota
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                      <div className="w-28 h-1.5 bg-slate-100 rounded-full overflow-hidden mt-1">
+                        <div
+                          className={`h-full rounded-full transition-all ${
+                            pct >= 90 ? "bg-red-500" : pct >= 70 ? "bg-amber-500" : "bg-purple-600"
+                          }`}
+                          style={{ width: `${Math.max(2, pct)}%` }}
+                        />
+                      </div>
+                    </td>
+                    <td className="py-3.5 px-4 font-mono font-bold text-slate-800">{limitMb.toLocaleString()} MB</td>
+                    <td className="py-3.5 px-4 text-right">
+                      {editingVendorId === v.id ? (
+                        <div className="flex items-center justify-end gap-1.5">
+                          <input
+                            type="number"
+                            value={newLimitMb}
+                            onChange={(e) => setNewLimitMb(e.target.value)}
+                            className="w-20 px-2 py-1 bg-slate-50 border border-slate-300 rounded text-xs font-mono"
+                          />
+                          <button
+                            onClick={() => handleUpdateLimit(v.id)}
+                            disabled={updating}
+                            className="px-2 py-1 rounded bg-purple-600 text-white font-semibold text-xs"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={() => setEditingVendorId(null)}
+                            className="px-2 py-1 rounded text-slate-500 hover:bg-slate-100 text-xs"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            setEditingVendorId(v.id);
+                            setNewLimitMb(String(limitMb));
+                          }}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-purple-700 bg-purple-50 border border-purple-200 hover:bg-purple-100"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                          Modify Quota
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}

@@ -523,6 +523,7 @@ async def list_all_vendors(
             selectinload(PlatformVendor.profile),
             selectinload(PlatformVendor.store),
             selectinload(PlatformVendor.app_config),
+            selectinload(PlatformVendor.storage_usage),
         )
         .order_by(desc(PlatformVendor.created_at))
     )
@@ -585,6 +586,8 @@ async def list_all_vendors(
             custom_domain_enabled=s.custom_domain_enabled if s else False,
             shiprocket_enabled=s.shiprocket_enabled if s else False,
             whatsapp_alerts_enabled=s.whatsapp_alerts_enabled if s else False,
+            storage_used_mb=round((v.storage_usage.total_bytes_used if v.storage_usage else 0) / (1024 * 1024), 2),
+            storage_limit_mb=round((v.storage_usage.limit_bytes if v.storage_usage else 1073741824) / (1024 * 1024), 2),
             created_at=v.created_at,
         ))
     return items

@@ -101,6 +101,7 @@ from app.services.ai_image_studio import enhance_product_image_studio
 from app.config import get_settings
 from app.services.store_email_service import StoreEmailService
 from app.services.sms_service import SmsService
+from app.services.platform_storage import recalculate_and_save_vendor_storage
 
 router = APIRouter(prefix="/platform/vendor", tags=["Vendor Dashboard"])
 
@@ -138,8 +139,8 @@ async def get_vendor_overview(
     # Customers count
     c_total = (await db.execute(select(func.count(PlatformCustomer.id)).where(PlatformCustomer.vendor_id == vid))).scalar() or 0
 
-    # Storage
-    storage = current.vendor.storage_usage
+    # Storage — dynamically recalculate all database records, product photos, and media assets
+    storage = await recalculate_and_save_vendor_storage(db, vid)
     used_bytes = storage.total_bytes_used if storage else 0
     limit_bytes = storage.limit_bytes if storage else 1073741824
     storage_pct = round((used_bytes / limit_bytes) * 100, 2) if limit_bytes > 0 else 0.0
@@ -1357,14 +1358,8 @@ async def create_vendor_product(
             )
             db.add(var_record)
 
-    # Update vendor product count in storage record
-    await db.execute(
-        update(PlatformStorageUsage)
-        .where(PlatformStorageUsage.vendor_id == vid)
-        .values(product_count=PlatformStorageUsage.product_count + 1)
-    )
-
     await db.commit()
+    await recalculate_and_save_vendor_storage(db, vid)
 
     # Reload with relationships
     stmt = (
@@ -1546,6 +1541,7 @@ async def update_vendor_product(
         product.has_variants = has_variants_payload
 
     await db.commit()
+    await recalculate_and_save_vendor_storage(db, vid)
 
     # Reload product with variants
     stmt = (
@@ -1613,11 +1609,8 @@ async def delete_vendor_product(
         raise HTTPException(status_code=404, detail="Product not found or access denied")
 
     await db.delete(product)
-    storage_stmt = select(PlatformStorageUsage).where(PlatformStorageUsage.vendor_id == vid)
-    storage = (await db.execute(storage_stmt)).scalar_one_or_none()
-    if storage and storage.product_count > 0:
-        storage.product_count -= 1
     await db.commit()
+    await recalculate_and_save_vendor_storage(db, vid)
     return {"message": "Product deleted successfully"}
 
 
@@ -1657,6 +1650,7 @@ async def create_vendor_banner(
     )
     db.add(banner)
     await db.commit()
+    await recalculate_and_save_vendor_storage(db, current.vendor.id)
     await db.refresh(banner)
     return banner
 
@@ -1696,6 +1690,7 @@ async def delete_vendor_banner(
 
     await db.delete(banner)
     await db.commit()
+    await recalculate_and_save_vendor_storage(db, current.vendor.id)
     return {"message": "Banner deleted successfully"}
 
 
@@ -2360,6 +2355,7 @@ async def ai_import_confirm(
     ))
 
     await db.commit()
+    await recalculate_and_save_vendor_storage(db, vendor.id)
     await db.refresh(product)
 
     return {

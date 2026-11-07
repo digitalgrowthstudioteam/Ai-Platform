@@ -45,6 +45,8 @@ class VendorListItem(BaseModel):
     custom_domain_enabled: bool = False
     shiprocket_enabled: bool = False
     whatsapp_alerts_enabled: bool = False
+    storage_used_mb: float = 0.0
+    storage_limit_mb: float = 1024.0
     created_at: datetime
 
 

@@ -359,6 +359,8 @@ export interface VendorListItem {
   shiprocket_enabled?: boolean;
   whatsapp_alerts_enabled?: boolean;
   hyperlocal_enabled?: boolean;
+  storage_used_mb?: number;
+  storage_limit_mb?: number;
   created_at: string;
 }
 
