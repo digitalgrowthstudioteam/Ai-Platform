@@ -1311,12 +1311,14 @@ async def create_vendor_product(
     has_variants = bool(payload.variants and len(payload.variants) > 0)
     stock_qty = sum(v.stock_quantity for v in payload.variants) if has_variants else payload.stock_quantity
 
+    sanitized_desc = re.sub(r'(?i)\s*style=(["\']).*?\1', '', payload.description).strip() if payload.description else None
+
     product = PlatformProduct(
         vendor_id=vid,
         category_id=cat_id,
         name=payload.name.strip(),
         slug=prod_slug,
-        description=payload.description,
+        description=sanitized_desc,
         regular_price=payload.regular_price,
         sale_price=payload.sale_price,
         sku=payload.sku or f"SKU-{uuid.uuid4().hex[:6].upper()}",
@@ -1455,6 +1457,8 @@ async def update_vendor_product(
         product.category_id = cat_id
 
     for field, value in data.items():
+        if field == "description" and value:
+            value = re.sub(r'(?i)\s*style=(["\']).*?\1', '', str(value)).strip()
         if field == "name" and value:
             # Preserve existing slug if already present and name unchanged, or append unique salt if slugify is needed
             if not product.slug or slugify(product.name or "") != slugify(value):
@@ -2285,12 +2289,14 @@ async def ai_import_confirm(
     mrp_val = float(payload.mrp) if payload.mrp and float(payload.mrp) >= sell_price else sell_price
     first_image = payload.images[0] if payload.images else None
 
+    clean_desc = re.sub(r'(?i)\s*style=(["\']).*?\1', '', payload.description_html or "").strip()
+
     product = PlatformProduct(
         vendor_id=vendor.id,
         category_id=category.id,
         name=payload.title.strip(),
         slug=unique_slug,
-        description=payload.description_html or "",
+        description=clean_desc,
         regular_price=mrp_val,
         sale_price=sell_price,
         sku=f"{unique_slug[:8].upper()}",
@@ -2316,9 +2322,14 @@ async def ai_import_confirm(
 
     # 4. Add variants
     if payload.variants:
+        seen_skus = set()
         for idx, v in enumerate(payload.variants):
             v_name = v.get("name") or "Standard"
-            v_sku = f"{unique_slug[:6].upper()}-{slugify(v_name)[:6].upper()}"
+            v_suffix = v.get("sku_suffix") or slugify(v_name).replace("-", "")[:6].upper() or f"V{idx+1}"
+            if v_suffix in seen_skus:
+                v_suffix = f"{v_suffix[:4]}{idx+1}"
+            seen_skus.add(v_suffix)
+            v_sku = f"{unique_slug[:6].upper()}-{v_suffix}"
             v_price = float(v.get("price") or sell_price)
             v_stock = int(v.get("stock") or 50)
             db.add(PlatformProductVariant(

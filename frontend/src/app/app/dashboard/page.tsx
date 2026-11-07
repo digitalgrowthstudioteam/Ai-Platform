@@ -32,7 +32,8 @@ export default function VendorDashboardOverviewPage() {
       if (cached) {
         try {
           const parsed = JSON.parse(cached);
-          if (parsed?.stats) {
+          // Only use cache if it has realistic storage data (>0 bytes or explicitly cached recently)
+          if (parsed?.stats && (parsed.stats.storage_used_bytes > 0 || parsed.stats.total_products === 0)) {
             setOverview(parsed.stats);
             setRecentOrders(parsed.orders || []);
             setLoading(false);

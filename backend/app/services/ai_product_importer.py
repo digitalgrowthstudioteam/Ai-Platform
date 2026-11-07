@@ -33,6 +33,26 @@ BROWSER_HEADERS = {
 }
 
 
+def _generate_variant_sku_suffix(name: str, index: int = 0) -> str:
+    """Generate distinct, clean variant SKU suffix without collisions."""
+    if not name:
+        return f"V{index+1}"
+    # Look for size/capacity like 6.5kg, 7kg, 128gb, XL, 8UK, etc.
+    m_cap = re.search(r'(\d+(?:\.\d+)?\s*(?:kg|l|gb|tb|inch|uk|cm|m|g|ml))', name, re.I)
+    if m_cap:
+        return re.sub(r'[^a-zA-Z0-9]', '', m_cap.group(1)).upper()
+    m_sz = re.search(r'\b(xxs|xs|s|m|l|xl|xxl|3xl|4xl|5xl)\b', name, re.I)
+    if m_sz:
+        return m_sz.group(1).upper()
+    # Strip common noise words
+    words = [w for w in re.split(r'[^a-zA-Z0-9]+', name) if w and w.lower() not in ['non', 'wifi', 'default', 'title', 'option', 'selected', 'variant', 'with', 'and', 'for', 'the']]
+    if words:
+        cand = "".join(words)[:6].upper()
+        if cand:
+            return cand
+    return f"V{index+1}"
+
+
 def _extract_json_ld(soup: BeautifulSoup) -> List[dict]:
     """Extract all JSON-LD structured data blocks from page."""
     items = []
@@ -67,50 +87,60 @@ async def _scrape_shopify_json(url: str) -> Optional[Dict[str, Any]]:
     """Attempt direct Shopify JSON endpoint fetch, falling back to Next.js / Headless Shopify HTML parsing."""
     try:
         clean_url = url.split("?")[0].rstrip("/")
-        json_url = f"{clean_url}.json"
-        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True, headers=BROWSER_HEADERS) as client:
-            resp = await client.get(json_url)
-            if resp.status_code == 200 and "application/json" in resp.headers.get("content-type", ""):
-                data = resp.json()
-                if "product" in data:
-                    p = data["product"]
-                    title = p.get("title", "")
-                    brand = p.get("vendor", "")
-                    desc = p.get("body_html", "")
-                    raw_images = [img["src"] for img in p.get("images", []) if isinstance(img, dict) and "src" in img]
-                    
-                    variants = []
-                    for v in p.get("variants", []):
-                        v_title = v.get("title", "")
-                        if v_title and v_title.lower() != "default title":
-                            variants.append({
-                                "name": v_title,
-                                "sku_suffix": re.sub(r'[^a-zA-Z0-9]', '', v_title)[:6].upper() or "VAR",
-                                "price_diff": 0.0,
-                                "stock": v.get("inventory_quantity") or 50
-                            })
-                    
-                    price = 0.0
-                    mrp = 0.0
-                    if p.get("variants"):
-                        first_v = p["variants"][0]
-                        price = float(first_v.get("price") or 0.0)
-                        mrp = float(first_v.get("compare_at_price") or (price * 1.4 if price > 0 else 0.0))
+        # Try both direct URL and language-stripped URL (e.g. /en/products/... -> /products/...)
+        json_urls = [f"{clean_url}.json"]
+        clean_no_lang = re.sub(r'/[a-z]{2}(?:-[a-z]{2})?/products/', '/products/', clean_url)
+        if clean_no_lang != clean_url:
+            json_urls.append(f"{clean_no_lang}.json")
 
-                    return {
-                        "source_url": url,
-                        "raw_title": title,
-                        "raw_description": desc,
-                        "brand": brand,
-                        "price": price,
-                        "mrp": mrp if mrp > price else round(price * 1.5, 2),
-                        "images": raw_images[:10],
-                        "features": [],
-                        "specifications": {"Vendor": brand} if brand else {},
-                        "colors": [],
-                        "sizes": [],
-                        "variants": variants,
-                    }
+        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True, headers=BROWSER_HEADERS) as client:
+            for j_url in json_urls:
+                try:
+                    resp = await client.get(j_url)
+                    if resp.status_code == 200 and "application/json" in resp.headers.get("content-type", ""):
+                        data = resp.json()
+                        if "product" in data:
+                            p = data["product"]
+                            title = p.get("title", "")
+                            brand = p.get("vendor", "")
+                            desc = p.get("body_html", "")
+                            raw_images = [img["src"] for img in p.get("images", []) if isinstance(img, dict) and "src" in img]
+                            
+                            variants = []
+                            for idx, v in enumerate(p.get("variants", [])):
+                                v_title = v.get("title", "")
+                                if v_title and v_title.lower() != "default title":
+                                    variants.append({
+                                        "name": v_title,
+                                        "sku_suffix": _generate_variant_sku_suffix(v_title, idx),
+                                        "price_diff": 0.0,
+                                        "stock": v.get("inventory_quantity") or 50
+                                    })
+                            
+                            price = 0.0
+                            mrp = 0.0
+                            if p.get("variants"):
+                                first_v = p["variants"][0]
+                                price = float(first_v.get("price") or 0.0)
+                                mrp = float(first_v.get("compare_at_price") or (price * 1.4 if price > 0 else 0.0))
+
+                            if title:
+                                return {
+                                    "source_url": url,
+                                    "raw_title": title,
+                                    "raw_description": desc,
+                                    "brand": brand,
+                                    "price": price,
+                                    "mrp": mrp if mrp > price else round(price * 1.5, 2),
+                                    "images": raw_images[:10],
+                                    "features": [],
+                                    "specifications": {"Vendor": brand} if brand else {},
+                                    "colors": [],
+                                    "sizes": [],
+                                    "variants": variants,
+                                }
+                except Exception:
+                    pass
 
             # Fallback for Headless Shopify / Next.js Storefronts (e.g. Clinderma)
             html_resp = await client.get(url)
@@ -119,25 +149,62 @@ async def _scrape_shopify_json(url: str) -> Optional[Dict[str, Any]]:
                 soup = BeautifulSoup(html, "html.parser")
 
                 title = ""
-                og_t = soup.find("meta", property="og:title")
-                if og_t and og_t.get("content"):
-                    title = og_t.get("content").strip()
-                elif soup.title:
-                    title = soup.title.string.strip()
-                    title = re.sub(r'\s*[—|–-]\s*[A-Za-z0-9\s]+$', '', title)
+                # Priority 1: H1 header
+                h1 = soup.find("h1")
+                if h1 and len(h1.get_text(strip=True)) > 3 and not any(bad in h1.get_text().lower() for bad in ["denied", "robot", "error", "404", "online shopping"]):
+                    title = h1.get_text(strip=True)
+
+                # Priority 2: og:title
+                if not title:
+                    og_t = soup.find("meta", property="og:title")
+                    if og_t and og_t.get("content"):
+                        cand = og_t.get("content").strip()
+                        if not any(bad in cand.lower() for bad in ["online shopping", "access denied"]):
+                            title = cand
+
+                # Priority 3: Title tag (strip brand suffixes like — Clinderma)
+                if not title and soup.title:
+                    raw_title_str = soup.title.string.strip() if soup.title.string else ""
+                    cand = re.sub(r'\s*[—|–-]\s*[A-Za-z0-9\s]+$', '', raw_title_str).strip()
+                    if cand and not any(bad in cand.lower() for bad in ["online shopping", "access denied"]):
+                        title = cand
+
+                # Priority 4: Slug fallback
+                if not title or any(bad in title.lower() for bad in ["online shopping", "shopping site"]):
+                    m_slug = re.search(r"/products?/([a-zA-Z0-9_-]+)", clean_url)
+                    if m_slug:
+                        words = [w for w in m_slug.group(1).replace("-", " ").split() if w.lower() not in ["en", "product", "products"]]
+                        if words:
+                            title = " ".join(words).title()
 
                 selling_price = 0.0
-                m_price = re.search(r'\\?"amount\\?":\s*\\?"([\d.]+)\\?"', html)
+                m_price = re.search(r'["\\]+amount["\\]+\s*:\s*["\\]+([\d.]+)', html)
                 if not m_price:
-                    m_price = re.search(r'\"price\":\s*\"?([\d.]+)\"?', html)
+                    m_price = re.search(r'["\\]+price["\\]+\s*:\s*["\\]+([\d.]+)', html)
                 if m_price:
                     try:
                         selling_price = float(m_price.group(1))
                     except Exception:
                         pass
 
+                # HTML rendered price fallbacks (e.g. ₹<!-- -->1635 or Add to Cart - ₹1635)
+                if selling_price == 0.0:
+                    for pat in [
+                        r'Add to Cart\s*[-–—]?\s*₹?\s*([\d,]+(?:\.\d+)?)',
+                        r'₹\s*(?:<!--\s*-->)?\s*([\d,]+(?:\.\d+)?)',
+                    ]:
+                        m_html_p = re.search(pat, html, re.I)
+                        if m_html_p:
+                            try:
+                                p_cand = float(m_html_p.group(1).replace(",", ""))
+                                if 20 < p_cand < 500000:
+                                    selling_price = p_cand
+                                    break
+                            except Exception:
+                                pass
+
                 mrp = 0.0
-                m_mrp = re.search(r'compareAtPrice.*?\\?"amount\\?":\s*\\?"([\d.]+)\\?"', html)
+                m_mrp = re.search(r'compareAtPrice.*?["\\]+amount["\\]+\s*:\s*["\\]+([\d.]+)', html)
                 if m_mrp:
                     try:
                         mrp = float(m_mrp.group(1))
@@ -152,6 +219,14 @@ async def _scrape_shopify_json(url: str) -> Optional[Dict[str, Any]]:
                     clean = re.sub(r'_\d+x\d*\.', '.', img).split("?")[0]
                     if clean not in images and not any(skip in clean.lower() for skip in ['icon', 'logo', 'badge', 'payment', 'star', 'cart']):
                         images.append(clean)
+
+                # Unpack next/image CDN URLs
+                for m_next in re.finditer(r'/_next/image\?url=([^&"\'<>]+)', html):
+                    import urllib.parse
+                    unpacked = urllib.parse.unquote(m_next.group(1))
+                    if unpacked.startswith("http") and unpacked not in images:
+                        if not any(skip in unpacked.lower() for skip in ['icon', 'logo', 'badge', 'cart']):
+                            images.append(unpacked)
 
                 desc_meta = soup.find("meta", attrs={"name": "description"})
                 desc = desc_meta.get("content") if desc_meta else ""
@@ -380,7 +455,7 @@ async def _scrape_flipkart_specialized(soup: BeautifulSoup, html: str, url: str)
                             if v_n and v_n not in [x.get("name") for x in variants]:
                                 variants.append({
                                     "name": v_n,
-                                    "sku_suffix": re.sub(r'[^a-zA-Z0-9]', '', v_n)[:6].upper() or "VAR",
+                                    "sku_suffix": _generate_variant_sku_suffix(v_n, len(variants)),
                                     "price": p_v,
                                     "stock": 50
                                 })
@@ -542,12 +617,17 @@ async def _scrape_flipkart_specialized(soup: BeautifulSoup, html: str, url: str)
 
     # Calculate price_diff for variants relative to main selling price
     formatted_variants = []
-    for v in variants:
+    seen_skus = set()
+    for idx, v in enumerate(variants):
         v_price = v.get("price")
         diff = round(v_price - price, 2) if (v_price and price > 0) else 0.0
+        sku_cand = v.get("sku_suffix") or _generate_variant_sku_suffix(v["name"], idx)
+        if sku_cand in seen_skus:
+            sku_cand = f"{sku_cand[:5]}{idx+1}"
+        seen_skus.add(sku_cand)
         formatted_variants.append({
             "name": v["name"],
-            "sku_suffix": v["sku_suffix"],
+            "sku_suffix": sku_cand,
             "price_diff": diff,
             "stock": v.get("stock", 50)
         })
@@ -1088,12 +1168,25 @@ async def fetch_product_raw_data(url: str) -> Dict[str, Any]:
         title = soup.title.get_text(strip=True)
 
     # Slug fallback
-    if not title or title.lower() in ["amazon.in", "amazon", "online shopping", "flipkart", "flipkart.com", "meesho"]:
-        m = re.search(r"/(?:dp/)?([a-zA-Z0-9_-]{5,})/(?:dp/|[?#/]|$)", cleaned_url)
-        if m:
-            slug_cand = m.group(1).replace("-", " ").strip()
-            if len(slug_cand) > 3 and not slug_cand.startswith("B0"):
-                title = slug_cand
+    if not title or any(bad in title.lower() for bad in [
+        "online shopping", "shopping site", "flipkart", "amazon", "access denied", "robot check",
+        "just a moment", "security check", "404", "page not found", "itm store online"
+    ]):
+        slug_cand = None
+        for pat in [
+            r"/(?:dp/)?([a-zA-Z0-9_-]{5,})/(?:dp/|[?#/]|$)",
+            r"/products?/([a-zA-Z0-9_-]+)",
+            r"/([a-zA-Z0-9_-]+)(?:/p/|$|\?)"
+        ]:
+            m = re.search(pat, cleaned_url)
+            if m:
+                cand = m.group(1).replace("-", " ").strip()
+                words = [w for w in cand.split() if w.lower() not in ["en", "product", "products", "item", "itm", "p", "dp"]]
+                if words and not cand.startswith("B0"):
+                    slug_cand = " ".join(words).title()
+                    break
+        if slug_cand:
+            title = slug_cand
 
     # Deduplicate master image URLs
     clean_images = []
@@ -1255,8 +1348,25 @@ async def enhance_product_with_gemini(raw_data: Dict[str, Any]) -> Dict[str, Any
         "",
         clean_title
     ).strip()
-    if not clean_title:
-        clean_title = raw_t
+
+    # Reject generic marketplace placeholders and recover from URL slug
+    if not clean_title or any(bad in clean_title.lower() for bad in [
+        "online shopping", "shopping site", "flipkart", "amazon", "access denied", "robot check", "just a moment"
+    ]):
+        src_u = raw_data.get("source_url") or ""
+        for pat in [
+            r"/products?/([a-zA-Z0-9_-]+)",
+            r"/([a-zA-Z0-9_-]+)(?:/p/|$|\?)"
+        ]:
+            m = re.search(pat, src_u)
+            if m:
+                cand = m.group(1).replace("-", " ").strip()
+                words = [w for w in cand.split() if w.lower() not in ["en", "p", "dp", "itm", "product", "products"]]
+                if words:
+                    clean_title = " ".join(words).title()
+                    break
+        if not clean_title or any(bad in clean_title.lower() for bad in ["online shopping", "shopping site"]):
+            clean_title = "Imported Premium Product"
 
     bullet_items = "".join([f"<li>{f}</li>" for f in features])
     specs_rows = "".join([
@@ -1274,7 +1384,8 @@ async def enhance_product_with_gemini(raw_data: Dict[str, Any]) -> Dict[str, Any
     if specs_rows:
         desc_parts.append(f"<h4>Product Specifications:</h4><table><tbody>{specs_rows}</tbody></table>")
 
-    rich_desc_html = "".join(desc_parts)
+    # Clean semantic HTML only — strictly NEVER include inline style attributes
+    rich_desc_html = re.sub(r'(?i)\s*style=(["\']).*?\1', '', "".join(desc_parts))
     suggested_category = _infer_category(clean_title, f"{raw_desc} {' '.join(features)} {raw_data.get('source_url', '')}")
 
     # Attempt Gemini Enhancement if API Key configured

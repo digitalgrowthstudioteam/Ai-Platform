@@ -638,7 +638,12 @@ export default function KcAariWorkTheme({
                         </h3>
 
                         <p className="text-xs text-slate-500 mt-1 line-clamp-2 leading-relaxed">
-                          {p.description}
+                          {(p.description || "")
+                            .replace(/<[^>]+>/g, " ")
+                            .replace(/&nbsp;/gi, " ")
+                            .replace(/&[a-z]+;/gi, " ")
+                            .replace(/\s+/g, " ")
+                            .trim()}
                         </p>
                       </Link>
                     </div>

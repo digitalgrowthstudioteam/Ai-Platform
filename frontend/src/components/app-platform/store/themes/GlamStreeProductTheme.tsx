@@ -539,7 +539,14 @@ export default function GlamStreeProductTheme({
                 </button>
                 {activeAccordion === "details" && (
                   <div className="p-3.5 text-xs text-slate-600 leading-relaxed border-t border-slate-100 space-y-2">
-                    <p>{currentProduct.description}</p>
+                    {/<[a-z][\s\S]*>/i.test(currentProduct.description || "") ? (
+                      <div
+                        className="space-y-2 [&_p]:mb-2 [&_h4]:font-bold [&_h4]:text-slate-900 [&_h4]:mt-3 [&_h4]:mb-1.5 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:space-y-1 [&_li]:text-slate-600 [&_table]:w-full [&_table]:border-collapse [&_table]:my-2.5 [&_table]:text-xs [&_td]:p-2 [&_td]:border [&_td]:border-slate-200 [&_th]:p-2 [&_th]:border [&_th]:border-slate-200 [&_strong]:text-slate-900"
+                        dangerouslySetInnerHTML={{ __html: (currentProduct.description || "").replace(/style=(["']).*?\1/gi, "") }}
+                      />
+                    ) : (
+                      <p className="whitespace-pre-line">{currentProduct.description}</p>
+                    )}
                     <div className="grid grid-cols-2 gap-2 pt-1 text-[11px]">
                       <div><strong>Material:</strong> 5-Layer UV Cured Salon Gel</div>
                       <div><strong>Finish:</strong> {currentProduct.finish}</div>

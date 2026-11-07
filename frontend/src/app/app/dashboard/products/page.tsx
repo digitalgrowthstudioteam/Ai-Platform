@@ -249,7 +249,14 @@ export default function VendorProductsPage() {
                                 <ExternalLink className="w-3 h-3" />
                               </a>
                             </div>
-                            <p className="text-[11px] text-slate-400 truncate max-w-xs">{p.description}</p>
+                            <p className="text-[11px] text-slate-400 truncate max-w-xs">
+                              {(p.description || "")
+                                .replace(/<[^>]+>/g, " ")
+                                .replace(/&nbsp;/gi, " ")
+                                .replace(/&[a-z]+;/gi, " ")
+                                .replace(/\s+/g, " ")
+                                .trim() || "No description provided"}
+                            </p>
                           </div>
                         </div>
                       </td>
