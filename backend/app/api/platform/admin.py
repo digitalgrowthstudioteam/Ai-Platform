@@ -1857,6 +1857,7 @@ async def create_plan(
         yearly_price_inr=payload.yearly_price_inr if payload.yearly_price_inr is not None else (payload.monthly_price_inr * 10),
         setup_fee_inr=payload.setup_fee_inr,
         setup_fee_sale_price_inr=payload.setup_fee_sale_price_inr if payload.setup_fee_sale_price_inr is not None else 2000.0,
+        waive_setup_fee_yearly=payload.waive_setup_fee_yearly,
         storage_limit_mb=payload.storage_limit_mb,
         max_products=payload.max_products,
         is_active=payload.is_active,

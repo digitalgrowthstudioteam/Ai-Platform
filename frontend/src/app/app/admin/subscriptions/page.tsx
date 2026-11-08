@@ -34,8 +34,8 @@ export default function AdminSubscriptionsPage() {
     yearly_price_inr: "4990",
     setup_fee_inr: "10000",
     setup_fee_sale_price_inr: "2000",
-    storage_limit_mb: "1024",
-    max_products: "150",
+    storage_limit_gb: "1",
+    waive_setup_fee_yearly: false,
     is_active: true,
   });
   const [submitting, setSubmitting] = useState(false);
@@ -94,6 +94,12 @@ export default function AdminSubscriptionsPage() {
     loadCoupons();
   }, []);
 
+  const formatStorageGb = (mb: number) => {
+    if (!mb) return "1 GB";
+    const gb = mb / 1024;
+    return gb >= 1 ? `${gb % 1 === 0 ? gb.toFixed(0) : gb.toFixed(1)} GB` : `${mb} MB`;
+  };
+
   const openAdd = () => {
     setEditingPlan(null);
     setFormData({
@@ -103,8 +109,8 @@ export default function AdminSubscriptionsPage() {
       yearly_price_inr: "4990",
       setup_fee_inr: "10000",
       setup_fee_sale_price_inr: "2000",
-      storage_limit_mb: "1024",
-      max_products: "150",
+      storage_limit_gb: "1",
+      waive_setup_fee_yearly: false,
       is_active: true,
     });
     setIsModalOpen(true);
@@ -112,6 +118,7 @@ export default function AdminSubscriptionsPage() {
 
   const openEdit = (p: Plan) => {
     setEditingPlan(p);
+    const gbValue = (p.storage_limit_mb || 1024) / 1024;
     setFormData({
       name: p.name,
       slug: p.slug,
@@ -119,8 +126,8 @@ export default function AdminSubscriptionsPage() {
       yearly_price_inr: String(p.yearly_price_inr ?? p.monthly_price_inr * 10),
       setup_fee_inr: String(p.setup_fee_inr),
       setup_fee_sale_price_inr: String(p.setup_fee_sale_price_inr ?? 2000),
-      storage_limit_mb: String(p.storage_limit_mb),
-      max_products: String(p.max_products),
+      storage_limit_gb: String(gbValue % 1 === 0 ? gbValue.toFixed(0) : gbValue.toFixed(1)),
+      waive_setup_fee_yearly: Boolean(p.waive_setup_fee_yearly),
       is_active: p.is_active,
     });
     setIsModalOpen(true);
@@ -130,6 +137,8 @@ export default function AdminSubscriptionsPage() {
     e.preventDefault();
     setSubmitting(true);
     try {
+      const gbFloat = parseFloat(formData.storage_limit_gb) || 1;
+      const mbCalculated = Math.round(gbFloat * 1024);
       const payload: any = {
         name: formData.name,
         slug: formData.slug || formData.name.toLowerCase().replace(/[^a-z0-9]/g, "-"),
@@ -137,8 +146,9 @@ export default function AdminSubscriptionsPage() {
         yearly_price_inr: parseFloat(formData.yearly_price_inr || "4990"),
         setup_fee_inr: parseFloat(formData.setup_fee_inr),
         setup_fee_sale_price_inr: parseFloat(formData.setup_fee_sale_price_inr),
-        storage_limit_mb: parseInt(formData.storage_limit_mb, 10),
-        max_products: parseInt(formData.max_products, 10),
+        waive_setup_fee_yearly: formData.waive_setup_fee_yearly,
+        storage_limit_mb: mbCalculated,
+        max_products: 999999,
         is_active: formData.is_active,
       };
 
@@ -285,9 +295,11 @@ export default function AdminSubscriptionsPage() {
                       </div>
                       <div className="flex items-center gap-2 text-xs text-purple-700 font-bold">
                         <span>Yearly: ₹{p.yearly_price_inr ?? p.monthly_price_inr * 10}/yr</span>
-                        <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">
-                          Waives Setup Fee
-                        </span>
+                        {p.waive_setup_fee_yearly ? (
+                          <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">
+                            Waives Setup Fee
+                          </span>
+                        ) : null}
                       </div>
                     </div>
 
@@ -308,11 +320,11 @@ export default function AdminSubscriptionsPage() {
                   <div className="mt-4 space-y-2 text-xs text-slate-600">
                     <div className="flex items-center gap-2">
                       <HardDrive className="w-3.5 h-3.5 text-amber-500" />
-                      <span>{p.storage_limit_mb} MB Cloud Storage</span>
+                      <span>{formatStorageGb(p.storage_limit_mb)} Cloud Storage</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Package className="w-3.5 h-3.5 text-blue-500" />
-                      <span>Up to {p.max_products} Products</span>
+                      <span>Unlimited Products (Storage Based)</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Sparkles className="w-3.5 h-3.5 text-purple-500" />
@@ -526,8 +538,27 @@ export default function AdminSubscriptionsPage() {
                     onChange={(e) => setFormData({ ...formData, yearly_price_inr: e.target.value })}
                     className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl"
                   />
-                  <p className="text-[10px] text-emerald-600 font-semibold mt-0.5">Waives setup fee 100%</p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">Charged annually</p>
                 </div>
+              </div>
+
+              {/* Waive Setup Fee Toggle */}
+              <div className="p-3 rounded-xl bg-purple-50/80 border border-purple-200 flex items-center justify-between gap-3">
+                <div>
+                  <label htmlFor="waive_setup_fee_yearly" className="font-bold text-slate-900 text-xs block cursor-pointer">
+                    Waive Setup Fee on Yearly Plan?
+                  </label>
+                  <p className="text-[10px] text-slate-500 mt-0.5">
+                    Check to give ₹0 setup fee on annual billing. Leave unchecked if setup fee should still be charged.
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  id="waive_setup_fee_yearly"
+                  checked={formData.waive_setup_fee_yearly}
+                  onChange={(e) => setFormData({ ...formData, waive_setup_fee_yearly: e.target.checked })}
+                  className="w-4 h-4 text-purple-600 rounded cursor-pointer accent-purple-600 shrink-0"
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -555,26 +586,27 @@ export default function AdminSubscriptionsPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3 items-center">
                 <div>
-                  <label className="font-semibold text-slate-700 block mb-1">Storage Limit (MB)</label>
+                  <label className="font-semibold text-slate-700 block mb-1">Cloud CDN Storage (GB)</label>
                   <input
                     type="number"
+                    step="0.5"
+                    min="0.5"
                     required
-                    value={formData.storage_limit_mb}
-                    onChange={(e) => setFormData({ ...formData, storage_limit_mb: e.target.value })}
+                    value={formData.storage_limit_gb}
+                    onChange={(e) => setFormData({ ...formData, storage_limit_gb: e.target.value })}
                     className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl"
                   />
+                  <p className="text-[10px] text-slate-400 mt-0.5">e.g. 1 for 1 GB, 2 for 2 GB</p>
                 </div>
-                <div>
-                  <label className="font-semibold text-slate-700 block mb-1">Max Products</label>
-                  <input
-                    type="number"
-                    required
-                    value={formData.max_products}
-                    onChange={(e) => setFormData({ ...formData, max_products: e.target.value })}
-                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl"
-                  />
+                <div className="p-2.5 rounded-xl bg-blue-50 border border-blue-100 text-xs">
+                  <span className="font-bold text-blue-900 flex items-center gap-1">
+                    <Package className="w-3.5 h-3.5 text-blue-600" /> Unlimited Products
+                  </span>
+                  <p className="text-[10px] text-blue-700 mt-0.5">
+                    Catalog capacity is storage-based (no product limits).
+                  </p>
                 </div>
               </div>
 

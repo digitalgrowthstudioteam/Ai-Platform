@@ -73,6 +73,7 @@ async def lifespan(app: FastAPI):
                 "ALTER TABLE platform_vendor_app_configs ADD COLUMN IF NOT EXISTS is_locked BOOLEAN NOT NULL DEFAULT FALSE;",
                 "ALTER TABLE platform_plans ADD COLUMN IF NOT EXISTS setup_fee_sale_price_inr DOUBLE PRECISION NOT NULL DEFAULT 2000.0;",
                 "ALTER TABLE platform_plans ADD COLUMN IF NOT EXISTS yearly_price_inr DOUBLE PRECISION NOT NULL DEFAULT 4990.0;",
+                "ALTER TABLE platform_plans ADD COLUMN IF NOT EXISTS waive_setup_fee_yearly BOOLEAN NOT NULL DEFAULT FALSE;",
                 "ALTER TABLE platform_subscriptions ADD COLUMN IF NOT EXISTS setup_fee_waived BOOLEAN NOT NULL DEFAULT FALSE;",
                 "ALTER TABLE platform_subscriptions ADD COLUMN IF NOT EXISTS setup_fee_custom_price_inr DOUBLE PRECISION;",
                 "ALTER TABLE platform_subscriptions ADD COLUMN IF NOT EXISTS setup_fee_paid_at TIMESTAMP WITH TIME ZONE;",

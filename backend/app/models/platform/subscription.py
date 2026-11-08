@@ -20,8 +20,9 @@ class PlatformPlan(BaseModel):
     yearly_price_inr: Mapped[Optional[float]] = mapped_column(Float, nullable=True, default=4990.0)
     setup_fee_inr: Mapped[float] = mapped_column(Float, nullable=False, default=10000.0)
     setup_fee_sale_price_inr: Mapped[float] = mapped_column(Float, nullable=False, default=2000.0)
+    waive_setup_fee_yearly: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     storage_limit_mb: Mapped[int] = mapped_column(Integer, nullable=False, default=1024)
-    max_products: Mapped[int] = mapped_column(Integer, nullable=False, default=100)
+    max_products: Mapped[int] = mapped_column(Integer, nullable=False, default=999999)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     features_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
 

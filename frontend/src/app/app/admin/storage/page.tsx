@@ -79,7 +79,9 @@ export default function AdminStoragePage() {
                     <td className="py-3.5 px-4 font-semibold text-slate-700">{v.total_products} items</td>
                     <td className="py-3.5 px-4">
                       <div className="flex items-center gap-2">
-                        <span className="font-mono font-semibold text-slate-800">{usedMb.toFixed(1)} MB</span>
+                        <span className="font-mono font-semibold text-slate-800">
+                          {usedMb >= 1024 ? `${(usedMb / 1024).toFixed(2)} GB` : `${usedMb.toFixed(1)} MB`}
+                        </span>
                         <span className="text-[11px] text-slate-400">({pct}%)</span>
                       </div>
                       <div className="w-28 h-1.5 bg-slate-100 rounded-full overflow-hidden mt-1">
@@ -91,7 +93,9 @@ export default function AdminStoragePage() {
                         />
                       </div>
                     </td>
-                    <td className="py-3.5 px-4 font-mono font-bold text-slate-800">{limitMb.toLocaleString()} MB</td>
+                    <td className="py-3.5 px-4 font-mono font-bold text-slate-800">
+                      {limitMb >= 1024 ? `${(limitMb / 1024).toFixed(limitMb % 1024 === 0 ? 0 : 1)} GB` : `${limitMb} MB`}
+                    </td>
                     <td className="py-3.5 px-4 text-right">
                       {editingVendorId === v.id ? (
                         <div className="flex items-center justify-end gap-1.5">

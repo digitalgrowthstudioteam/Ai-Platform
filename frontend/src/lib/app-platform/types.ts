@@ -372,6 +372,7 @@ export interface Plan {
   yearly_price_inr?: number;
   setup_fee_inr: number;
   setup_fee_sale_price_inr?: number;
+  waive_setup_fee_yearly?: boolean;
   storage_limit_mb: number;
   max_products: number;
   is_active: boolean;

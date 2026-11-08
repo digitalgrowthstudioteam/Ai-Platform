@@ -34,6 +34,12 @@ import {
   Gift,
 } from "lucide-react";
 
+const formatStorageGb = (mb: number) => {
+  if (!mb) return "1 GB";
+  const gb = mb / 1024;
+  return gb >= 1 ? `${gb % 1 === 0 ? gb.toFixed(0) : gb.toFixed(1)} GB` : `${mb} MB`;
+};
+
 const FALLBACK_PLANS: Plan[] = [
   {
     id: "b8f38d9f-e1f9-49c9-b032-0ca958e00441",
@@ -43,8 +49,9 @@ const FALLBACK_PLANS: Plan[] = [
     yearly_price_inr: 4990,
     setup_fee_inr: 10000,
     setup_fee_sale_price_inr: 2000,
+    waive_setup_fee_yearly: false,
     storage_limit_mb: 1024,
-    max_products: 150,
+    max_products: 999999,
     is_active: true,
     features_json: "[]",
     created_at: new Date().toISOString(),
@@ -493,8 +500,8 @@ export default function PlatformHomePage() {
               }`}
             >
               <span>Yearly Billing</span>
-              <span className="bg-emerald-400 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider animate-pulse">
-                ₹0 Setup Fee • Save ₹2,000
+              <span className="bg-emerald-400 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
+                Save with Annual Billing • 2 Months Free
               </span>
             </button>
           </div>
@@ -590,7 +597,7 @@ export default function PlatformHomePage() {
                             </span>
                           </div>
                         </div>
-                      ) : (
+                      ) : p.waive_setup_fee_yearly ? (
                         <div className="p-3.5 rounded-2xl bg-emerald-950/60 border border-emerald-500/40">
                           <div className="flex items-center justify-between text-xs">
                             <span className="font-bold text-emerald-300 uppercase tracking-wider flex items-center gap-1.5">
@@ -606,6 +613,27 @@ export default function PlatformHomePage() {
                             <span className="text-xs text-slate-400 line-through">₹{originalSetup}</span>
                             <span className="text-[11px] text-emerald-200 font-semibold">
                               🎉 Setup Fee 100% Waived with Annual Plan
+                            </span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="p-3.5 rounded-2xl bg-purple-950/60 border border-purple-500/40">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="font-bold text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                              <CreditCard className="w-4 h-4 text-purple-400" />
+                              One-Time Setup Fee:
+                            </span>
+                            <span className="text-[10px] font-bold text-emerald-300 bg-emerald-500/20 px-2 py-0.5 rounded">
+                              Active Price (80% OFF)
+                            </span>
+                          </div>
+                          <div className="flex items-baseline gap-2 mt-1.5">
+                            <span className="text-2xl font-black text-amber-300">₹{saleSetup}</span>
+                            {originalSetup > saleSetup && (
+                              <span className="text-xs text-slate-400 line-through">₹{originalSetup}</span>
+                            )}
+                            <span className="text-[11px] text-slate-300">
+                              (One-time custom APK compilation & publishing)
                             </span>
                           </div>
                         </div>
@@ -650,14 +678,14 @@ export default function PlatformHomePage() {
                         <div className="flex items-start gap-2.5">
                           <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
                           <span>
-                            <strong>{p.storage_limit_mb} MB High-Speed Cloud CDN Storage</strong> — Fast-loading image hosting and asset management included.
+                            <strong>{formatStorageGb(p.storage_limit_mb)} High-Speed Cloud CDN Storage</strong> — Fast-loading image hosting and asset management included.
                           </span>
                         </div>
 
                         <div className="flex items-start gap-2.5">
                           <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
                           <span>
-                            <strong>Up to {p.max_products} Products in App Catalog</strong> — Manage variants, sizes, colors, and real-time inventory.
+                            <strong>Unlimited Products Catalog</strong> — Add and showcase as many products as your cloud storage allows (zero product count limits).
                           </span>
                         </div>
 

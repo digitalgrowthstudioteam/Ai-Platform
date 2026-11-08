@@ -289,8 +289,8 @@ export default function VendorSubscriptionPage() {
   const storage = data?.storage;
   const addons = data?.available_addons || [];
 
-  const storageUsedMb = storage ? (storage.total_bytes_used / (1024 * 1024)).toFixed(1) : "0";
-  const storageLimitMb = storage ? (storage.limit_bytes / (1024 * 1024)).toFixed(0) : "1024";
+  const storageUsedGb = storage ? (storage.total_bytes_used / (1024 * 1024 * 1024)).toFixed(2) : "0.00";
+  const storageLimitGb = storage ? (storage.limit_bytes / (1024 * 1024 * 1024)).toFixed(0) : "1";
 
   const isApkReadyForApproval =
     (appConfig?.app_build_status === "BUILT" || appConfig?.app_build_status === "PUBLISHED") &&
@@ -454,7 +454,7 @@ export default function VendorSubscriptionPage() {
             <span className="text-xs text-slate-400 block mb-1">Cloud Storage Usage</span>
             <p className="text-sm font-bold text-slate-900 flex items-center gap-1.5 font-mono">
               <HardDrive className="w-4 h-4 text-amber-600" />
-              {storageUsedMb} MB / {storageLimitMb} MB
+              {storageUsedGb} GB / {storageLimitGb} GB
             </p>
             <p className="text-[11px] text-slate-500 mt-1">{storage?.product_count || 0} products uploaded</p>
           </div>

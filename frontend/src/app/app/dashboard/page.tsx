@@ -90,8 +90,8 @@ export default function VendorDashboardOverviewPage() {
     );
   }
 
-  const storageUsedMb = overview ? (overview.storage_used_bytes / (1024 * 1024)).toFixed(1) : "0";
-  const storageLimitMb = overview ? (overview.storage_limit_bytes / (1024 * 1024)).toFixed(0) : "1024";
+  const storageUsedGb = overview ? (overview.storage_used_bytes / (1024 * 1024 * 1024)).toFixed(2) : "0.00";
+  const storageLimitGb = overview ? ((overview.storage_limit_bytes || 1073741824) / (1024 * 1024 * 1024)).toFixed(0) : "1";
 
   return (
     <div className="space-y-8">
@@ -154,8 +154,8 @@ export default function VendorDashboardOverviewPage() {
         />
         <StatCard
           title="Cloud Storage"
-          value={`${storageUsedMb} MB`}
-          subtitle={`Limit: ${storageLimitMb} MB (${overview?.storage_percentage || 0}%)`}
+          value={`${storageUsedGb} GB`}
+          subtitle={`Limit: ${storageLimitGb} GB (${overview?.storage_percentage || 0}%)`}
           icon={HardDrive}
           accentColor="text-amber-600 bg-amber-50"
         />
@@ -258,7 +258,7 @@ export default function VendorDashboardOverviewPage() {
                 />
               </div>
               <p className="text-[11px] text-slate-400">
-                {storageUsedMb} MB used of {storageLimitMb} MB limit
+                {storageUsedGb} GB used of {storageLimitGb} GB limit
               </p>
             </div>
           </div>

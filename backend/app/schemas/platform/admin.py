@@ -81,8 +81,9 @@ class PlanCreateOrUpdateRequest(BaseModel):
     yearly_price_inr: Optional[float] = 4990.0
     setup_fee_inr: float
     setup_fee_sale_price_inr: Optional[float] = 2000.0
+    waive_setup_fee_yearly: bool = False
     storage_limit_mb: int = 1024
-    max_products: int = 100
+    max_products: int = 999999
     is_active: bool = True
     features_json: Optional[str] = "[]"
 
@@ -95,6 +96,7 @@ class PlanResponse(BaseModel):
     yearly_price_inr: Optional[float] = 4990.0
     setup_fee_inr: float
     setup_fee_sale_price_inr: Optional[float] = 2000.0
+    waive_setup_fee_yearly: bool = False
     storage_limit_mb: int
     max_products: int
     is_active: bool
