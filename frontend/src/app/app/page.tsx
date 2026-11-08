@@ -474,7 +474,7 @@ export default function PlatformHomePage() {
             <span className="text-amber-300">Just ₹499 Today</span>
           </h2>
           <p className="text-sm sm:text-base text-slate-400 max-w-2xl mx-auto mt-3">
-            Choose monthly flexibility or unlock massive savings with annual billing. Go yearly to get <strong>100% Free Setup Fee (Save ₹2,000)</strong> + 2 months free!
+            Choose monthly flexibility or unlock special savings with annual billing and customized setup fee options.
           </p>
 
           {/* Interactive Monthly / Yearly Billing Toggle */}
@@ -501,7 +501,7 @@ export default function PlatformHomePage() {
             >
               <span>Yearly Billing</span>
               <span className="bg-emerald-400 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
-                Save with Annual Billing • 2 Months Free
+                Save with Annual Discount
               </span>
             </button>
           </div>
@@ -521,6 +521,9 @@ export default function PlatformHomePage() {
               const originalSetup = p.setup_fee_inr ?? 10000;
               const yearlyPrice = p.yearly_price_inr ?? p.monthly_price_inr * 10;
               const monthlyEquivalent = Math.round(yearlyPrice / 12);
+              const fullYearMonthlySum = p.monthly_price_inr * 12;
+              const annualSavings = Math.max(0, Math.round(fullYearMonthlySum - yearlyPrice));
+              const discountPercent = fullYearMonthlySum > 0 ? Math.round((annualSavings / fullYearMonthlySum) * 100) : 0;
               const isPopular = p.slug === "starter-store" || idx === 0;
 
               return (
@@ -565,9 +568,16 @@ export default function PlatformHomePage() {
                                 ₹{yearlyPrice}
                               </span>
                               <span className="text-sm font-semibold text-slate-400">/ yr</span>
+                              {fullYearMonthlySum > yearlyPrice && (
+                                <span className="text-xs text-slate-500 line-through ml-1">
+                                  ₹{fullYearMonthlySum}
+                                </span>
+                              )}
                             </div>
                             <span className="text-[11px] font-semibold text-purple-300 bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/20">
-                              Only ₹{monthlyEquivalent}/mo • 2 Months Free
+                              {annualSavings > 0
+                                ? `Only ₹${monthlyEquivalent}/mo • ₹${annualSavings} Discount (${discountPercent}% OFF)`
+                                : `Only ₹${monthlyEquivalent}/mo • Annual Billing`}
                             </span>
                           </>
                         )}
