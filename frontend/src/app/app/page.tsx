@@ -13,6 +13,7 @@ import {
   ArrowRight,
   CheckCircle2,
   ChevronRight,
+  ChevronLeft,
   Star,
   Play,
   CreditCard,
@@ -32,6 +33,8 @@ import {
   Send,
   HardDrive,
   Gift,
+  Menu,
+  X,
 } from "lucide-react";
 
 const formatStorageGb = (mb: number) => {
@@ -64,6 +67,10 @@ export default function PlatformHomePage() {
   const [plans, setPlans] = useState<Plan[]>(FALLBACK_PLANS);
   const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("monthly");
   const [plansLoading, setPlansLoading] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [bannerDismissed, setBannerDismissed] = useState(false);
+  const [currentBannerSlide, setCurrentBannerSlide] = useState(0);
+  const [isScrolled, setIsScrolled] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -89,105 +96,358 @@ export default function PlatformHomePage() {
     };
   }, []);
 
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentBannerSlide((prev) => (prev + 1) % 3);
+    }, 5500);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 20);
+    };
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
   const toggleFaq = (idx: number) => {
     setActiveFaq(activeFaq === idx ? null : idx);
   };
 
+  const minMonthlyPrice = plans.length > 0
+    ? Math.min(...plans.map((p) => p.monthly_price_inr))
+    : 499;
+
+  const minYearlyPrice = plans.length > 0
+    ? Math.min(...plans.map((p) => p.yearly_price_inr ?? p.monthly_price_inr * 10))
+    : 4990;
+
+  const maxSavingsPercent = plans.reduce((max, p) => {
+    const fullYear = p.monthly_price_inr * 12;
+    const yr = p.yearly_price_inr ?? p.monthly_price_inr * 10;
+    const pct = fullYear > 0 ? Math.round(((fullYear - yr) / fullYear) * 100) : 0;
+    return Math.max(max, pct);
+  }, 0);
+
+  const minSaleSetup = plans.length > 0
+    ? Math.min(...plans.map((p) => p.setup_fee_sale_price_inr ?? 2000))
+    : 2000;
+
+  const minOriginalSetup = plans.length > 0
+    ? Math.min(...plans.map((p) => p.setup_fee_inr ?? 10000))
+    : 10000;
+
+  const bannerSlides = [
+    {
+      id: "price",
+      badge: "LIMITED OFFER",
+      badgeClass: "bg-amber-400 text-slate-950 font-black",
+      content: (
+        <span>
+          Now start with your own official <strong>Branded Android App</strong> just for{" "}
+          <span className="font-extrabold text-amber-300 underline decoration-amber-400 decoration-2">
+            ₹{minMonthlyPrice}/mo today!
+          </span>
+        </span>
+      ),
+      ctaText: "Get Your Own App Today",
+      ctaLink: "/app/register",
+    },
+    {
+      id: "discount",
+      badge: "ANNUAL SAVINGS",
+      badgeClass: "bg-emerald-400 text-slate-950 font-black",
+      content: (
+        <span>
+          Save up to{" "}
+          <strong className="text-emerald-300">
+            {maxSavingsPercent > 0 ? `${maxSavingsPercent}% OFF` : "special discounts"}
+          </strong>{" "}
+          with Annual Billing + customized setup fee options!
+        </span>
+      ),
+      ctaText: "View Annual Plans",
+      ctaLink: "#pricing",
+    },
+    {
+      id: "instant",
+      badge: "0% COMMISSION",
+      badgeClass: "bg-indigo-400 text-slate-950 font-black",
+      content: (
+        <span>
+          <strong>Direct 1-Tap UPI Settlements</strong> + Unlimited Free Push Notifications on customer lock screens!
+        </span>
+      ),
+      ctaText: "Explore Features",
+      ctaLink: "#features",
+    },
+  ];
+
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col selection:bg-purple-500 selection:text-white">
       {/* ──────────────────────────────────────────────────────────── */}
-      {/* 1. TOP ANNOUNCEMENT BANNER */}
+      {/* STICKY HEADER (ANNOUNCEMENT BANNER + MODERN GLASS NAVIGATION) */}
       {/* ──────────────────────────────────────────────────────────── */}
-      <div className="bg-gradient-to-r from-purple-700 via-indigo-600 to-blue-600 text-white text-xs sm:text-sm font-medium py-2.5 px-4 text-center sticky top-0 z-50 shadow-md">
-        <div className="max-w-7xl mx-auto flex items-center justify-center gap-2 flex-wrap">
-          <span className="inline-flex items-center gap-1 bg-white/20 px-2 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider text-amber-200">
-            <Flame className="w-3 h-3 text-amber-300 animate-pulse" />
-            Limited Offer
-          </span>
-          <span>
-            Now start with your own official <strong>Branded Android App</strong> just for{" "}
-            <span className="underline decoration-amber-300 decoration-2 font-bold text-amber-200">
-              ₹499 today!
-            </span>
-          </span>
-          <Link
-            href="/app/register"
-            className="inline-flex items-center gap-1 font-bold underline underline-offset-4 hover:text-amber-200 transition-colors ml-1"
-          >
-            Get Your Own App Today <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
-        </div>
-      </div>
-
-      {/* ──────────────────────────────────────────────────────────── */}
-      {/* 2. MODERN GLASS NAVIGATION */}
-      {/* ──────────────────────────────────────────────────────────── */}
-      <nav className="border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-xl sticky top-[41px] z-40 transition-all">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-          {/* Logo */}
-          <Link href="/app" className="flex items-center gap-3 group">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-purple-500/25 group-hover:scale-105 transition-transform">
-              <Smartphone className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-extrabold text-lg sm:text-xl tracking-tight text-white">
-                  Digital Growth Studio
-                </span>
-                <span className="text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">
-                  Android App Engine
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-400 font-medium">Branded Android Apps for Businesses</p>
-            </div>
-          </Link>
-
-          {/* Desktop Nav Links */}
-          <div className="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-300">
-            <a href="#android-showcase" className="hover:text-white transition-colors flex items-center gap-1">
-              Android App
-              <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.2 rounded font-bold">New</span>
-            </a>
-            <a href="#features" className="hover:text-white transition-colors">Features</a>
-            <a href="#ai-importer" className="hover:text-white transition-colors">AI Importer</a>
-            <Link href="/app/demoapp" className="hover:text-purple-300 transition-colors flex items-center gap-1">
-              Live Demo App
-              <ArrowUpRight className="w-3.5 h-3.5 opacity-70" />
-            </Link>
-            <a href="#pricing" className="hover:text-amber-300 transition-colors">Pricing (₹499)</a>
-            <a href="#faq" className="hover:text-white transition-colors">FAQ</a>
-          </div>
-
-          {/* User Auth Buttons */}
-          <div className="flex items-center gap-3">
-            {user ? (
-              <Link
-                href={user.role === "SUPER_ADMIN" ? "/app/admin" : "/app/dashboard"}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-sm shadow-md shadow-purple-600/30 transition-all hover:scale-[1.02]"
+      <header className="sticky top-0 z-50 w-full transition-all">
+        {/* 1. TOP ANNOUNCEMENT BANNER (DYNAMIC & ROTATING TICKER) */}
+        {!bannerDismissed && (
+          <div className="bg-gradient-to-r from-purple-950 via-slate-950 to-indigo-950 border-b border-purple-500/20 text-white text-xs sm:text-sm font-medium py-2 px-3 sm:px-6 shadow-md backdrop-blur-md transition-all">
+            <div className="max-w-7xl mx-auto flex items-center justify-between gap-2">
+              {/* Prev Slide (Desktop) */}
+              <button
+                type="button"
+                onClick={() =>
+                  setCurrentBannerSlide((prev) => (prev - 1 + bannerSlides.length) % bannerSlides.length)
+                }
+                className="hidden md:flex p-1 rounded-md text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+                aria-label="Previous announcement"
               >
-                Go to Dashboard
-                <ArrowRight className="w-4 h-4" />
-              </Link>
-            ) : (
-              <>
-                <Link
-                  href="/app/login"
-                  className="hidden sm:inline-flex px-4 py-2 rounded-xl text-sm font-bold text-slate-300 hover:text-white transition-colors"
+                <ChevronLeft className="w-3.5 h-3.5" />
+              </button>
+
+              {/* Slide Content */}
+              <div className="flex-1 flex items-center justify-center gap-2 sm:gap-3 flex-wrap text-center overflow-hidden">
+                <span
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] tracking-wider uppercase shadow-xs ${bannerSlides[currentBannerSlide].badgeClass}`}
                 >
-                  Sign In
-                </Link>
+                  <Flame className="w-3 h-3 animate-pulse text-slate-950 fill-slate-950" />
+                  {bannerSlides[currentBannerSlide].badge}
+                </span>
+
+                <div className="transition-all duration-300">
+                  {bannerSlides[currentBannerSlide].content}
+                </div>
+
                 <Link
-                  href="/app/register"
-                  className="inline-flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-bold text-sm shadow-lg shadow-purple-600/25 transition-all hover:scale-[1.02]"
+                  href={bannerSlides[currentBannerSlide].ctaLink}
+                  className="inline-flex items-center gap-1 font-bold text-amber-300 hover:text-amber-200 underline underline-offset-4 decoration-amber-400/50 hover:decoration-amber-300 transition-all text-xs ml-1"
                 >
-                  <Smartphone className="w-4 h-4" />
-                  Get Your Own App Today
+                  <span>{bannerSlides[currentBannerSlide].ctaText}</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
                 </Link>
-              </>
-            )}
+              </div>
+
+              {/* Next Slide & Dismiss Controls */}
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCurrentBannerSlide((prev) => (prev + 1) % bannerSlides.length)
+                  }
+                  className="hidden md:flex p-1 rounded-md text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+                  aria-label="Next announcement"
+                >
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setBannerDismissed(true)}
+                  className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-white/10 transition-colors ml-0.5"
+                  aria-label="Dismiss banner"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
           </div>
-        </div>
-      </nav>
+        )}
+
+        {/* 2. MODERN GLASS NAVIGATION (CLEAN & DYNAMIC) */}
+        <nav
+          className={`border-b border-slate-800/80 transition-all ${
+            isScrolled
+              ? "bg-slate-950/95 shadow-xl shadow-purple-950/20 backdrop-blur-xl"
+              : "bg-slate-950/85 backdrop-blur-md"
+          }`}
+        >
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+            {/* Logo */}
+            <Link href="/app" className="flex items-center gap-3 group">
+              <div className="relative w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-blue-500 flex items-center justify-center shadow-lg shadow-purple-500/25 group-hover:scale-105 transition-all text-white">
+                <Smartphone className="w-5 h-5" />
+                <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-400 border-2 border-slate-950 rounded-full animate-pulse" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-extrabold text-lg sm:text-xl tracking-tight text-white group-hover:text-purple-200 transition-colors">
+                    Digital Growth Studio
+                  </span>
+                  <span className="hidden sm:inline-flex items-center gap-1.5 text-[10px] uppercase font-bold tracking-wider px-2.5 py-0.5 rounded-full bg-purple-500/15 text-purple-300 border border-purple-500/30">
+                    <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-ping" />
+                    App Engine
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 font-medium">Branded Android Apps for Businesses</p>
+              </div>
+            </Link>
+
+            {/* Desktop Nav Links */}
+            <div className="hidden lg:flex items-center gap-1 text-sm font-semibold text-slate-300">
+              <a
+                href="#android-showcase"
+                className="px-3 py-1.5 rounded-lg hover:text-white hover:bg-slate-800/60 transition-all flex items-center gap-1.5"
+              >
+                <span>Showcase</span>
+                <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.2 rounded font-bold border border-emerald-500/30">
+                  New
+                </span>
+              </a>
+              <a
+                href="#features"
+                className="px-3 py-1.5 rounded-lg hover:text-white hover:bg-slate-800/60 transition-all"
+              >
+                Features
+              </a>
+              <a
+                href="#ai-importer"
+                className="px-3 py-1.5 rounded-lg hover:text-white hover:bg-slate-800/60 transition-all"
+              >
+                AI Importer
+              </a>
+              <Link
+                href="/app/demoapp"
+                className="px-3 py-1.5 rounded-lg hover:text-purple-300 hover:bg-purple-950/40 transition-all flex items-center gap-1"
+              >
+                <span>Live Demo</span>
+                <ArrowUpRight className="w-3.5 h-3.5 opacity-70" />
+              </Link>
+              <a
+                href="#pricing"
+                className="px-3 py-1.5 rounded-lg hover:text-white hover:bg-slate-800/60 transition-all flex items-center gap-1.5 group"
+              >
+                <span>Pricing</span>
+                <span className="text-[10px] font-black text-amber-300 bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 rounded-md group-hover:bg-amber-500/25 transition-colors">
+                  from ₹{minMonthlyPrice}/mo
+                </span>
+              </a>
+              <a
+                href="#faq"
+                className="px-3 py-1.5 rounded-lg hover:text-white hover:bg-slate-800/60 transition-all"
+              >
+                FAQ
+              </a>
+            </div>
+
+            {/* User Auth Buttons + Mobile Hamburger */}
+            <div className="flex items-center gap-2 sm:gap-3">
+              {user ? (
+                <Link
+                  href={user.role === "SUPER_ADMIN" ? "/app/admin" : "/app/dashboard"}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-sm shadow-md shadow-purple-600/30 transition-all hover:scale-[1.02]"
+                >
+                  Go to Dashboard
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
+              ) : (
+                <>
+                  <Link
+                    href="/app/login"
+                    className="hidden sm:inline-flex px-3.5 py-2 rounded-xl text-sm font-bold text-slate-300 hover:text-white hover:bg-slate-800/60 transition-all"
+                  >
+                    Sign In
+                  </Link>
+                  <Link
+                    href="/app/register"
+                    className="inline-flex items-center gap-2 px-3.5 sm:px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-bold text-xs sm:text-sm shadow-lg shadow-purple-600/30 hover:shadow-purple-600/50 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                  >
+                    <Smartphone className="w-4 h-4" />
+                    <span>Get Your Own App Today</span>
+                  </Link>
+                </>
+              )}
+
+              {/* Mobile Hamburger Toggle Button */}
+              <button
+                type="button"
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="lg:hidden p-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800/80 transition-colors focus:outline-hidden"
+                aria-label="Toggle mobile menu"
+              >
+                {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              </button>
+            </div>
+          </div>
+
+          {/* Mobile Navigation Drawer */}
+          {mobileMenuOpen && (
+            <div className="lg:hidden border-t border-slate-800/80 bg-slate-950/98 backdrop-blur-2xl px-4 py-5 shadow-2xl">
+              <div className="flex flex-col gap-2">
+                <a
+                  href="#android-showcase"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="px-3 py-2.5 rounded-xl text-slate-200 hover:text-white hover:bg-slate-900 transition-all flex items-center justify-between font-semibold text-sm"
+                >
+                  <span>App Showcase</span>
+                  <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-bold border border-emerald-500/30">
+                    New
+                  </span>
+                </a>
+                <a
+                  href="#features"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="px-3 py-2.5 rounded-xl text-slate-200 hover:text-white hover:bg-slate-900 transition-all font-semibold text-sm"
+                >
+                  Features
+                </a>
+                <a
+                  href="#ai-importer"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="px-3 py-2.5 rounded-xl text-slate-200 hover:text-white hover:bg-slate-900 transition-all font-semibold text-sm"
+                >
+                  AI 1-Click Importer
+                </a>
+                <Link
+                  href="/app/demoapp"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="px-3 py-2.5 rounded-xl text-purple-300 hover:bg-purple-950/30 transition-all flex items-center justify-between font-semibold text-sm"
+                >
+                  <span>Live Demo App</span>
+                  <ArrowUpRight className="w-4 h-4 opacity-70" />
+                </Link>
+                <a
+                  href="#pricing"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="px-3 py-2.5 rounded-xl text-slate-200 hover:text-white hover:bg-slate-900 transition-all flex items-center justify-between font-semibold text-sm"
+                >
+                  <span>Pricing Plans</span>
+                  <span className="text-[10px] font-black text-amber-300 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded-full">
+                    from ₹{minMonthlyPrice}/mo
+                  </span>
+                </a>
+                <a
+                  href="#faq"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="px-3 py-2.5 rounded-xl text-slate-200 hover:text-white hover:bg-slate-900 transition-all font-semibold text-sm"
+                >
+                  Frequently Asked Questions
+                </a>
+
+                <div className="pt-3 border-t border-slate-800/80 mt-2 flex flex-col gap-2">
+                  {!user && (
+                    <Link
+                      href="/app/login"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="w-full text-center py-2.5 rounded-xl text-sm font-bold text-slate-300 hover:text-white bg-slate-900 border border-slate-800 transition-colors"
+                    >
+                      Sign In
+                    </Link>
+                  )}
+                  <Link
+                    href="/app/register"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 text-white font-extrabold text-sm shadow-lg shadow-purple-600/30 transition-all"
+                  >
+                    <Smartphone className="w-4 h-4" />
+                    <span>Get Your Own App Today — ₹{minMonthlyPrice}/mo</span>
+                  </Link>
+                </div>
+              </div>
+            </div>
+          )}
+        </nav>
+      </header>
 
       {/* ──────────────────────────────────────────────────────────── */}
       {/* 3. HERO SECTION (100% ANDROID APP FOCUS) */}
@@ -218,7 +478,7 @@ export default function PlatformHomePage() {
             <div className="mt-6 p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-purple-900/60 via-indigo-900/60 to-slate-800/60 border-2 border-purple-500/40 shadow-xl shadow-purple-950/50 backdrop-blur-md">
               <p className="text-lg sm:text-2xl font-black text-amber-300 tracking-tight flex items-center justify-center gap-2 flex-wrap">
                 <Flame className="w-6 h-6 text-amber-400 animate-bounce" />
-                Now start with your own Android App just for ₹499 today!
+                Now start with your own Android App just for ₹{minMonthlyPrice}/mo today!
               </p>
               <p className="text-xs sm:text-sm text-slate-300 mt-2 font-medium max-w-2xl mx-auto leading-relaxed">
                 Zero coding required. Get a production-ready, signed Android APK with your custom logo, colors, and catalog. Keep your brand on customers’ home screens, send unlimited free push notifications, and accept direct UPI payments with <strong>0% platform commission</strong>.
@@ -232,7 +492,7 @@ export default function PlatformHomePage() {
                 className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-8 py-4 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-extrabold text-base shadow-xl shadow-purple-600/30 transition-all hover:scale-105"
               >
                 <Smartphone className="w-5 h-5" />
-                <span>Get Your Own App Today — ₹499</span>
+                <span>Get Your Own App Today — ₹{minMonthlyPrice}/mo</span>
                 <ArrowRight className="w-5 h-5" />
               </Link>
               <Link
@@ -471,7 +731,7 @@ export default function PlatformHomePage() {
 
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight">
             Start With Your Own Android App for{" "}
-            <span className="text-amber-300">Just ₹499 Today</span>
+            <span className="text-amber-300">Just ₹{minMonthlyPrice} Today</span>
           </h2>
           <p className="text-sm sm:text-base text-slate-400 max-w-2xl mx-auto mt-3">
             Choose monthly flexibility or unlock special savings with annual billing and customized setup fee options.
@@ -881,12 +1141,12 @@ export default function PlatformHomePage() {
           <div className="space-y-4">
             {[
               {
-                q: "What is the One-Time Setup Fee and how do I get it waived?",
-                a: "The standard one-time setup fee for compiling, digitally signing, and configuring your Android APK is ₹2,000 (discounted from ₹10,000). If you choose the Yearly Subscription plan, the entire ₹2,000 setup fee is 100% WAIVED (₹0 setup fee)!",
+                q: "What is the One-Time Setup Fee and how does it work?",
+                a: `The standard one-time setup fee for compiling, digitally signing, and configuring your Android APK is ₹${minSaleSetup} (discounted from ₹${minOriginalSetup}). For select annual plans with the fee waiver enabled, the setup fee is 100% WAIVED (₹0 setup fee)!`,
               },
               {
-                q: "Is the Branded Android App really included for just ₹499/month?",
-                a: "Yes! For just ₹499/month, you receive your own official, customized Android Mobile Application (signed APK bundle) with your brand name, logo, colors, and live product catalog, alongside a vendor companion dashboard.",
+                q: `Is the Branded Android App really included for just ₹${minMonthlyPrice}/month?`,
+                a: `Yes! For just ₹${minMonthlyPrice}/month, you receive your own official, customized Android Mobile Application (signed APK bundle) with your brand name, logo, colors, and live product catalog, alongside a vendor companion dashboard.`,
               },
               {
                 q: "Do I need coding or technical knowledge to manage my app?",
@@ -948,7 +1208,7 @@ export default function PlatformHomePage() {
             Put Your Brand App on Every Customer’s Phone Today.
           </h2>
           <p className="text-sm sm:text-base text-slate-300 max-w-xl mx-auto mt-4 leading-relaxed">
-            Stop losing customers to marketplaces and browser tabs. Build lasting brand loyalty with your own official Android application starting at just ₹499 today.
+            Stop losing customers to marketplaces and browser tabs. Build lasting brand loyalty with your own official Android application starting at just ₹{minMonthlyPrice}/mo today.
           </p>
 
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -992,7 +1252,7 @@ export default function PlatformHomePage() {
             <Link href="/terms" className="hover:text-white transition-colors">Terms of Service</Link>
             <Link href="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>
             <Link href="/app/login" className="hover:text-white transition-colors">Merchant Login</Link>
-            <Link href="/app/register" className="hover:text-amber-300 font-bold transition-colors">Get Your Own App Today (₹499)</Link>
+            <Link href="/app/register" className="hover:text-amber-300 font-bold transition-colors">Get Your Own App Today (from ₹{minMonthlyPrice}/mo)</Link>
           </div>
         </div>
       </footer>
